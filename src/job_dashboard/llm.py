@@ -19,9 +19,9 @@ from .prompt_context import load_prompt_context
 class OpenRouterDocumentGenerator:
     """Generate grounded application documents with the configured OpenRouter model."""
 
-    def __init__(self, source_dir: str | Path, guidelines_dir: str | Path, model: str | None = None, api_key: str | None = None):
+    def __init__(self, source_dir: str | Path, guidelines_dir: str | Path, model: str | None = None, api_key: str | None = None, examples_dir: str | Path | None = None):
         self.source_dir = Path(source_dir)
-        self.context = load_prompt_context(source_dir, guidelines_dir)
+        self.context = load_prompt_context(source_dir, guidelines_dir, examples_dir=examples_dir)
         self.reference_style = """Use the attached reference examples and Shared Voice Guide as the writing and presentation standard. Write in Sam Ludwig's confident, plain-spoken, technically precise voice. Use action-led achievement bullets, accurate metrics, Australian spelling, clean title-case headings, and generous whitespace. Cover letters must be natural business letters without visible section labels or meta commentary."""
         self.model = model or os.environ.get("LLM_MODEL", "deepseek/deepseek-v4-flash-0731")
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")

@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--no-linkedin", action="store_true")
     parser.add_argument("--source-dir", type=Path, default=PROJECT_ROOT / "Source of truth")
     parser.add_argument("--guidelines-dir", type=Path, default=PROJECT_ROOT / "Guidelines")
+    parser.add_argument("--examples-dir", type=Path, default=PROJECT_ROOT / "data" / "Examples")
     args = parser.parse_args()
     profile = load_profile(args.profile)
     seek_enabled = os.getenv("SEEK_ENABLED", "1").lower() not in {"0", "false", "no"}
@@ -50,7 +51,7 @@ def main():
     sources.extend([AdzunaApiSource(), RemoteOkApiSource()])
     if not args.no_linkedin:
         sources.append(LinkedInBrowserSource())
-    generator = OpenRouterDocumentGenerator(args.source_dir, args.guidelines_dir)
+    generator = OpenRouterDocumentGenerator(args.source_dir, args.guidelines_dir, examples_dir=args.examples_dir)
     app = DashboardApp(profile, sources, args.data_dir, generator, DEFAULT_QUERIES)
     def synchronize():
         try:

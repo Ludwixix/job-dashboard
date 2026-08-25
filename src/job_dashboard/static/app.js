@@ -64,7 +64,16 @@ function ensureCriteriaPanel() {
     try {
       const response = await fetch('/api/search-criteria', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries})});
       const result = await response.json();
-      byId('criteria-status').textContent = response.ok ? `${result.queries.length} saved` : result.error || 'Save failed';
+      if (!response.ok) {
+        byId('criteria-status').textContent = result.error || 'Save failed';
+        return;
+      }
+      byId('criteria-status').textContent = `${result.queries.length} saved — refreshing jobs…`;
+      const jobsResponse = await fetch('/api/jobs');
+      if (!jobsResponse.ok) throw new Error('Unable to refresh jobs');
+      state.jobs = (await jobsResponse.json()).jobs;
+      render();
+      byId('criteria-status').textContent = `${result.queries.length} saved — jobs updated`;
     } catch (error) {
       byId('criteria-status').textContent = 'Save failed — dashboard unavailable';
     }

@@ -198,7 +198,6 @@ function render() {
       emailLink.href = job.email_url;
       emailLink.hidden = false;
     }
-    node.querySelector('.status').value = job.status || 'sourced';
     const tags = node.querySelector('.tags');
     for (const tag of job.matched_skills.slice(0, 5)) {
       const span = document.createElement('span');
@@ -467,12 +466,6 @@ byId('jobs').addEventListener('click', event => {
     card.classList.add('is-selected');
     renderPreview(job);
   }
-});
-byId('jobs').addEventListener('change', async event => {
-  if (!event.target.matches('.status')) return;
-  const card = event.target.closest('.job-card');
-  const job = state.jobs.find(item => item.id === card.dataset.jobId);
-  if (job) await fetch(`/api/jobs/${job.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: event.target.value }) });
 });
 byId('jobs').addEventListener('pointermove', event => {
   const card = event.target.closest('.job-card');

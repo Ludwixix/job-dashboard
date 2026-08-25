@@ -81,6 +81,28 @@ class DashboardApp:
         self.save_search_queries()
         return [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
 
+    def suggested_search_queries(self):
+        """Return search terms grounded in the candidate's experience and skills."""
+        profile = self.dashboard.profile
+        terms = []
+        seen = set()
+
+        def add(term, stream="core-it"):
+            term = str(term).strip()
+            if term and term.lower() not in seen:
+                seen.add(term.lower())
+                terms.append(SearchQuery(term, "Melbourne, VIC", stream))
+
+        for experience in profile.get("experience", []):
+            add(experience.get("title", ""))
+        for term in ("Microsoft 365 Administrator", "SharePoint Administrator", "SharePoint Developer", "Azure Administrator", "Entra ID Administrator", "Intune Administrator", "Endpoint Engineer", "PowerShell Automation Engineer", "ServiceNow Administrator", "Technical Support Engineer", "Infrastructure Consultant"):
+            add(term)
+        add("warehouse", "bridge")
+        add("casual work", "bridge")
+        add("data centre technician", "traineeship")
+        add("cabling technician", "traineeship")
+        return [{"term": query.term, "location": query.location, "stream": query.stream} for query in terms]
+
     def _load_generated_documents(self):
         path = self.data_dir / "generated_documents.json"
         if not path.exists():
@@ -410,6 +432,9 @@ def make_handler(app: DashboardApp):
                 return
             if path == "/api/search-criteria/defaults":
                 self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in DEFAULT_QUERIES]})
+                return
+            if path == "/api/search-criteria/suggestions":
+                self.send_json(200, {"queries": app.suggested_search_queries()})
                 return
             if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
                 job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")

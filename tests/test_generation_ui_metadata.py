@@ -105,3 +105,11 @@ def test_search_criteria_defaults_are_available():
     from job_dashboard.scrape_config import DEFAULT_QUERIES
 
     assert any(query.term == "systems administrator" for query in DEFAULT_QUERIES)
+
+
+def test_search_criteria_suggestions_include_experience_roles(tmp_path):
+    app = DashboardApp({"experience": [{"title": "SharePoint Developer"}]}, [], tmp_path)
+    suggestions = app.suggested_search_queries()
+
+    assert any(query["term"] == "SharePoint Developer" for query in suggestions)
+    assert any(query["term"] == "Azure Administrator" for query in suggestions)

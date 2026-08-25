@@ -54,7 +54,7 @@ function ensureCriteriaPanel() {
   if (byId('criteria-editor')) return;
   const panel = document.createElement('div');
   panel.className = 'side-group criteria';
-  panel.innerHTML = '<h2>Search criteria</h2><textarea id="criteria-editor" rows="6" placeholder="cloud engineer | core-it | Melbourne, VIC"></textarea><div class="criteria-actions"><button id="save-criteria">Save criteria</button><button id="default-criteria" type="button">Use defaults</button><button id="reset-criteria" type="button">Reset</button></div><span id="criteria-status" class="side-empty"></span>';
+  panel.innerHTML = '<h2>Search criteria</h2><textarea id="criteria-editor" rows="6" placeholder="cloud engineer | core-it | Melbourne, VIC"></textarea><div class="criteria-actions"><button id="save-criteria">Save criteria</button><button id="suggested-criteria" type="button">Suggest from experience</button><button id="default-criteria" type="button">Use defaults</button><button id="reset-criteria" type="button">Reset</button></div><span id="criteria-status" class="side-empty"></span>';
   byId('sidebar').insertBefore(panel, byId('highlights').closest('.side-group'));
   byId('save-criteria').addEventListener('click', async event => {
     const queries = byId('criteria-editor').value.split('\n').map(line => {
@@ -87,6 +87,12 @@ function ensureCriteriaPanel() {
     const result = await response.json();
     byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
     byId('criteria-status').textContent = 'Defaults loaded — click Save criteria to apply';
+  });
+  byId('suggested-criteria').addEventListener('click', async () => {
+    const response = await fetch('/api/search-criteria/suggestions');
+    const result = await response.json();
+    byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
+    byId('criteria-status').textContent = 'Experience-based suggestions loaded — click Save criteria to apply';
   });
   byId('reset-criteria').addEventListener('click', () => {
     byId('criteria-editor').value = '';

@@ -14,10 +14,9 @@ from urllib.parse import parse_qs, urlparse
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from .documents import generate_documents
 from .email_connector import GmailApiScanner, GmailScanner

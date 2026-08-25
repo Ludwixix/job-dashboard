@@ -54,7 +54,15 @@ Company: {job.company}
 Location: {job.location}
 Description: {job.description}
 
-Create a tailored CV/resume and cover letter using only verified candidate facts. Reorder and emphasise relevant evidence, but do not invent skills, dates, employers, qualifications, metrics, or licences. Use Australian spelling. Return the CV first, then exactly this separator on its own line: ===COVER_LETTER===, then the cover letter. Do not add commentary outside the documents. Candidate name: {personal.get('full_name', 'Candidate')}"""
+Create a polished, modern, ATS-friendly CV and a professional cover letter using only verified candidate facts.
+Use the attached guidelines as binding instructions. Tailor emphasis to the listing, but do not invent skills,
+dates, employers, qualifications, metrics, licences, or responsibilities. Use Australian spelling and natural,
+senior-professional wording. Do not include listing metadata, scratchpad notes, match commentary, or a target-role
+heading that is not appropriate for a CV. The CV must use clear headings, concise achievement-led bullets, and
+consistent date formatting. The cover letter must be 250-400 words, reference a specific detail from the listing,
+and avoid generic boilerplate. Return the CV first, then exactly this separator on its own line:
+===COVER_LETTER===
+Then return only the cover letter. Do not add commentary outside the documents. Candidate name: {personal.get('full_name', 'Candidate')}"""
         model = self.model.removeprefix("openrouter/")
         payload = {"model": model, "messages": [{"role": "system", "content": "You produce accurate, grounded job application documents."}, {"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 4000}
         request = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})

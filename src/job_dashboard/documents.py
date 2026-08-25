@@ -22,9 +22,12 @@ def generate_documents(job: Job, profile: Mapping[str, Any]) -> dict[str, str]:
     matched = set(audit.matched_skills)
     ranked = sorted(all_experience, key=lambda item: sum(skill in " ".join(item.get("achievements", [])).lower() for skill in matched), reverse=True)
     skills = [skill for skill in profile.get("technical_expertise", {}).values() for skill in skill]
+    # Keep the fallback output aligned with the canonical profile rather than
+    # copying wording from the job listing.
+    skills = [str(skill) for skill in skills if str(skill).strip()]
     skills_text = " · ".join(dict.fromkeys(skills))
     summary = profile.get("professional_summary", "").strip()
-    resume_lines = [f"# {name}", f"**{personal.get('title', 'Infrastructure & M365 Engineer')}**", contact, links, "", f"## Target Role", job.title, "", "## Professional Summary", summary, "", "## Core Skills", skills_text, "", "## Professional Experience"]
+    resume_lines = [f"# {name}", personal.get('title', 'Infrastructure & M365 Engineer'), contact, links, "", "## Target Role", job.title, "", "## Professional Summary", summary, "", "## Technical Expertise", skills_text, "", "## Professional Experience"]
     for experience in ranked:
         resume_lines.extend([f"### {experience.get('title', '')} | {experience.get('company', '')}", experience.get("period", ""), *[f"- {item}" for item in experience.get("achievements", [])], ""])
     resume_lines.extend(["## Certifications", *[f"- {item}" for item in profile.get("certifications", [])], "", "## Education", *[f"- {item}" for item in profile.get("education", [])], "", "## Additional Information", "Australian citizen · Unrestricted Australian work rights"])

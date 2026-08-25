@@ -22,6 +22,7 @@ class OpenRouterDocumentGenerator:
     def __init__(self, source_dir: str | Path, guidelines_dir: str | Path, model: str | None = None, api_key: str | None = None):
         self.source_dir = Path(source_dir)
         self.context = load_prompt_context(source_dir, guidelines_dir)
+        self.reference_style = """Use the attached reference examples and Shared Voice Guide as the writing and presentation standard. Write in Sam Ludwig's confident, plain-spoken, technically precise voice. Use action-led achievement bullets, accurate metrics, Australian spelling, clean title-case headings, and generous whitespace. Cover letters must be natural business letters without visible section labels or meta commentary."""
         self.model = model or os.environ.get("LLM_MODEL", "deepseek/deepseek-v4-flash-0731")
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
 
@@ -45,8 +46,11 @@ class OpenRouterDocumentGenerator:
         prompt = f"""Candidate profile JSON (verified facts only):
 {json.dumps(profile, ensure_ascii=False, indent=2)}
 
-Source of truth and writing guidelines:
+Source of truth and writing guidelines (Master Resume.md is authoritative):
 {self.context}
+
+Reference style standard:
+{self.reference_style}
 
 Target job:
 Title: {job.title}

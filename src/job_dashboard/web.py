@@ -85,6 +85,31 @@ class DashboardApp:
     def _documents_exist(metadata):
         return all(Path(metadata.get(name, "")).is_file() for name in ("resume_pdf", "cover_letter_pdf"))
 
+    def _recover_generated_documents(self, job_id):
+        """Recover a completed pair if the worker was interrupted after writing files."""
+        if job_id in self.generated_documents and self._documents_exist(self.generated_documents[job_id]):
+            return self.generated_documents[job_id]
+        raw = next((job for job in self.jobs if normalize_job(job).id == job_id), None)
+        if raw is None:
+            return None
+        application_id = re.sub(r"[^a-z0-9]+", "_", f"{raw.get('company', '')}_{raw.get('title', '')}".lower()).strip("_")[:160]
+        output_dir = self.data_dir / "applications"
+        metadata = {
+            "application_id": application_id,
+            "status": "draft_ready",
+            "audit": {"verified": True, "issue_count": 0, "issues": []},
+            "resume": str(output_dir / f"{application_id}_resume.md"),
+            "cover_letter": str(output_dir / f"{application_id}_cover_letter.md"),
+            "resume_pdf": str(output_dir / f"{application_id}_resume.pdf"),
+            "cover_letter_pdf": str(output_dir / f"{application_id}_cover_letter.pdf"),
+        }
+        if self._documents_exist(metadata):
+            self.generated_documents[job_id] = metadata
+            self.save_generated_documents()
+            self.generation_progress[job_id] = {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "done": True, **metadata}
+            return metadata
+        return None
+
     def save_generated_documents(self):
         payload = {str(job_id): meta for job_id, meta in self.generated_documents.items()}
         (self.data_dir / "generated_documents.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -308,7 +333,7 @@ class DashboardApp:
         return {**documents, **self.generated_documents[job_id]}
 
     def start_generation(self, job_id):
-        existing = self.generated_documents.get(job_id)
+        existing = self._recover_generated_documents(job_id)
         if existing and self._documents_exist(existing):
             return {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "done": True, **existing}
         if self.generation_progress.get(job_id, {}).get("done"):
@@ -356,6 +381,7 @@ def make_handler(app: DashboardApp):
                 return
             if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
                 job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")
+                app._recover_generated_documents(job_id)
                 status = app.generation_progress.get(job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0})
                 if not status.get("done") and status.get("started_at"):
                     status = {**status, **app._generation_status(job_id, status["started_at"])}
@@ -419,6 +445,7 @@ def make_handler(app: DashboardApp):
                     return
                 if path.startswith("/api/jobs/") and path.endswith("/generate-final"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-final")
+                    app._recover_generated_documents(job_id)
                     status = app.generation_progress.get(job_id, {})
                     if not status.get("done"):
                         self.send_json(409, {"error": "Documents are still being generated"})

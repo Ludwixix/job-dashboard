@@ -206,6 +206,13 @@ function render() {
           }
           return;
         }
+        if (status.progress >= 95 && Date.now() - (status.started_at * 1000) > 60000) {
+          generated.textContent = 'Generation timed out. Please try again.';
+          state.generating.delete(jobId);
+          event.target.disabled = false;
+          event.target.textContent = 'Generate CV + letter';
+          return;
+        }
         if (status.progress < 100) setTimeout(poll, 1200);
         else {
           state.generating.delete(jobId);

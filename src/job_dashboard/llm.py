@@ -39,12 +39,7 @@ class OpenRouterDocumentGenerator:
     def generate(self, job: Job, profile: Mapping[str, Any]) -> dict[str, Any]:
         key = self.api_key or self._config_key()
         if not key:
-            documents = generate_fallback(job, profile)
-            documents["audit"] = ContentLibrary(self.source_dir).validate_claims(
-                documents["resume"] + "\n" + documents["cover_letter"]
-            ) if self.source_dir.exists() else {"verified": True, "issue_count": 0, "issues": []}
-            documents["status"] = "draft_ready" if documents["audit"]["verified"] else "needs_review"
-            return documents
+            return self._fallback(job, profile)
         personal = profile.get("personal", {})
         prompt = f"""Candidate profile JSON (verified facts only):
 {json.dumps(profile, ensure_ascii=False, indent=2)}
@@ -67,6 +62,14 @@ Create a tailored CV/resume and cover letter using only verified candidate facts
         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         resume, cover, _ = split_documents(content)
         if not resume or not cover:
-            raise RuntimeError("LLM returned an invalid document pair")
+            return self._fallback(job, profile)
         audit = ContentLibrary(self.source_dir).validate_claims(resume + "\n" + cover) if self.source_dir.exists() else {"verified": True, "issue_count": 0, "issues": []}
         return {"resume": resume + "\n", "cover_letter": cover + "\n", "application_id": re.sub(r"[^a-z0-9]+", "_", f"{job.company}_{job.title}".lower()).strip("_")[:160], "audit": audit, "status": "draft_ready" if audit["verified"] else "needs_review"}
+
+    def _fallback(self, job: Job, profile: Mapping[str, Any]) -> dict[str, Any]:
+        documents = generate_fallback(job, profile)
+        documents["audit"] = ContentLibrary(self.source_dir).validate_claims(
+            documents["resume"] + "\n" + documents["cover_letter"]
+        ) if self.source_dir.exists() else {"verified": True, "issue_count": 0, "issues": []}
+        documents["status"] = "draft_ready" if documents["audit"]["verified"] else "needs_review"
+        return documents

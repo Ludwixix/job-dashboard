@@ -115,16 +115,15 @@ class DashboardApp:
 
     def _generation_status(self, job_id: str, started_at: float):
         elapsed = max(0.0, time.time() - started_at)
-        estimate = max(8.0, 18.0 - min(10.0, elapsed / 2.0))
-        if elapsed < 8:
-            pct = min(90, int((elapsed / 8.0) * 100))
-            phase = "Preparing profile"
-        elif elapsed < 14:
-            pct = min(96, int((elapsed / 14.0) * 100))
-            phase = "Tailoring documents"
+        estimate = max(8.0, 45.0 - int(elapsed))
+        if elapsed < 3:
+            pct, phase = 10, "Preparing profile"
+        elif elapsed < 8:
+            pct, phase = 25, "Calling OpenRouter"
+        elif elapsed < 45:
+            pct, phase = min(90, 25 + int((elapsed - 8) / 37 * 65)), "Tailoring documents"
         else:
-            pct = 100
-            phase = "Finalising"
+            pct, phase = 95, "Finalising response"
         return {"phase": phase, "estimate_seconds": round(estimate), "progress": pct, "started_at": started_at}
 
     def _load_jobs(self):
@@ -354,6 +353,8 @@ def make_handler(app: DashboardApp):
             if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
                 job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")
                 status = app.generation_progress.get(job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0})
+                if not status.get("done") and status.get("started_at"):
+                    status = {**status, **app._generation_status(job_id, status["started_at"])}
                 if status.get("done"):
                     status = {**status, "status": "done"}
                 self.send_json(200, status)

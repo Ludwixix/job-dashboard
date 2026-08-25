@@ -150,8 +150,18 @@ function render() {
         return;
       }
       const poll = async () => {
-        const statusResponse = await fetch(`/api/jobs/${jobId}/generate-status`);
-        const status = await statusResponse.json();
+        let statusResponse;
+        let status;
+        try {
+          statusResponse = await fetch(`/api/jobs/${jobId}/generate-status`);
+          status = await statusResponse.json();
+        } catch (error) {
+          state.generating.delete(jobId);
+          generated.textContent = 'Generation status unavailable. Please try again.';
+          event.target.disabled = false;
+          event.target.textContent = 'Generate CV + letter';
+          return;
+        }
         if (!statusResponse.ok) {
           generated.textContent = status.error || 'Unable to read generation status';
           event.target.disabled = false;
@@ -183,6 +193,11 @@ function render() {
           return;
         }
         if (status.progress < 100) setTimeout(poll, 1200);
+        else {
+          state.generating.delete(jobId);
+          event.target.disabled = false;
+          event.target.textContent = 'Generate CV + letter';
+        }
       };
       poll();
     });

@@ -46,10 +46,10 @@ class OpenRouterDocumentGenerator:
         prompt = f"""Candidate profile JSON (verified facts only):
 {json.dumps(profile, ensure_ascii=False, indent=2)}
 
-Source of truth and writing guidelines (Master Resume.md is authoritative):
+Career facts from Master Resume.md and formatting guidance from the reference examples:
 {self.context}
 
-Reference style standard:
+Reference formatting and style standard (do not copy the Master Resume layout):
 {self.reference_style}
 
 Target job:

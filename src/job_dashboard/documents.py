@@ -27,6 +27,8 @@ def generate_documents(job: Job, profile: Mapping[str, Any]) -> dict[str, str]:
     skills = [str(skill) for skill in skills if str(skill).strip()]
     skills_text = " · ".join(dict.fromkeys(skills))
     summary = profile.get("professional_summary", "").strip()
+    # The fallback uses the profile's facts, but its structure is deliberately
+    # independent of the Master Resume's source-document layout.
     resume_lines = [f"# {name}", personal.get('title', 'Infrastructure & M365 Engineer'), contact, links, "", "## Target Role", job.title, "", "## Professional Summary", summary, "", "## Technical Expertise", skills_text, "", "## Professional Experience"]
     for experience in ranked:
         resume_lines.extend([f"### {experience.get('title', '')} | {experience.get('company', '')}", experience.get("period", ""), *[f"- {item}" for item in experience.get("achievements", [])], ""])

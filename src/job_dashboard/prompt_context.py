@@ -20,6 +20,7 @@ def load_prompt_context(source_dir: str | Path, guidelines_dir: str | Path, max_
                 label = "Source of truth" if root == Path(source_dir) else root.name
                 sections.append(f"\n--- {label}/{path.relative_to(root)} ---\n{text}")
     context = "\n".join(sections)
-    return ("AUTHORITATIVE SOURCE RULE: Master Resume.md is the canonical source of career facts. "
-        "Use other source files only to clarify formatting; never introduce a fact absent from the Master Resume.\n"
+    return ("SOURCE RULE: Master Resume.md is the canonical source of career facts only. "
+        "Use the reference examples and guidelines for formatting, structure, tone, and wording. "
+        "Do not copy the Master Resume's layout or formatting. Never introduce a fact absent from the Master Resume.\n"
         + context)[:max_chars]

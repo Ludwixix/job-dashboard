@@ -50,7 +50,11 @@ class DashboardApp:
     def save_search_queries(self):
         payload = [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
         temporary = self.search_queries_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        with temporary.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
         temporary.replace(self.search_queries_path)
 
     def _load_search_queries(self, defaults=None):

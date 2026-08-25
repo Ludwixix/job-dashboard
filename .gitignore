@@ -7,5 +7,6 @@ client_secret_*.json
 gmail_token.json
 data/jobs.json
 data/jobs.sqlite3
+data/search_queries.json
 data/generated_documents.json
 data/applications/

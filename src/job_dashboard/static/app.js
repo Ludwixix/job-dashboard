@@ -13,12 +13,13 @@ byId('theme-toggle').addEventListener('click', event => {
 
 function filteredJobs() {
   const query = byId('search').value.toLowerCase();
+  const criteria = (byId('criteria-filter')?.value || '').toLowerCase();
   const stream = byId('stream').value;
   const source = byId('source').value;
   const minimum = Number(byId('minimum').value || 0);
   const jobs = state.jobs.filter(job => {
     const searchable = `${job.title} ${job.company} ${job.description} ${job.matched_skills.join(' ')}`.toLowerCase();
-    return (!query || searchable.includes(query)) && (!stream || job.stream === stream) &&
+    return (!query || searchable.includes(query)) && (!criteria || (job.tags || []).some(tag => tag.toLowerCase() === criteria)) && (!stream || job.stream === stream) &&
       (!source || job.source === source) && job.score >= minimum;
   });
   const sort = byId('sort')?.value || 'score';
@@ -27,6 +28,17 @@ function filteredJobs() {
     if (sort === 'newest') return String(right.posted || '').localeCompare(String(left.posted || ''));
     return (right.score || 0) - (left.score || 0);
   });
+}
+
+function updateCriteriaFilter() {
+  const selector = byId('criteria-filter');
+  if (!selector) return;
+  const current = selector.value;
+  selector.replaceChildren(new Option('All returned results', ''));
+  const excluded = ['indeed', 'seek', 'linkedin', 'adzuna', 'remoteok', 'core-it', 'bridge', 'traineeship'];
+  const terms = [...new Set(state.jobs.flatMap(job => job.tags || []).filter(tag => tag && !excluded.includes(tag.toLowerCase())))].sort();
+  for (const term of terms) selector.append(new Option(term, term));
+  selector.value = terms.includes(current) ? current : '';
 }
 
 function renderHighlights() {
@@ -155,6 +167,7 @@ function ensureRejectionArchive() {
 
 function render() {
   const jobs = filteredJobs();
+  updateCriteriaFilter();
   ensureCriteriaPanel();
   ensureRejectionArchive();
   renderCategoryCounts();
@@ -443,7 +456,7 @@ async function loadCriteria() {
   byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
 }
 
-for (const id of ['search', 'stream', 'source', 'minimum', 'sort']) byId(id).addEventListener('input', render);
+for (const id of ['search', 'stream', 'source', 'minimum', 'sort', 'criteria-filter']) byId(id)?.addEventListener('input', render);
 byId('jobs').addEventListener('click', event => {
   if (event.target.closest('button, a, select, label')) return;
   const card = event.target.closest('.job-card');

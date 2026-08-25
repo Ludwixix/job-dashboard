@@ -11,6 +11,6 @@ def test_prompt_context_loads_and_labels_both_document_sets(tmp_path):
     context = load_prompt_context(source, guidelines)
     assert "Guidelines/Voice.md" in context
     assert "Source of truth/Master Resume.md" in context
-    assert "Every file in Source of truth/ contains career facts" in context
-    assert "Do not copy any source-of-truth document's layout or formatting" in context
+    assert "Use every file in Source of truth/ as the factual data set" in context
+    assert "Use every file in Guidelines/ and its Examples/ as instructions" in context
     assert "verified experience" in context

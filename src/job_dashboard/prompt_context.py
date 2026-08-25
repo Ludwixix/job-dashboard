@@ -20,7 +20,8 @@ def load_prompt_context(source_dir: str | Path, guidelines_dir: str | Path, max_
                 label = "Source of truth" if root == Path(source_dir) else root.name
                 sections.append(f"\n--- {label}/{path.relative_to(root)} ---\n{text}")
     context = "\n".join(sections)
-    return ("SOURCE RULE: Every file in Source of truth/ contains career facts and may be used as factual source material. "
-        "Use the reference examples and Guidelines/ for formatting, structure, tone, and wording only. "
-        "Do not copy any source-of-truth document's layout or formatting. Never introduce a fact absent from Source of truth/.\n"
+    return ("GENERATION RULE: Use every file in Source of truth/ as the factual data set for the candidate's career. "
+        "Use every file in Guidelines/ and its Examples/ as instructions and references for constructing the resume "
+        "and cover letter: formatting, structure, tone, wording, tailoring, and presentation. "
+        "Guidelines control presentation; Source of truth controls facts. Never invent a fact.\n"
         + context)[:max_chars]

@@ -62,12 +62,13 @@
   </style>
   <style>
     /* Keep the listing cards readable beside the detail pane. */
-    .workspace{grid-template-columns:190px minmax(0,1fr) minmax(620px,1.45fr);gap:16px}
-    .jobs{display:grid;grid-template-columns:repeat(2,minmax(250px,1fr));gap:14px;align-content:start}
+    .workspace{grid-template-columns:190px minmax(0,1.05fr) minmax(760px,1.8fr);gap:24px;align-items:stretch}
+    .jobs{display:grid;grid-template-columns:repeat(2,minmax(280px,1fr));gap:18px;align-content:start}
     .job-card{min-width:0;width:100%;box-sizing:border-box;padding:18px;min-height:0;overflow:hidden}
     .job-card>*{min-width:0;max-width:100%}.job-card h2,.job-card p,.job-card .details{overflow-wrap:anywhere}.preview{min-width:0;width:100%;box-sizing:border-box}
-    .job-card .details{font-size:11px;margin-top:8px}.job-card>label{font-size:10px;margin-top:8px}.job-card>label select{padding:6px 8px;min-height:30px}.job-card .actions{padding-top:10px;margin-top:8px;gap:6px}.job-card .actions a,.job-card .actions button{padding:8px 10px;font-size:11px}.job-card .generated{font-size:10px;line-height:1.3}
-    @media(max-width:1180px){.workspace{grid-template-columns:170px minmax(0,1fr)}.preview{grid-column:2;position:relative;top:auto;max-height:none;min-height:0}.jobs{grid-template-columns:repeat(2,minmax(240px,1fr))}}
+    .job-card .details{font-size:11px;margin-top:8px}.job-card .actions{padding-top:10px;margin-top:8px;gap:6px}.job-card .actions a,.job-card .actions button{padding:8px 10px;font-size:11px}.job-card .generated{font-size:10px;line-height:1.3}.preview{position:sticky;top:16px;height:calc(100vh - 170px);min-height:600px;max-height:none}
+    @media(max-width:1400px){.workspace{grid-template-columns:170px minmax(0,1fr) minmax(560px,1.2fr)}.preview{height:calc(100vh - 170px);min-height:520px}.jobs{grid-template-columns:repeat(2,minmax(240px,1fr))}}
+    @media(max-width:1180px){.workspace{grid-template-columns:170px minmax(0,1fr)}.preview{grid-column:2;position:relative;top:auto;height:auto;max-height:none;min-height:0}.jobs{grid-template-columns:repeat(2,minmax(240px,1fr))}}
     @media(max-width:760px){.workspace{grid-template-columns:1fr}.preview{grid-column:auto}.jobs{grid-template-columns:1fr}}
   </style>
   <style>

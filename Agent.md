@@ -148,6 +148,9 @@ finished_at, listings_found, errors).
 - Treat every file under `Guidelines/` and `Guidelines/Examples/` as construction
   guidance. These files define the resume and cover-letter structure, formatting,
   tone, wording, tailoring approach, and professional presentation.
+- Treat every PDF and other file under `data/Examples/` as an additional resume-format
+  reference. Use these examples for layout, hierarchy, spacing, and presentation only;
+  never use them as a source of career facts.
 - Use the source-of-truth facts and guideline instructions together: Guidelines control
   how the document is written; Source of truth controls what may be claimed.
 - Generate documents locally through the configured OpenRouter model when available,

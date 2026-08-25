@@ -1,4 +1,5 @@
 from job_dashboard.web import DashboardApp
+from job_dashboard.sources import SearchQuery
 
 
 def test_generate_persists_downloadable_document_links(tmp_path):
@@ -60,3 +61,13 @@ def test_generated_documents_restore_only_when_files_exist(tmp_path):
 
     restored = DashboardApp({"personal": {}}, [], tmp_path)
     assert restored.generated_documents["job-3"]["application_id"] == "job-3-app"
+
+
+def test_search_criteria_persist_across_restart(tmp_path):
+    app = DashboardApp({}, [], tmp_path)
+    saved = app.update_search_queries([{"term": "azure engineer", "location": "Melbourne", "stream": "core-it"}])
+
+    restored = DashboardApp({}, [], tmp_path, search_queries=[SearchQuery("default", "", "bridge")])
+
+    assert saved == [{"term": "azure engineer", "location": "Melbourne", "stream": "core-it"}]
+    assert restored.search_queries[0].term == "azure engineer"

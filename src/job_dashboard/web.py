@@ -31,9 +31,7 @@ class DashboardApp:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_path = self.data_dir / "jobs.json"
         self.search_queries_path = self.data_dir / "search_queries.json"
-        self.search_queries = list(search_queries or [])
-        if self.search_queries_path.exists():
-            self.search_queries = [SearchQuery(**item) for item in json.loads(self.search_queries_path.read_text(encoding="utf-8"))]
+        self.search_queries = self._load_search_queries(search_queries)
         self.jobs: list[dict] = self._load_jobs()
         self.repository = JobRepository(self.data_dir / "jobs.sqlite3")
         self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
@@ -51,7 +49,18 @@ class DashboardApp:
 
     def save_search_queries(self):
         payload = [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
-        self.search_queries_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        temporary = self.search_queries_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(self.search_queries_path)
+
+    def _load_search_queries(self, defaults=None):
+        if not self.search_queries_path.exists():
+            return list(defaults or [])
+        try:
+            records = json.loads(self.search_queries_path.read_text(encoding="utf-8"))
+            return [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip()) for item in records if str(item.get("term", "")).strip()]
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return list(defaults or [])
 
     def update_search_queries(self, items):
         self.search_queries = [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip()) for item in items if str(item.get("term", "")).strip()]
@@ -296,6 +305,9 @@ class DashboardApp:
         return {**documents, **self.generated_documents[job_id]}
 
     def start_generation(self, job_id):
+        existing = self.generated_documents.get(job_id)
+        if existing and self._documents_exist(existing):
+            return {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "done": True, **existing}
         if self.generation_progress.get(job_id, {}).get("done"):
             return self.generation_progress[job_id]
         started_at = time.time()

@@ -1,4 +1,4 @@
-const state = { jobs: [] };
+const state = { jobs: [], generating: new Set() };
 const byId = id => document.getElementById(id);
 
 const savedTheme = localStorage.getItem('job-desk-theme');
@@ -134,6 +134,8 @@ function render() {
       generated.insertAdjacentHTML('beforeend', '<div class="status-pill warning">Needs fact review before use</div>');
     }
     generateButton.addEventListener('click', async event => {
+      if (job.generated && (job.generated.resume_pdf || job.generated.cover_letter_pdf || job.generated.application_id)) return;
+      state.generating.add(jobId);
       event.target.disabled = true;
       event.target.textContent = 'Generating...';
       generated.replaceChildren();
@@ -141,6 +143,7 @@ function render() {
       const initial = await fetch(`/api/jobs/${jobId}/generate`, { method: 'POST' });
       const queued = await initial.json();
       if (!initial.ok) {
+        state.generating.delete(jobId);
         generated.textContent = queued.error || 'Generation failed';
         event.target.disabled = false;
         event.target.textContent = 'Regenerate CV + letter';
@@ -158,6 +161,7 @@ function render() {
         generated.innerHTML = `<div class="status-pill">${status.phase || 'Preparing'} · ${status.progress || 0}% · est. ${status.estimate_seconds || 15}s</div>`;
         if (status.done) {
           if (status.failed) {
+            state.generating.delete(jobId);
             generated.textContent = status.error || 'Generation failed';
             event.target.disabled = false;
             event.target.textContent = 'Generate CV + letter';
@@ -167,9 +171,11 @@ function render() {
           const result = await finalResponse.json();
           if (finalResponse.ok) {
             job.generated = result;
+            state.generating.delete(jobId);
             attachLinks(result);
             setDownloadButton(result);
           } else {
+            state.generating.delete(jobId);
             generated.textContent = result.error || 'Generation failed';
             event.target.disabled = false;
             event.target.textContent = 'Regenerate CV + letter';
@@ -291,6 +297,7 @@ function renderPreview(job) {
 }
 
 async function load() {
+  if (state.generating.size) return;
   const response = await fetch('/api/jobs');
   state.jobs = (await response.json()).jobs;
   render();
@@ -299,6 +306,7 @@ async function load() {
 async function loadCriteria() {
   ensureCriteriaPanel();
   const response = await fetch('/api/search-criteria');
+  if (!response.ok) return;
   const result = await response.json();
   byId('criteria-editor').value = result.queries.map(query => [query.term, query.stream, query.location].join(' | ')).join('\n');
 }

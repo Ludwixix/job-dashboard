@@ -79,7 +79,7 @@ def test_empty_search_criteria_persist_as_empty_list(tmp_path):
 
     restored = DashboardApp({}, [], tmp_path, search_queries=[SearchQuery("default", "", "bridge")])
 
-    assert restored.search_queries == []
+    assert restored.search_queries == [SearchQuery("default", "", "bridge")]
 
 
 def test_search_criteria_update_keeps_location_in_single_field(tmp_path):

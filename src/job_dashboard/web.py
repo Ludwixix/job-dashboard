@@ -64,7 +64,8 @@ class DashboardApp:
             return list(defaults or [])
         try:
             records = json.loads(self.search_queries_path.read_text(encoding="utf-8"))
-            return [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip()) for item in records if str(item.get("term", "")).strip()]
+            loaded = [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip()) for item in records if str(item.get("term", "")).strip()]
+            return loaded or list(defaults or DEFAULT_QUERIES)
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return list(defaults or [])
 

@@ -99,3 +99,9 @@ def test_plain_search_term_does_not_gain_display_defaults(tmp_path):
     restored = DashboardApp({}, [], tmp_path)
 
     assert restored.search_queries[0].term == "help desk"
+
+
+def test_search_criteria_defaults_are_available():
+    from job_dashboard.scrape_config import DEFAULT_QUERIES
+
+    assert any(query.term == "systems administrator" for query in DEFAULT_QUERIES)

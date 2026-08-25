@@ -21,6 +21,7 @@ from .normalize import normalize_job
 from .service import JobDashboard
 from .sources import SearchQuery, ScrapePipeline, clean_description, is_recent, posted_age
 from .repository import JobRepository
+from .scrape_config import DEFAULT_QUERIES
 
 
 class DashboardApp:
@@ -406,6 +407,9 @@ def make_handler(app: DashboardApp):
                 return
             if path == "/api/search-criteria":
                 self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in app.search_queries]})
+                return
+            if path == "/api/search-criteria/defaults":
+                self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in DEFAULT_QUERIES]})
                 return
             if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
                 job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")

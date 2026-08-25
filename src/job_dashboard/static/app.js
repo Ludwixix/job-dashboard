@@ -149,8 +149,20 @@ function render() {
       const poll = async () => {
         const statusResponse = await fetch(`/api/jobs/${jobId}/generate-status`);
         const status = await statusResponse.json();
+        if (!statusResponse.ok) {
+          generated.textContent = status.error || 'Unable to read generation status';
+          event.target.disabled = false;
+          event.target.textContent = 'Generate CV + letter';
+          return;
+        }
         generated.innerHTML = `<div class="status-pill">${status.phase || 'Preparing'} · ${status.progress || 0}% · est. ${status.estimate_seconds || 15}s</div>`;
         if (status.done) {
+          if (status.failed) {
+            generated.textContent = status.error || 'Generation failed';
+            event.target.disabled = false;
+            event.target.textContent = 'Generate CV + letter';
+            return;
+          }
           const finalResponse = await fetch(`/api/jobs/${jobId}/generate-final`, { method: 'POST' });
           const result = await finalResponse.json();
           if (finalResponse.ok) {

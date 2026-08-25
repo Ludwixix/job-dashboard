@@ -302,8 +302,11 @@ class DashboardApp:
         self.generation_progress[job_id] = self._generation_status(job_id, started_at)
 
         def runner():
-            generated = self.generate(job_id)
-            status = {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "started_at": started_at, "done": True, **generated}
+            try:
+                generated = self.generate(job_id)
+                status = {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "started_at": started_at, "done": True, **generated}
+            except Exception as error:
+                status = {"phase": "Failed", "error": str(error), "estimate_seconds": 0, "progress": 100, "started_at": started_at, "done": True, "failed": True}
             self.generation_progress[job_id] = status
 
         thread = threading.Thread(target=runner, daemon=True)
@@ -335,6 +338,13 @@ def make_handler(app: DashboardApp):
                 return
             if path == "/api/search-criteria":
                 self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in app.search_queries]})
+                return
+            if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
+                job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")
+                status = app.generation_progress.get(job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0})
+                if status.get("done"):
+                    status = {**status, "status": "done"}
+                self.send_json(200, status)
                 return
             if path.startswith("/applications/"):
                 target = (app.data_dir / path.removeprefix("/applications/")).resolve()

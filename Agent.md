@@ -151,6 +151,16 @@ finished_at, listings_found, errors).
 - Treat every PDF and other file under `data/Examples/` as an additional resume-format
   reference. Use these examples for layout, hierarchy, spacing, and presentation only;
   never use them as a source of career facts.
+- The files currently in `data/Examples/` are the authoritative visual references for
+  resume formatting: `Sam Ludwig CV.pdf`, `SamLudwigResume.pdf`,
+  `SamLudwig_SeniorSystemsEngineer.pdf`, `Sam_Ludwig_CV_Clinical_Informatics.pdf`,
+  `Sam_Ludwig_CV_Women.pdf`, and `resume_paloalto_it_field_engineer.pdf`.
+- Before changing resume generation, inspect these PDFs and reproduce their clean,
+  professional hierarchy rather than relying on generic Markdown formatting. The PDF
+  renderer must produce a polished document, not a raw Markdown export: use proper
+  typography, whitespace, section hierarchy, aligned dates, readable bullets, and
+  page-break control. Do not include Markdown markers such as `#`, `**`, or `##` in
+  candidate-facing PDFs.
 - Use the source-of-truth facts and guideline instructions together: Guidelines control
   how the document is written; Source of truth controls what may be claimed.
 - Generate documents locally through the configured OpenRouter model when available,
@@ -197,6 +207,10 @@ For this workspace, the attached local directories are the defaults:
 - Save each generated resume with a reference back to which source documents and which
   job it was generated for, so a human reviewer can spot-check claims against the
   originals.
+
+Resume presentation is a separate concern from career facts. Build the resume from
+facts in `Source of truth/`, but follow the visual examples in `data/Examples/` for the
+rendered output. A plain concatenation of Markdown headings and text is not acceptable.
 
 **matching-agent:** on ingest, score each job 0–100 against the content-library fact base
 (not a static CV file) via OpenClaw, store the score plus a short rationale.

@@ -36,7 +36,8 @@ def test_gmail_scan_matches_existing_and_adds_unmatched(tmp_path, monkeypatch):
 
     assert result["matched"] == 1
     assert result["created"] == 1
-    assert any(job["source"] == "Gmail" for job in result["jobs"])
+    assert not any(job["source"] == "Gmail" for job in result["jobs"])
+    assert any(item["company"] == "Other Co" for item in app.application_archive())
 def test_rejected_applications_are_available_in_archive(tmp_path):
     app = DashboardApp({}, [], tmp_path)
     app.jobs = [{

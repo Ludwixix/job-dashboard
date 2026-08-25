@@ -230,6 +230,13 @@ class DashboardApp:
             archived.append({"id": job.id, "title": job.title, "company": job.company or "Company not identified", "received_at": latest.get("received_at", ""), "confidence": latest.get("confidence", 0), "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "description": job.description})
         return archived
 
+    def application_archive(self):
+        archive = []
+        for raw in self.jobs:
+            for event in raw.get("email_events", []):
+                archive.append({"title": raw.get("title", "Gmail application"), "company": raw.get("company", "Company not identified"), "category": event.get("category", "tracked"), "received_at": event.get("received_at", "")})
+        return archive
+
     def public_jobs(self, filters=None):
         filters = filters or {}
         stored = self.repository.list_jobs(**filters)
@@ -241,6 +248,8 @@ class DashboardApp:
             stored_job = stored_by_id[analysis.job.id]
             posted = next((job.get("posted", "") for job in self.jobs if job.get("id") == analysis.job.id or job.get("url") == analysis.job.url), "")
             raw = next((job for job in self.jobs if job.get("id") == analysis.job.id or job.get("url") == analysis.job.url), {})
+            if str(analysis.job.source).lower() == "gmail":
+                continue
             if stored_job.get("status") == "rejected" or not self._has_recent_activity(raw):
                 continue
             generated = raw.get("generated") or self.generated_documents.get(analysis.job.id)
@@ -431,6 +440,9 @@ def make_handler(app: DashboardApp):
                 return
             if path == "/api/rejections":
                 self.send_json(200, {"rejections": app.rejected_applications()})
+                return
+            if path == "/api/applications/archive":
+                self.send_json(200, {"applications": app.application_archive()})
                 return
             if path == "/api/search-criteria":
                 self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in app.search_queries]})

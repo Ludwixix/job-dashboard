@@ -110,7 +110,7 @@ function ensureRejectionArchive() {
   if (byId('rejection-archive')) return;
   const panel = document.createElement('div');
   panel.className = 'side-group rejection-archive';
-  panel.innerHTML = '<h2>Application archive</h2><button id="show-rejections">Rejected applications</button><div id="rejections" class="side-empty" hidden></div>';
+  panel.innerHTML = '<h2>Application archive</h2><button id="show-rejections">Rejected applications</button><button id="show-applications" type="button">All tracked applications</button><div id="rejections" class="side-empty" hidden></div>';
   byId('sidebar').insertBefore(panel, byId('highlights').closest('.side-group'));
   byId('show-rejections').addEventListener('click', async () => {
     const target = byId('rejections');
@@ -136,6 +136,20 @@ function ensureRejectionArchive() {
       }
       target.append(item);
     }
+  });
+  byId('show-applications').addEventListener('click', async () => {
+    const target = byId('rejections');
+    target.hidden = false;
+    target.textContent = 'Loading…';
+    const response = await fetch('/api/applications/archive');
+    const result = await response.json();
+    target.replaceChildren();
+    for (const application of result.applications) {
+      const item = document.createElement('p');
+      item.textContent = `${application.title} · ${application.company} · ${application.category}`;
+      target.append(item);
+    }
+    if (!result.applications.length) target.textContent = 'No tracked applications';
   });
 }
 

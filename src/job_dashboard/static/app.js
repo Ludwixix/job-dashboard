@@ -84,9 +84,43 @@ function ensureCriteriaPanel() {
   });
 }
 
+function ensureRejectionArchive() {
+  if (byId('rejection-archive')) return;
+  const panel = document.createElement('div');
+  panel.className = 'side-group rejection-archive';
+  panel.innerHTML = '<h2>Application archive</h2><button id="show-rejections">Rejected applications</button><div id="rejections" class="side-empty" hidden></div>';
+  byId('sidebar').insertBefore(panel, byId('highlights').closest('.side-group'));
+  byId('show-rejections').addEventListener('click', async () => {
+    const target = byId('rejections');
+    target.hidden = false;
+    target.textContent = 'Loading…';
+    const response = await fetch('/api/rejections');
+    const result = await response.json();
+    target.replaceChildren();
+    if (!result.rejections.length) {
+      target.textContent = 'No rejected applications';
+      return;
+    }
+    for (const rejection of result.rejections) {
+      const item = document.createElement('p');
+      item.textContent = `${rejection.title} · ${rejection.company}`;
+      if (rejection.email_url) {
+        const link = document.createElement('a');
+        link.href = rejection.email_url;
+        link.target = '_blank';
+        link.rel = 'noreferrer';
+        link.textContent = 'View email';
+        item.append(' ', link);
+      }
+      target.append(item);
+    }
+  });
+}
+
 function render() {
   const jobs = filteredJobs();
   ensureCriteriaPanel();
+  ensureRejectionArchive();
   renderCategoryCounts();
   renderHighlights();
   byId('count').textContent = `${jobs.length} job${jobs.length === 1 ? '' : 's'}`;

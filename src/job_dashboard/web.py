@@ -189,6 +189,19 @@ class DashboardApp:
     def analyses(self):
         return [self.dashboard.analyse(job) for job in self.jobs]
 
+    def rejected_applications(self):
+        """Return Gmail rejection records for a separate archive view."""
+        archived = []
+        for raw in self.jobs:
+            events = [event for event in raw.get("email_events", []) if event.get("category") == "rejected"]
+            if not events:
+                continue
+            job = normalize_job(raw)
+            latest = events[-1]
+            email_id = latest.get("email_id", "")
+            archived.append({"id": job.id, "title": job.title, "company": job.company or "Company not identified", "received_at": latest.get("received_at", ""), "confidence": latest.get("confidence", 0), "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "description": job.description})
+        return archived
+
     def public_jobs(self, filters=None):
         filters = filters or {}
         stored = self.repository.list_jobs(**filters)
@@ -387,6 +400,9 @@ def make_handler(app: DashboardApp):
                 return
             if path == "/api/metrics/summary":
                 self.send_json(200, app.repository.metrics())
+                return
+            if path == "/api/rejections":
+                self.send_json(200, {"rejections": app.rejected_applications()})
                 return
             if path == "/api/search-criteria":
                 self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in app.search_queries]})

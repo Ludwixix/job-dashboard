@@ -61,9 +61,13 @@ function ensureCriteriaPanel() {
       const [term, stream = 'core-it', location = 'Melbourne, VIC'] = line.split('|').map(value => value.trim());
       return {term, stream, location};
     }).filter(query => query.term);
-    const response = await fetch('/api/search-criteria', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries})});
-    const result = await response.json();
-    byId('criteria-status').textContent = response.ok ? `${result.queries.length} saved` : result.error || 'Save failed';
+    try {
+      const response = await fetch('/api/search-criteria', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries})});
+      const result = await response.json();
+      byId('criteria-status').textContent = response.ok ? `${result.queries.length} saved` : result.error || 'Save failed';
+    } catch (error) {
+      byId('criteria-status').textContent = 'Save failed — dashboard unavailable';
+    }
   });
 }
 
@@ -177,8 +181,18 @@ function render() {
             event.target.textContent = 'Generate CV + letter';
             return;
           }
-          const finalResponse = await fetch(`/api/jobs/${jobId}/generate-final`, { method: 'POST' });
-          const result = await finalResponse.json();
+          let finalResponse;
+          let result;
+          try {
+            finalResponse = await fetch(`/api/jobs/${jobId}/generate-final`, { method: 'POST' });
+            result = await finalResponse.json();
+          } catch (error) {
+            state.generating.delete(jobId);
+            generated.textContent = 'Generation finished but the result could not be loaded. Please refresh.';
+            event.target.disabled = false;
+            event.target.textContent = 'Generate CV + letter';
+            return;
+          }
           if (finalResponse.ok) {
             job.generated = result;
             state.generating.delete(jobId);

@@ -71,3 +71,12 @@ def test_search_criteria_persist_across_restart(tmp_path):
 
     assert saved == [{"term": "azure engineer", "location": "Melbourne", "stream": "core-it"}]
     assert restored.search_queries[0].term == "azure engineer"
+
+
+def test_empty_search_criteria_persist_as_empty_list(tmp_path):
+    app = DashboardApp({}, [], tmp_path, search_queries=[SearchQuery("default", "", "bridge")])
+    app.update_search_queries([])
+
+    restored = DashboardApp({}, [], tmp_path, search_queries=[SearchQuery("default", "", "bridge")])
+
+    assert restored.search_queries == []

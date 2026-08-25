@@ -4,6 +4,7 @@ import json
 import os
 import re
 import urllib.request
+import urllib.error
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -57,8 +58,11 @@ Create a tailored CV/resume and cover letter using only verified candidate facts
         model = self.model.removeprefix("openrouter/")
         payload = {"model": model, "messages": [{"role": "system", "content": "You produce accurate, grounded job application documents."}, {"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 4000}
         request = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
-        with urllib.request.urlopen(request, timeout=180) as response:
-            data = json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+            return self._fallback(job, profile)
         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         resume, cover, _ = split_documents(content)
         if not resume or not cover:

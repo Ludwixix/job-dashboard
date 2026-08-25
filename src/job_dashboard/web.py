@@ -6,6 +6,7 @@ import os
 import re
 import threading
 import time
+import textwrap
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -121,12 +122,15 @@ class DashboardApp:
         pdf.setFont("Helvetica", 10)
         lines = text.splitlines()
         y = 760
-        for line in lines:
-            if y < 40:
-                pdf.showPage()
-                y = 760
-            pdf.drawString(50, y, line[:120])
-            y -= 14
+        for source_line in lines:
+            line = source_line.replace("**", "")
+            wrapped = textwrap.wrap(line, width=100) or [""]
+            for line in wrapped:
+                if y < 40:
+                    pdf.showPage()
+                    y = 760
+                pdf.drawString(50, y, line)
+                y -= 14
         pdf.save()
 
     def _document_metadata(self, job_id, documents, output_dir):
@@ -144,15 +148,15 @@ class DashboardApp:
 
     def _generation_status(self, job_id: str, started_at: float):
         elapsed = max(0.0, time.time() - started_at)
-        estimate = max(8.0, 45.0 - int(elapsed))
+        estimate = 0
         if elapsed < 3:
-            pct, phase = 10, "Preparing profile"
+            pct, phase = 10, "Now generating"
         elif elapsed < 8:
-            pct, phase = 25, "Calling OpenRouter"
+            pct, phase = 25, "Now generating"
         elif elapsed < 45:
-            pct, phase = min(90, 25 + int((elapsed - 8) / 37 * 65)), "Tailoring documents"
+            pct, phase = min(90, 25 + int((elapsed - 8) / 37 * 65)), "Now generating"
         else:
-            pct, phase = 95, "Finalising response"
+            pct, phase = 95, "Now generating"
         return {"phase": phase, "estimate_seconds": round(estimate), "progress": pct, "started_at": started_at}
 
     def _load_jobs(self):

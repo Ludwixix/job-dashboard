@@ -143,9 +143,19 @@ function render() {
       event.target.disabled = true;
       event.target.textContent = 'Generating...';
       generated.replaceChildren();
-      generated.innerHTML = '<div class="status-pill">Estimating…</div>';
-      const initial = await fetch(`/api/jobs/${jobId}/generate`, { method: 'POST' });
-      const queued = await initial.json();
+      generated.innerHTML = '<div class="status-pill">Now generating…</div>';
+      let initial;
+      let queued;
+      try {
+        initial = await fetch(`/api/jobs/${jobId}/generate`, { method: 'POST' });
+        queued = await initial.json();
+      } catch (error) {
+        state.generating.delete(jobId);
+        generated.textContent = 'Generation failed — dashboard unavailable';
+        event.target.disabled = false;
+        event.target.textContent = 'Generate CV + letter';
+        return;
+      }
       if (!initial.ok) {
         state.generating.delete(jobId);
         generated.textContent = queued.error || 'Generation failed';
@@ -172,7 +182,7 @@ function render() {
           event.target.textContent = 'Generate CV + letter';
           return;
         }
-        generated.innerHTML = `<div class="status-pill">${status.phase || 'Preparing'} · ${status.progress || 0}% · est. ${status.estimate_seconds || 15}s</div>`;
+        generated.innerHTML = `<div class="status-pill">${status.done ? 'Generation complete' : 'Now generating…'}</div>`;
         if (status.done) {
           if (status.failed) {
             state.generating.delete(jobId);
@@ -198,6 +208,7 @@ function render() {
             state.generating.delete(jobId);
             attachLinks(result);
             setDownloadButton(result);
+            generated.insertAdjacentHTML('beforeend', '<div class="status-pill">Documents ready to download</div>');
           } else {
             state.generating.delete(jobId);
             generated.textContent = result.error || 'Generation failed';

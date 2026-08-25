@@ -140,9 +140,33 @@ finished_at, listings_found, errors).
 
 ## Phase 4 — Source-of-Truth Content, Matching, and Generation
 
+### User requirements for career documents
+
+- Treat every file under `Source of truth/` as a career-information wiki. It is the
+  factual data source for employment history, skills, achievements, dates, education,
+  certifications, and other career evidence. Do not treat its layout as a template.
+- Treat every file under `Guidelines/` and `Guidelines/Examples/` as construction
+  guidance. These files define the resume and cover-letter structure, formatting,
+  tone, wording, tailoring approach, and professional presentation.
+- Use the source-of-truth facts and guideline instructions together: Guidelines control
+  how the document is written; Source of truth controls what may be claimed.
+- Generate documents locally through the configured OpenRouter model when available,
+  with the local grounded fallback used only when the provider is unavailable.
+- Generated documents must be modern, ATS-friendly, professional, readable, and free of
+  scratchpad text, listing metadata, invented claims, clichés, emojis, and awkward
+  boilerplate. Cover letters must read as polished business letters.
+- Generated CVs and cover letters must be saved locally and remain downloadable after
+  the dashboard restarts. Existing files must be detected and reused rather than
+  forcing regeneration.
+
 **Config:** add two paths to the app config — `SOURCE_OF_TRUTH_DIR` (prior job/experience
 documents) and `GUIDELINES_DIR` (documents dictating structure/format/tone). Point these at
 your actual local folders; nothing in this pipeline should ever write to either folder.
+
+For this workspace, the attached local directories are the defaults:
+
+- `Source of truth/`
+- `Guidelines/`
 
 **content-library-agent** builds `services/content_library.py`:
 - Parses every file in `SOURCE_OF_TRUTH_DIR` (docx, pdf, md, txt — use the docx/pdf skills

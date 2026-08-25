@@ -105,6 +105,8 @@ def test_search_criteria_defaults_are_available():
     from job_dashboard.scrape_config import DEFAULT_QUERIES
 
     assert any(query.term == "systems administrator" for query in DEFAULT_QUERIES)
+    assert any(query.term == "Microsoft 365 Administrator" for query in DEFAULT_QUERIES)
+    assert any(query.term == "Endpoint Engineer" for query in DEFAULT_QUERIES)
 
 
 def test_search_criteria_suggestions_include_experience_roles(tmp_path):

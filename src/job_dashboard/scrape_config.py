@@ -18,4 +18,18 @@ DEFAULT_QUERIES = (
     SearchQuery("traineeship", stream="traineeship"),
     SearchQuery("data centre technician", stream="traineeship"),
     SearchQuery("cabling technician", stream="traineeship"),
+    # Closely related roles based on the candidate's M365, endpoint, identity,
+    # automation, and service-management experience.
+    SearchQuery("Microsoft 365 Administrator"),
+    SearchQuery("SharePoint Administrator"),
+    SearchQuery("SharePoint Developer"),
+    SearchQuery("Azure Administrator"),
+    SearchQuery("Entra ID Administrator"),
+    SearchQuery("Intune Administrator"),
+    SearchQuery("Endpoint Engineer"),
+    SearchQuery("Identity and Access Administrator"),
+    SearchQuery("PowerShell Automation Engineer"),
+    SearchQuery("ServiceNow Administrator"),
+    SearchQuery("Technical Support Engineer"),
+    SearchQuery("Infrastructure Consultant"),
 )

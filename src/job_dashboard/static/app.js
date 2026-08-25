@@ -16,10 +16,16 @@ function filteredJobs() {
   const stream = byId('stream').value;
   const source = byId('source').value;
   const minimum = Number(byId('minimum').value || 0);
-  return state.jobs.filter(job => {
+  const jobs = state.jobs.filter(job => {
     const searchable = `${job.title} ${job.company} ${job.description} ${job.matched_skills.join(' ')}`.toLowerCase();
     return (!query || searchable.includes(query)) && (!stream || job.stream === stream) &&
       (!source || job.source === source) && job.score >= minimum;
+  });
+  const sort = byId('sort')?.value || 'score';
+  return jobs.sort((left, right) => {
+    if (sort === 'title' || sort === 'company') return String(left[sort] || '').localeCompare(String(right[sort] || ''));
+    if (sort === 'newest') return String(right.posted || '').localeCompare(String(left.posted || ''));
+    return (right.score || 0) - (left.score || 0);
   });
 }
 
@@ -423,7 +429,7 @@ async function loadCriteria() {
   byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
 }
 
-for (const id of ['search', 'stream', 'source', 'minimum']) byId(id).addEventListener('input', render);
+for (const id of ['search', 'stream', 'source', 'minimum', 'sort']) byId(id).addEventListener('input', render);
 byId('jobs').addEventListener('click', event => {
   if (event.target.closest('button, a, select, label')) return;
   const card = event.target.closest('.job-card');

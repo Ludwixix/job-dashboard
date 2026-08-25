@@ -216,6 +216,7 @@ class DashboardApp:
     def rejected_applications(self):
         """Return Gmail rejection records for a separate archive view."""
         archived = []
+        seen = set()
         for raw in self.jobs:
             events = [event for event in raw.get("email_events", []) if event.get("category") == "rejected"]
             if not events:
@@ -223,6 +224,9 @@ class DashboardApp:
             job = normalize_job(raw)
             latest = events[-1]
             email_id = latest.get("email_id", "")
+            if email_id in seen:
+                continue
+            seen.add(email_id)
             archived.append({"id": job.id, "title": job.title, "company": job.company or "Company not identified", "received_at": latest.get("received_at", ""), "confidence": latest.get("confidence", 0), "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "description": job.description})
         return archived
 

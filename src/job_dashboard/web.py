@@ -68,7 +68,15 @@ class DashboardApp:
             return list(defaults or [])
 
     def update_search_queries(self, items):
-        self.search_queries = [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip()) for item in items if str(item.get("term", "")).strip()]
+        self.search_queries = [
+            SearchQuery(
+                str(item.get("term", "")).strip(),
+                str(item.get("location", "Melbourne, VIC")).strip() or "Melbourne, VIC",
+                str(item.get("stream", "core-it")).strip().lower() or "core-it",
+            )
+            for item in items
+            if str(item.get("term", "")).strip()
+        ]
         self.save_search_queries()
         return [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
 

@@ -58,7 +58,11 @@ function ensureCriteriaPanel() {
   byId('sidebar').insertBefore(panel, byId('highlights').closest('.side-group'));
   byId('save-criteria').addEventListener('click', async event => {
     const queries = byId('criteria-editor').value.split('\n').map(line => {
-      const [term, stream = 'core-it', location = 'Melbourne, VIC'] = line.split('|').map(value => value.trim());
+      const parts = line.split('|').map(value => value.trim()).filter(Boolean);
+      const term = parts[0] || '';
+      const streams = ['core-it', 'bridge', 'traineeship'];
+      const stream = streams.includes((parts[1] || '').toLowerCase()) ? parts[1].toLowerCase() : 'core-it';
+      const location = streams.includes((parts[1] || '').toLowerCase()) ? (parts[2] || 'Melbourne, VIC') : (parts[1] || 'Melbourne, VIC');
       return {term, stream, location};
     }).filter(query => query.term);
     try {

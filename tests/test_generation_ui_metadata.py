@@ -80,3 +80,14 @@ def test_empty_search_criteria_persist_as_empty_list(tmp_path):
     restored = DashboardApp({}, [], tmp_path, search_queries=[SearchQuery("default", "", "bridge")])
 
     assert restored.search_queries == []
+
+
+def test_search_criteria_update_keeps_location_in_single_field(tmp_path):
+    app = DashboardApp({}, [], tmp_path)
+    app.update_search_queries([{"term": "Melbourne", "location": "Melbourne, VIC", "stream": "core-it"}])
+
+    restored = DashboardApp({}, [], tmp_path)
+
+    assert restored.search_queries[0].term == "Melbourne"
+    assert restored.search_queries[0].location == "Melbourne, VIC"
+    assert restored.search_queries[0].stream == "core-it"

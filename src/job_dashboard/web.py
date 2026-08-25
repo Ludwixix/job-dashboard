@@ -7,12 +7,17 @@ import re
 import threading
 import time
 import textwrap
+from xml.sax.saxutils import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 from .documents import generate_documents
 from .email_connector import GmailApiScanner, GmailScanner
@@ -148,22 +153,45 @@ class DashboardApp:
         (self.data_dir / "generated_documents.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     def _write_pdf(self, output_path: Path, text: str):
-        pdf = canvas.Canvas(str(output_path), pagesize=letter)
-        pdf.setTitle(output_path.stem)
-        pdf.setAuthor("Local Job Desk")
-        pdf.setFont("Helvetica", 10)
-        lines = text.splitlines()
-        y = 760
-        for source_line in lines:
-            line = source_line.replace("**", "")
-            wrapped = textwrap.wrap(line, width=100) or [""]
-            for line in wrapped:
-                if y < 40:
-                    pdf.showPage()
-                    y = 760
-                pdf.drawString(50, y, line)
-                y -= 14
-        pdf.save()
+        styles = getSampleStyleSheet()
+        body = ParagraphStyle("DocumentBody", parent=styles["BodyText"], fontName="Helvetica", fontSize=9.5, leading=13, textColor=colors.HexColor("#26383a"), spaceAfter=5)
+        name = ParagraphStyle("DocumentName", parent=body, fontName="Helvetica-Bold", fontSize=21, leading=24, textColor=colors.HexColor("#123c42"), spaceAfter=2)
+        subtitle = ParagraphStyle("DocumentSubtitle", parent=body, fontSize=10.5, leading=14, textColor=colors.HexColor("#397078"), spaceAfter=3)
+        heading = ParagraphStyle("DocumentHeading", parent=body, fontName="Helvetica-Bold", fontSize=10.5, leading=14, textColor=colors.HexColor("#123c42"), spaceBefore=10, spaceAfter=5, keepWithNext=True)
+        role = ParagraphStyle("DocumentRole", parent=body, fontName="Helvetica-Bold", fontSize=10, leading=13, textColor=colors.HexColor("#26383a"), spaceBefore=6, spaceAfter=1, keepWithNext=True)
+        date = ParagraphStyle("DocumentDate", parent=body, fontSize=8.5, leading=11, textColor=colors.HexColor("#607477"), spaceAfter=3, keepWithNext=True)
+        bullet = ParagraphStyle("DocumentBullet", parent=body, leftIndent=10, firstLineIndent=-7, bulletIndent=0, spaceAfter=3)
+
+        story = []
+        lines = [line.strip() for line in text.replace("**", "").splitlines()]
+        for line in lines:
+            if not line:
+                story.append(Spacer(1, 3))
+                continue
+            if line.startswith("# "):
+                story.append(Paragraph(escape(line[2:].strip()), name))
+            elif line.startswith("## "):
+                story.append(Paragraph(escape(line[3:].strip()).upper(), heading))
+            elif line.startswith("### "):
+                story.append(Paragraph(escape(line[4:].strip()), role))
+            elif line.startswith("- ") or line.startswith("• "):
+                story.append(Paragraph(f"&bull; {escape(line[2:].strip())}", bullet))
+            elif re.fullmatch(r"(?:[A-Z][a-z]+ \d{4}|Present|\d{4})\s*[–-]\s*(?:[A-Z][a-z]+ \d{4}|Present|\d{4})", line):
+                story.append(Paragraph(escape(line), date))
+            else:
+                story.append(Paragraph(escape(line), body))
+
+        def footer(canvas, document):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.HexColor("#d4e2e2"))
+            canvas.line(20 * mm, 14 * mm, 190 * mm, 14 * mm)
+            canvas.setFont("Helvetica", 7.5)
+            canvas.setFillColor(colors.HexColor("#789093"))
+            canvas.drawRightString(190 * mm, 9 * mm, f"{document.page}")
+            canvas.restoreState()
+
+        document = SimpleDocTemplate(str(output_path), pagesize=letter, rightMargin=20 * mm, leftMargin=20 * mm, topMargin=16 * mm, bottomMargin=20 * mm, title=output_path.stem, author="Local Job Desk")
+        document.build(story, onFirstPage=footer, onLaterPages=footer)
 
     def _document_metadata(self, job_id, documents, output_dir):
         metadata = {

@@ -62,7 +62,7 @@ function ensureCriteriaPanel() {
       const term = parts[0] || '';
       const streams = ['core-it', 'bridge', 'traineeship'];
       const stream = streams.includes((parts[1] || '').toLowerCase()) ? parts[1].toLowerCase() : 'core-it';
-      const location = streams.includes((parts[1] || '').toLowerCase()) ? (parts[2] || 'Melbourne, VIC') : (parts[1] || 'Melbourne, VIC');
+      const location = streams.includes((parts[1] || '').toLowerCase()) ? (parts[2] || 'Melbourne, VIC') : (parts.length > 1 ? parts[1] : 'Melbourne, VIC');
       return {term, stream, location};
     }).filter(query => query.term);
     try {
@@ -402,7 +402,9 @@ async function loadCriteria() {
   const response = await fetch('/api/search-criteria');
   if (!response.ok) return;
   const result = await response.json();
-  byId('criteria-editor').value = result.queries.map(query => [query.term, query.stream, query.location].join(' | ')).join('\n');
+  // Keep the editor focused on the search terms. Stream and location use the
+  // backend defaults unless the optional pipe syntax is explicitly entered.
+  byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
 }
 
 for (const id of ['search', 'stream', 'source', 'minimum']) byId(id).addEventListener('input', render);

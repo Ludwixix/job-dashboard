@@ -91,3 +91,11 @@ def test_search_criteria_update_keeps_location_in_single_field(tmp_path):
     assert restored.search_queries[0].term == "Melbourne"
     assert restored.search_queries[0].location == "Melbourne, VIC"
     assert restored.search_queries[0].stream == "core-it"
+
+
+def test_plain_search_term_does_not_gain_display_defaults(tmp_path):
+    app = DashboardApp({}, [], tmp_path)
+    app.update_search_queries([{"term": "help desk"}])
+    restored = DashboardApp({}, [], tmp_path)
+
+    assert restored.search_queries[0].term == "help desk"

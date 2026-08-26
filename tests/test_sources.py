@@ -8,6 +8,8 @@ from job_dashboard.sources import (
     ScrapePipeline,
     deduplicate_jobs,
     is_recent,
+    normalize_posted_date,
+    posted_age,
 )
 
 
@@ -40,6 +42,15 @@ def test_recent_accepts_missing_and_iso_dates():
     assert not is_recent({"posted": "2026-07-01"}, now=now)
 
 
+def test_relative_seek_dates_are_normalized_and_age_checked():
+    now = datetime(2026, 8, 25, tzinfo=timezone.utc)
+    assert normalize_posted_date("28d ago", now) == "2026-07-28"
+    assert normalize_posted_date("2d ago", now) == "2026-08-23"
+    assert not is_recent({"posted": "28d ago"}, days=14, now=now)
+    assert is_recent({"posted": "2d ago"}, days=14, now=now)
+    assert posted_age("10d ago", now) == "Posted 10 days ago"
+
+
 def test_dedupe_merges_tags():
     result = deduplicate_jobs([
         {"title": "Role", "company": "Co", "url": "https://x", "source": "Indeed", "tags": ["one"]},
@@ -47,6 +58,15 @@ def test_dedupe_merges_tags():
     ])
     assert result[0]["source"] == "LinkedIn"
     assert result[0]["tags"] == ["one", "two"]
+
+
+def test_scrape_pipeline_tracks_source_health():
+    jobs = [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": "2026-08-24"}]
+    pipeline = ScrapePipeline([FakeSource(jobs)], days=14)
+    pipeline.run([SearchQuery("cloud")])
+    assert pipeline.source_health["fake"]["jobs"] == 1
+    assert pipeline.source_health["fake"]["queries"] == 1
+    assert pipeline.source_health["fake"]["success"] is True
 
 
 def test_adzuna_api_source_parses_results(monkeypatch):

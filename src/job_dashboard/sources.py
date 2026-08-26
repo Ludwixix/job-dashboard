@@ -12,6 +12,7 @@ from html.parser import HTMLParser
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Protocol
 
 
@@ -228,7 +229,8 @@ class SeekApiSource:
 
     def __init__(self, page_size: int = 22, timeout: float = 15.0, pause_seconds: float = 1.5,
                  max_pages: int = 3, max_results: int = 60, retries: int = 2,
-                 endpoint: str | None = None, allow_browser_fallback: bool = False):
+                 endpoint: str | None = None, allow_browser_fallback: bool = False,
+                 cache_path: str | Path | None = None, allow_cache_fallback: bool = False):
         self.page_size = max(1, min(100, page_size))
         self.timeout = timeout
         self.pause_seconds = max(0.0, pause_seconds)
@@ -237,20 +239,54 @@ class SeekApiSource:
         self.retries = max(0, min(3, retries))
         self.endpoint = endpoint or self.endpoint
         self.allow_browser_fallback = allow_browser_fallback
+        self.cache_path = Path(cache_path) if cache_path else None
+        self.allow_cache_fallback = allow_cache_fallback
 
     def search(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
+        failures = []
         try:
-            yield from self._search_api(query)
-            return
-        except SeekUnavailableError:
-            raise
+            records = list(self._search_api(query))
+            if records:
+                if self.allow_cache_fallback and len(records) < self.max_results:
+                    try:
+                        cached = list(self._search_cache(query))
+                        seen = {str(record.get("url") or record.get("id") or "") for record in records}
+                        records.extend(
+                            record for record in cached
+                            if str(record.get("url") or record.get("id") or "") not in seen
+                        )
+                    except Exception as cache_error:
+                        failures.append(f"cache supplement: {cache_error}")
+                yield from records
+                return
+            failures.append("API returned no jobs")
         except Exception as api_error:
-            if not self.allow_browser_fallback:
-                raise SeekUnavailableError(f"public API unavailable: {api_error}") from api_error
+            failures.append(f"API: {api_error}")
+
+        if self.allow_browser_fallback:
             try:
-                yield from self._search_browser(query)
+                records = list(self._search_browser(query))
+                if records:
+                    yield from records
+                    return
+                failures.append("browser returned no jobs")
             except Exception as browser_error:
-                raise SeekUnavailableError(f"API: {api_error}; browser fallback: {browser_error}") from browser_error
+                failures.append(f"browser: {browser_error}")
+
+        if self.allow_cache_fallback:
+            try:
+                records = list(self._search_cache(query))
+                if records:
+                    yield from records
+                    return
+                failures.append("cache returned no jobs")
+            except Exception as cache_error:
+                failures.append(f"cache: {cache_error}")
+
+        if not self.allow_browser_fallback and not self.allow_cache_fallback:
+            detail = failures[0] if failures else "API unavailable"
+            raise SeekUnavailableError(f"public API unavailable: {detail}")
+        raise SeekUnavailableError("; ".join(failures) or "all fallbacks are disabled")
 
     def _search_api(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         page = 0
@@ -334,6 +370,39 @@ class SeekApiSource:
             finally:
                 browser.close()
 
+    def _search_cache(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
+        if self.cache_path is None or not self.cache_path.is_file():
+            raise SeekUnavailableError("cache file not found")
+        try:
+            payload = json.loads(self.cache_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise SeekUnavailableError("cache file contains invalid JSON") from error
+        records = payload.get("jobs") if isinstance(payload, Mapping) else payload
+        if not isinstance(records, list):
+            raise SeekUnavailableError("cache format invalid: expected a jobs list")
+
+        term = query.term.casefold()
+        matched = []
+        for record in records:
+            if not isinstance(record, Mapping):
+                continue
+            searchable = " ".join(str(record.get(field) or "") for field in (
+                "title", "company", "location", "description", "tags"
+            )).casefold()
+            if term in searchable:
+                tags = record.get("tags") or []
+                if isinstance(tags, str):
+                    tags = [tags]
+                matched.append({
+                    **record,
+                    "source": "Seek",
+                    "tags": [*tags, query.term, "seek", query.stream],
+                    "application_route": record.get("url", ""),
+                })
+            if len(matched) >= self.max_results:
+                break
+        yield from matched
+
 
 def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
     identifier = str(job.get("id", "") or "")
@@ -343,6 +412,7 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
     url = f"https://www.seek.com.au/job/{identifier}" if identifier else ""
     work_types = job.get("workType") or []
     stable_id = identifier or re.sub(r"[^a-z0-9]+", "-", f"{job.get('title', '')}-{advertiser.get('description', '')}".lower()).strip("-")
+    raw_posted = job.get("listingDate") or job.get("listedDate") or job.get("date") or job.get("created") or job.get("publishedAt") or ""
     return {
         "id": f"seek-{stable_id}" if stable_id else "",
         "title": job.get("title", ""),
@@ -351,7 +421,7 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
         "description": clean_description(job.get("teaser", "")),
         "url": url,
         "source": "Seek",
-        "posted": str(job.get("listingDate", "") or "")[:10],
+        "posted": normalize_posted_date(raw_posted),
         "remote": any(str(item.get("label", "")).lower() == "remote" for item in work_types),
         "tags": [query.term, "seek", query.stream],
         "application_route": url,
@@ -444,38 +514,90 @@ def _linkedin_description(page: Any, record: dict[str, Any]) -> str:
         return ""
 
 
+def normalize_posted_date(value: Any, now: datetime | None = None) -> str:
+    """Convert raw provider dates into a canonical ISO date string.
+
+    This supports ISO timestamps, YYYY-MM-DD dates, and provider-relative strings
+    like '28d ago', '2w ago', or '3h ago'.
+    """
+    text = str(value or "").strip()
+    if not text or text.lower() in {"null", "none", "n/a", "na"}:
+        return ""
+
+    current = now or datetime.now(timezone.utc)
+    lower = text.lower()
+
+    relative_match = re.search(r"(?i)\b(?P<number>\d+)\s*(?P<unit>d|day|days|w|week|weeks|m|month|months|h|hr|hrs|hour|hours|min|mins|minute|minutes)\s*ago\b", text)
+    if relative_match:
+        number = int(relative_match.group("number"))
+        unit = relative_match.group("unit").lower()
+        if unit.startswith("w"):
+            delta = timedelta(weeks=number)
+        elif unit.startswith("m") and unit not in {"min", "mins", "minute", "minutes"}:
+            delta = timedelta(days=number * 30)
+        elif unit.startswith("h"):
+            delta = timedelta(hours=number)
+        elif unit.startswith("min"):
+            delta = timedelta(minutes=number)
+        else:
+            delta = timedelta(days=number)
+        posted = current - delta
+        return posted.date().isoformat()
+
+    if lower in {"today", "yesterday"}:
+        posted = current - timedelta(days=1 if lower == "yesterday" else 0)
+        return posted.date().isoformat()
+
+    for candidate in (text, text[:10]):
+        try:
+            posted = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+            if posted.tzinfo is None:
+                posted = posted.replace(tzinfo=timezone.utc)
+            return posted.astimezone(timezone.utc).date().isoformat()
+        except ValueError:
+            pass
+
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            posted = datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            return posted.date().isoformat()
+        except ValueError:
+            pass
+
+    return ""
+
+
 def is_recent(job: Mapping[str, Any], days: int = 14, now: datetime | None = None) -> bool:
-    value = str(job.get("posted", "") or "")
-    if not value:
+    value = job.get("posted", "")
+    normalized = normalize_posted_date(value, now)
+    if not normalized:
         return True
     try:
-        posted = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        posted = datetime.fromisoformat(normalized).date()
     except ValueError:
-        try:
-            posted = datetime.strptime(value[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        except ValueError:
-            return True
-    if posted.tzinfo is None:
-        posted = posted.replace(tzinfo=timezone.utc)
+        return True
     current = now or datetime.now(timezone.utc)
-    return posted >= current - timedelta(days=days)
+    cutoff = (current - timedelta(days=days)).date()
+    return posted >= cutoff
+
 
 def posted_age(value: Any, now: datetime | None = None) -> str:
     """Return a human-readable age while retaining the original date in storage."""
     text = str(value or "").strip()
     if not text:
         return "Posting date unavailable"
+
+    normalized = normalize_posted_date(text, now)
+    if not normalized:
+        return "Posting date unavailable"
+
     try:
-        posted = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        posted = datetime.fromisoformat(normalized)
     except ValueError:
-        try:
-            posted = datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        except ValueError:
-            return "Posting date unavailable"
-    if posted.tzinfo is None:
-        posted = posted.replace(tzinfo=timezone.utc)
+        return "Posting date unavailable"
+
     current = now or datetime.now(timezone.utc)
-    age = max(0, (current.date() - posted.astimezone(timezone.utc).date()).days)
+    age = max(0, (current.date() - posted.date()).days)
     if age == 0:
         return "Posted today"
     if age == 1:
@@ -551,16 +673,27 @@ class ScrapePipeline:
         self.sources = tuple(sources)
         self.days = days
         self.pause_seconds = pause_seconds
+        self.source_health: dict[str, dict[str, Any]] = {}
 
     def run(self, queries: Iterable[SearchQuery]) -> list[dict[str, Any]]:
         collected: list[Mapping[str, Any]] = []
         self.errors: list[str] = []
         for source in self.sources:
+            name = getattr(source, "name", source.__class__.__name__)
+            state = self.source_health.setdefault(name, {"jobs": 0, "queries": 0, "success": False, "last_error": None})
             for query in queries:
                 try:
-                    collected.extend(source.search(query))
+                    results = list(source.search(query))
+                    state["queries"] += 1
+                    state["jobs"] += len(results)
+                    state["success"] = True
+                    state["last_error"] = None
+                    collected.extend(results)
                 except Exception as error:
-                    self.errors.append(f"{source.name} / {query.term}: {error}")
+                    self.errors.append(f"{name} / {query.term}: {error}")
+                    state["queries"] += 1
+                    state["last_error"] = str(error)
+                    state["success"] = False
                 if self.pause_seconds:
                     time.sleep(self.pause_seconds)
         return ensure_descriptions(deduplicate_jobs(job for job in collected if is_recent(job, self.days)))

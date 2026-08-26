@@ -41,10 +41,19 @@ def main() -> int:
     )
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--output", type=Path, default=Path("jobs.json"))
+    parser.add_argument("--seek-browser-fallback", action="store_true")
+    parser.add_argument("--seek-cache-path", type=Path)
+    parser.add_argument("--seek-cache-fallback", action="store_true")
     args = parser.parse_args()
 
     source_names = args.sources or ["indeed", "seek", "linkedin", "adzuna", "remoteok"]
-    jobs = ScrapePipeline(build_sources(source_names), days=args.days).run(DEFAULT_QUERIES)
+    sources = build_sources(source_names)
+    for source in sources:
+        if isinstance(source, SeekApiSource):
+            source.allow_browser_fallback = args.seek_browser_fallback
+            source.cache_path = args.seek_cache_path
+            source.allow_cache_fallback = args.seek_cache_fallback
+    jobs = ScrapePipeline(sources, days=args.days).run(DEFAULT_QUERIES)
     payload = {
         "scraped_at": datetime.now(timezone.utc).isoformat(),
         "sources": source_names,

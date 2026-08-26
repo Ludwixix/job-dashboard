@@ -10,7 +10,7 @@ A modular extraction of the existing job dashboard's reusable behavior. This pro
 - `score.py` calculates fit dimensions, matched skills, gaps, and confidence.
 - `applications.py` handles document splitting and application-index persistence.
 - `service.py` composes the pure functions into an application-facing service.
-- `sources.py` provides Indeed, Seek, and LinkedIn adapters plus deduplication.
+- `sources.py` provides Indeed, Adzuna, RemoteOK, Seek, and LinkedIn adapters plus deduplication.
 
 ## Quick start
 
@@ -26,11 +26,40 @@ python -m playwright install chromium
 PYTHONPATH=src python -m job_dashboard.scrape --output jobs.json
 ```
 
+Adzuna requires credentials supplied through the environment (or the local `.env`):
+
+```bash
+export ADZUNA_APP_ID=your-app-id
+export ADZUNA_API_KEY=your-api-key
+```
+
+The source adapters are the tested integration of the usable scrapers from the
+legacy `job-dashboard-site/scrapers` folder. Indeed uses JobSpy, Adzuna uses its
+API, SEEK uses its public search API with an optional browser fallback, LinkedIn
+uses public search pages through Playwright, and RemoteOK adds remote listings.
+The legacy scripts are retained as reference material rather than copied into
+this application; fragile HTML, Google-search, Jora, CareerOne, and RSS
+variants are not part of the production pipeline.
+
 Run one provider while developing an adapter:
 
 ```bash
 PYTHONPATH=src python -m job_dashboard.scrape --source seek --output jobs-seek.json
 ```
+
+For Seek, the optional fallbacks can be enabled in order after the API:
+
+```bash
+PYTHONPATH=src python -m job_dashboard.scrape --source seek \
+    --seek-browser-fallback \
+    --seek-cache-fallback \
+    --seek-cache-path /path/to/jobs_seek.json \
+    --output jobs-seek.json
+```
+
+The app server enables the browser and cache fallbacks by default. Override
+`SEEK_BROWSER_FALLBACK`, `SEEK_CACHE_FALLBACK`, or `SEEK_CACHE_PATH` when a
+different policy or snapshot is required.
 
 Indeed uses JobSpy, SEEK uses its public search API when that endpoint permits the request, and LinkedIn uses public job search pages through Playwright. Provider dependencies are optional so the domain core remains usable offline. The SEEK adapter deliberately does not bypass CAPTCHA, bot protection, robots rules, authentication, or rate limits; denied requests are reported in the dashboard refresh errors. Configure `SEEK_ENABLED=0` to disable it, or set `SEEK_API_ENDPOINT` only to a provider-approved endpoint. `SEEK_MAX_PAGES`, `SEEK_MAX_RESULTS`, and `SEEK_PAUSE_SECONDS` provide conservative request bounds.
 

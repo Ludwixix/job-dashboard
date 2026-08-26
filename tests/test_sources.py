@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timezone
 
+from job_dashboard.models import Job
+from job_dashboard.score import score_job
 from job_dashboard.sources import (
     AdzunaApiSource,
     RemoteOkApiSource,
@@ -21,6 +23,15 @@ class FakeSource:
 
     def search(self, query):
         return [{**job, "tags": [query.term]} for job in self.jobs]
+
+
+class PartialSource:
+    name = "partial"
+
+    def search(self, query):
+        if query.term == "broken":
+            raise RuntimeError("provider unavailable")
+        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": "2026-08-24"}]
 
 
 def test_pipeline_filters_recent_and_deduplicates_sources():
@@ -67,6 +78,29 @@ def test_scrape_pipeline_tracks_source_health():
     assert pipeline.source_health["fake"]["jobs"] == 1
     assert pipeline.source_health["fake"]["queries"] == 1
     assert pipeline.source_health["fake"]["success"] is True
+    assert "last_success" in pipeline.source_health["fake"]
+
+
+def test_source_health_stays_healthy_after_partial_query_failure():
+    pipeline = ScrapePipeline([PartialSource()], days=14)
+    pipeline.run([SearchQuery("cloud"), SearchQuery("broken")])
+    assert pipeline.source_health["partial"]["success"] is True
+    assert pipeline.source_health["partial"]["last_error"] == "provider unavailable"
+
+
+def test_dedupe_uses_location_when_titles_match():
+    result = deduplicate_jobs([
+        {"title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://x", "source": "Seek", "tags": ["one"]},
+        {"title": "Cloud Engineer", "company": "Acme", "location": "Sydney", "url": "https://y", "source": "Indeed", "tags": ["two"]},
+    ])
+    assert len(result) == 2
+
+
+def test_score_penalises_seniority_mismatch():
+    profile = {"skills": {"azure": "advanced", "powershell": "advanced"}}
+    engineer = score_job(Job("1", "Azure Engineer", "Acme", description="Azure and PowerShell automation for cloud services"), profile)
+    manager = score_job(Job("1", "Head of Cloud Platform", "Acme", description="Azure strategy and platform leadership with PowerShell automation"), profile)
+    assert engineer.score > manager.score + 15
 
 
 def test_adzuna_api_source_parses_results(monkeypatch):
@@ -86,6 +120,9 @@ def test_adzuna_api_source_parses_results(monkeypatch):
                     "description": "<p>Azure and automation</p>",
                     "redirect_url": "https://example.com/jobs/1",
                     "created": "2026-08-20T00:00:00Z",
+                    "salary_is_predicted": 1,
+                    "salary_min": 110000,
+                    "salary_max": 130000,
                 }]
             }).encode("utf-8")
 
@@ -99,6 +136,7 @@ def test_adzuna_api_source_parses_results(monkeypatch):
     assert records[0]["title"] == "Azure Engineer"
     assert records[0]["company"] == "Contoso"
     assert records[0]["source"] == "Adzuna"
+    assert records[0]["salary"] == "110000 - 130000"
     assert records[0]["remote"] is False
 
 

@@ -36,7 +36,7 @@ def main():
     parser.add_argument("--no-linkedin", action="store_true")
     parser.add_argument("--source-dir", type=Path, default=PROJECT_ROOT / "Source of truth")
     parser.add_argument("--guidelines-dir", type=Path, default=PROJECT_ROOT / "Guidelines")
-    parser.add_argument("--examples-dir", type=Path, default=PROJECT_ROOT / "data" / "Examples")
+    parser.add_argument("--examples-dir", type=Path, default=PROJECT_ROOT / "Guidelines" / "Examples")
     args = parser.parse_args()
     profile = load_profile(args.profile)
     seek_enabled = os.getenv("SEEK_ENABLED", "1").lower() not in {"0", "false", "no"}
@@ -47,6 +47,9 @@ def main():
             max_results=int(os.getenv("SEEK_MAX_RESULTS", "60")),
             pause_seconds=float(os.getenv("SEEK_PAUSE_SECONDS", "1.5")),
             endpoint=os.getenv("SEEK_API_ENDPOINT") or None,
+            allow_browser_fallback=os.getenv("SEEK_BROWSER_FALLBACK", "true").lower() in {"1", "true", "yes"},
+            cache_path=os.getenv("SEEK_CACHE_PATH") or PROJECT_ROOT.parent / "job-dashboard-site" / "scrapers" / "jobs_seek_robust.json",
+            allow_cache_fallback=os.getenv("SEEK_CACHE_FALLBACK", "true").lower() in {"1", "true", "yes"},
         ))
     sources.extend([AdzunaApiSource(), RemoteOkApiSource()])
     if not args.no_linkedin:

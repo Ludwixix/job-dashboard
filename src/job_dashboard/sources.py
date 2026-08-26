@@ -161,7 +161,7 @@ def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]
         "remote": remote_value,
         "tags": [query.term, "adzuna", query.stream],
         "application_route": url,
-        "salary": str(job.get("salary_is_predicted") or job.get("salary_min") or job.get("salary_max") or "").strip() or "",
+        "salary": " - ".join(str(value).strip() for value in (job.get("salary_min"), job.get("salary_max")) if value is not None and str(value).strip()) or "",
     }
 
 
@@ -606,25 +606,31 @@ def posted_age(value: Any, now: datetime | None = None) -> str:
 
 
 def deduplicate_jobs(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Deduplicate by URL first, then by normalized company/title."""
+    """Deduplicate by exact URL first, then by normalized company/title/location."""
     priority = {"LinkedIn": 0, "Seek": 1, "Indeed": 2}
     ordered = sorted(jobs, key=lambda job: priority.get(str(job.get("source", "")), 99))
     seen_urls: set[str] = set()
-    seen_titles: dict[tuple[str, str], dict[str, Any]] = {}
+    seen_by_identity: dict[tuple[str, str, str], dict[str, Any]] = {}
     result: list[dict[str, Any]] = []
     for raw in ordered:
         job = dict(raw)
         url = str(job.get("url") or job.get("application_route") or "").rstrip("/")
-        key = (str(job.get("company", "")).strip().lower(), str(job.get("title", "")).strip().lower())
-        duplicate_key = key != ("", "") and key in seen_titles
-        if (url and url in seen_urls) or duplicate_key:
-            existing = seen_titles.get(key)
-            if existing is not None:
-                existing["tags"] = sorted(set(existing.get("tags", [])) | set(job.get("tags", [])))
+        company = str(job.get("company", "")).strip().lower()
+        title = str(job.get("title", "")).strip().lower()
+        location = str(job.get("location", "")).strip().lower()
+        identity = (company, title, location)
+        if url and url in seen_urls:
+            continue
+        if identity != ("", "", "") and identity in seen_by_identity:
+            existing = seen_by_identity[identity]
+            existing["tags"] = sorted(set(existing.get("tags", [])) | set(job.get("tags", [])))
+            if not existing.get("url") and url:
+                existing["url"] = url
             continue
         if url:
             seen_urls.add(url)
-        seen_titles[key] = job
+        if identity != ("", "", ""):
+            seen_by_identity[identity] = job
         result.append(job)
     return result
 
@@ -680,7 +686,7 @@ class ScrapePipeline:
         self.errors: list[str] = []
         for source in self.sources:
             name = getattr(source, "name", source.__class__.__name__)
-            state = self.source_health.setdefault(name, {"jobs": 0, "queries": 0, "success": False, "last_error": None})
+            state = self.source_health.setdefault(name, {"jobs": 0, "queries": 0, "success": False, "last_error": None, "last_success": None})
             for query in queries:
                 try:
                     results = list(source.search(query))
@@ -688,12 +694,12 @@ class ScrapePipeline:
                     state["jobs"] += len(results)
                     state["success"] = True
                     state["last_error"] = None
+                    state["last_success"] = datetime.now(timezone.utc).isoformat()
                     collected.extend(results)
                 except Exception as error:
                     self.errors.append(f"{name} / {query.term}: {error}")
                     state["queries"] += 1
                     state["last_error"] = str(error)
-                    state["success"] = False
                 if self.pause_seconds:
                     time.sleep(self.pause_seconds)
         return ensure_descriptions(deduplicate_jobs(job for job in collected if is_recent(job, self.days)))

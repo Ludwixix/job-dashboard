@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,15 +54,33 @@ class JobRepository:
                 clauses.append(f"lower({field}) LIKE lower(?)")
                 values.append(f"%{value}%")
         if role:
-            clauses.append("(lower(title) LIKE lower(?) OR lower(description) LIKE lower(?))")
-            values.extend([f"%{role}%", f"%{role}%"])
+            clauses.append("(lower(title) LIKE lower(?) OR lower(company) LIKE lower(?) OR lower(description) LIKE lower(?))")
+            values.extend([f"%{role}%", f"%{role}%", f"%{role}%"])
         rows = self.connection.execute(f"SELECT * FROM jobs WHERE {' AND '.join(clauses)} ORDER BY score DESC, posted DESC", values).fetchall()
         result = []
         for row in rows:
             job = json.loads(row["data_json"])
+            if salary_min is not None and self._salary_amount(job.get("salary", "")) < salary_min:
+                continue
             job["status"] = row["status"]
             result.append(job)
         return result
+
+    @staticmethod
+    def _salary_amount(value: Any) -> float:
+        """Extract a comparable lower salary bound from provider text."""
+        text = str(value or "")
+        numbers = []
+        for match in re.finditer(r"(\d[\d,]*(?:\.\d+)?)\s*(k|m)?", text, re.I):
+            number = float(match.group(1).replace(",", ""))
+            multiplier = match.group(2)
+            if multiplier:
+                number *= 1000 if multiplier.lower() == "k" else 1000000
+            numbers.append(number)
+        super_match = re.search(r"\d+(?:\.\d+)?\s*%\s*(?:super|superannuation)", text, re.I)
+        if super_match:
+            numbers = [number for number in numbers if number != float(re.search(r"\d+(?:\.\d+)?", super_match.group()).group())]
+        return min(numbers) if numbers else 0.0
 
     def update_status(self, job_id: str, status: str) -> dict[str, Any]:
         if status not in STATUSES:

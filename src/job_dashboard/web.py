@@ -42,6 +42,8 @@ class DashboardApp:
         self.repository = JobRepository(self.data_dir / "jobs.sqlite3")
         self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
         self.generation_progress: dict[str, dict[str, object]] = {}
+        self.source_health: dict[str, dict] = {}
+        self.last_refresh_errors: list[str] = []
         if self.jobs:
             self.jobs = self.materialize_jobs(self.jobs)
             for job in self.jobs:
@@ -298,6 +300,8 @@ class DashboardApp:
             fresh = pipeline.run(queries)
             self.jobs = self.materialize_jobs(fresh)
             self.save_jobs()
+            self.source_health = pipeline.source_health
+            self.last_refresh_errors = list(pipeline.errors)
             return self.public_jobs(), pipeline.errors
 
     @staticmethod
@@ -460,10 +464,15 @@ def make_handler(app: DashboardApp):
                 query = parse_qs(parsed.query)
                 filters = {key: query[key][0] for key in ("location", "role", "source", "stream", "status") if key in query}
                 filters["match_score_min"] = int(query.get("match_score_min", [0])[0])
+                if query.get("salary_min", [""])[0].strip():
+                    filters["salary_min"] = float(query["salary_min"][0])
                 self.send_json(200, {"jobs": app.public_jobs(filters)})
                 return
             if path == "/api/metrics/summary":
-                self.send_json(200, app.repository.metrics())
+                metrics = app.repository.metrics()
+                metrics["source_health"] = app.source_health
+                metrics["last_refresh_errors"] = app.last_refresh_errors
+                self.send_json(200, metrics)
                 return
             if path == "/api/rejections":
                 self.send_json(200, {"rejections": app.rejected_applications()})

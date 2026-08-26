@@ -1,4 +1,4 @@
-const state = { jobs: [], generating: new Set() };
+const state = { jobs: [], generating: new Set(), metrics: null };
 const byId = id => document.getElementById(id);
 
 const savedTheme = localStorage.getItem('job-desk-theme');
@@ -17,10 +17,11 @@ function filteredJobs() {
   const stream = byId('stream').value;
   const source = byId('source').value;
   const minimum = Number(byId('minimum').value || 0);
+  const salaryMinimum = Number(byId('salary-min')?.value || 0);
   const jobs = state.jobs.filter(job => {
     const searchable = `${job.title} ${job.company} ${job.description} ${job.matched_skills.join(' ')}`.toLowerCase();
     return (!query || searchable.includes(query)) && (!criteria || (job.tags || []).some(tag => tag.toLowerCase() === criteria)) && (!stream || job.stream === stream) &&
-      (!source || job.source === source) && job.score >= minimum;
+      (!source || job.source === source) && job.score >= minimum && (!salaryMinimum || salaryAmount(job.salary) >= salaryMinimum);
   });
   const sort = byId('sort')?.value || 'score';
   return jobs.sort((left, right) => {
@@ -28,6 +29,16 @@ function filteredJobs() {
     if (sort === 'newest') return String(right.posted || '').localeCompare(String(left.posted || ''));
     return (right.score || 0) - (left.score || 0);
   });
+}
+
+function salaryAmount(value) {
+  const salaryText = String(value || '').replace(/\d+(?:\.\d+)?\s*%\s*(?:super|superannuation)/gi, '');
+  const matches = salaryText.match(/\d[\d,]*(?:\.\d+)?\s*[km]?/gi) || [];
+  return Math.min(...matches.map(item => {
+    const match = item.match(/([\d,]+(?:\.\d+)?)\s*([km])?/i);
+    const number = Number(match[1].replaceAll(',', ''));
+    return number * (match[2]?.toLowerCase() === 'm' ? 1000000 : match[2] ? 1000 : 1);
+  }).filter(number => number > 0), Infinity);
 }
 
 function updateCriteriaFilter() {
@@ -66,6 +77,20 @@ function renderCategoryCounts() {
     if (job.score >= 70) counts[70] += 1;
   }
   for (const count of document.querySelectorAll('.category-count')) count.textContent = counts[count.dataset.count] ?? 0;
+}
+
+function renderHealth() {
+  const health = byId('health');
+  const errors = byId('refresh-errors');
+  if (!health || !errors) return;
+  health.replaceChildren();
+  for (const [name, details] of Object.entries(state.metrics?.source_health || {})) {
+    const item = document.createElement('span');
+    item.className = `health-item${details.success ? '' : ' failed'}`;
+    item.textContent = `${name}: ${details.success ? `${details.jobs} jobs` : 'unavailable'}`;
+    health.append(item);
+  }
+  errors.textContent = (state.metrics?.last_refresh_errors || []).join(' | ');
 }
 
 function ensureCriteriaPanel() {
@@ -168,6 +193,7 @@ function ensureRejectionArchive() {
 function render() {
   const jobs = filteredJobs();
   updateCriteriaFilter();
+  renderHealth();
   ensureCriteriaPanel();
   ensureRejectionArchive();
   renderCategoryCounts();
@@ -188,6 +214,7 @@ function render() {
     node.querySelector('.company').textContent = job.company || 'Company not listed';
     node.querySelector('.score').textContent = `${job.score}%`;
     node.querySelector('.meta').textContent = [job.location, job.posted_age].filter(Boolean).join(' · ') || 'Location not listed';
+    node.querySelector('.status').value = job.status || 'sourced';
     node.querySelector('.salary').textContent = job.salary || (job.remote ? 'Remote' : '');
     node.querySelector('.description').textContent = job.description || 'No description captured.';
     node.querySelector('.fit').textContent = job.fit;
@@ -445,6 +472,35 @@ async function load() {
   render();
 }
 
+async function loadMetrics() {
+  const response = await fetch('/api/metrics/summary');
+  if (response.ok) {
+    state.metrics = await response.json();
+    renderHealth();
+  }
+}
+
+byId('refresh-jobs').addEventListener('click', async event => {
+  const button = event.target;
+  button.disabled = true;
+  button.textContent = 'Refreshing...';
+  try {
+    const criteria = await fetch('/api/search-criteria');
+    const configured = criteria.ok ? (await criteria.json()).queries : [];
+    const response = await fetch('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries: configured})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Refresh failed');
+    state.jobs = result.jobs;
+    await loadMetrics();
+    render();
+  } catch (error) {
+    byId('refresh-errors').textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Refresh listings';
+  }
+});
+
 async function loadCriteria() {
   ensureCriteriaPanel();
   const response = await fetch('/api/search-criteria');
@@ -455,7 +511,7 @@ async function loadCriteria() {
   byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
 }
 
-for (const id of ['search', 'stream', 'source', 'minimum', 'sort', 'criteria-filter']) byId(id)?.addEventListener('input', render);
+for (const id of ['search', 'stream', 'source', 'minimum', 'salary-min', 'sort', 'criteria-filter']) byId(id)?.addEventListener('input', render);
 byId('jobs').addEventListener('click', event => {
   if (event.target.closest('button, a, select, label')) return;
   const card = event.target.closest('.job-card');
@@ -465,6 +521,26 @@ byId('jobs').addEventListener('click', event => {
     document.querySelectorAll('.job-card.is-selected').forEach(item => item.classList.remove('is-selected'));
     card.classList.add('is-selected');
     renderPreview(job);
+  }
+});
+byId('jobs').addEventListener('change', async event => {
+  const selector = event.target.closest('.status');
+  if (!selector) return;
+  const card = selector.closest('.job-card');
+  const job = state.jobs.find(item => item.id === card?.dataset.jobId);
+  if (!job) return;
+  const previous = job.status || 'sourced';
+  selector.disabled = true;
+  try {
+    const response = await fetch(`/api/jobs/${job.id}/status`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({status: selector.value})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Status update failed');
+    job.status = result.status;
+    render();
+  } catch (error) {
+    selector.value = previous;
+    selector.disabled = false;
+    window.alert(error.message);
   }
 });
 byId('jobs').addEventListener('pointermove', event => {
@@ -486,5 +562,6 @@ byId('jobs').addEventListener('pointerleave', event => {
 byId('job-modal').querySelector('.modal-close').addEventListener('click', () => byId('job-modal').close());
 byId('job-modal').addEventListener('click', event => { if (event.target === byId('job-modal')) byId('job-modal').close(); });
 load();
+loadMetrics();
 loadCriteria();
 setInterval(load, 15000);

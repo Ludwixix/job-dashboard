@@ -6,11 +6,16 @@ def test_prompt_context_loads_and_labels_both_document_sets(tmp_path):
     guidelines = tmp_path / "Guidelines"
     source.mkdir()
     guidelines.mkdir()
+    examples = guidelines / "Examples"
+    examples.mkdir()
     (source / "Master Resume.md").write_text("verified experience", encoding="utf-8")
     (guidelines / "Voice.md").write_text("Australian spelling", encoding="utf-8")
+    (examples / "Resume-style.txt").write_text("one-page navy resume example", encoding="utf-8")
     context = load_prompt_context(source, guidelines)
     assert "Guidelines/Voice.md" in context
     assert "Source of truth/Master Resume.md" in context
     assert "Use every file in Source of truth/ as the factual data set" in context
     assert "Use every file in Guidelines/ and its Examples/ as instructions" in context
     assert "verified experience" in context
+    assert "Examples/Resume-style.txt" in context
+    assert "one-page navy resume example" in context

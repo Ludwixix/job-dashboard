@@ -76,6 +76,15 @@ def _experience_level(job: Job) -> str:
     return "mid"
 
 
+def _seniority_penalty(job: Job) -> float:
+    level = _experience_level(job)
+    if level in {"senior", "executive"}:
+        return 0.18
+    if level == "junior":
+        return 0.04
+    return 0.0
+
+
 def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
     """Calculate a deterministic fit audit from a job and injected profile."""
     skills = _job_skills(job)
@@ -89,8 +98,10 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
     location = 1.0 if job.remote or re.search(r"remote|melbourne|vic", job.location, re.I) else 0.5
     company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.I) else 0.7
     growth = 0.9 if re.search(r"trainee|graduate|junior|training", job.text(), re.I) else 0.8 if re.search(r"cloud|azure|devops", job.text(), re.I) else 0.5
+    seniority_penalty = _seniority_penalty(job)
     dimensions = {"skill_match": round(skill_match * 100), "experience_fit": round(experience * 100), "location_fit": round(location * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}
-    total = skill_match * 0.4 + experience * 0.25 + location * 0.15 + company * 0.1 + growth * 0.1
+    total = skill_match * 0.4 + experience * 0.25 + location * 0.15 + company * 0.1 + growth * 0.1 - seniority_penalty
+    total = max(0.0, min(1.0, total))
     fit = "Excellent fit" if total >= 0.85 else "Strong fit" if total >= 0.7 else "Good fit" if total >= 0.55 else "Partial fit" if total >= 0.4 else "Weak fit"
     confidence = min(1.0, 0.5 + (0.2 if job.description else 0) + (0.1 if job.tags else 0) + (0.1 if job.why else 0) + (0.1 if len(skills) > 3 else 0))
     strengths = ("Strong skill alignment", "Experience level matches role requirements", "Ideal location match")[:1 + (experience >= 0.8) + (location >= 0.9)]

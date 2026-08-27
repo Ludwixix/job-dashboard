@@ -9,4 +9,6 @@ data/jobs.json
 data/jobs.sqlite3
 data/search_queries.json
 data/generated_documents.json
+data/generation_timings.json
+data/compare_results.json
 data/applications/

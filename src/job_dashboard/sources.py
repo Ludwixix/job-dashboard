@@ -21,6 +21,10 @@ class SearchQuery:
     term: str
     location: str = "Melbourne, VIC"
     stream: str = "core-it"
+    group: str = ""
+    weight: float = 1.0
+    exclude_terms: tuple[str, ...] = ()
+    enabled: bool = True
 
 
 class JobSource(Protocol):
@@ -161,7 +165,7 @@ def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]
         "remote": remote_value,
         "tags": [query.term, "adzuna", query.stream],
         "application_route": url,
-        "salary": " - ".join(str(value).strip() for value in (job.get("salary_min"), job.get("salary_max")) if value is not None and str(value).strip()) or "",
+        "salary": " - ".join(str(value) for value in (job.get("salary_min"), job.get("salary_max")) if value is not None) or str(job.get("salary") or "").strip(),
     }
 
 
@@ -247,16 +251,6 @@ class SeekApiSource:
         try:
             records = list(self._search_api(query))
             if records:
-                if self.allow_cache_fallback and len(records) < self.max_results:
-                    try:
-                        cached = list(self._search_cache(query))
-                        seen = {str(record.get("url") or record.get("id") or "") for record in records}
-                        records.extend(
-                            record for record in cached
-                            if str(record.get("url") or record.get("id") or "") not in seen
-                        )
-                    except Exception as cache_error:
-                        failures.append(f"cache supplement: {cache_error}")
                 yield from records
                 return
             failures.append("API returned no jobs")
@@ -412,7 +406,6 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
     url = f"https://www.seek.com.au/job/{identifier}" if identifier else ""
     work_types = job.get("workType") or []
     stable_id = identifier or re.sub(r"[^a-z0-9]+", "-", f"{job.get('title', '')}-{advertiser.get('description', '')}".lower()).strip("-")
-    raw_posted = job.get("listingDate") or job.get("listedDate") or job.get("date") or job.get("created") or job.get("publishedAt") or ""
     return {
         "id": f"seek-{stable_id}" if stable_id else "",
         "title": job.get("title", ""),
@@ -421,7 +414,7 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
         "description": clean_description(job.get("teaser", "")),
         "url": url,
         "source": "Seek",
-        "posted": normalize_posted_date(raw_posted),
+        "posted": str(job.get("listingDate", "") or "")[:10],
         "remote": any(str(item.get("label", "")).lower() == "remote" for item in work_types),
         "tags": [query.term, "seek", query.stream],
         "application_route": url,
@@ -514,90 +507,58 @@ def _linkedin_description(page: Any, record: dict[str, Any]) -> str:
         return ""
 
 
-def normalize_posted_date(value: Any, now: datetime | None = None) -> str:
-    """Convert raw provider dates into a canonical ISO date string.
-
-    This supports ISO timestamps, YYYY-MM-DD dates, and provider-relative strings
-    like '28d ago', '2w ago', or '3h ago'.
-    """
-    text = str(value or "").strip()
-    if not text or text.lower() in {"null", "none", "n/a", "na"}:
-        return ""
-
-    current = now or datetime.now(timezone.utc)
-    lower = text.lower()
-
-    relative_match = re.search(r"(?i)\b(?P<number>\d+)\s*(?P<unit>d|day|days|w|week|weeks|m|month|months|h|hr|hrs|hour|hours|min|mins|minute|minutes)\s*ago\b", text)
-    if relative_match:
-        number = int(relative_match.group("number"))
-        unit = relative_match.group("unit").lower()
-        if unit.startswith("w"):
-            delta = timedelta(weeks=number)
-        elif unit.startswith("m") and unit not in {"min", "mins", "minute", "minutes"}:
-            delta = timedelta(days=number * 30)
-        elif unit.startswith("h"):
-            delta = timedelta(hours=number)
-        elif unit.startswith("min"):
-            delta = timedelta(minutes=number)
-        else:
-            delta = timedelta(days=number)
-        posted = current - delta
-        return posted.date().isoformat()
-
-    if lower in {"today", "yesterday"}:
-        posted = current - timedelta(days=1 if lower == "yesterday" else 0)
-        return posted.date().isoformat()
-
-    for candidate in (text, text[:10]):
-        try:
-            posted = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
-            if posted.tzinfo is None:
-                posted = posted.replace(tzinfo=timezone.utc)
-            return posted.astimezone(timezone.utc).date().isoformat()
-        except ValueError:
-            pass
-
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y"):
-        try:
-            posted = datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
-            return posted.date().isoformat()
-        except ValueError:
-            pass
-
-    return ""
-
-
 def is_recent(job: Mapping[str, Any], days: int = 14, now: datetime | None = None) -> bool:
-    value = job.get("posted", "")
-    normalized = normalize_posted_date(value, now)
-    if not normalized:
+    value = normalize_posted_date(job.get("posted", ""), now)
+    if not value:
         return True
     try:
-        posted = datetime.fromisoformat(normalized).date()
+        posted = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return True
+        try:
+            posted = datetime.strptime(value[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return True
+    if posted.tzinfo is None:
+        posted = posted.replace(tzinfo=timezone.utc)
     current = now or datetime.now(timezone.utc)
-    cutoff = (current - timedelta(days=days)).date()
-    return posted >= cutoff
+    return posted >= current - timedelta(days=days)
+
+
+def normalize_posted_date(value: Any, now: datetime | None = None) -> str:
+    """Normalize ISO and relative provider dates to an ISO calendar date."""
+    text = str(value or "").strip().lower()
+    current = now or datetime.now(timezone.utc)
+    relative = re.fullmatch(r"(\d+)\s*d(?:ays?)?\s*ago", text)
+    if relative:
+        return (current - timedelta(days=int(relative.group(1)))).date().isoformat()
+    try:
+        posted = datetime.fromisoformat(text.replace("z", "+00:00"))
+    except ValueError:
+        try:
+            posted = datetime.strptime(text[:10], "%Y-%m-%d")
+        except ValueError:
+            return ""
+    if posted.tzinfo is None:
+        posted = posted.replace(tzinfo=timezone.utc)
+    return posted.astimezone(timezone.utc).date().isoformat()
 
 
 def posted_age(value: Any, now: datetime | None = None) -> str:
     """Return a human-readable age while retaining the original date in storage."""
-    text = str(value or "").strip()
+    text = normalize_posted_date(value, now)
     if not text:
         return "Posting date unavailable"
-
-    normalized = normalize_posted_date(text, now)
-    if not normalized:
-        return "Posting date unavailable"
-
     try:
-        posted = datetime.fromisoformat(normalized)
+        posted = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
-        return "Posting date unavailable"
-
+        try:
+            posted = datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return "Posting date unavailable"
+    if posted.tzinfo is None:
+        posted = posted.replace(tzinfo=timezone.utc)
     current = now or datetime.now(timezone.utc)
-    age = max(0, (current.date() - posted.date()).days)
+    age = max(0, (current.date() - posted.astimezone(timezone.utc).date()).days)
     if age == 0:
         return "Posted today"
     if age == 1:
@@ -606,31 +567,25 @@ def posted_age(value: Any, now: datetime | None = None) -> str:
 
 
 def deduplicate_jobs(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Deduplicate by exact URL first, then by normalized company/title/location."""
+    """Deduplicate by URL first, then by normalized company/title."""
     priority = {"LinkedIn": 0, "Seek": 1, "Indeed": 2}
     ordered = sorted(jobs, key=lambda job: priority.get(str(job.get("source", "")), 99))
     seen_urls: set[str] = set()
-    seen_by_identity: dict[tuple[str, str, str], dict[str, Any]] = {}
+    seen_titles: dict[tuple[str, str], dict[str, Any]] = {}
     result: list[dict[str, Any]] = []
     for raw in ordered:
         job = dict(raw)
         url = str(job.get("url") or job.get("application_route") or "").rstrip("/")
-        company = str(job.get("company", "")).strip().lower()
-        title = str(job.get("title", "")).strip().lower()
-        location = str(job.get("location", "")).strip().lower()
-        identity = (company, title, location)
-        if url and url in seen_urls:
-            continue
-        if identity != ("", "", "") and identity in seen_by_identity:
-            existing = seen_by_identity[identity]
-            existing["tags"] = sorted(set(existing.get("tags", [])) | set(job.get("tags", [])))
-            if not existing.get("url") and url:
-                existing["url"] = url
+        key = (str(job.get("company", "")).strip().lower(), str(job.get("title", "")).strip().lower(), str(job.get("location", "")).strip().lower())
+        duplicate_key = key != ("", "", "") and key in seen_titles
+        if (url and url in seen_urls) or duplicate_key:
+            existing = seen_titles.get(key)
+            if existing is not None:
+                existing["tags"] = sorted(set(existing.get("tags", [])) | set(job.get("tags", [])))
             continue
         if url:
             seen_urls.add(url)
-        if identity != ("", "", ""):
-            seen_by_identity[identity] = job
+        seen_titles[key] = job
         result.append(job)
     return result
 
@@ -685,21 +640,24 @@ class ScrapePipeline:
         collected: list[Mapping[str, Any]] = []
         self.errors: list[str] = []
         for source in self.sources:
-            name = getattr(source, "name", source.__class__.__name__)
-            state = self.source_health.setdefault(name, {"jobs": 0, "queries": 0, "success": False, "last_error": None, "last_success": None})
+            health = self.source_health.setdefault(source.name, {"jobs": 0, "queries": 0, "success": False, "last_error": ""})
             for query in queries:
+                if not query.enabled:
+                    continue
                 try:
-                    results = list(source.search(query))
-                    state["queries"] += 1
-                    state["jobs"] += len(results)
-                    state["success"] = True
-                    state["last_error"] = None
-                    state["last_success"] = datetime.now(timezone.utc).isoformat()
-                    collected.extend(results)
+                    results = source.search(query)
+                    health["queries"] += 1
+                    health["success"] = True
+                    health["last_success"] = datetime.now(timezone.utc).isoformat()
+                    for job in results:
+                        text = " ".join(str(job.get(field, "")) for field in ("title", "company", "description", "tags")).lower()
+                        if not any(term.lower() in text for term in query.exclude_terms):
+                            collected.append(job)
+                            health["jobs"] += 1
                 except Exception as error:
-                    self.errors.append(f"{name} / {query.term}: {error}")
-                    state["queries"] += 1
-                    state["last_error"] = str(error)
+                    health["queries"] += 1
+                    health["last_error"] = str(error)
+                    self.errors.append(f"{source.name} / {query.term}: {error}")
                 if self.pause_seconds:
                     time.sleep(self.pause_seconds)
         return ensure_descriptions(deduplicate_jobs(job for job in collected if is_recent(job, self.days)))

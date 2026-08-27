@@ -14,11 +14,7 @@ def _read_reference(path: Path) -> str:
 def load_prompt_context(source_dir: str | Path, guidelines_dir: str | Path, max_chars: int = 50000, examples_dir: str | Path | None = None) -> str:
     """Load verified résumé sources and writing guidance into one labelled context."""
     sections: list[str] = []
-    guidelines_root = Path(guidelines_dir)
-    examples_root = Path(examples_dir) if examples_dir else None
-    if examples_root and examples_root.resolve().is_relative_to(guidelines_root.resolve()):
-        examples_root = None
-    roots = (guidelines_root, examples_root, Path(source_dir))
+    roots = (Path(guidelines_dir), Path(examples_dir) if examples_dir else None, Path(source_dir))
     for root in roots:
         if root is None or not root.exists():
             continue

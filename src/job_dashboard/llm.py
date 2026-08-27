@@ -21,9 +21,9 @@ class OpenRouterDocumentGenerator:
 
     def __init__(self, source_dir: str | Path, guidelines_dir: str | Path, model: str | None = None, api_key: str | None = None, examples_dir: str | Path | None = None):
         self.source_dir = Path(source_dir)
-        examples_dir = examples_dir or Path(guidelines_dir) / "Examples"
+        self.guidelines_dir = Path(guidelines_dir)
         self.context = load_prompt_context(source_dir, guidelines_dir, examples_dir=examples_dir)
-        self.reference_style = """Use the attached reference examples and updated Resume & Cover Letter Master Prompt as binding presentation standards. For resumes, target a clean one-page Letter-sized, single-column ATS layout where practical: prominent uppercase candidate name, target role beneath it, one compact contact line, uppercase section headings with restrained navy/blue rules, compact sans-serif typography, and dense but readable spacing. Use the required section order: Professional Summary, Technical Expertise, Professional Experience, Key Projects & Automation Tools, and Education & Certifications. Format expertise as bold category labels followed by comma-separated technologies. Format experience with bold company and role, dates aligned consistently, and concise bullets beginning with a bold competency label where supported by the source facts. Use action-led achievement bullets, accurate metrics, Australian spelling, and no graphics, tables, icons, panels, or invented claims. Keep cover letters as natural 250-400 word business letters with no visible section labels or meta commentary."""
+        self.reference_style = """Use the attached reference examples and Shared Voice Guide as the writing and presentation standard. Write in Sam Ludwig's confident, plain-spoken, technically precise voice. Use action-led achievement bullets, accurate metrics, Australian spelling, clean title-case headings, and generous whitespace. Cover letters must be natural business letters without visible section labels or meta commentary."""
         self.model = model or os.environ.get("LLM_MODEL", "deepseek/deepseek-v4-flash-0731")
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
 
@@ -81,7 +81,7 @@ Then return only the cover letter. Do not add commentary outside the documents. 
         if not resume or not cover:
             return self._fallback(job, profile)
         audit = ContentLibrary(self.source_dir).validate_claims(resume + "\n" + cover) if self.source_dir.exists() else {"verified": True, "issue_count": 0, "issues": []}
-        return {"resume": resume + "\n", "cover_letter": cover + "\n", "application_id": re.sub(r"[^a-z0-9]+", "_", f"{job.company}_{job.title}".lower()).strip("_")[:160], "audit": audit, "status": "draft_ready" if audit["verified"] else "needs_review"}
+        return {"resume": resume + "\n", "cover_letter": cover + "\n", "application_id": re.sub(r"[^a-z0-9]+", "_", f"{job.company}_{job.title}".lower()).strip("_")[:160], "audit": audit, "status": "draft_ready" if audit["verified"] else "needs_review", "usage": data.get("usage")}
 
     def _fallback(self, job: Job, profile: Mapping[str, Any]) -> dict[str, Any]:
         documents = generate_fallback(job, profile)

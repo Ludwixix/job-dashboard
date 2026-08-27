@@ -2,6 +2,8 @@ from pathlib import Path
 
 from job_dashboard import JobDashboard, normalize_job
 from job_dashboard.applications import ApplicationIndex, split_documents
+from job_dashboard.documents import RelevanceError, generate_documents
+from job_dashboard.models import Job
 from job_dashboard.models import ApplicationRecord
 
 
@@ -32,3 +34,14 @@ def test_document_split_and_index_upsert(tmp_path: Path):
     index.upsert(record)
     index.upsert(record)
     assert len(index.load()["roles"]) == 1
+
+
+def test_document_generation_blocks_no_match_role():
+    job = Job("id", "Business Development Executive - Data & AI", "HSO", description="Own revenue targets and close new sales opportunities")
+
+    try:
+        generate_documents(job, {"personal": {}})
+    except RelevanceError as error:
+        assert "Resume not generated" in str(error)
+    else:
+        raise AssertionError("Expected no-match role to be blocked")

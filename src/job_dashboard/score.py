@@ -10,7 +10,7 @@ SKILL_ALIASES = {
     "sharepoint": ("sharepoint", "sharepoint online"),
     "exchange": ("exchange", "exchange online"),
     "intune": ("intune", "endpoint manager", "mdm"),
-    "powershell": ("powershell", "pwsh", "automation"),
+    "powershell": ("powershell", "pwsh"),
     "python": ("python", "python3"),
     "windows": ("windows", "windows server"),
     "linux": ("linux", "ubuntu", "redhat"),
@@ -24,6 +24,12 @@ SKILL_ALIASES = {
 }
 
 _LEVEL_WEIGHT = {"expert": 1.0, "advanced": 0.8, "intermediate": 0.6, "basic": 0.4}
+_CLUSTER_WEIGHT = {"primary": 1.0, "secondary": 0.45}
+_PRIMARY_SKILLS = {"sharepoint", "microsoft 365", "exchange", "intune", "azure", "powershell", "windows", "networking", "servicenow", "itil", "customer service"}
+_SECONDARY_SKILLS = {"linux", "cybersecurity", "data centre", "documentation", "python"}
+_TRADE_TERMS = ("hvac", "building management", "bms", "mechanical", "electrical", "plumbing", "refrigeration")
+_DATA_ROLE_TERMS = ("data engineer", "data warehouse", "data warehousing", "etl", "extract transform load", "data model", "dimensional model", "sql developer")
+_DATA_SPECIFIC_TERMS = ("data warehouse", "data warehousing", "etl", "extract transform load", "dimensional model", "data pipeline", "sql modeling", "data modelling")
 
 
 def _profile_skills(profile: Mapping[str, Any]) -> dict[str, str]:
@@ -85,25 +91,55 @@ def _seniority_penalty(job: Job) -> float:
     return 0.0
 
 
+def _role_domain(job: Job) -> str:
+    text = job.text().lower()
+    if any(term in text for term in _TRADE_TERMS) and re.search(r"bms|building management|hvac|mechanical|electrical|plumbing", text):
+        return "trade"
+    if any(term in text for term in _DATA_ROLE_TERMS):
+        return "data"
+    return "it"
+
+
+def _skill_cluster(skill: str) -> str:
+    return "primary" if skill in _PRIMARY_SKILLS else "secondary"
+
+
 def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
     """Calculate a deterministic fit audit from a job and injected profile."""
     skills = _job_skills(job)
     profile_skills = _profile_skills(profile)
-    matched = tuple(skill for skill, confidence in skills.items() if confidence >= 0.6 and skill in profile_skills)
+    domain = _role_domain(job)
+    matched = tuple(
+        skill for skill, confidence in skills.items()
+        if confidence >= 0.6 and skill in profile_skills and domain != "trade"
+    )
     missing = tuple(skill for skill in skills if skill not in profile_skills)
-    total_weight = sum(_LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) for skill in skills)
-    matched_weight = sum(_LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * skills[skill] for skill in matched)
-    skill_match = matched_weight / total_weight if total_weight else 0.5
+    total_weight = sum(
+        _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill)]
+        for skill in skills
+    )
+    matched_weight = sum(
+        _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill)] * skills[skill]
+        for skill in matched
+    )
+    skill_match = matched_weight / total_weight if total_weight else 0.0
     experience = {"junior": 0.7, "mid": 1.0, "senior": 0.9, "executive": 0.3}[_experience_level(job)]
     location = 1.0 if job.remote or re.search(r"remote|melbourne|vic", job.location, re.I) else 0.5
     company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.I) else 0.7
     growth = 0.9 if re.search(r"trainee|graduate|junior|training", job.text(), re.I) else 0.8 if re.search(r"cloud|azure|devops", job.text(), re.I) else 0.5
     seniority_penalty = _seniority_penalty(job)
-    dimensions = {"skill_match": round(skill_match * 100), "experience_fit": round(experience * 100), "location_fit": round(location * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}
-    total = skill_match * 0.4 + experience * 0.25 + location * 0.15 + company * 0.1 + growth * 0.1 - seniority_penalty
+    title_category = 1.0 if any(term in job.title.lower() for term in ("sharepoint", "microsoft 365", "m365", "infrastructure", "systems administrator", "powershell", "azure", "cloud")) else 0.45
+    recency = 1.0 if getattr(job, "posted", "") else 0.5
+    dimensions = {"skill_match": round(skill_match * 100), "title_category_match": round(title_category * 100), "location_fit": round(location * 100), "recency_weight": round(recency * 100), "experience_fit": round(experience * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}
+    total = skill_match * 0.6 + title_category * 0.12 + location * 0.08 + experience * 0.08 + company * 0.04 + growth * 0.03 + recency * 0.05 - seniority_penalty
+    if domain == "data" and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS):
+        total = min(total, 0.5)
+    if domain == "trade":
+        total = min(total, 0.35)
     total = max(0.0, min(1.0, total))
-    fit = "Excellent fit" if total >= 0.85 else "Strong fit" if total >= 0.7 else "Good fit" if total >= 0.55 else "Partial fit" if total >= 0.4 else "Weak fit"
+    fit = "No skill match" if not matched else "Excellent fit" if total >= 0.85 else "Strong fit" if total >= 0.7 else "Good fit" if total >= 0.55 else "Partial fit"
     confidence = min(1.0, 0.5 + (0.2 if job.description else 0) + (0.1 if job.tags else 0) + (0.1 if job.why else 0) + (0.1 if len(skills) > 3 else 0))
     strengths = ("Strong skill alignment", "Experience level matches role requirements", "Ideal location match")[:1 + (experience >= 0.8) + (location >= 0.9)]
     risks = ((f"Missing skills: {', '.join(missing[:3])}",) if missing else ()) + ("Verify exact requirements before applying",)
-    return ScoreResult(round(total * 100), fit, dimensions, matched, missing, strengths, risks[:3], round(confidence, 2), _experience_level(job))
+    relevance = "No match" if domain == "trade" else "Strong"
+    return ScoreResult(round(total * 100), fit, dimensions, matched, missing, strengths, risks[:3], round(confidence, 2), _experience_level(job), relevance, dimensions)

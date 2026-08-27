@@ -1,4 +1,4 @@
-const state = { jobs: [], generating: new Set(), metrics: null };
+const state = { jobs: [], generating: new Set() };
 const byId = id => document.getElementById(id);
 
 const savedTheme = localStorage.getItem('job-desk-theme');
@@ -15,13 +15,13 @@ function filteredJobs() {
   const query = byId('search').value.toLowerCase();
   const criteria = (byId('criteria-filter')?.value || '').toLowerCase();
   const stream = byId('stream').value;
+  const fitCategory = byId('fit-category')?.value || '';
   const source = byId('source').value;
   const minimum = Number(byId('minimum').value || 0);
-  const salaryMinimum = Number(byId('salary-min')?.value || 0);
   const jobs = state.jobs.filter(job => {
     const searchable = `${job.title} ${job.company} ${job.description} ${job.matched_skills.join(' ')}`.toLowerCase();
     return (!query || searchable.includes(query)) && (!criteria || (job.tags || []).some(tag => tag.toLowerCase() === criteria)) && (!stream || job.stream === stream) &&
-      (!source || job.source === source) && job.score >= minimum && (!salaryMinimum || salaryAmount(job.salary) >= salaryMinimum);
+      (!source || job.source === source) && (!fitCategory || job.fit_category === fitCategory) && job.score >= minimum;
   });
   const sort = byId('sort')?.value || 'score';
   return jobs.sort((left, right) => {
@@ -29,16 +29,6 @@ function filteredJobs() {
     if (sort === 'newest') return String(right.posted || '').localeCompare(String(left.posted || ''));
     return (right.score || 0) - (left.score || 0);
   });
-}
-
-function salaryAmount(value) {
-  const salaryText = String(value || '').replace(/\d+(?:\.\d+)?\s*%\s*(?:super|superannuation)/gi, '');
-  const matches = salaryText.match(/\d[\d,]*(?:\.\d+)?\s*[km]?/gi) || [];
-  return Math.min(...matches.map(item => {
-    const match = item.match(/([\d,]+(?:\.\d+)?)\s*([km])?/i);
-    const number = Number(match[1].replaceAll(',', ''));
-    return number * (match[2]?.toLowerCase() === 'm' ? 1000000 : match[2] ? 1000 : 1);
-  }).filter(number => number > 0), Infinity);
 }
 
 function updateCriteriaFilter() {
@@ -69,6 +59,107 @@ function renderHighlights() {
   }
 }
 
+function compareCard(model, job, comparisonId) {
+  const article = document.createElement('article');
+  article.className = 'compare-model';
+  article.dataset.modelId = model.model_id;
+  const title = document.createElement('h3');
+  title.textContent = model.display_name || model.model_id;
+  const status = document.createElement('p');
+  status.className = 'compare-status';
+  article.append(title, status);
+  if (model.status === 'loading' || model.status === 'queued') {
+    status.textContent = 'Generating...';
+    article.insertAdjacentHTML('beforeend', '<div class="compare-skeleton"></div><div class="compare-skeleton"></div>');
+    return article;
+  }
+  if (model.status !== 'completed') {
+    status.textContent = model.error || 'Generation failed';
+    const retry = document.createElement('button');
+    retry.textContent = 'Retry this model';
+    retry.onclick = async () => {
+      retry.disabled = true;
+      await fetch(`/api/compare/${comparisonId}/retry`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({model_id: model.model_id})});
+      openCompareModal(job, comparisonId);
+    };
+    article.append(retry);
+    return article;
+  }
+  status.textContent = `${((model.latency_ms || 0) / 1000).toFixed(1)}s${model.cached ? ' · cached' : ''}`;
+  if (model.audit && !model.audit.verified) {
+    const warning = document.createElement('p');
+    warning.className = 'compare-warning';
+    warning.textContent = `Fact review needed: ${(model.audit.issues || []).slice(0, 2).join('; ') || 'unverified claims detected'}`;
+    article.append(warning);
+  }
+  for (const [label, value] of [['CV', model.resume_text], ['Cover letter', model.cover_letter_text]]) {
+    const heading = document.createElement('h4');
+    heading.textContent = label;
+    const copy = document.createElement('button');
+    copy.textContent = 'Copy';
+    copy.className = 'compare-copy';
+    copy.onclick = () => navigator.clipboard.writeText(value || '');
+    const block = document.createElement('pre');
+    block.textContent = value || 'No output returned.';
+    article.append(heading, copy, block);
+  }
+  const use = document.createElement('button');
+  use.textContent = 'Use this one';
+  use.onclick = async () => {
+    use.disabled = true;
+    const response = await fetch(`/api/compare/${comparisonId}/select`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({model_id: model.model_id})});
+    if (response.ok) {
+      job.generated = await response.json();
+      document.getElementById('compare-modal')?.close();
+      render();
+    } else use.disabled = false;
+  };
+  article.append(use);
+  return article;
+}
+
+async function openCompareModal(job, comparisonId = '') {
+  let modal = byId('compare-modal');
+  if (!modal) {
+    modal = document.createElement('dialog');
+    modal.id = 'compare-modal';
+    modal.className = 'job-modal compare-modal';
+    document.body.append(modal);
+  }
+  modal.replaceChildren();
+  const heading = document.createElement('h2');
+  heading.textContent = `Compare CV + letter: ${job.title}`;
+  const close = document.createElement('button');
+  close.textContent = 'Close';
+  close.className = 'modal-close';
+  close.onclick = () => modal.close();
+  const columns = document.createElement('section');
+  columns.className = 'compare-columns';
+  modal.append(close, heading, columns);
+  if (!comparisonId) {
+    const response = await fetch(`/api/jobs/${job.id}/compare`, {method: 'POST'});
+    const queued = await response.json();
+    if (!response.ok) {
+      columns.textContent = queued.error || 'Comparison could not be started.';
+      modal.showModal();
+      return;
+    }
+    comparisonId = queued.comparison_id;
+  }
+  modal.showModal();
+  const poll = async () => {
+    const response = await fetch(`/api/compare/${comparisonId}`);
+    const comparison = await response.json();
+    if (!response.ok) {
+      columns.textContent = comparison.error || 'Comparison unavailable.';
+      return;
+    }
+    columns.replaceChildren(...Object.values(comparison.models || {}).map(model => compareCard(model, job, comparisonId)));
+    if (!comparison.done) setTimeout(poll, 700);
+  };
+  poll();
+}
+
 function renderCategoryCounts() {
   const counts = { all: state.jobs.length, 'core-it': 0, bridge: 0, traineeship: 0, Adzuna: 0, Seek: 0, Indeed: 0, 70: 0 };
   for (const job of state.jobs) {
@@ -79,25 +170,11 @@ function renderCategoryCounts() {
   for (const count of document.querySelectorAll('.category-count')) count.textContent = counts[count.dataset.count] ?? 0;
 }
 
-function renderHealth() {
-  const health = byId('health');
-  const errors = byId('refresh-errors');
-  if (!health || !errors) return;
-  health.replaceChildren();
-  for (const [name, details] of Object.entries(state.metrics?.source_health || {})) {
-    const item = document.createElement('span');
-    item.className = `health-item${details.success ? '' : ' failed'}`;
-    item.textContent = `${name}: ${details.success ? `${details.jobs} jobs` : 'unavailable'}`;
-    health.append(item);
-  }
-  errors.textContent = (state.metrics?.last_refresh_errors || []).join(' | ');
-}
-
 function ensureCriteriaPanel() {
   if (byId('criteria-editor')) return;
   const panel = document.createElement('div');
   panel.className = 'side-group criteria';
-  panel.innerHTML = '<h2>Search criteria</h2><textarea id="criteria-editor" rows="6" placeholder="cloud engineer | core-it | Melbourne, VIC"></textarea><div class="criteria-actions"><button id="save-criteria">Save criteria</button><button id="suggested-criteria" type="button">Suggest from experience</button><button id="default-criteria" type="button">Use defaults</button><button id="reset-criteria" type="button">Reset</button></div><span id="criteria-status" class="side-empty"></span>';
+  panel.innerHTML = '<h2>Search criteria</h2><textarea id="criteria-editor" rows="6" placeholder="SharePoint Administrator | core-it | Melbourne, VIC | m365 | 1.5 | warehouse,trainee"></textarea><div class="criteria-actions"><button id="save-criteria">Save criteria</button><button id="suggested-criteria" type="button">Suggest from experience</button><button id="default-criteria" type="button">Use defaults</button><button id="reset-criteria" type="button">Reset</button></div><span id="criteria-status" class="side-empty"></span>';
   byId('sidebar').insertBefore(panel, byId('highlights').closest('.side-group'));
   byId('save-criteria').addEventListener('click', async event => {
     const queries = byId('criteria-editor').value.split('\n').map(line => {
@@ -106,7 +183,10 @@ function ensureCriteriaPanel() {
       const streams = ['core-it', 'bridge', 'traineeship'];
       const stream = streams.includes((parts[1] || '').toLowerCase()) ? parts[1].toLowerCase() : 'core-it';
       const location = streams.includes((parts[1] || '').toLowerCase()) ? (parts[2] || 'Melbourne, VIC') : (parts.length > 1 ? parts[1] : 'Melbourne, VIC');
-      return {term, stream, location};
+      const group = parts[3] || '';
+      const weight = Number(parts[4] || 1);
+      const exclude_terms = (parts[5] || '').split(',').map(value => value.trim()).filter(Boolean);
+      return {term, stream, location, group, weight: Number.isFinite(weight) ? weight : 1, exclude_terms, enabled: true};
     }).filter(query => query.term);
     try {
       const response = await fetch('/api/search-criteria', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries})});
@@ -146,8 +226,9 @@ function ensureCriteriaPanel() {
 function ensureRejectionArchive() {
   if (byId('rejection-archive')) return;
   const panel = document.createElement('div');
+  panel.id = 'rejection-archive';
   panel.className = 'side-group rejection-archive';
-  panel.innerHTML = '<h2>Application archive</h2><button id="show-rejections">Rejected applications</button><button id="show-applications" type="button">All tracked applications</button><div id="rejections" class="side-empty" hidden></div>';
+  panel.innerHTML = '<h2>Application archive</h2><button id="show-rejections">Rejected applications</button><button id="show-applications" type="button">All tracked applications</button><button id="show-suggestions" type="button">Job suggestions</button><button id="sync-tracker" type="button">Sync tracker</button><p id="tracker-status" class="side-empty"></p><div id="rejections" class="side-empty" hidden></div>';
   byId('sidebar').insertBefore(panel, byId('highlights').closest('.side-group'));
   byId('show-rejections').addEventListener('click', async () => {
     const target = byId('rejections');
@@ -188,12 +269,61 @@ function ensureRejectionArchive() {
     }
     if (!result.applications.length) target.textContent = 'No tracked applications';
   });
+  byId('show-suggestions').addEventListener('click', async () => {
+    const target = byId('rejections');
+    target.hidden = false;
+    target.textContent = 'Loading…';
+    try {
+      const response = await fetch('/api/tracker/suggestions');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unable to load job suggestions');
+      target.replaceChildren();
+      for (const suggestion of result.suggestions) {
+        const item = document.createElement('p');
+        item.textContent = `${suggestion.title} · ${suggestion.company}`;
+        item.title = `${suggestion.status}${suggestion.date ? ` · ${suggestion.date}` : ''}${suggestion.notes ? ` · ${suggestion.notes}` : ''}`;
+        if (suggestion.email_link) {
+          const link = document.createElement('a');
+          link.href = suggestion.email_link;
+          link.target = '_blank';
+          link.rel = 'noreferrer';
+          link.textContent = 'Email';
+          item.append(' ', link);
+        }
+        target.append(item);
+      }
+      if (!result.suggestions.length) target.textContent = 'No new tracker suggestions';
+      renderTrackerStatus(result.tracker_state);
+    } catch (error) {
+      target.textContent = error.message;
+    }
+  });
+  byId('sync-tracker').addEventListener('click', async event => {
+    event.target.disabled = true;
+    byId('tracker-status').textContent = 'Syncing…';
+    try {
+      const response = await fetch('/api/tracker/sync', { method: 'POST' });
+      const result = await response.json();
+      renderTrackerStatus(result);
+    } catch (error) {
+      byId('tracker-status').textContent = 'Tracker sync failed — dashboard unavailable';
+    }
+    event.target.disabled = false;
+  });
+}
+
+function renderTrackerStatus(state) {
+  const target = byId('tracker-status');
+  if (!target || !state) return;
+  if (state.status === 'completed') target.textContent = `${state.matched} matched · ${state.rows} tracker rows`;
+  else if (state.status === 'failed') target.textContent = state.error || 'Tracker sync failed';
+  else if (state.status === 'syncing') target.textContent = 'Syncing…';
+  else target.textContent = '';
 }
 
 function render() {
   const jobs = filteredJobs();
   updateCriteriaFilter();
-  renderHealth();
   ensureCriteriaPanel();
   ensureRejectionArchive();
   renderCategoryCounts();
@@ -213,8 +343,8 @@ function render() {
     node.querySelector('h2').textContent = job.title || 'Untitled role';
     node.querySelector('.company').textContent = job.company || 'Company not listed';
     node.querySelector('.score').textContent = `${job.score}%`;
+    node.querySelector('.score').title = Object.entries(job.dimensions || {}).map(([key, value]) => `${key.replaceAll('_', ' ')}: ${value}%`).join(' | ');
     node.querySelector('.meta').textContent = [job.location, job.posted_age].filter(Boolean).join(' · ') || 'Location not listed';
-    node.querySelector('.status').value = job.status || 'sourced';
     node.querySelector('.salary').textContent = job.salary || (job.remote ? 'Remote' : '');
     node.querySelector('.description').textContent = job.description || 'No description captured.';
     node.querySelector('.fit').textContent = job.fit;
@@ -355,6 +485,8 @@ function render() {
       };
       poll();
     });
+    const compareButton = node.querySelector('.compare');
+    compareButton.addEventListener('click', () => openCompareModal(job));
     container.append(node);
   }
   if (jobs.length && !document.querySelector('.preview-header')) renderPreview(jobs[0]);
@@ -472,35 +604,6 @@ async function load() {
   render();
 }
 
-async function loadMetrics() {
-  const response = await fetch('/api/metrics/summary');
-  if (response.ok) {
-    state.metrics = await response.json();
-    renderHealth();
-  }
-}
-
-byId('refresh-jobs').addEventListener('click', async event => {
-  const button = event.target;
-  button.disabled = true;
-  button.textContent = 'Refreshing...';
-  try {
-    const criteria = await fetch('/api/search-criteria');
-    const configured = criteria.ok ? (await criteria.json()).queries : [];
-    const response = await fetch('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({queries: configured})});
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Refresh failed');
-    state.jobs = result.jobs;
-    await loadMetrics();
-    render();
-  } catch (error) {
-    byId('refresh-errors').textContent = error.message;
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Refresh listings';
-  }
-});
-
 async function loadCriteria() {
   ensureCriteriaPanel();
   const response = await fetch('/api/search-criteria');
@@ -511,7 +614,7 @@ async function loadCriteria() {
   byId('criteria-editor').value = result.queries.map(query => query.term).join('\n');
 }
 
-for (const id of ['search', 'stream', 'source', 'minimum', 'salary-min', 'sort', 'criteria-filter']) byId(id)?.addEventListener('input', render);
+for (const id of ['search', 'stream', 'source', 'minimum', 'sort', 'criteria-filter']) byId(id)?.addEventListener('input', render);
 byId('jobs').addEventListener('click', event => {
   if (event.target.closest('button, a, select, label')) return;
   const card = event.target.closest('.job-card');
@@ -521,26 +624,6 @@ byId('jobs').addEventListener('click', event => {
     document.querySelectorAll('.job-card.is-selected').forEach(item => item.classList.remove('is-selected'));
     card.classList.add('is-selected');
     renderPreview(job);
-  }
-});
-byId('jobs').addEventListener('change', async event => {
-  const selector = event.target.closest('.status');
-  if (!selector) return;
-  const card = selector.closest('.job-card');
-  const job = state.jobs.find(item => item.id === card?.dataset.jobId);
-  if (!job) return;
-  const previous = job.status || 'sourced';
-  selector.disabled = true;
-  try {
-    const response = await fetch(`/api/jobs/${job.id}/status`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({status: selector.value})});
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Status update failed');
-    job.status = result.status;
-    render();
-  } catch (error) {
-    selector.value = previous;
-    selector.disabled = false;
-    window.alert(error.message);
   }
 });
 byId('jobs').addEventListener('pointermove', event => {
@@ -562,6 +645,5 @@ byId('jobs').addEventListener('pointerleave', event => {
 byId('job-modal').querySelector('.modal-close').addEventListener('click', () => byId('job-modal').close());
 byId('job-modal').addEventListener('click', event => { if (event.target === byId('job-modal')) byId('job-modal').close(); });
 load();
-loadMetrics();
 loadCriteria();
 setInterval(load, 15000);

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import mimetypes
 import os
@@ -7,6 +9,8 @@ import re
 import threading
 import time
 import textwrap
+import urllib.error
+import urllib.request
 from xml.sax.saxutils import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +23,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from .documents import generate_documents
+from .compare import COMPARE_MODELS, CompareRunner
 from .email_connector import GmailApiScanner, GmailScanner
 from .models import Job
 from .normalize import normalize_job
@@ -26,6 +31,8 @@ from .service import JobDashboard
 from .sources import SearchQuery, ScrapePipeline, clean_description, is_recent, posted_age
 from .repository import JobRepository
 from .scrape_config import DEFAULT_QUERIES
+
+TRACKER_CSV_URL = "https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv&gid=0"
 
 
 class DashboardApp:
@@ -42,8 +49,14 @@ class DashboardApp:
         self.repository = JobRepository(self.data_dir / "jobs.sqlite3")
         self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
         self.generation_progress: dict[str, dict[str, object]] = {}
-        self.source_health: dict[str, dict] = {}
-        self.last_refresh_errors: list[str] = []
+        self.compare_results: dict[str, dict[str, object]] = self._load_compare_results()
+        self.compare_progress: dict[str, dict[str, object]] = {}
+        self.tracker_state: dict[str, object] = {"status": "idle", "last_sync": None, "rows": 0, "matched": 0, "error": None}
+        self.tracker_rows: list[dict[str, str]] = []
+        generator_factory = None
+        if document_generator is not None:
+            generator_factory = lambda model: type(document_generator)(document_generator.source_dir, document_generator.guidelines_dir, model=model, api_key=document_generator.api_key)
+        self.compare_runner = CompareRunner(self.data_dir, generator_factory=generator_factory)
         if self.jobs:
             self.jobs = self.materialize_jobs(self.jobs)
             for job in self.jobs:
@@ -70,7 +83,7 @@ class DashboardApp:
             return list(defaults or [])
         try:
             records = json.loads(self.search_queries_path.read_text(encoding="utf-8"))
-            loaded = [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip()) for item in records if str(item.get("term", "")).strip()]
+            loaded = [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip(), str(item.get("group", "")).strip(), float(item.get("weight", 1.0)), tuple(str(term).strip() for term in item.get("exclude_terms", []) if str(term).strip()), bool(item.get("enabled", True))) for item in records if str(item.get("term", "")).strip()]
             return loaded or list(defaults or DEFAULT_QUERIES)
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return list(defaults or [])
@@ -81,12 +94,30 @@ class DashboardApp:
                 str(item.get("term", "")).strip(),
                 str(item.get("location", "Melbourne, VIC")).strip() or "Melbourne, VIC",
                 str(item.get("stream", "core-it")).strip().lower() or "core-it",
+                str(item.get("group", "")).strip(),
+                float(item.get("weight", 1.0)),
+                tuple(str(term).strip() for term in item.get("exclude_terms", []) if str(term).strip()),
+                bool(item.get("enabled", True)),
             )
             for item in items
             if str(item.get("term", "")).strip()
         ]
         self.save_search_queries()
-        return [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
+        result = []
+        for query in self.search_queries:
+            item = {"term": query.term, "location": query.location, "stream": query.stream}
+            if query.group or query.weight != 1.0 or query.exclude_terms or not query.enabled:
+                item.update({"group": query.group, "weight": query.weight, "exclude_terms": list(query.exclude_terms), "enabled": query.enabled})
+            result.append(item)
+        return result
+
+    def update_status(self, job_id: str, status: str):
+        result = self.repository.update_status(job_id, status)
+        for job in self.jobs:
+            if job.get("id") == job_id:
+                job["status"] = status
+                break
+        return result
 
     def suggested_search_queries(self):
         """Return search terms grounded in the candidate's experience and skills."""
@@ -152,6 +183,74 @@ class DashboardApp:
     def save_generated_documents(self):
         payload = {str(job_id): meta for job_id, meta in self.generated_documents.items()}
         (self.data_dir / "generated_documents.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _load_compare_results(self):
+        path = self.data_dir / "compare_results.json"
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+    def _save_compare_results(self):
+        (self.data_dir / "compare_results.json").write_text(json.dumps(self.compare_results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _compare_update(self, comparison_id, model_id, cache_key, result):
+        comparison = self.compare_results.setdefault(comparison_id, {"comparison_id": comparison_id, "job_id": comparison_id.removeprefix("cmp_").rsplit("_", 1)[0], "models": {}, "selected_model": None})
+        comparison["models"][model_id] = {**result, "cache_key": cache_key}
+        self.compare_progress[comparison_id] = {"done": all(item.get("status") in {"completed", "failed", "timeout"} for item in comparison["models"].values()) and len(comparison["models"]) == len(COMPARE_MODELS), "models": comparison["models"]}
+        self._save_compare_results()
+
+    def start_compare(self, job_id: str):
+        raw = next((job for job in self.jobs if normalize_job(job).id == job_id), None)
+        if raw is None:
+            raise KeyError(job_id)
+        analysis = self.dashboard.analyse(raw)
+        comparison_id = f"cmp_{job_id}_{int(time.time())}"
+        comparison = {"comparison_id": comparison_id, "job_id": job_id, "started_at": time.time(), "models": {}, "selected_model": None, "warning": "Low match quality; review carefully before using generated documents." if analysis.score.score < 70 or not analysis.score.matched_skills else ""}
+        self.compare_results[comparison_id] = comparison
+        self.compare_progress[comparison_id] = {"done": False, "models": {model_id: {"model_id": model_id, "display_name": display_name, "status": "queued"} for model_id, display_name in COMPARE_MODELS}, "warning": comparison["warning"]}
+        self._save_compare_results()
+        cached = {result.get("cache_key"): result for past in self.compare_results.values() for result in past.get("models", {}).values() if result.get("cache_key")}
+        self.compare_runner.submit(comparison_id, analysis.job, self.dashboard.profile, cached, lambda model, key, result: self._compare_update(comparison_id, model, key, result))
+        return {"comparison_id": comparison_id, **self.compare_progress[comparison_id]}
+
+    def select_compare_output(self, comparison_id: str, model_id: str):
+        comparison = self.compare_results.get(comparison_id)
+        if not comparison or model_id not in comparison.get("models", {}):
+            raise KeyError(model_id)
+        selected = comparison["models"][model_id]
+        if selected.get("status") != "completed":
+            raise ValueError("That model has no completed output")
+        job_id = comparison["job_id"]
+        output_dir = self.data_dir / "applications"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        application_id = re.sub(r"[^a-z0-9]+", "_", f"{job_id}_{model_id}".lower()).strip("_")[:160]
+        resume_path = output_dir / f"{application_id}_resume.md"
+        cover_path = output_dir / f"{application_id}_cover_letter.md"
+        resume_path.write_text(selected["resume_text"], encoding="utf-8")
+        cover_path.write_text(selected["cover_letter_text"], encoding="utf-8")
+        self._write_pdf(output_dir / f"{application_id}_resume.pdf", selected["resume_text"])
+        self._write_pdf(output_dir / f"{application_id}_cover_letter.pdf", selected["cover_letter_text"])
+        metadata = {"application_id": application_id, "model_id": model_id, "status": "needs_review" if not selected.get("audit", {}).get("verified", True) else "draft_ready", "audit": selected.get("audit", {}), "resume": str(resume_path), "cover_letter": str(cover_path), "resume_pdf": str(output_dir / f"{application_id}_resume.pdf"), "cover_letter_pdf": str(output_dir / f"{application_id}_cover_letter.pdf")}
+        self.generated_documents[job_id] = metadata
+        comparison["selected_model"] = model_id
+        self.save_generated_documents()
+        self._save_compare_results()
+        return metadata
+
+    def retry_compare_model(self, comparison_id: str, model_id: str):
+        comparison = self.compare_results.get(comparison_id)
+        if not comparison:
+            raise KeyError(comparison_id)
+        raw = next((job for job in self.jobs if normalize_job(job).id == comparison["job_id"]), None)
+        if raw is None:
+            raise KeyError(comparison["job_id"])
+        self.compare_runner.submit(comparison_id, self.dashboard.analyse(raw).job, self.dashboard.profile, {}, lambda model, key, result: self._compare_update(comparison_id, model, key, result), model_ids=[model_id])
+        comparison["models"][model_id] = {"model_id": model_id, "status": "loading"}
+        self._save_compare_results()
+        return comparison["models"][model_id]
 
     def _write_pdf(self, output_path: Path, text: str):
         styles = getSampleStyleSheet()
@@ -235,7 +334,7 @@ class DashboardApp:
             job = normalize_job(raw)
             analysis = self.dashboard.analyse(raw)
             item = dict(raw)
-            item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "description": clean_description(job.description)})
+            item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "fit_category": analysis.fit_category, "dimensions": analysis.score.dimensions, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "description": clean_description(job.description)})
             materialized.append(item)
         return materialized
 
@@ -279,12 +378,14 @@ class DashboardApp:
             raw = next((job for job in self.jobs if job.get("id") == analysis.job.id or job.get("url") == analysis.job.url), {})
             if str(analysis.job.source).lower() == "gmail":
                 continue
+            if not filters.get("status") and stored_job.get("status", "sourced") != "sourced":
+                continue
             if stored_job.get("status") == "rejected" or not self._has_recent_activity(raw):
                 continue
             generated = raw.get("generated") or self.generated_documents.get(analysis.job.id)
             email_events = raw.get("email_events", [])
             email_id = email_events[-1].get("email_id") if email_events else ""
-            result.append({"id": analysis.job.id, "title": analysis.job.title, "company": analysis.job.company, "location": analysis.job.location, "description": analysis.job.description, "source": analysis.job.source, "url": analysis.job.url, "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "salary": raw.get("salary", ""), "posted": posted, "posted_age": posted_age(posted), "remote": analysis.job.remote, "stream": analysis.stream, "score": analysis.score.score, "fit": analysis.score.fit, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "dimensions": analysis.score.dimensions, "generated": generated})
+            result.append({"id": analysis.job.id, "title": analysis.job.title, "company": analysis.job.company, "location": analysis.job.location, "description": analysis.job.description, "source": analysis.job.source, "url": analysis.job.url, "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "salary": raw.get("salary", ""), "posted": posted, "posted_age": posted_age(posted), "remote": analysis.job.remote, "stream": analysis.stream, "fit_category": analysis.fit_category, "score": analysis.score.score, "fit": analysis.score.fit, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "dimensions": analysis.score.dimensions, "generated": generated})
             result[-1]["status"] = stored_job.get("status", "sourced")
         return result
 
@@ -300,8 +401,6 @@ class DashboardApp:
             fresh = pipeline.run(queries)
             self.jobs = self.materialize_jobs(fresh)
             self.save_jobs()
-            self.source_health = pipeline.source_health
-            self.last_refresh_errors = list(pipeline.errors)
             return self.public_jobs(), pipeline.errors
 
     @staticmethod
@@ -394,6 +493,77 @@ class DashboardApp:
         thread.start()
         return thread
 
+    def sync_tracker(self):
+        """Pull the shared application tracker sheet and reconcile it against current jobs."""
+        self.tracker_state = {**self.tracker_state, "status": "syncing"}
+        try:
+            request = urllib.request.Request(TRACKER_CSV_URL, headers={"User-Agent": "job-dashboard/1.0"})
+            with urllib.request.urlopen(request, timeout=20) as response:
+                text = response.read().decode("utf-8", errors="replace")
+        except (urllib.error.URLError, TimeoutError) as error:
+            self.tracker_state = {**self.tracker_state, "status": "failed", "error": str(error)}
+            return self.tracker_state
+        rows = [row for row in csv.DictReader(io.StringIO(text)) if any(value.strip() for value in row.values())]
+        self.tracker_rows = rows
+        matched = 0
+        for row in rows:
+            title = str(row.get("Job Title") or row.get("Title") or row.get("Role") or row.get("Position") or "").strip()
+            company = str(row.get("Company") or row.get("Employer") or "").strip()
+            status = str(row.get("Status") or row.get("Stage") or "").strip().lower()
+            if not title:
+                continue
+            existing = next((job for job in self.jobs if self._same_job(job, title, company)), None)
+            if not existing:
+                continue
+            matched += 1
+            mapped_status = self._map_tracker_status(status)
+            if mapped_status:
+                try:
+                    self.update_status(normalize_job(existing).id, mapped_status)
+                except (KeyError, ValueError):
+                    pass
+        self.tracker_state = {"status": "completed", "last_sync": time.time(), "rows": len(rows), "matched": matched, "error": None}
+        return self.tracker_state
+
+    def start_tracker_sync(self):
+        thread = threading.Thread(target=self.sync_tracker, daemon=True)
+        thread.start()
+        return thread
+
+    @staticmethod
+    def _map_tracker_status(status_text: str) -> str | None:
+        """Classify a free-text tracker status cell into a dashboard stage."""
+        text = status_text.lower()
+        if any(term in text for term in ("unsuccessful", "reject", "declined", "closed", "expired")):
+            return "rejected"
+        if "offer" in text:
+            return "offer"
+        if "interview" in text:
+            return "interviewing"
+        if any(term in text for term in ("shortlist",)):
+            return "shortlisted"
+        if any(term in text for term in ("applied", "submitted", "confirmation", "confirmed", "under review", "action required", "viewed", "response received")):
+            return "applied"
+        return None
+
+    def tracker_suggestions(self):
+        """Tracker rows not yet represented among the dashboard's jobs."""
+        suggestions = []
+        for row in self.tracker_rows:
+            title = str(row.get("Job Title") or row.get("Title") or row.get("Role") or row.get("Position") or "").strip()
+            company = str(row.get("Company") or row.get("Employer") or "").strip()
+            if not title or any(self._same_job(job, title, company) for job in self.jobs):
+                continue
+            suggestions.append({
+                "title": title,
+                "company": company or "Company not listed",
+                "status": str(row.get("Status") or row.get("Stage") or "").strip(),
+                "date": str(row.get("Date") or row.get("Applied") or "").strip(),
+                "notes": str(row.get("Notes") or "").strip(),
+                "email_link": str(row.get("Email Link") or row.get("Email link") or row.get("Email") or "").strip(),
+            })
+        return suggestions
+
     def generate(self, job_id):
         raw = next((job for job in self.jobs if normalize_job(job).id == job_id), None)
         if raw is None:
@@ -464,24 +634,32 @@ def make_handler(app: DashboardApp):
                 query = parse_qs(parsed.query)
                 filters = {key: query[key][0] for key in ("location", "role", "source", "stream", "status") if key in query}
                 filters["match_score_min"] = int(query.get("match_score_min", [0])[0])
-                if query.get("salary_min", [""])[0].strip():
-                    filters["salary_min"] = float(query["salary_min"][0])
                 self.send_json(200, {"jobs": app.public_jobs(filters)})
                 return
             if path == "/api/metrics/summary":
                 metrics = app.repository.metrics()
-                metrics["source_health"] = app.source_health
-                metrics["last_refresh_errors"] = app.last_refresh_errors
+                metrics["tracker_state"] = app.tracker_state
                 self.send_json(200, metrics)
                 return
             if path == "/api/rejections":
                 self.send_json(200, {"rejections": app.rejected_applications()})
                 return
+            if path == "/api/tracker/suggestions":
+                self.send_json(200, {"suggestions": app.tracker_suggestions(), "tracker_state": app.tracker_state})
+                return
+            if path.startswith("/api/compare/"):
+                comparison_id = path.removeprefix("/api/compare/")
+                comparison = app.compare_results.get(comparison_id)
+                if not comparison:
+                    self.send_json(404, {"error": "Comparison not found"})
+                    return
+                self.send_json(200, app.compare_progress.get(comparison_id, comparison))
+                return
             if path == "/api/applications/archive":
                 self.send_json(200, {"applications": app.application_archive()})
                 return
             if path == "/api/search-criteria":
-                self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in app.search_queries]})
+                self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream, "group": query.group, "weight": query.weight, "exclude_terms": list(query.exclude_terms), "enabled": query.enabled} for query in app.search_queries]})
                 return
             if path == "/api/search-criteria/defaults":
                 self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in DEFAULT_QUERIES]})
@@ -524,9 +702,23 @@ def make_handler(app: DashboardApp):
         def do_POST(self):
             path = urlparse(self.path).path
             try:
+                if path.startswith("/api/jobs/") and path.endswith("/compare"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/compare")
+                    self.send_json(202, {"status": "queued", **app.start_compare(job_id)})
+                    return
+                if path.startswith("/api/compare/") and path.endswith("/retry"):
+                    comparison_id = path.removeprefix("/api/compare/").removesuffix("/retry")
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    self.send_json(202, {"status": "queued", **app.retry_compare_model(comparison_id, payload["model_id"])})
+                    return
+                if path.startswith("/api/compare/") and path.endswith("/select"):
+                    comparison_id = path.removeprefix("/api/compare/").removesuffix("/select")
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    self.send_json(200, app.select_compare_output(comparison_id, payload["model_id"]))
+                    return
                 if path == "/api/refresh":
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    queries = [SearchQuery(item["term"], item.get("location", "Melbourne, VIC"), item.get("stream", "core-it")) for item in payload.get("queries", [])]
+                    queries = [SearchQuery(item["term"], item.get("location", "Melbourne, VIC"), item.get("stream", "core-it"), item.get("group", ""), float(item.get("weight", 1.0)), tuple(item.get("exclude_terms", [])), bool(item.get("enabled", True))) for item in payload.get("queries", [])]
                     jobs, errors = app.refresh(queries)
                     self.send_json(200, {"jobs": jobs, "errors": errors})
                     return
@@ -540,6 +732,9 @@ def make_handler(app: DashboardApp):
                     app_password = os.getenv("GMAIL_APP_PASSWORD")
                     days = max(1, min(7, int(payload.get("days", 7))))
                     self.send_json(200, app.scan_gmail(username, app_password, days))
+                    return
+                if path == "/api/tracker/sync":
+                    self.send_json(200, app.sync_tracker())
                     return
                 if path.startswith("/api/jobs/") and path.endswith("/generate"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/generate")
@@ -565,7 +760,7 @@ def make_handler(app: DashboardApp):
                 if path.startswith("/api/jobs/") and path.endswith("/status"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/status")
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    self.send_json(200, app.repository.update_status(job_id, payload["status"]))
+                    self.send_json(200, app.update_status(job_id, payload["status"]))
                     return
                 self.send_json(404, {"error": "not found"})
             except Exception as error:

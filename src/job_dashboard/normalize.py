@@ -36,4 +36,5 @@ def normalize_job(raw: Mapping[str, Any]) -> Job:
         source=str(raw.get("source") or "").strip(),
         url=str(raw.get("url") or raw.get("application_url") or "").strip(),
         subcategory=str(raw.get("subcategory") or "").strip(),
+        posted=str(raw.get("posted") or raw.get("date_posted") or "").strip(),
     )

@@ -15,6 +15,7 @@ class Job:
     source: str = ""
     url: str = ""
     subcategory: str = ""
+    posted: str = ""
 
     def text(self) -> str:
         return " ".join((self.title, self.company, self.location, self.description, self.why, *self.tags))
@@ -31,6 +32,8 @@ class ScoreResult:
     risks: tuple[str, ...] = ()
     confidence: float = 0.0
     experience_level: str = "mid"
+    relevance: str = "Strong"
+    score_breakdown: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,7 @@ class JobAnalysis:
     job: Job
     stream: str
     score: ScoreResult
+    fit_category: str = "weak-fit"
 
 
 @dataclass

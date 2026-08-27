@@ -60,6 +60,6 @@ def test_seek_does_not_use_cache_after_api_success(tmp_path):
         def _search_cache(self, query):
             raise AssertionError("cache should not be read after API success")
 
-    source = SuccessfulSeek(max_results=1, cache_path=tmp_path / "unused.json", allow_cache_fallback=True)
+    source = SuccessfulSeek(cache_path=tmp_path / "unused.json", allow_cache_fallback=True)
 
     assert [job["id"] for job in source.search(SearchQuery("cloud"))] == ["api-1"]

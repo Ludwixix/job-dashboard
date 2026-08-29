@@ -481,29 +481,59 @@ class DashboardApp:
         dates.extend(event.get("received_at", "") for event in job.get("email_events", []))
         return any(value and is_recent({"posted": value}, days=days) for value in dates)
 
-    def refresh(self, queries):
+    def refresh(self, queries, force: bool = False, ttl_hours: float = 12.0):
         with self.lock:
-            pipeline = ScrapePipeline(self.sources, days=14)
-            fresh = pipeline.run(queries)
-            if fresh:
-                # Materialize the fresh jobs
-                fresh_materialized = self.materialize_jobs(fresh)
-                
-                # Create a set of existing job IDs
-                existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
-                
-                # Merge fresh jobs with existing jobs
-                merged_jobs = list(self.jobs)  # Start with all existing jobs
-                
-                # Add fresh jobs that aren't already in the list
-                for job in fresh_materialized:
-                    job_id = job.get("id")
-                    if job_id and job_id not in existing_ids:
-                        merged_jobs.append(job)
-                
-                self.jobs = merged_jobs
-                self.save_jobs()
-            return self.public_jobs(), pipeline.errors
+            queries_to_scrape = []
+            cached_query_terms = []
+
+            for q in queries:
+                term = q.term if hasattr(q, "term") else str(q.get("term", ""))
+                loc = q.location if hasattr(q, "location") else str(q.get("location", ""))
+
+                if not force and self.repository.is_query_cached(term, loc, ttl_hours=ttl_hours):
+                    cached_query_terms.append(term)
+                else:
+                    queries_to_scrape.append(q)
+
+            pipeline_errors = []
+            if queries_to_scrape:
+                pipeline = ScrapePipeline(self.sources, days=14)
+                fresh = pipeline.run(queries_to_scrape)
+                pipeline_errors = pipeline.errors
+
+                if fresh:
+                    # Materialize fresh jobs
+                    fresh_materialized = self.materialize_jobs(fresh)
+                    existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
+                    merged_jobs = list(self.jobs)
+
+                    for job in fresh_materialized:
+                        job_id = job.get("id")
+                        if job_id and job_id not in existing_ids:
+                            merged_jobs.append(job)
+                            existing_ids.add(job_id)
+
+                    self.jobs = merged_jobs
+                    self.save_jobs()
+
+                # Record cache hit timestamps for freshly scraped queries
+                for q in queries_to_scrape:
+                    term = q.term if hasattr(q, "term") else str(q.get("term", ""))
+                    loc = q.location if hasattr(q, "location") else str(q.get("location", ""))
+                    self.repository.record_query_scrape(term, loc, len(fresh or []))
+
+            # Recalibrate/score all database jobs against current profile
+            self.jobs = self.materialize_jobs(self.jobs)
+
+            stats = {
+                "total_jobs": len(self.jobs),
+                "queries_scraped": len(queries_to_scrape),
+                "queries_cached": len(cached_query_terms),
+                "cache_hit": len(queries_to_scrape) == 0,
+                "cached_terms": cached_query_terms
+            }
+            return self.public_jobs(), pipeline_errors, stats
+
 
     @staticmethod
     def _gmail_job_details(message):
@@ -979,9 +1009,17 @@ def make_handler(app: DashboardApp):
                 if path == "/api/refresh":
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
                     queries = [SearchQuery(item["term"], item.get("location", "Melbourne, VIC"), item.get("stream", "core-it"), item.get("group", ""), float(item.get("weight", 1.0)), tuple(item.get("exclude_terms", [])), bool(item.get("enabled", True))) for item in payload.get("queries", [])]
-                    jobs, errors = app.refresh(queries)
-                    self.send_json(200, {"jobs": jobs, "errors": errors})
+                    force = bool(payload.get("force", False))
+                    ttl_hours = float(payload.get("ttl_hours", 12.0))
+                    jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                    self.send_json(200, {
+                        "jobs": jobs,
+                        "errors": errors,
+                        "cache_stats": cache_stats,
+                        "success": True
+                    })
                     return
+
                 if path == "/api/search-criteria":
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
                     self.send_json(200, {"queries": app.update_search_queries(payload.get("queries", []))})

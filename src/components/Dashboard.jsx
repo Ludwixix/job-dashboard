@@ -4,15 +4,24 @@ import { ApplicationTracker } from './ApplicationTracker';
 import { JobSeeker } from './JobSeeker';
 import { JobModal } from './JobModal';
 import { GeneratorModal } from './GeneratorModal';
+import { InterviewPrepModal } from './InterviewPrepModal';
+import { MarketIntelligence } from './MarketIntelligence';
+import { KanbanBoard } from './KanbanBoard';
 import { CommandPalette } from './CommandPalette';
+import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
-import { Terminal, Sparkles, CheckCircle2, Cpu, Activity, RefreshCw, MapPin, Edit2, Check, X, Download, Command, Zap } from 'lucide-react';
+import { 
+  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
+  MapPin, Edit2, Check, X, Download, Command, Zap, LayoutGrid, 
+  Sliders, TrendingUp, Table 
+} from 'lucide-react';
 
 export const Dashboard = () => {
   const { jobs, loading, error, refetch, updateJobStatus, rejectJob, unrejectJob } = useJobs();
-  const [activeSection, setActiveSection] = useState('seeker');
+  const [activeSection, setActiveSection] = useState('seeker'); // 'seeker', 'kanban', 'market', 'tracker'
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedForGenerator, setSelectedForGenerator] = useState(null);
+  const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
 
@@ -26,6 +35,18 @@ export const Dashboard = () => {
   useEffect(() => {
     localStorage.setItem('userBaseLocation', baseLocation);
   }, [baseLocation]);
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleSaveLocation = (e) => {
     if (e) e.preventDefault();
@@ -46,25 +67,28 @@ export const Dashboard = () => {
   ];
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-900 gap-4 font-mono">
+    <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-slate-100 gap-4 font-mono">
       <div className="relative flex items-center justify-center">
         <div className="animate-ping absolute inline-flex h-12 w-12 rounded-full bg-indigo-500/20"></div>
-        <Cpu size={32} className="text-indigo-600 animate-pulse" />
+        <Cpu size={32} className="text-indigo-400 animate-pulse" />
       </div>
-      <p className="text-xs font-bold tracking-widest uppercase text-slate-600">LOADING GOOGLE SHEETS PIPELINE...</p>
+      <p className="text-xs font-bold tracking-widest uppercase text-slate-400">INITIALIZING V2.0 AUTONOMOUS CAREER ENGINE...</p>
     </div>
   );
 
   if (error) return (
-    <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-50 text-rose-900 rounded-lg border border-rose-200 font-mono text-xs shadow-xs">
+    <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-950 text-rose-200 rounded-xl border border-rose-800 font-mono text-xs shadow-lg">
       <h2 className="text-sm font-bold tracking-widest uppercase mb-1">SYSTEM ERROR // FETCH FAILED</h2>
       <p>{error}</p>
     </div>
   );
 
   const preparedCount = jobs.filter(j => 
-    j.status.toLowerCase().includes('package prepared') || 
-    j.status.toLowerCase().includes('to submit')
+    !j.isRejected && (
+      j.status.toLowerCase().includes('package prepared') || 
+      j.status.toLowerCase().includes('to submit') ||
+      j.status.toLowerCase().includes('discovered')
+    )
   ).length;
 
   const handleExportCSV = () => {
@@ -96,22 +120,22 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 bg-tech-grid font-sans text-slate-900 pb-12 selection:bg-indigo-600 selection:text-white">
-      {/* Dynamic Live Ticker Bar */}
+    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
+      {/* Top Live Engine Status Bar */}
       <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[11px] border-b border-slate-800 flex items-center justify-between font-semibold">
         <div className="flex items-center gap-4 truncate">
           <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0">
-            <Activity size={13} className="animate-pulse" /> ENGINE ACTIVE
+            <Activity size={13} className="animate-pulse" /> V2.0 ENGINE ACTIVE
           </span>
-          <span className="text-slate-400 hidden sm:inline">|</span>
+          <span className="text-slate-700 hidden sm:inline">|</span>
           <span className="truncate text-slate-300">
-            <strong className="text-white">{jobs.length}</strong> TOTAL POSITIONS IN DATABASE
+            <strong className="text-white">{jobs.length}</strong> INDEXED POSITIONS
           </span>
-          <span className="text-slate-400 hidden md:inline">|</span>
+          <span className="text-slate-700 hidden md:inline">|</span>
           
-          {/* Updatable Location Bound Bar */}
+          {/* Location Bound selector */}
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 font-bold">LOCATION BOUND:</span>
+            <span className="text-slate-500 font-bold">BASE:</span>
             {isEditingLocation ? (
               <form onSubmit={handleSaveLocation} className="flex items-center gap-1.5">
                 <input
@@ -141,7 +165,7 @@ export const Dashboard = () => {
             ) : (
               <button
                 onClick={() => { setTempLocationInput(baseLocation); setIsEditingLocation(true); }}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 transition-all font-black cursor-pointer group"
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 transition-all font-bold cursor-pointer group text-[11px]"
                 title="Click to change your location bound base"
               >
                 <MapPin size={11} className="text-emerald-400" />
@@ -155,7 +179,7 @@ export const Dashboard = () => {
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => setIsBatchApplyOpen(true)}
-            className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded"
+            className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950 border border-emerald-500/40 px-2 py-0.5 rounded"
             title="Dispatch 1-Click Batch Automated Applications"
           >
             <Zap size={12} className="animate-bounce text-emerald-400" /> BATCH AUTO-APPLY
@@ -163,45 +187,45 @@ export const Dashboard = () => {
 
           <button
             onClick={() => setIsCommandPaletteOpen(true)}
-            className="flex items-center gap-1 text-purple-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-purple-950/80 border border-purple-500/40 px-2 py-0.5 rounded"
+            className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950 border border-indigo-500/40 px-2 py-0.5 rounded"
             title="Open Command Palette (Ctrl+K)"
           >
-            <Command size={12} /> CTRL+K
+            <Command size={12} /> ⌘K
           </button>
 
-          <span className="text-slate-700">|</span>
+          <span className="text-slate-800">|</span>
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer text-[10px] uppercase font-bold"
+            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold"
             title="Export all database postings to CSV"
           >
-            <Download size={12} /> EXPORT CSV
+            <Download size={12} /> CSV
           </button>
 
-          <span className="text-slate-700">|</span>
+          <span className="text-slate-800">|</span>
 
           <button 
             onClick={refetch}
             className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold"
           >
-            <RefreshCw size={12} /> SYNC DATA
+            <RefreshCw size={12} /> SYNC
           </button>
         </div>
       </div>
 
-      {/* Quick Location Preset Selector Bar when editing */}
+      {/* Location Preset Bar */}
       {isEditingLocation && (
-        <div className="bg-slate-800 text-slate-300 py-1.5 px-4 font-mono text-[10px] border-b border-slate-700 flex items-center gap-2 overflow-x-auto animate-in fade-in duration-150">
-          <span className="text-slate-400 font-bold uppercase shrink-0">QUICK PRESETS:</span>
+        <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[10px] border-b border-slate-800 flex items-center gap-2 overflow-x-auto">
+          <span className="text-slate-500 font-bold uppercase shrink-0">QUICK PRESETS:</span>
           {PRESET_SUBURBS.map(suburb => (
             <button
               key={suburb}
               onClick={() => { setBaseLocation(suburb); setTempLocationInput(suburb); setIsEditingLocation(false); }}
-              className={`px-2 py-0.5 rounded border transition-colors shrink-0 cursor-pointer font-extrabold ${
+              className={`px-2 py-0.5 rounded border transition-colors shrink-0 cursor-pointer font-bold ${
                 baseLocation === suburb 
-                  ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                  : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-700'
+                  ? 'bg-emerald-600 text-white border-emerald-400'
+                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
               }`}
             >
               {suburb}
@@ -210,67 +234,98 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* High-Contrast Technocratic Header */}
-      <header className="bg-slate-900 border-b-2 border-slate-800 text-white sticky top-0 z-40 shadow-md font-mono">
-        <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Technocratic Header & Top Navigation */}
+      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 shadow-xl font-mono">
+        <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-xs border border-indigo-400/40">
+            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md border border-indigo-400/40">
               <Terminal size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-black tracking-wider uppercase text-white">
-                  APPLICATIONS.HUB // v3.0
+                  CAREER.AGENT // V2.0
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 pulse-emerald">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> LIVE SYNCED
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-400/30">
+                  <Sparkles size={11} className="text-indigo-400" /> SUPER INTELLIGENCE
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono font-bold mt-0.5">
-                REAL-TIME GOOGLE SHEETS & AUTOMATED APPLICATION DISPATCHER
+              <p className="text-[11px] text-slate-400 font-medium">
+                AUTONOMOUS APPLICATION DISPATCHER & CAREER ACCELERATOR
               </p>
             </div>
           </div>
 
-          {/* Section Navigation Tabs */}
-          <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+          {/* 4-Way Tab View Switcher */}
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 overflow-x-auto">
             <button
               onClick={() => setActiveSection('seeker')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
                 activeSection === 'seeker' 
-                  ? 'bg-indigo-600 text-white shadow-md border border-indigo-400/50 pulse-indigo' 
+                  ? 'bg-indigo-600 text-white shadow-md' 
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <Sparkles size={15} className={activeSection === 'seeker' ? "text-indigo-200 animate-spin-slow" : "text-indigo-400"} /> 
-              JOB SEEKER & PREP
+              <LayoutGrid size={14} /> 
+              STREAM
               {preparedCount > 0 && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
-                  activeSection === 'seeker' ? 'bg-white text-indigo-900' : 'bg-indigo-950 text-indigo-300 border border-indigo-500/40'
-                }`}>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40">
                   {preparedCount}
                 </span>
               )}
             </button>
 
             <button
-              onClick={() => setActiveSection('tracker')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
-                activeSection === 'tracker' 
-                  ? 'bg-emerald-600 text-white shadow-md border border-emerald-400/50 pulse-emerald' 
+              onClick={() => setActiveSection('kanban')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                activeSection === 'kanban' 
+                  ? 'bg-indigo-600 text-white shadow-md' 
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <CheckCircle2 size={15} className={activeSection === 'tracker' ? "text-emerald-200" : "text-emerald-400"} /> 
-              APPLICATION TRACKER
+              <Sliders size={14} /> 
+              FUNNEL KANBAN
+            </button>
+
+            <button
+              onClick={() => setActiveSection('market')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                activeSection === 'market' 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <TrendingUp size={14} /> 
+              MARKET INTEL
+            </button>
+
+            <button
+              onClick={() => setActiveSection('tracker')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                activeSection === 'tracker' 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Table size={14} /> 
+              TABLE
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeSection === 'seeker' ? (
+      <main className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Autonomous Copilot Bar */}
+        <CopilotBar 
+          jobs={jobs} 
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenGenerator={(j) => setSelectedForGenerator(j)}
+          onNavigateView={(view) => setActiveSection(view)}
+        />
+
+        {/* Dynamic View Component */}
+        {activeSection === 'seeker' && (
           <JobSeeker 
             jobs={jobs} 
             onSelectJob={(job) => setSelectedJob(job)} 
@@ -278,7 +333,22 @@ export const Dashboard = () => {
             onUnrejectJob={unrejectJob}
             baseLocation={baseLocation} 
           />
-        ) : (
+        )}
+
+        {activeSection === 'kanban' && (
+          <KanbanBoard 
+            jobs={jobs} 
+            onUpdateStatus={(id, status) => updateJobStatus(id, status)}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
+            onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+          />
+        )}
+
+        {activeSection === 'market' && (
+          <MarketIntelligence jobs={jobs} />
+        )}
+
+        {activeSection === 'tracker' && (
           <ApplicationTracker 
             jobs={jobs} 
             onSelectJob={(job) => setSelectedJob(job)} 
@@ -315,21 +385,24 @@ export const Dashboard = () => {
         />
       )}
 
-      {/* Intelligent Quick Action Command Palette */}
+      {/* Interview Prep Super Intelligence Modal */}
+      {selectedForInterviewPrep && (
+        <InterviewPrepModal 
+          job={selectedForInterviewPrep} 
+          onClose={() => setSelectedForInterviewPrep(null)} 
+        />
+      )}
+
+      {/* Omni-Command Palette Modal */}
       <CommandPalette 
         isOpen={isCommandPaletteOpen}
-        onClose={setIsCommandPaletteOpen}
-        onSelectAction={(actionId) => {
-          if (actionId === 'batch_apply') setIsBatchApplyOpen(true);
-          else if (actionId === 'export_csv') handleExportCSV();
-          else if (actionId === 'sync_data') refetch();
-          else if (actionId === 'set_location') setIsEditingLocation(true);
-          else if (actionId === 'view_table') setActiveSection('tracker');
-          else if (actionId === 'view_kanban') setActiveSection('tracker');
-        }}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        jobs={jobs}
+        onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
+        onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
       />
 
-      {/* 1-Click Batch Application Dispatcher Modal */}
+      {/* Batch Application Dispatcher Modal */}
       <BatchApplyModal 
         jobs={jobs}
         isOpen={isBatchApplyOpen}
@@ -343,25 +416,20 @@ export const Dashboard = () => {
         }}
       />
 
-      {/* VS Code Dark Theme Fixed Bottom Status Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 h-7 bg-[#007acc] text-white font-mono text-[11px] font-bold px-3 flex items-center justify-between z-50 select-none shadow-md">
+      {/* Fixed Bottom Status Bar */}
+      <footer className="fixed bottom-0 left-0 right-0 h-7 bg-slate-900 border-t border-slate-800 text-slate-400 font-mono text-[11px] font-bold px-4 flex items-center justify-between z-50 select-none shadow-md">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer transition-colors">
-            <span>⚡ master*</span>
+          <div className="flex items-center gap-1 text-emerald-400">
+            <span>⚡ V2.0 AUTONOMOUS</span>
           </div>
-          <div className="flex items-center gap-1 hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer transition-colors">
-            <span>0 errors, 0 warnings</span>
-          </div>
-          <div className="flex items-center gap-1 text-sky-200">
-            <span>Synced: {jobs.length} jobs</span>
+          <div className="flex items-center gap-1 text-slate-500 hidden sm:flex">
+            <span>Active Feed: {jobs.length} jobs</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer">UTF-8</span>
-          <span className="hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer">Prettier</span>
-          <span className="hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer">React 19 / Vite</span>
-          <span className="bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-black text-[10px]">
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500">React 19 / Vite 6</span>
+          <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-black text-[10px]">
             {baseLocation.split(' ')[0]}
           </span>
         </div>

@@ -1,107 +1,162 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Search, Zap, Download, RefreshCw, Wrench, Building2, 
-  Server, ShieldCheck, Database, LayoutList, Kanban, MapPin, X
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Sparkles, Zap, Briefcase, X, ArrowRight, Sliders, ExternalLink } from 'lucide-react';
 
-export const CommandPalette = ({ isOpen, onClose, onSelectAction }) => {
+export const CommandPalette = ({ isOpen, onClose, jobs = [], onSelectJob, onNavigateView }) => {
   const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef(null);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        onClose(!isOpen);
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      setQuery('');
+      setSelectedIndex(0);
+    }
+  }, [isOpen]);
+
+  // Filter commands & jobs
+  const cleanQ = query.toLowerCase().trim();
+
+  const staticActions = [
+    { id: 'view_stream', label: 'View: Live Stream & All Jobs', icon: <Briefcase size={14} className="text-indigo-400" />, action: () => onNavigateView('stream') },
+    { id: 'view_kanban', label: 'View: Application Pipeline (Kanban)', icon: <Sliders size={14} className="text-emerald-400" />, action: () => onNavigateView('kanban') },
+    { id: 'view_market', label: 'View: Market Intelligence & Skill Gap Analysis', icon: <Sparkles size={14} className="text-amber-400" />, action: () => onNavigateView('market') },
+  ];
+
+  const matchedActions = staticActions.filter(a => a.label.toLowerCase().includes(cleanQ));
+  const matchedJobs = cleanQ
+    ? jobs.filter(j => 
+        j.company.toLowerCase().includes(cleanQ) || 
+        j.title.toLowerCase().includes(cleanQ) ||
+        (j.location && j.location.toLowerCase().includes(cleanQ))
+      ).slice(0, 8)
+    : jobs.slice(0, 5);
+
+  const totalItems = [...matchedActions, ...matchedJobs];
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+
+  // Keyboard navigation
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1) % Math.max(1, totalItems.length));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 + totalItems.length) % Math.max(1, totalItems.length));
+    } else if (e.key === 'Enter' && totalItems[selectedIndex]) {
+      e.preventDefault();
+      const item = totalItems[selectedIndex];
+      if (item.action) {
+        item.action();
+      } else {
+        onSelectJob(item);
       }
-      if (e.key === 'Escape' && isOpen) {
-        onClose(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+      onClose();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
 
   if (!isOpen) return null;
 
-  const COMMANDS = [
-    { id: 'batch_apply', title: '🚀 Execute Automated Application Pipeline for Top Matches', category: 'Automation', icon: Zap, action: () => onSelectAction('batch_apply') },
-    { id: 'export_csv', title: '📥 Export Complete Job Database to CSV', category: 'Data', icon: Download, action: () => onSelectAction('export_csv') },
-    { id: 'sync_data', title: '🔄 Sync Google Sheets & Scraper Telemetry', category: 'Data', icon: RefreshCw, action: () => onSelectAction('sync_data') },
-    { id: 'tab_field_tech', title: '🛠️ Filter Stream: Field Tech, Labour & Outdoor Work', category: 'Stream Filter', icon: Wrench, action: () => onSelectAction('stream_Field Tech, Labour & Physical') },
-    { id: 'tab_gov', title: '🏛️ Filter Stream: Government & Council Pathways', category: 'Stream Filter', icon: Building2, action: () => onSelectAction('stream_Gov & Council Pathways') },
-    { id: 'tab_it', title: '🖥️ Filter Stream: Core IT & Systems Engineering', category: 'Stream Filter', icon: Server, action: () => onSelectAction('stream_Core IT & Systems') },
-    { id: 'tab_cyber', title: '🛡️ Filter Stream: Cybersecurity & SOC Operations', category: 'Stream Filter', icon: ShieldCheck, action: () => onSelectAction('stream_Cybersecurity') },
-    { id: 'tab_data', title: '📊 Filter Stream: Data & Analytics', category: 'Stream Filter', icon: Database, action: () => onSelectAction('stream_Data & Analytics') },
-    { id: 'view_table', title: '📋 Switch to Table View in Application Tracker', category: 'View', icon: LayoutList, action: () => onSelectAction('view_table') },
-    { id: 'view_kanban', title: '🗂️ Switch to Kanban Board in Application Tracker', category: 'View', icon: Kanban, action: () => onSelectAction('view_kanban') },
-    { id: 'set_location', title: '📍 Update Base Location (Current: Balaclava VIC)', category: 'Settings', icon: MapPin, action: () => onSelectAction('set_location') },
-  ];
-
-  const filteredCommands = COMMANDS.filter(cmd => 
-    cmd.title.toLowerCase().includes(query.toLowerCase()) || 
-    cmd.category.toLowerCase().includes(query.toLowerCase())
-  );
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-slate-950/80 backdrop-blur-md font-mono p-4">
-      <div className="w-full max-w-2xl bg-[#181825] border-2 border-purple-500/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-slate-100">
-        {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#313244] bg-[#1e1e2e]">
-          <Search size={18} className="text-purple-400 shrink-0" />
+    <div 
+      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-start justify-center pt-20 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[75vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Search header */}
+        <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-950">
+          <Search size={18} className="text-indigo-400 shrink-0" />
           <input
+            ref={inputRef}
             type="text"
-            placeholder="TYPE A COMMAND OR ACTION (e.g., EXPORT, FIELD TECH, SYNC)..."
+            className="w-full bg-transparent text-white text-sm focus:outline-none placeholder-slate-500 font-medium"
+            placeholder="Type a command, job title, company, or tech keyword... (e.g. 'Azure', 'Kanban', 'Australia Post')"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none"
-            autoFocus
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
           />
-          <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-bold shrink-0">
-            ESC TO CLOSE
-          </span>
-          <button 
-            onClick={() => onClose(false)} 
-            className="text-slate-400 hover:text-white p-1 rounded transition-colors cursor-pointer"
-          >
-            <X size={16} />
-          </button>
+          <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] bg-slate-800 border border-slate-700 text-slate-400 rounded-md font-mono">ESC</kbd>
         </div>
 
-        {/* Command List */}
-        <div className="max-h-96 overflow-y-auto p-2 space-y-1">
-          {filteredCommands.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">
-              No matching commands found for "{query}".
+        {/* Results list */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {matchedActions.length > 0 && (
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              System Views & Actions
             </div>
-          ) : (
-            filteredCommands.map(cmd => {
-              const CmdIcon = cmd.icon;
-              return (
-                <div
-                  key={cmd.id}
-                  onClick={() => { cmd.action(); onClose(false); }}
-                  className="flex items-center justify-between p-3 rounded-xl hover:bg-purple-600/30 hover:border-purple-400/50 border border-transparent transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-900 text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                      <CmdIcon size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-white group-hover:text-purple-200">
-                        {cmd.title}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">
-                        {cmd.category}
-                      </div>
-                    </div>
+          )}
+          {matchedActions.map((item, idx) => {
+            const isSelected = selectedIndex === idx;
+            return (
+              <div
+                key={item.id}
+                onClick={() => { item.action(); onClose(); }}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isSelected ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800/70'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  {item.icon}
+                  <span>{item.label}</span>
+                </div>
+                <ArrowRight size={13} className={isSelected ? 'text-white' : 'text-slate-600'} />
+              </div>
+            );
+          })}
+
+          {matchedJobs.length > 0 && (
+            <div className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Jobs & Target Companies ({matchedJobs.length})
+            </div>
+          )}
+          {matchedJobs.map((job, idx) => {
+            const actualIdx = matchedActions.length + idx;
+            const isSelected = selectedIndex === actualIdx;
+            return (
+              <div
+                key={job.id || idx}
+                onClick={() => { onSelectJob(job); onClose(); }}
+                className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors ${
+                  isSelected ? 'bg-slate-800 text-white border border-indigo-500/50' : 'text-slate-300 hover:bg-slate-800/40'
+                }`}
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-bold text-indigo-400 shrink-0">
+                    {job.company.substring(0, 2).toUpperCase()}
                   </div>
-                  <span className="text-[10px] font-bold text-purple-400 group-hover:text-white bg-purple-950/80 group-hover:bg-purple-500 px-2.5 py-1 rounded-full border border-purple-500/30 transition-all">
-                    RUN ↵
+                  <div className="truncate">
+                    <div className="font-bold text-slate-200 truncate">{job.title}</div>
+                    <div className="text-[11px] text-slate-400 truncate">{job.company} • {job.location || 'Melbourne'}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-950 border border-slate-800 text-emerald-400">
+                    {job.score || 85}%
                   </span>
                 </div>
-              );
-            })
+              </div>
+            );
+          })}
+
+          {totalItems.length === 0 && (
+            <div className="p-8 text-center text-xs text-slate-500">
+              No matching commands or jobs found for "{query}".
+            </div>
           )}
+        </div>
+
+        {/* Footer info */}
+        <div className="px-4 py-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Navigate with <kbd className="text-slate-400 font-mono">↑</kbd> <kbd className="text-slate-400 font-mono">↓</kbd>, Select <kbd className="text-slate-400 font-mono">↵</kbd></span>
+          <span>Open with <kbd className="text-slate-400 font-mono">Ctrl+K</kbd> / <kbd className="text-slate-400 font-mono">⌘K</kbd></span>
         </div>
       </div>
     </div>

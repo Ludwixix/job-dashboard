@@ -42,7 +42,7 @@ export const MarketIntelligence = ({ jobs = [] }) => {
       </div>
 
       {/* ── Career Drivers & Strategic Moats ── */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {gapReport.careerDrivers.map((item, idx) => (
           <div key={idx} className="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{item.driver}</div>
@@ -55,9 +55,9 @@ export const MarketIntelligence = ({ jobs = [] }) => {
       </div>
 
       {/* ── Main 2-Column Grid: Skill Demand vs Gap Report ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Market Skill Demand Matrix (2 cols) */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+        {/* Market Skill Demand Matrix (2 cols on laptop, 3 cols on ultrawide) */}
+        <div className="lg:col-span-2 2xl:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <TrendingUp size={16} className="text-indigo-400" />

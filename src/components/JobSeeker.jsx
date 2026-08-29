@@ -708,7 +708,7 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
             </div>
           ) : (
             <div className="space-y-6">
-              <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+              <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
                 {paginatedJobs.map(job => {
                   const isTopFit = (job.score || 0) >= 90;
                   const matchedSkills = job.audit?.matched_terms || job.tags || [];

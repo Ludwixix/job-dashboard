@@ -154,7 +154,7 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
   const proximityTier = highlightedLocalJob ? getProximityTier(highlightedLocalJob.location) : 3;
 
   return (
-    <aside className="w-full lg:w-80 shrink-0 space-y-3 font-sans">
+    <aside className="w-full lg:w-80 xl:w-88 2xl:w-[380px] 3xl:w-[420px] shrink-0 space-y-3 font-sans">
       {/* FEATURED INSIGHTS 1: LIVE POINTS OF INTEREST (Real-Time Telemetry HUD) */}
       <div className="bg-slate-900 text-white rounded-xl p-3.5 border border-indigo-500/40 shadow-md font-mono relative overflow-hidden">
         <div 

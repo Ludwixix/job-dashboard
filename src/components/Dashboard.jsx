@@ -236,7 +236,7 @@ export const Dashboard = () => {
 
       {/* Technocratic Header & Top Navigation */}
       <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 shadow-xl font-mono">
-        <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="w-full max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md border border-indigo-400/40">
               <Terminal size={20} />
@@ -314,9 +314,9 @@ export const Dashboard = () => {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Autonomous Copilot Bar */}
+      {/* Main Workspace Dashboard Container */}
+      <main className="w-full max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 space-y-6 flex-1">
+        {/* Proactive Agent Copilot Intelligence Bar */}
         <CopilotBar 
           jobs={jobs} 
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}

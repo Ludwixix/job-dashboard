@@ -79,6 +79,9 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
     }, 1200);
   };
 
+  const [telemetryLogs, setTelemetryLogs]     = useState([]);
+  const [quickApiKey, setQuickApiKey]         = useState('');
+
   // Pre-compute ATS analysis from job description
   const jobDescription = job.notes || job.description || '';
   const matchedKeywords = extractJobKeywords(jobDescription);
@@ -89,14 +92,21 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
     return runDocumentQualityAudit(job, resumeText, coverLetterText);
   }, [job, resumeText, coverLetterText]);
 
-  // ── Unified 1-Click AI Generation ──────────────────────────────────────────
+  // ── Unified 1-Click AI Generation with Live Streaming Telemetry ─────────────
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError('');
     setGenProgress('Connecting to OpenRouter online (GLM 5.3 Flash)…');
+    setTelemetryLogs([
+      { time: '0.0s', msg: `Initialized dispatch for ${job.title} at ${job.company}`, type: 'init' }
+    ]);
+
+    const handleLog = (logEntry) => {
+      setTelemetryLogs(prev => [...prev, logEntry]);
+    };
 
     try {
-      const result = await generateApplicationDocs(job, setGenProgress);
+      const result = await generateApplicationDocs(job, setGenProgress, handleLog);
 
       if (!result) {
         setGenError('Unable to connect to generation engine.');
@@ -115,10 +125,12 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
       setGenProgress('');
       
       // Automatically transition to the Double-Check Quality Gate tab
-      setActiveTab('quality');
+      setTimeout(() => {
+        setActiveTab('quality');
+      }, 900);
 
     } catch (err) {
-      setGenError(err.message || 'Generation failed. Please check your API key in Settings.');
+      setGenError(err.message || 'Generation failed. Please check your API key.');
       setGenProgress('');
     } finally {
       setIsGenerating(false);
@@ -432,6 +444,41 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                 </div>
               )}
 
+              {/* OpenRouter API Key Input Banner if Missing */}
+              {!getActiveApiKey() && (
+                <div className="bg-amber-950/40 border border-amber-500/40 p-4 rounded-xl space-y-2.5">
+                  <div className="flex items-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+                    <KeyRound size={14} className="text-amber-400" />
+                    OpenRouter API Key Required
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Enter your OpenRouter key to activate live role tailoring with <strong className="text-white">z-ai/glm-5.3-flash</strong>:
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="password"
+                      placeholder="sk-or-v1-..."
+                      value={quickApiKey}
+                      onChange={(e) => setQuickApiKey(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-400"
+                    />
+                    <button
+                      onClick={() => {
+                        if (quickApiKey.trim()) {
+                          setActiveApiKey(quickApiKey.trim());
+                          setInputKey(quickApiKey.trim());
+                          setSavedSettingsSuccess(true);
+                          setTimeout(() => setSavedSettingsSuccess(false), 2000);
+                        }
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer shrink-0 transition-colors shadow-sm"
+                    >
+                      Activate Key
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Main 1-Click Action Card */}
               <div className="p-6 rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-700/60 flex flex-col justify-between gap-5 shadow-lg">
                 <div className="space-y-2">
@@ -469,6 +516,36 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                   )}
                 </div>
               </div>
+
+              {/* Live Streaming Telemetry Terminal Feed */}
+              {telemetryLogs.length > 0 && (
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs space-y-2.5 shadow-inner">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-emerald-400 animate-ping' : 'bg-indigo-400'}`} />
+                      <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                        {isGenerating ? 'LIVE AI TELEMETRY STREAM' : 'AI EXECUTION TELEMETRY LOG'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-indigo-400 font-bold">{selectedModel}</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {telemetryLogs.map((entry, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-[11px] leading-relaxed font-mono animate-in fade-in duration-150">
+                        <span className="text-slate-500 shrink-0 select-none">[{entry.time}]</span>
+                        <span className={
+                          entry.type === 'error' ? 'text-rose-400 font-bold' :
+                          entry.type === 'success' ? 'text-emerald-400 font-bold' :
+                          entry.type === 'network' ? 'text-cyan-300' :
+                          'text-slate-300'
+                        }>
+                          {entry.msg}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -282,16 +282,24 @@ Australian Citizen | Unrestricted Work Rights`;
  * Calls OpenRouter directly via HTTPS CORS with GLM 5.3 Flash.
  * Falls back seamlessly to grounded client-side generation if offline.
  */
-export const generateApplicationDocs = async (job, onProgress) => {
+export const generateApplicationDocs = async (job, onProgress, onLog) => {
   const apiKey = getActiveApiKey();
   const model = getActiveModel() || 'z-ai/glm-5.3-flash';
+  const startTime = Date.now();
+
+  const log = (msg, type = 'info') => {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+    onLog?.({ time: elapsed, msg, type });
+    onProgress?.(msg);
+  };
 
   if (!apiKey) {
-    throw new Error('OpenRouter API key is required for live AI generation. Please enter your key in the box below or in Settings.');
+    log('API key missing: Please configure OpenRouter key in Settings or input below', 'error');
+    throw new Error('OpenRouter API key is required. Please paste your key in Settings or the key box.');
   }
 
-  onProgress?.(`Contacting OpenRouter (${model})…`);
-  const startTime = Date.now();
+  log(`Initializing OpenRouter API stream [Model: ${model}]`, 'init');
+  log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
 
   const systemPrompt = `You are an elite ATS resume and executive cover letter architect for Sam Ludwig.
 Candidate Background: Senior IT Systems & Infrastructure Specialist (Melbourne, VIC, 0405 993 245, sam.ludwig@gmail.com, Australian Citizen, Baseline/NV1 Eligible).
@@ -322,7 +330,8 @@ ${job.notes || job.description || 'Enterprise IT infrastructure, systems enginee
 
 Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover Letter.`;
 
-  onProgress?.(`GLM 5.3 Flash is reasoning and drafting tailored application…`);
+  log('Extracting high-priority ATS keywords and requirements…', 'info');
+  log('Dispatching request to OpenRouter HTTPS CORS gateway…', 'network');
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -349,9 +358,11 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
       const errJson = await res.json();
       if (errJson?.error?.message) errDetail = errJson.error.message;
     } catch {}
+    log(`OpenRouter API Error: ${errDetail}`, 'error');
     throw new Error(`OpenRouter API Error: ${errDetail}`);
   }
 
+  log('Response payload received from OpenRouter. Parsing tokens…', 'success');
   const data = await res.json();
   const choice = data?.choices?.[0];
   const msg = choice?.message || {};
@@ -362,9 +373,11 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
   }
 
   if (!content) {
+    log('Received empty content from model.', 'error');
     throw new Error('OpenRouter returned an empty response. Please check model quota or try again.');
   }
 
+  log('Splitting tailored ATS Resume and executive Cover Letter…', 'info');
   const sepIdx = content.indexOf('===COVER_LETTER===');
   let resume = '', coverLetter = '';
   if (sepIdx !== -1) {
@@ -373,6 +386,8 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
   } else {
     resume = content.trim();
   }
+
+  log(`Document synthesis complete (${resume.length + coverLetter.length} chars). Running Quality Gate…`, 'success');
 
   return {
     success: true,

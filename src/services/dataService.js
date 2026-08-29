@@ -201,37 +201,46 @@ export const fetchJobsData = async () => {
   return [...sheetJobs, ...uniqueScrapedJobs];
 };
 
-const fetchSheetData = async () => {
-  return new Promise((resolve) => {
-    Papa.parse(CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const mainData = (results.data || [])
-          .filter(row => row['Company'] || row['Job Title'])
-          .map((row, index) => parseMetadata(row, index));
+const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-        Papa.parse(SUGGESTIONS_CSV_URL, {
-          download: true,
-          header: true,
-          skipEmptyLines: true,
-          complete: (sugResults) => {
-            const sugData = (sugResults.data || [])
-              .map((row, index) => parseSuggestionRow(row, index))
-              .filter(Boolean);
-            
-            resolve([...mainData, ...sugData]);
-          },
-          error: () => {
-            resolve(mainData);
-          }
-        });
-      },
-      error: () => {
-        fetchFallbackData(resolve);
-      }
+const fetchSheetData = async () => {
+  if (isLocalHost) {
+    return new Promise((resolve) => {
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const mainData = (results.data || [])
+            .filter(row => row['Company'] || row['Job Title'])
+            .map((row, index) => parseMetadata(row, index));
+
+          Papa.parse(SUGGESTIONS_CSV_URL, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: (sugResults) => {
+              const sugData = (sugResults.data || [])
+                .map((row, index) => parseSuggestionRow(row, index))
+                .filter(Boolean);
+              
+              resolve([...mainData, ...sugData]);
+            },
+            error: () => {
+              resolve(mainData);
+            }
+          });
+        },
+        error: () => {
+          fetchFallbackData(resolve);
+        }
+      });
     });
+  }
+
+  // Production static host (GitHub Pages) -> fetch directly from Google Sheets CSV
+  return new Promise((resolve) => {
+    fetchFallbackData(resolve);
   });
 };
 
@@ -268,17 +277,16 @@ const fetchFallbackData = (resolve) => {
 };
 
 const fetchStoredScrapedJobs = async () => {
-  // Try local Vite dev-server API first
-  try {
-    const res = await fetch('/api/scraped-jobs', { signal: AbortSignal.timeout(3000) });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && Array.isArray(data.jobs)) {
-        return data.jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
+  if (isLocalHost) {
+    try {
+      const res = await fetch('/api/scraped-jobs', { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.jobs)) {
+          return data.jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
+        }
       }
-    }
-  } catch {
-    // Not running locally — fall through to static bundled data
+    } catch {}
   }
 
   // Static fallback: bundled jobs_combined.json copied to public/ at build time

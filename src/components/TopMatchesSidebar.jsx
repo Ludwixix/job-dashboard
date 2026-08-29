@@ -43,11 +43,11 @@ const formatDaysAgo = (dateStr) => {
 };
 
 export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
+  const [showTopMatches, setShowTopMatches] = useState(true); // Open by default
   const [showLiveInsights, setShowLiveInsights] = useState(true);
   const [showLocalJob, setShowLocalJob] = useState(false);
   const [showWildCard, setShowWildCard] = useState(false);
   const [showMostRecent, setShowMostRecent] = useState(false);
-  const [showTopMatches, setShowTopMatches] = useState(false);
   const [showMostLikely, setShowMostLikely] = useState(false);
 
   // Unsubmitted jobs pool
@@ -67,55 +67,21 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
     });
   }, [jobs]);
 
-  // Live Analytics & Points of Interest Computation
-  const liveInsights = useMemo(() => {
-    const totalCount = unsubmittedJobs.length || 1;
-    
-    // Balaclava & Commute Proximity < 10km
-    const nearBalaclava = unsubmittedJobs.filter(j => getProximityTier(j.location) <= 2).length;
-    const proximityPct = Math.round((nearBalaclava / totalCount) * 100);
-
-    // Top employer & match score
-    const sortedByScore = [...unsubmittedJobs].sort((a, b) => (b.score || 0) - (a.score || 0));
-    const topEmployer = sortedByScore[0] || null;
-
-    // Fresh < 7 days
-    const fresh7Days = unsubmittedJobs.filter(j => {
-      if (!j.date) return false;
-      try {
-        const d = parseISO(j.date);
-        return isValid(d) && differenceInDays(new Date(), d) <= 7;
-      } catch { return false; }
-    }).length;
-
-    // High compensation roles ($100k+)
-    const highSalaryCount = unsubmittedJobs.filter(j => 
-      j.salary && (j.salary.includes('100') || j.salary.includes('110') || j.salary.includes('120') || j.salary.includes('130'))
-    ).length;
-
-    return {
-      nearBalaclava,
-      proximityPct,
-      topEmployer,
-      fresh7Days,
-      freshPct: Math.round((fresh7Days / totalCount) * 100),
-      highSalaryCount
-    };
-  }, [unsubmittedJobs]);
-
-  // Top 3 Most Recent Jobs (Sorted by date descending)
-  const mostRecentJobs = useMemo(() => {
+  // Top 10 Best Aligned & Newest Job Ads
+  const top10Matches = useMemo(() => {
     return [...unsubmittedJobs]
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-      .slice(0, 3);
+      .map(job => {
+        const score = Number(job.score) || 75;
+        const age = getAgeInDays(job.date);
+        // Composite priority: 65% match score + 35% date recency
+        const recencyScore = Math.max(0, 100 - (age * 7));
+        const compositeRank = (score * 0.65) + (recencyScore * 0.35);
+        return { ...job, compositeRank, ageInDays: age };
+      })
+      .sort((a, b) => b.compositeRank - a.compositeRank || (b.date || '').localeCompare(a.date || ''))
+      .slice(0, 10);
   }, [unsubmittedJobs]);
 
-  // Top 3 Highest Match Scores (90%+)
-  const topMatches = useMemo(() => {
-    return [...unsubmittedJobs]
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
-      .slice(0, 3);
-  }, [unsubmittedJobs]);
 
   // Highlighted Local Job (Sorted by Proximity Tier to Balaclava, VIC 3183)
   const highlightedLocalJob = useMemo(() => {
@@ -427,60 +393,72 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
         )}
       </div>
 
-      {/* Widget 5: Top Matches (Minimized by default) */}
-      <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs font-mono">
+      {/* Widget 5: Top 10 Matches (Best Aligned & Newest Job Ads) */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 border border-rose-500/40 shadow-lg font-mono">
         <div 
           onClick={() => setShowTopMatches(!showTopMatches)}
           className="flex items-center justify-between cursor-pointer select-none group"
         >
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-rose-100 text-rose-700 rounded">
-              <Flame size={14} />
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-rose-500/20 text-rose-300 rounded-xl border border-rose-400/30">
+              <Flame size={16} className="text-rose-400 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">
-                TOP MATCHES
+              <h3 className="font-black text-xs text-rose-300 uppercase tracking-wider group-hover:text-white transition-colors">
+                TOP 10 BEST MATCHES
               </h3>
+              <div className="text-[9px] text-slate-400 font-bold">BEST ALIGNED & NEWEST JOBS</div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-900 border border-emerald-300">
-              90%+ FIT
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-200 border border-rose-500/50">
+              TOP 10
             </span>
-            <button className="text-slate-500 hover:text-slate-900 p-0.5">
-              {showTopMatches ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            <button className="text-slate-400 hover:text-white p-0.5">
+              {showTopMatches ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
           </div>
         </div>
 
         {showTopMatches && (
-          <div className="space-y-2.5 pt-3 mt-2 border-t border-slate-100 animate-in fade-in duration-200">
-            {topMatches.map((job) => (
+          <div className="space-y-2.5 pt-3.5 mt-2 border-t border-slate-800 animate-in fade-in duration-200">
+            {top10Matches.map((job, idx) => (
               <div 
-                key={job.id} 
+                key={job.id || `${job.company}_${job.title}_${idx}`} 
                 onClick={() => onSelectJob(job)}
-                className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200 transition-all cursor-pointer group"
+                className="p-3 rounded-xl bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-rose-500/50 transition-all cursor-pointer group shadow-xs"
               >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-xs font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug truncate pr-2">
-                    {job.company}
-                  </span>
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 shrink-0">
-                    <Award size={11} /> {job.score}%
-                  </span>
+                <div className="flex justify-between items-start mb-1 gap-2">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="w-5 h-5 rounded-lg bg-rose-500/20 text-rose-300 font-black text-[10px] flex items-center justify-center shrink-0 border border-rose-500/30">
+                      #{idx + 1}
+                    </span>
+                    <span className="text-xs font-black text-white group-hover:text-rose-300 transition-colors leading-snug truncate">
+                      {job.company}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                      <Clock size={9} /> {formatDaysAgo(job.date)}
+                    </span>
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                      <Award size={10} /> {job.score}%
+                    </span>
+                  </div>
                 </div>
-                <p className="text-[11px] font-semibold text-slate-600 truncate mb-2">{job.title}</p>
+
+                <p className="text-[11px] font-bold text-slate-300 truncate mb-1.5">{job.title}</p>
                 
-                <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-200/60">
-                  <span className="text-slate-500 truncate max-w-[140px]">
-                    <MapPin size={10} className="inline mr-1 text-slate-400" />
+                <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-800 text-slate-400">
+                  <span className="truncate max-w-[150px]">
+                    <MapPin size={10} className="inline mr-1 text-slate-500" />
                     {job.location}
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpenGenerator(job); }}
-                    className="text-indigo-600 hover:text-indigo-900 font-bold flex items-center gap-0.5 cursor-pointer"
+                    className="text-rose-300 hover:text-white font-black flex items-center gap-0.5 cursor-pointer bg-rose-950/60 hover:bg-rose-900 px-2 py-0.5 rounded border border-rose-500/30 transition-colors"
                   >
-                    PACK <ArrowRight size={10} />
+                    PREP DOCS <ArrowRight size={10} />
                   </button>
                 </div>
               </div>
@@ -488,6 +466,7 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
           </div>
         )}
       </div>
+
 
       {/* Widget 6: Most Likely to Get (Minimized by default) */}
       <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs font-mono">

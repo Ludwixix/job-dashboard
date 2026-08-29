@@ -8,8 +8,9 @@ import {
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
   ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap,
-  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star
+  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText
 } from 'lucide-react';
+
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
@@ -481,7 +482,7 @@ export const JobSeeker = ({
   const STREAM_TAB_DEFINITIONS = [
     { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
     { id: 'TopFit', name: '⭐ MY TOP MATCHES', icon: Star, color: 'amber', highlight: true },
-    { id: 'ReadyForSubmission', name: '✨ READY TO SUBMIT', icon: Sparkles, color: 'emerald' },
+    { id: 'ReadyForSubmission', name: '📄 GENERATED (CV & COVER LETTER)', icon: FileText, color: 'emerald', highlight: true },
     { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
     { id: 'Finance & Accounting', name: 'FINANCE & BANKING', icon: TrendingUp, color: 'emerald' },
     { id: 'Marketing & Sales', name: 'MARKETING & GROWTH', icon: Megaphone, color: 'amber' },
@@ -517,6 +518,28 @@ export const JobSeeker = ({
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Dedicated Filter Button: Only Generated Cover Letter & Resume */}
+          <button
+            onClick={() => {
+              setDocsReadyFilter(!docsReadyFilter);
+              setCurrentPage(1);
+            }}
+            className={`inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-mono font-black text-xs transition-all cursor-pointer border shadow-sm ${
+              docsReadyFilter
+                ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50'
+                : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40'
+            }`}
+            title="Refine job ads only to positions that have had custom Cover Letter & Resume generated"
+          >
+            <FileText size={14} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
+            <span>{docsReadyFilter ? "SHOWING GENERATED ONLY" : "GENERATED PACKAGES ONLY"}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+            }`}>
+              {readyToSubmitCount}
+            </span>
+          </button>
+
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer"
@@ -528,17 +551,18 @@ export const JobSeeker = ({
           <button
             onClick={handleRunScraper}
             disabled={scraping}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-xs transition-all disabled:opacity-80 cursor-pointer min-w-[260px]"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-xs transition-all disabled:opacity-80 cursor-pointer min-w-[220px]"
           >
             <RefreshCw size={14} className={scraping ? "animate-spin text-indigo-200" : ""} />
             {scraping ? (
-              <span>SCRAPING BOARDS... EST. ~{scrapeRemainingSec}s REMAINING ({scrapeElapsedSeconds}s)</span>
+              <span>SCRAPING... ({scrapeElapsedSeconds}s)</span>
             ) : (
-              <span>RUN SCRAPERS (EST. ~20s)</span>
+              <span>RUN SCRAPERS</span>
             )}
           </button>
         </div>
       </div>
+
 
       {scrapeSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-mono font-bold flex items-center gap-2 animate-in fade-in duration-200">

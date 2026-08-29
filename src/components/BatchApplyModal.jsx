@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Zap, CheckCircle2, X, Play, Loader2 } from 'lucide-react';
+import { executeClientSideAutoApply } from '../services/generationService';
 
 export const BatchApplyModal = ({ jobs, isOpen, onClose, onComplete }) => {
   const [selectedJobIds, setSelectedJobIds] = useState(() => {
@@ -40,16 +41,11 @@ export const BatchApplyModal = ({ jobs, isOpen, onClose, onComplete }) => {
       const job = targetJobs[i];
       setCurrentProgressIndex(i + 1);
       try {
-        const res = await fetch('/api/auto-apply', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(job)
-        });
-        const data = await res.json();
-        if (data.success) {
+        const data = await executeClientSideAutoApply(job);
+        if (data && data.success) {
           results.push({ job, result: data.pipeline_result, success: true });
         } else {
-          results.push({ job, error: data.error, success: false });
+          results.push({ job, error: data?.error || 'Failed to apply', success: false });
         }
       } catch (e) {
         results.push({ job, error: e.message, success: false });

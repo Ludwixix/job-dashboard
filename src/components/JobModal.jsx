@@ -6,6 +6,7 @@ import {
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
+import { executeClientSideAutoApply } from '../services/generationService';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob }) => {
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
@@ -387,13 +388,8 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                     setIsAutoApplying(true);
                     setAutoApplyReceipt(null);
                     try {
-                      const res = await fetch('/api/auto-apply', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(job)
-                      });
-                      const data = await res.json();
-                      if (data.success) {
+                      const data = await executeClientSideAutoApply(job);
+                      if (data && data.success) {
                         const updatedJob = {
                           ...job,
                           status: 'Applied / Confirmation Received',
@@ -404,7 +400,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                         }
                         setAutoApplyReceipt(data.pipeline_result || null);
                       } else {
-                        alert(`Error: ${data.error}`);
+                        alert(`Auto-apply pipeline error: ${data?.error || 'Unable to complete'}`);
                       }
                     } catch (e) {
                       alert(`Auto-apply pipeline failed: ${e.message}`);

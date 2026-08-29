@@ -119,7 +119,7 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
 
   // Interactive Pagination & Batch Loading State
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(24); // 12, 24, 48, 'All'
+  const [pageSize, setPageSize] = useState(48); // 24, 48, 96, 'All'
   const gridTopRef = useRef(null);
 
   const [selectedForGenerator, setSelectedForGenerator] = useState(null);
@@ -625,9 +625,9 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
                     onChange={(e) => { setPageSize(e.target.value); setCurrentPage(1); }}
                     className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-extrabold text-slate-900 focus:outline-none cursor-pointer"
                   >
-                    <option value="12">12 / PAGE</option>
                     <option value="24">24 / PAGE</option>
-                    <option value="48">48 / PAGE</option>
+                    <option value="48">48 / PAGE (DEFAULT)</option>
+                    <option value="96">96 / PAGE</option>
                     <option value="All">SHOW ALL ({seekerJobs.length})</option>
                   </select>
                 </div>

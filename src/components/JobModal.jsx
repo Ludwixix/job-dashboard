@@ -3,10 +3,11 @@ import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck,
-  Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp
+  Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply } from '../services/generationService';
+import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob }) => {
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
@@ -475,7 +476,15 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                     {/* Tab 2: Exact Resume Content Sent */}
                     {activeReceiptTab === 'resume' && (
                       <div className="space-y-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">TAILORED RESUME CONTENT SENT</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">TAILORED RESUME CONTENT SENT</div>
+                          <button
+                            onClick={() => downloadResumePdf(autoApplyReceipt.resume_text, job)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Download size={11} /> DOWNLOAD RESUME (PDF)
+                          </button>
+                        </div>
                         <pre className="text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto p-2 bg-slate-900 rounded border border-slate-800 leading-relaxed">
                           {autoApplyReceipt.resume_text}
                         </pre>
@@ -485,7 +494,15 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                     {/* Tab 3: Exact Cover Letter Sent */}
                     {activeReceiptTab === 'cover' && (
                       <div className="space-y-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">EXECUTIVE COVER LETTER SENT</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">EXECUTIVE COVER LETTER SENT</div>
+                          <button
+                            onClick={() => downloadCoverLetterPdf(autoApplyReceipt.cover_text, job)}
+                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Download size={11} /> DOWNLOAD COVER LETTER (PDF)
+                          </button>
+                        </div>
                         <pre className="text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto p-2 bg-slate-900 rounded border border-slate-800 leading-relaxed">
                           {autoApplyReceipt.cover_text}
                         </pre>

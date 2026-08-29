@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   X, Sparkles, FileText, Check, Copy, ExternalLink, FileUser,
   Zap, BarChart3, AlertCircle, Clock, Send,
-  ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, Settings,
+  ShieldCheck, CheckCircle2, AlertTriangle, Settings,
   Cpu, KeyRound, Download
 } from 'lucide-react';
 import { 
@@ -10,6 +10,7 @@ import {
   runDocumentQualityAudit, getActiveApiKey, setActiveApiKey,
   getActiveModel, setActiveModel, AVAILABLE_MODELS
 } from '../services/generationService';
+import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 
 const GEMINI_GEM_URL = "https://gemini.google.com/gem/1Bxx-IAsb1aBD0T6rxC6aJB1frzm4Yphz?usp=drive_link";
 
@@ -44,34 +45,6 @@ KEY INSTRUCTIONS (apply all of these):
 7. USE ONLY VERIFIED FACTS from Sam's career — never invent achievements, dates, or metrics
 
 Now generate: (1) a tailored resume, then the separator ===COVER_LETTER===, then (2) a tailored cover letter.`;
-
-// ── PDF print utility ──────────────────────────────────────────────────────────
-const printDoc = (content, filename) => {
-  const win = window.open('', '_blank');
-  if (!win) return;
-  const html = content
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^\*\*(.+)\*\*$/gm, '<strong>$1</strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
-    .replace(/\n{2,}/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-
-  win.document.write(`<!DOCTYPE html><html><head><title>${filename}</title><style>
-    @page { margin: 18mm 16mm; }
-    body { font-family: Arial, Calibri, sans-serif; font-size: 10.5pt; color: #1a1a1a; line-height: 1.45; max-width: 720px; margin: 0 auto; }
-    h1 { font-size: 20pt; font-weight: 800; margin: 0 0 2px; letter-spacing: -0.3px; }
-    h2 { font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1.5px solid #1a1a1a; margin: 14px 0 5px; padding-bottom: 2px; }
-    h3 { font-size: 10.5pt; font-weight: 700; margin: 8px 0 1px; }
-    li { margin: 1px 0 1px 14px; }
-    p { margin: 4px 0; }
-    strong { font-weight: 700; }
-  </style></head><body><p>${html}</p>
-  <script>window.onload=function(){window.print()}</script></body></html>`);
-  win.document.close();
-};
 
 export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
   const [activeTab, setActiveTab]             = useState('overview');
@@ -161,7 +134,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
     window.open(GEMINI_GEM_URL, '_blank');
   };
 
-  // ── Copy / Download ────────────────────────────────────────────────────────
+  // ── Copy ───────────────────────────────────────────────────────────────────
   const handleCopy = () => {
     const text = activeTab === 'resume' ? resumeText : coverLetterText;
     if (!text) return;
@@ -170,19 +143,22 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
     setTimeout(() => setCopiedText(false), 2500);
   };
 
-  const handleDownloadSingle = () => {
-    const text     = activeTab === 'resume' ? resumeText : coverLetterText;
-    const docLabel = activeTab === 'resume' ? 'RESUME' : 'COVER_LETTER';
-    if (!text) return;
-    const name = `Sam_Ludwig_${job.company.replace(/[^a-zA-Z0-9]/g, '_')}_${docLabel}`;
-    printDoc(text, name);
+  // ── Direct PDF Downloads ────────────────────────────────────────────────────
+  const handleDownloadResume = () => {
+    if (!resumeText) return;
+    downloadResumePdf(resumeText, job);
   };
 
-  const handleDownloadFullPackage = () => {
-    if (!resumeText) return;
-    const fullContent = `${resumeText}\n\n---\n\n# COVER LETTER\n\n${coverLetterText}`;
-    const name = `Sam_Ludwig_${job.company.replace(/[^a-zA-Z0-9]/g, '_')}_Complete_Application`;
-    printDoc(fullContent, name);
+  const handleDownloadCoverLetter = () => {
+    if (!coverLetterText) return;
+    downloadCoverLetterPdf(coverLetterText, job);
+  };
+
+  const handleDownloadBoth = () => {
+    if (resumeText) downloadResumePdf(resumeText, job);
+    if (coverLetterText) {
+      setTimeout(() => downloadCoverLetterPdf(coverLetterText, job), 400);
+    }
   };
 
   const handleAutoSubmit = () => {
@@ -192,8 +168,8 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
         appliedDate: new Date().toISOString().split('T')[0]
       });
     }
-    // Also trigger the complete verified PDF download
-    handleDownloadFullPackage();
+    // Also trigger direct separate PDF downloads
+    handleDownloadBoth();
     setIsSubmittedSuccess(true);
     setTimeout(() => {
       onClose();
@@ -387,23 +363,43 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
             ))}
           </div>
 
-          {(activeTab === 'resume' || activeTab === 'cover_letter') && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={handleCopy}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
-              >
-                {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                {copiedText ? 'COPIED' : 'COPY'}
-              </button>
-              <button
-                onClick={handleDownloadSingle}
-                className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
-              >
-                PRINT / PDF
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {activeTab === 'resume' && (
+              <>
+                <button
+                  onClick={handleCopy}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
+                >
+                  {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                  {copiedText ? 'COPIED' : 'COPY'}
+                </button>
+                <button
+                  onClick={handleDownloadResume}
+                  className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Download size={12} /> DOWNLOAD RESUME (PDF)
+                </button>
+              </>
+            )}
+
+            {activeTab === 'cover_letter' && (
+              <>
+                <button
+                  onClick={handleCopy}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
+                >
+                  {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                  {copiedText ? 'COPIED' : 'COPY'}
+                </button>
+                <button
+                  onClick={handleDownloadCoverLetter}
+                  className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Download size={12} /> DOWNLOAD COVER LETTER (PDF)
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── Content ── */}
@@ -448,7 +444,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                     </span>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-                    Synthesizes a fully tailored ATS Resume and 3-paragraph Cover Letter in one operation. 
+                    Synthesizes a tailored ATS Resume and 3-paragraph Cover Letter in one operation. 
                     Automatically triggers the <strong className="text-emerald-400 font-bold">Pre-Submission Adversarial Quality Gate</strong> to guarantee title mirroring, outcome metrics, and ATS keyword coverage.
                   </p>
                 </div>
@@ -493,7 +489,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                   ? 'bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 border-emerald-500/50 shadow-lg shadow-emerald-950/30' 
                   : 'bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-900 border-amber-500/50'
               }`}>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
                   <div className="flex items-start gap-3.5">
                     <div className={`p-3 rounded-xl shrink-0 ${
                       qualityAudit.isReadyToSubmit ? 'bg-emerald-500/20 text-emerald-400 shadow-inner' : 'bg-amber-500/20 text-amber-400'
@@ -515,35 +511,46 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                       </div>
                       <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">
                         {qualityAudit.isReadyToSubmit 
-                          ? 'This application package satisfies all 7 ATS checks, verified metric standards, and employer tone criteria. The automated submission & download actions are illuminated below.' 
+                          ? 'This application package satisfies all 7 ATS checks. Download your separate Resume and Cover Letter PDF files below or dispatch auto-apply.' 
                           : 'Review the checks below to ensure maximum interview conversion before submitting.'}
                       </p>
                     </div>
                   </div>
 
-                  {/* ── ILLUMINATED ACTION BUTTONS ── */}
-                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 pt-2 md:pt-0">
+                  {/* ── SEPARATE ILLUMINATED ACTION BUTTONS ── */}
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
                     <button
-                      onClick={handleDownloadFullPackage}
-                      className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+                      onClick={handleDownloadResume}
+                      className={`px-3.5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
                         qualityAudit.isReadyToSubmit
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25 ring-2 ring-emerald-400/50 animate-pulse'
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25 ring-2 ring-emerald-400/50'
                           : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                       }`}
                     >
-                      <Download size={14} /> DOWNLOAD PACKAGE (PDF)
+                      <Download size={13} /> RESUME (PDF)
+                    </button>
+
+                    <button
+                      onClick={handleDownloadCoverLetter}
+                      className={`px-3.5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                        qualityAudit.isReadyToSubmit
+                          ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/25 ring-2 ring-indigo-400/50'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      <Download size={13} /> COVER LETTER (PDF)
                     </button>
 
                     <button
                       onClick={handleAutoSubmit}
                       disabled={isSubmittedSuccess}
-                      className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
+                      className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-lg ${
                         qualityAudit.isReadyToSubmit
-                          ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-500/30 ring-2 ring-indigo-400/60'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-purple-500/30'
                           : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                       }`}
                     >
-                      <Send size={13} /> {isSubmittedSuccess ? 'SUBMITTED' : 'AUTOMATICALLY SUBMIT'}
+                      <Send size={13} /> {isSubmittedSuccess ? 'SUBMITTED' : 'SUBMIT & LOG'}
                     </button>
                   </div>
                 </div>
@@ -609,12 +616,20 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tailored Master Resume</span>
                   <span className="text-[10px] text-slate-500 font-mono">({qualityAudit.wordCount.resumeWords} words)</span>
                 </div>
-                <button
-                  onClick={() => setActiveTab('quality')}
-                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadResume}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Download size={12} /> Direct PDF Download
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('quality')}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
+                  </button>
+                </div>
               </div>
 
               <textarea
@@ -634,12 +649,20 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tailored 3-Paragraph Cover Letter</span>
                   <span className="text-[10px] text-slate-500 font-mono">({qualityAudit.wordCount.coverLetterWords} words)</span>
                 </div>
-                <button
-                  onClick={() => setActiveTab('quality')}
-                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadCoverLetter}
+                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Download size={12} /> Direct PDF Download
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('quality')}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
+                  </button>
+                </div>
               </div>
 
               <textarea

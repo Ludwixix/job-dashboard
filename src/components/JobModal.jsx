@@ -3,14 +3,24 @@ import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck,
-  Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download
+  Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
+  ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
+import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply }) => {
+  const jobId = job?.id || `${job?.company}_${job?.title}`;
+  const initialPrefs = getUserPreferences();
+  const [prefStatus, setPrefStatus] = useState(() => {
+    if (initialPrefs.promotedJobIds?.includes(jobId)) return 'promoted';
+    if (initialPrefs.demotedJobIds?.includes(jobId)) return 'demoted';
+    return null;
+  });
+
 
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
   const [copiedSubject, setCopiedSubject] = useState(false);
@@ -141,6 +151,41 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Show More / Show Less Like This Buttons */}
+            <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+              <button
+                onClick={() => {
+                  promoteSimilarJobs(job);
+                  setPrefStatus('promoted');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                  prefStatus === 'promoted'
+                    ? 'bg-emerald-500 text-slate-950 shadow-xs'
+                    : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-700'
+                }`}
+                title="Show More Like This: Algorithm prioritizes similar roles"
+              >
+                <ThumbsUp size={13} className={prefStatus === 'promoted' ? 'fill-slate-950' : ''} />
+                <span className="hidden sm:inline">MORE LIKE THIS</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  demoteSimilarJobs(job);
+                  setPrefStatus('demoted');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                  prefStatus === 'demoted'
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'text-slate-300 hover:text-rose-300 hover:bg-slate-700'
+                }`}
+                title="Show Less Like This: Algorithm demotes similar roles"
+              >
+                <ThumbsDown size={13} className={prefStatus === 'demoted' ? 'fill-white' : ''} />
+                <span className="hidden sm:inline">LESS LIKE THIS</span>
+              </button>
+            </div>
+
             {job.isRejected ? (
               <button
                 onClick={() => onUnrejectJob && onUnrejectJob(job.id || `${job.company}_${job.title}`)}
@@ -166,6 +211,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
               <X size={18} />
             </button>
           </div>
+
         </div>
 
         {/* Modal Sub-Navigation Tabs */}

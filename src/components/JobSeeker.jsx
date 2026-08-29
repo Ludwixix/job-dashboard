@@ -9,15 +9,24 @@ import {
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
   ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap,
-  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText
+  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText,
+  ThumbsUp, ThumbsDown
 } from 'lucide-react';
 
 import { AutoApplyModal } from './AutoApplyModal';
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
-import { calculateCandidateJobMatch, calculateCandidateDistanceKm } from '../services/scoringEngine';
+import { 
+  calculateCandidateJobMatch, 
+  calculateCandidateDistanceKm,
+  promoteSimilarJobs,
+  demoteSimilarJobs,
+  getUserPreferences,
+  resetUserPreferences
+} from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
 import { SCRAPER_BASE_URL } from '../services/jobQueryService';
+
 
 
 
@@ -197,6 +206,42 @@ export const JobSeeker = ({
   const [scrapeElapsedSeconds, setScrapeElapsedSeconds] = useState(0);
   const ESTIMATED_SCRAPE_DURATION_SEC = 20;
 
+  // User Recommendation Preference State (More/Less Like This)
+  const [userPrefs, setUserPrefs] = useState(() => getUserPreferences());
+  const [prefToast, setPrefToast] = useState(null);
+
+  useEffect(() => {
+    const handlePrefChange = (e) => {
+      setUserPrefs(e.detail || getUserPreferences());
+    };
+    window.addEventListener('job-preferences-changed', handlePrefChange);
+    return () => window.removeEventListener('job-preferences-changed', handlePrefChange);
+  }, []);
+
+  const handlePromote = (job) => {
+    const updated = promoteSimilarJobs(job);
+    setUserPrefs(updated);
+    setPrefToast(`👍 Promoted! Algorithm prioritizing roles like "${job.title}" & ${job.company}`);
+    setTimeout(() => setPrefToast(null), 4000);
+  };
+
+  const handleDemote = (job) => {
+    const updated = demoteSimilarJobs(job);
+    setUserPrefs(updated);
+    setPrefToast(`👎 Demoted! Showing fewer roles like "${job.title}"`);
+    setTimeout(() => setPrefToast(null), 4000);
+  };
+
+  const isJobPromoted = (job) => {
+    const jobId = job.id || `${job.company}_${job.title}`;
+    return userPrefs?.promotedJobIds?.includes(jobId);
+  };
+
+  const isJobDemoted = (job) => {
+    const jobId = job.id || `${job.company}_${job.title}`;
+    return userPrefs?.demotedJobIds?.includes(jobId);
+  };
+
   useEffect(() => {
     let timer;
     if (scraping) {
@@ -206,6 +251,7 @@ export const JobSeeker = ({
     }
     return () => clearInterval(timer);
   }, [scraping]);
+
 
   // Unsubmitted jobs pool
   const unsubmittedJobs = useMemo(() => {
@@ -257,7 +303,7 @@ export const JobSeeker = ({
     };
 
     unsubmittedJobs.forEach(j => {
-      const match = calculateCandidateJobMatch(j, currentProfile);
+      const match = calculateCandidateJobMatch(j, currentProfile, userPrefs);
       if (match.score >= 85) {
         counts.TopFit = (counts.TopFit || 0) + 1;
       }
@@ -269,23 +315,25 @@ export const JobSeeker = ({
     });
 
     return counts;
-  }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs, currentProfile]);
+  }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
 
 
   const seekerJobs = useMemo(() => {
     const sourcePool = activeStreamTab === 'Rejected Jobs' ? rejectedJobs : unsubmittedJobs;
 
-    // Enriched with active candidate dynamic ATS match & commute distance
+    // Enriched with active candidate dynamic ATS match & commute distance & preference weights
     const enrichedPool = sourcePool.map(job => {
-      const match = calculateCandidateJobMatch(job, currentProfile);
+      const match = calculateCandidateJobMatch(job, currentProfile, userPrefs);
       return {
         ...job,
         score: match.score,
         matchedSkills: match.matchedSkills,
         distanceKm: match.distanceKm,
-        matchTier: match.matchTier
+        matchTier: match.matchTier,
+        feedbackBonus: match.feedbackBonus
       };
     });
+
 
     const filtered = enrichedPool.filter(job => {
       const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
@@ -696,8 +744,59 @@ export const JobSeeker = ({
             })}
           </div>
 
+          {/* Active Recommendation Rules Feedback Bar */}
+          {(userPrefs?.boostedTerms?.length > 0 || userPrefs?.demotedTerms?.length > 0 || userPrefs?.boostedCompanies?.length > 0 || userPrefs?.demotedCompanies?.length > 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/40 text-xs font-mono text-indigo-200 shadow-md">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-black text-indigo-300 flex items-center gap-1.5 text-[11px]">
+                  <Sparkles size={13} className="text-indigo-400" /> ACTIVE PREFERENCES:
+                </span>
+                {userPrefs.boostedCompanies?.slice(0, 3).map((c, i) => (
+                  <span key={`bc-${i}`} className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                    👍 +{c.toUpperCase()}
+                  </span>
+                ))}
+                {userPrefs.boostedTerms?.slice(0, 4).map((t, i) => (
+                  <span key={`bt-${i}`} className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                    👍 +{t}
+                  </span>
+                ))}
+                {userPrefs.demotedCompanies?.slice(0, 2).map((c, i) => (
+                  <span key={`dc-${i}`} className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+                    👎 -{c.toUpperCase()}
+                  </span>
+                ))}
+                {userPrefs.demotedTerms?.slice(0, 3).map((t, i) => (
+                  <span key={`dt-${i}`} className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+                    👎 -{t}
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  resetUserPreferences();
+                  setUserPrefs(getUserPreferences());
+                  setPrefToast('Preferences reset to default ranking.');
+                  setTimeout(() => setPrefToast(null), 3000);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[10px] border border-slate-700 transition-colors cursor-pointer"
+              >
+                Reset Preferences
+              </button>
+            </div>
+          )}
+
+          {/* Toast Notification */}
+          {prefToast && (
+            <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-slate-900 text-white border border-indigo-500 shadow-2xl flex items-center gap-3 font-mono text-xs font-bold animate-in fade-in slide-in-from-bottom duration-200">
+              <Sparkles size={16} className="text-indigo-400 animate-pulse" />
+              <span>{prefToast}</span>
+            </div>
+          )}
+
           {/* VS Code Theme Refinement Console */}
           <div className="bg-[#1e1e2e] p-5 rounded-2xl border border-[#313244] shadow-md space-y-4 font-mono">
+
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
               {/* Main Keyword Search */}
               <div className="relative flex-1 w-full">
@@ -1075,6 +1174,41 @@ export const JobSeeker = ({
                           </span>
 
                           <div className="flex items-center gap-1.5">
+                            {/* Promote / Demote Controls */}
+                            <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePromote(job);
+                                }}
+                                className={`p-1 rounded-md text-[10px] font-mono font-black flex items-center gap-1 transition-all cursor-pointer ${
+                                  isJobPromoted(job)
+                                    ? 'bg-emerald-500 text-slate-950 shadow-xs ring-1 ring-emerald-400 font-black'
+                                    : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50'
+                                }`}
+                                title="Show More Like This: Algorithm prioritizes roles with similar titles and company"
+                              >
+                                <ThumbsUp size={11} className={isJobPromoted(job) ? "fill-slate-950" : ""} />
+                                <span className="hidden sm:inline text-[9px]">MORE</span>
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDemote(job);
+                                }}
+                                className={`p-1 rounded-md text-[10px] font-mono font-black flex items-center gap-1 transition-all cursor-pointer ${
+                                  isJobDemoted(job)
+                                    ? 'bg-rose-500 text-white shadow-xs ring-1 ring-rose-400 font-black'
+                                    : 'text-slate-600 hover:text-rose-700 hover:bg-rose-50'
+                                }`}
+                                title="Show Less Like This: Algorithm demotes roles with similar titles and company"
+                              >
+                                <ThumbsDown size={11} className={isJobDemoted(job) ? "fill-white" : ""} />
+                                <span className="hidden sm:inline text-[9px]">LESS</span>
+                              </button>
+                            </div>
+
                             {job.isRejected ? (
                               <button
                                 onClick={(e) => {
@@ -1105,6 +1239,7 @@ export const JobSeeker = ({
                               </span>
                             )}
                           </div>
+
                         </div>
 
                         <div>

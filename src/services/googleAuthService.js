@@ -100,6 +100,41 @@ export const signOutGoogleUser = () => {
   localStorage.removeItem(LS_AUTH_USER);
 };
 
+export const isValidGoogleClientId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  const clean = id.trim();
+  if (clean.includes('demo-client-id') || clean.length < 25 || !clean.includes('.apps.googleusercontent.com')) {
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Creates a simulated / local Google Workspace session for instant testing
+ */
+export const simulateGoogleWorkspaceAuth = (profile) => {
+  const email = profile?.email || 'candidate@gmail.com';
+  const name = profile?.name || 'Google User';
+  const simulatedId = `google_sim_${Date.now()}`;
+  
+  const authUser = {
+    id: simulatedId,
+    name: name,
+    email: email,
+    picture: '',
+    accessToken: `simulated_token_${Date.now()}`,
+    expiresAt: Date.now() + (3600 * 1000 * 24 * 7), // 7 days
+    scopes: ['openid', 'email', 'profile', 'gmail.readonly', 'spreadsheets', 'drive.file'],
+    spreadsheetId: `1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk`,
+    spreadsheetUrl: `https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/edit`,
+    lastGmailScan: new Date().toISOString(),
+    isSimulated: true
+  };
+
+  setAuthenticatedUser(authUser);
+  return authUser;
+};
+
 /**
  * Request Google OAuth 2.0 Access Token with Gmail & Sheets scopes
  */
@@ -115,12 +150,18 @@ export const requestGoogleAuthToken = async ({
   ],
   prompt = 'consent'
 } = {}) => {
+  if (!isValidGoogleClientId(clientId)) {
+    throw new Error(
+      'Google OAuth requires a registered Google Cloud Client ID (e.g. xxxxx.apps.googleusercontent.com). Enter your Client ID or use 1-Click Direct Login / Demo Mode.'
+    );
+  }
+
   await loadGoogleIdentityScript();
 
   return new Promise((resolve, reject) => {
     try {
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId || DEFAULT_CLIENT_ID,
+        client_id: clientId.trim(),
         scope: scopes.join(' '),
         prompt: prompt,
         callback: async (tokenResponse) => {

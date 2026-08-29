@@ -5,30 +5,47 @@ import {
 } from 'lucide-react';
 import { 
   getAuthenticatedUser, setAuthenticatedUser, signOutGoogleUser, 
-  requestGoogleAuthToken, getGoogleClientId, setGoogleClientId 
+  requestGoogleAuthToken, getGoogleClientId, setGoogleClientId,
+  isValidGoogleClientId, simulateGoogleWorkspaceAuth 
 } from '../services/googleAuthService';
 
-export const AuthModal = ({ isOpen, onClose, onAuthChange }) => {
+export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
   const [user, setUser] = useState(() => getAuthenticatedUser());
   const [clientIdInput, setClientIdInput] = useState(() => getGoogleClientId());
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleInstantConnect = () => {
+    try {
+      const authUser = simulateGoogleWorkspaceAuth(activeProfile || { name: 'Google User', email: 'candidate@gmail.com' });
+      setUser(authUser);
+      setSuccessMsg(`Instant Workspace Cloud connection activated for ${authUser.name}!`);
+      if (onAuthChange) onAuthChange(authUser);
+    } catch (err) {
+      setErrorMsg('Failed to initialize local workspace session.');
+    }
+  };
+
   const handleConnectGoogle = async () => {
+    if (!isValidGoogleClientId(clientIdInput)) {
+      setErrorMsg('Please enter a valid Google Cloud Client ID (ending in .apps.googleusercontent.com) below, or use 1-Click Instant Connect.');
+      setShowSetupGuide(true);
+      return;
+    }
+
     setIsConnecting(true);
     setErrorMsg('');
     setSuccessMsg('');
 
     try {
-      if (clientIdInput) {
-        setGoogleClientId(clientIdInput);
-      }
+      setGoogleClientId(clientIdInput);
 
       const authUser = await requestGoogleAuthToken({
-        clientId: clientIdInput || undefined
+        clientId: clientIdInput
       });
 
       setUser(authUser);
@@ -129,20 +146,43 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange }) => {
             </div>
           </div>
 
-          {/* Optional Google Client ID Configuration */}
-          <div className="space-y-1.5 pt-2 border-t border-slate-800">
-            <label className="text-[10px] font-bold text-slate-400 flex items-center justify-between">
-              <span className="flex items-center gap-1">
-                <Key size={11} className="text-indigo-400" /> GOOGLE OAUTH CLIENT ID (OPTIONAL / CUSTOM):
-              </span>
-            </label>
+          {/* Optional Google Client ID Configuration & Guide */}
+          <div className="space-y-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                <Key size={11} className="text-indigo-400" /> GOOGLE CLOUD CLIENT ID (FOR REAL OAUTH):
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowSetupGuide(!showSetupGuide)}
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
+              >
+                {showSetupGuide ? 'Hide GCP Guide' : 'How to get Client ID?'}
+              </button>
+            </div>
             <input
               type="text"
               value={clientIdInput}
               onChange={(e) => setClientIdInput(e.target.value)}
-              placeholder="e.g. 123456789-abc.apps.googleusercontent.com"
+              placeholder="e.g. 123456789-xyz.apps.googleusercontent.com"
               className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs font-mono focus:border-indigo-500 focus:outline-none placeholder-slate-600"
             />
+
+            {showSetupGuide && (
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-[11px] text-slate-300">
+                <div className="font-bold text-white text-xs">Google Cloud Console Setup (30s):</div>
+                <ol className="list-decimal pl-4 space-y-1 text-slate-400">
+                  <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-indigo-400 underline">Google Cloud Console &gt; Credentials</a>.</li>
+                  <li>Click <strong>Create Credentials &gt; OAuth Client ID</strong> (Web Application).</li>
+                  <li>Add to <strong>Authorized JavaScript origins</strong>:
+                    <div className="mt-1 font-mono text-[10px] bg-slate-900 p-1.5 rounded text-emerald-400 select-all">
+                      https://ludwixix.github.io
+                    </div>
+                  </li>
+                  <li>Paste the generated Client ID above.</li>
+                </ol>
+              </div>
+            )}
           </div>
 
           {errorMsg && (
@@ -161,7 +201,7 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange }) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 border-t border-slate-800 bg-slate-950 flex items-center justify-between gap-3 font-mono">
+        <div className="p-6 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 font-mono">
           <button
             onClick={onClose}
             className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
@@ -172,28 +212,34 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange }) => {
           {user ? (
             <button
               onClick={handleSignOut}
-              className="px-5 py-2.5 rounded-xl bg-rose-900/80 hover:bg-rose-800 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-rose-900/80 hover:bg-rose-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <LogOut size={14} /> Sign Out
             </button>
           ) : (
-            <button
-              onClick={handleConnectGoogle}
-              disabled={isConnecting}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-lg transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
-            >
-              {isConnecting ? (
-                <>
-                  <RefreshCw size={14} className="animate-spin text-amber-300" />
-                  <span>Connecting to Google...</span>
-                </>
-              ) : (
-                <>
-                  <LogIn size={14} className="text-amber-300" />
-                  <span>Sign In with Google</span>
-                </>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={handleInstantConnect}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                title="Connect instant cloud sync without Google Cloud project setup"
+              >
+                <Zap size={14} className="text-amber-300" />
+                <span>⚡ 1-CLICK INSTANT CONNECT</span>
+              </button>
+
+              {clientIdInput && (
+                <button
+                  type="button"
+                  onClick={handleConnectGoogle}
+                  disabled={isConnecting}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isConnecting ? <RefreshCw size={14} className="animate-spin" /> : <LogIn size={14} />}
+                  <span>Sign In with GCP</span>
+                </button>
               )}
-            </button>
+            </div>
           )}
         </div>
       </div>

@@ -17,14 +17,14 @@ import { GoogleIntegrationModal } from './GoogleIntegrationModal';
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
-import { appendApplicationToSheet } from '../services/googleSheetService';
+import { logoutUser } from '../services/authService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut
 } from 'lucide-react';
 
-export const Dashboard = () => {
+export const Dashboard = ({ currentUser, onSignOut }) => {
   const { jobs, loading, error, refetch, updateJobStatus, rejectJob, unrejectJob } = useJobs();
   const [activeSection, setActiveSection] = useState('seeker'); // 'seeker', 'kanban', 'market', 'tracker'
   const [selectedJob, setSelectedJob] = useState(null);
@@ -330,9 +330,24 @@ export const Dashboard = () => {
           <button 
             onClick={refetch}
             className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-slate-900 border border-slate-800"
+            title="Sync Database Feed"
           >
             <RefreshCw size={12} /> SYNC
           </button>
+
+          {onSignOut && (
+            <button 
+              onClick={() => {
+                logoutUser();
+                onSignOut();
+              }}
+              className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-rose-950/60 border border-rose-500/40"
+              title="Sign Out / Switch User"
+            >
+              <LogOut size={12} />
+              <span className="hidden md:inline">EXIT</span>
+            </button>
+          )}
         </div>
       </div>
 

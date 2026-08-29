@@ -7,7 +7,8 @@ import fs from 'fs'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.GITHUB_PAGES === 'true' ? '/job-dashboard-react/' : '/',
+  base: './',
+
   plugins: [
     react(),
     tailwindcss(),

@@ -7,8 +7,10 @@ import {
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
+  ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap,
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText
 } from 'lucide-react';
+
 
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
 import { calculateCandidateJobMatch, calculateCandidateDistanceKm } from '../services/scoringEngine';

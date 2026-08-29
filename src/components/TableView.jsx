@@ -3,7 +3,7 @@ import { Badge } from './Badge';
 import { ExternalLink, FileText, DollarSign, MapPin, Award, Clock, Download } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
-import { hasGeneratedApplicationDocs } from './JobSeeker';
+import { hasGeneratedApplicationDocs } from '../services/generationService';
 
 export const TableView = ({ jobs, onSelectJob }) => {
   const formatDaysAgo = (dateStr) => {

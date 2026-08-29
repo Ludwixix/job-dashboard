@@ -897,6 +897,23 @@ export const executeClientSideAutoApply = async (job) => {
 };
 
 /**
+ * Strict verification that both tailored ATS resume and cover letter are generated and exist
+ */
+export const hasGeneratedApplicationDocs = (job) => {
+  return Boolean(
+    job && 
+    job.hasCustomDocs && 
+    job.resumeText && 
+    typeof job.resumeText === 'string' &&
+    job.resumeText.trim().length > 0 &&
+    (
+      (job.coverLetterText && typeof job.coverLetterText === 'string' && job.coverLetterText.trim().length > 0) ||
+      (job.coverLetter && typeof job.coverLetter === 'string' && job.coverLetter.trim().length > 0)
+    )
+  );
+};
+
+/**
  * 1-Click Direct Application Dispatcher
  * Automatically triggers:
  * 1. Resume & Cover Letter PDF downloads to browser / file explorer

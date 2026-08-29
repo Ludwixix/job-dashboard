@@ -6,7 +6,7 @@ import {
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
-import { executeClientSideAutoApply } from '../services/generationService';
+import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob }) => {

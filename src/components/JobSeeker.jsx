@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
-import { dispatchDirectApplicationSubmission } from '../services/generationService';
+import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
 
 const BALACLAVA_TIER_1 = [
   'balaclava', 'st kilda', 'prahran', 'windsor', 'elsternwick', 'elwood', 
@@ -57,21 +57,6 @@ const formatDaysAgo = (dateStr) => {
   } catch {
     return 'Recently';
   }
-};
-
-// Strict check: Both resume and cover letter must be generated and non-empty
-export const hasGeneratedApplicationDocs = (job) => {
-  return Boolean(
-    job && 
-    job.hasCustomDocs && 
-    job.resumeText && 
-    typeof job.resumeText === 'string' &&
-    job.resumeText.trim().length > 0 &&
-    (
-      (job.coverLetterText && typeof job.coverLetterText === 'string' && job.coverLetterText.trim().length > 0) ||
-      (job.coverLetter && typeof job.coverLetter === 'string' && job.coverLetter.trim().length > 0)
-    )
-  );
 };
 
 // Categorize jobs into expanded granular sub-streams

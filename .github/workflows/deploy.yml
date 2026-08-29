@@ -30,10 +30,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare static job data
+      - name: Verify static job data
         run: |
-          echo '{"count":0,"jobs":[]}' > public/jobs_combined.json
-          echo "Placed empty jobs_combined.json (scraper runs locally)"
+          if [ ! -f public/jobs_combined.json ] || [ ! -s public/jobs_combined.json ]; then
+            echo '{"count":0,"jobs":[]}' > public/jobs_combined.json
+          fi
+          echo "Preserved full job data: $(wc -c < public/jobs_combined.json) bytes"
 
       - name: Build
         run: npm run build

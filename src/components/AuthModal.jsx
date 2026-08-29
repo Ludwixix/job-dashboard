@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, LogIn, LogOut, CheckCircle2, ShieldCheck, Mail, 
-  Table, Sparkles, Key, AlertCircle, RefreshCw, ExternalLink 
+  Table, Sparkles, Key, AlertCircle, RefreshCw, ExternalLink, Zap
 } from 'lucide-react';
 import { 
   getAuthenticatedUser, setAuthenticatedUser, signOutGoogleUser, 

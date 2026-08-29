@@ -95,6 +95,50 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
       .slice(0, 10);
   }, [unsubmittedJobs]);
 
+  // Live Analytics & Points of Interest Computation
+  const liveInsights = useMemo(() => {
+    const totalCount = unsubmittedJobs.length || 1;
+    
+    // Near Balaclava & Commute Proximity < 10km
+    const nearBalaclava = unsubmittedJobs.filter(j => getProximityTier(j.location) <= 2).length;
+    const proximityPct = Math.round((nearBalaclava / totalCount) * 100);
+
+    // Top employer & match score
+    const sortedByScore = [...unsubmittedJobs].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const topEmployer = sortedByScore[0] || null;
+
+    // Fresh < 7 days
+    const fresh7Days = unsubmittedJobs.filter(j => {
+      if (!j.date) return false;
+      try {
+        const d = parseISO(j.date);
+        return isValid(d) && differenceInDays(new Date(), d) <= 7;
+      } catch { return false; }
+    }).length;
+
+    // High compensation roles ($100k+)
+    const highSalaryCount = unsubmittedJobs.filter(j => 
+      j.salary && (j.salary.includes('100') || j.salary.includes('110') || j.salary.includes('120') || j.salary.includes('130'))
+    ).length;
+
+    return {
+      nearBalaclava,
+      proximityPct,
+      topEmployer,
+      fresh7Days,
+      freshPct: Math.round((fresh7Days / totalCount) * 100),
+      highSalaryCount
+    };
+  }, [unsubmittedJobs]);
+
+  // Top 3 Most Recent Jobs
+  const mostRecentJobs = useMemo(() => {
+    return [...unsubmittedJobs]
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      .slice(0, 3);
+  }, [unsubmittedJobs]);
+
+
 
   // Highlighted Local Job (Sorted by Proximity Tier to Balaclava, VIC 3183)
   const highlightedLocalJob = useMemo(() => {

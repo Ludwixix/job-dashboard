@@ -1,118 +1,149 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchJobsData } from '../services/dataService';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const LS_REJECTED  = 'rejectedJobIds';
+const LS_OVERRIDES = 'jobOverrides'; // { [jobKey]: { status, notes, ... } }
+
+const readLS = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeLS = (key, value) => {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
+};
+
+const jobKey = (j) => j.id ? String(j.id) : `${j.company}_${j.title}`;
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
 export const useJobs = () => {
-  const [jobs, setJobs] = useState([]);
+  const [rawJobs, setRawJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
+  const [error, setError]     = useState(null);
+  const [search, setSearch]   = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
 
-  const [rejectedIds, setRejectedIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rejectedJobIds');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Persisted: rejected IDs
+  const [rejectedIds, setRejectedIds] = useState(() => readLS(LS_REJECTED, []));
+  useEffect(() => { writeLS(LS_REJECTED, rejectedIds); }, [rejectedIds]);
 
-  useEffect(() => {
-    localStorage.setItem('rejectedJobIds', JSON.stringify(rejectedIds));
-  }, [rejectedIds]);
+  // Persisted: per-job field overrides (status, notes, applied date, etc.)
+  const [overrides, setOverrides] = useState(() => readLS(LS_OVERRIDES, {}));
+  useEffect(() => { writeLS(LS_OVERRIDES, overrides); }, [overrides]);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchJobsData();
-        if (mounted) {
-          setJobs(data);
-          setError(null);
-        }
-      } catch (err) {
-        if (mounted) {
-          console.error("Error fetching data:", err);
-          setError(err.message || "Failed to load job data");
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-    loadData();
-    return () => { mounted = false; };
-  }, []);
-
-  const refetch = useCallback(async () => {
+  // ── Load remote data ──────────────────────────────────────────────────────
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchJobsData();
-      setJobs(data);
+      setRawJobs(data);
       setError(null);
     } catch (err) {
-      console.error("Error fetching data:", err);
-      setError(err.message || "Failed to load job data");
+      console.error('Error fetching data:', err);
+      setError(err.message || 'Failed to load job data');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const updateJobStatus = useCallback((targetJobIdentifier, newStatus, extraData = {}) => {
-    setJobs(prevJobs => {
-      return prevJobs.map(j => {
-        const matchesId = j.id && String(j.id) === String(targetJobIdentifier);
-        const matchesKey = `${j.company}_${j.title}` === targetJobIdentifier;
-        const matchesTitle = j.title === targetJobIdentifier;
+  useEffect(() => {
+    let mounted = true;
+    loadData().finally(() => { if (!mounted) return; });
+    return () => { mounted = false; };
+  }, [loadData]);
 
-        if (matchesId || matchesKey || matchesTitle) {
-          return {
-            ...j,
-            status: newStatus,
-            date: new Date().toISOString().split('T')[0],
-            ...extraData
-          };
-        }
-        return j;
-      });
+  const refetch = loadData;
+
+  // ── Merge overrides + rejection flags on top of remote data ───────────────
+  const enrichedJobs = useMemo(() => {
+    return rawJobs.map(j => {
+      const key   = jobKey(j);
+      const patch = overrides[key] || {};
+      const merged = { ...j, ...patch };
+      const isRejected =
+        rejectedIds.includes(String(j.id)) ||
+        rejectedIds.includes(`${j.company}_${j.title}`) ||
+        (merged.status || '').toLowerCase().includes('rejected') ||
+        (merged.status || '').toLowerCase().includes('dismissed');
+      return { ...merged, isRejected };
     });
-  }, []);
+  }, [rawJobs, overrides, rejectedIds]);
+
+  // ── Mutation helpers ──────────────────────────────────────────────────────
+
+  /** Persist a status change + optional extra fields for a job. Survives page refresh. */
+  const updateJobStatus = useCallback((targetJobIdentifier, newStatus, extraData = {}) => {
+    setOverrides(prev => {
+      const next  = { ...prev };
+      const match = rawJobs.find(j =>
+        (j.id && String(j.id) === String(targetJobIdentifier)) ||
+        `${j.company}_${j.title}` === targetJobIdentifier ||
+        j.title === targetJobIdentifier
+      );
+      const key  = match ? jobKey(match) : String(targetJobIdentifier);
+      next[key]  = { ...(prev[key] || {}), status: newStatus, ...extraData };
+      return next;
+    });
+  }, [rawJobs]);
+
+  /** Persist a notes/description edit for a job. */
+  const updateJobNotes = useCallback((targetJobIdentifier, notes) => {
+    setOverrides(prev => {
+      const next  = { ...prev };
+      const match = rawJobs.find(j =>
+        (j.id && String(j.id) === String(targetJobIdentifier)) ||
+        `${j.company}_${j.title}` === targetJobIdentifier
+      );
+      const key  = match ? jobKey(match) : String(targetJobIdentifier);
+      next[key]  = { ...(prev[key] || {}), notes };
+      return next;
+    });
+  }, [rawJobs]);
 
   const rejectJob = useCallback((targetJobIdentifier) => {
     setRejectedIds(prev => {
       const strId = String(targetJobIdentifier);
-      if (!prev.includes(strId)) return [...prev, strId];
-      return prev;
+      return prev.includes(strId) ? prev : [...prev, strId];
     });
     updateJobStatus(targetJobIdentifier, 'Rejected / Dismissed');
   }, [updateJobStatus]);
 
   const unrejectJob = useCallback((targetJobIdentifier) => {
     setRejectedIds(prev => prev.filter(id => id !== String(targetJobIdentifier)));
-    updateJobStatus(targetJobIdentifier, 'Discovered');
-  }, [updateJobStatus]);
-
-  const enrichedJobs = useMemo(() => {
-    return jobs.map(j => {
-      const identifier = j.id || `${j.company}_${j.title}`;
-      const isRejected = rejectedIds.includes(String(j.id)) || 
-                         rejectedIds.includes(`${j.company}_${j.title}`) || 
-                         (j.status || '').toLowerCase().includes('rejected') ||
-                         (j.status || '').toLowerCase().includes('dismissed');
-      return {
-        ...j,
-        isRejected
-      };
+    // Remove the status override so the job reverts to its original status
+    setOverrides(prev => {
+      const next  = { ...prev };
+      const match = rawJobs.find(j =>
+        (j.id && String(j.id) === String(targetJobIdentifier)) ||
+        `${j.company}_${j.title}` === targetJobIdentifier
+      );
+      const key = match ? jobKey(match) : String(targetJobIdentifier);
+      if (next[key]) {
+        const { status: _s, ...rest } = next[key];
+        if (Object.keys(rest).length === 0) {
+          delete next[key];
+        } else {
+          next[key] = rest;
+        }
+      }
+      return next;
     });
-  }, [jobs, rejectedIds]);
+  }, [rawJobs]);
 
+  // ── Filtered view for ApplicationTracker ─────────────────────────────────
   const filteredJobs = useMemo(() => {
     return enrichedJobs.filter(job => {
-      const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
-                            job.title.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        job.company.toLowerCase().includes(search.toLowerCase()) ||
+        job.title.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'All' || job.status === statusFilter;
       const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
       return matchesSearch && matchesStatus && matchesSource;
@@ -139,6 +170,7 @@ export const useJobs = () => {
     error,
     refetch,
     updateJobStatus,
+    updateJobNotes,
     search,
     setSearch,
     statusFilter,
@@ -146,6 +178,6 @@ export const useJobs = () => {
     sourceFilter,
     setSourceFilter,
     statuses,
-    sources
+    sources,
   };
 };

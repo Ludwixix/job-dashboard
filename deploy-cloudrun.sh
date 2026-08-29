@@ -38,8 +38,22 @@ if ! gcloud artifacts repositories describe "${REPO_NAME}" --location="${REGION}
         --quiet
 fi
 
+# Build modern React SPA into static directory
+echo "▶ Building job-dashboard-react frontend for Cloud Run deployment…"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REACT_DIR="$(cd "${SCRIPT_DIR}/../job-dashboard-react" && pwd)"
+if [ -d "${REACT_DIR}" ]; then
+    cd "${REACT_DIR}"
+    npm run build
+    rm -rf "${SCRIPT_DIR}/src/job_dashboard/static/"*
+    cp -r dist/* "${SCRIPT_DIR}/src/job_dashboard/static/"
+    cd "${SCRIPT_DIR}"
+    echo "✓ React frontend packaged into src/job_dashboard/static/"
+fi
+
 # Build & push image via Cloud Build
 echo "▶ Building container image via Cloud Build…"
+
 gcloud builds submit \
     --tag "${IMAGE}" \
     --project="${PROJECT_ID}" \

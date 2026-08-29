@@ -977,15 +977,30 @@ def make_handler(app: DashboardApp):
                     self.end_headers()
                     self.wfile.write(data)
                     return
-            asset = Path(__file__).parent / "static" / ("index.html" if path == "/" else path.removeprefix("/"))
-            if asset.is_file():
-                data = asset.read_bytes()
+            static_dir = Path(__file__).parent / "static"
+            target_asset = (static_dir / path.removeprefix("/")).resolve()
+            if target_asset.is_file() and str(target_asset).startswith(str(static_dir.resolve())):
+                data = target_asset.read_bytes()
                 self.send_response(200)
-                self.send_header("Content-Type", mimetypes.guess_type(asset.name)[0] or "text/plain")
+                self.send_header("Content-Type", mimetypes.guess_type(target_asset.name)[0] or "text/plain")
                 self.send_header("Content-Length", str(len(data)))
+                self._send_cors_headers()
                 self.end_headers()
                 self.wfile.write(data)
                 return
+
+            if path == "/" or (not path.startswith("/api/") and not path.startswith("/health") and not path.startswith("/metrics")):
+                index_html = static_dir / "index.html"
+                if index_html.is_file():
+                    data = index_html.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(data)))
+                    self._send_cors_headers()
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+
             
             path = urlparse(self.path).path
             try:

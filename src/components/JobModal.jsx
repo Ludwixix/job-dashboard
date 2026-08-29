@@ -121,6 +121,11 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                   {job.source}
                 </span>
               )}
+              {job.hasCustomDocs && (
+                <span className="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 flex items-center gap-1 shadow-xs animate-pulse">
+                  <Sparkles size={11} className="text-slate-950" /> TAILORED ASSETS READY (PDFs)
+                </span>
+              )}
               <span className="text-[10px] font-mono font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                 <Clock size={11} /> {formatDaysAgo(job.date).toUpperCase()}
               </span>
@@ -195,12 +200,54 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
             }`}
           >
             <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-500"} />
-            ASSETS & ACTIONS
+            ASSETS & ACTIONS {job.hasCustomDocs && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
           </button>
         </div>
 
         {/* Modal Scrollable Body */}
         <div className="p-6 space-y-6 overflow-y-auto flex-1 font-sans">
+          {/* Prominent Custom Documents Ready Banner */}
+          {job.hasCustomDocs && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white border-2 border-emerald-500 shadow-md font-mono space-y-3 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-400/30 shrink-0">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">CUSTOM APPLICATION ASSETS READY</div>
+                    <div className="text-xs font-bold text-white">Tailored ATS Resume & Executive Cover Letter attached</div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold bg-slate-800 text-emerald-300 px-2.5 py-1 rounded-lg border border-slate-700 w-fit">
+                  {job.docsModel || 'GLM 5.3 Flash'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
+                <button
+                  onClick={() => downloadResumePdf(job.resumeText, job)}
+                  className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  title="Download Tailored Resume PDF"
+                >
+                  <Download size={13} /> DOWNLOAD RESUME (PDF)
+                </button>
+                <button
+                  onClick={() => downloadCoverLetterPdf(job.coverLetterText, job)}
+                  className="py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  title="Download Tailored Cover Letter PDF"
+                >
+                  <Download size={13} /> DOWNLOAD COVER (PDF)
+                </button>
+                <button
+                  onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
+                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer border border-emerald-500/40 transition-colors sm:ml-auto"
+                >
+                  <Sparkles size={13} className="text-emerald-400" /> EDIT IN STUDIO
+                </button>
+              </div>
+            </div>
+          )}
           {/* TAB 1: FIT & AI AUDIT */}
           {activeTab === 'fit' && (
             <div className="space-y-6 animate-in fade-in duration-200">

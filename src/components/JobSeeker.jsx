@@ -11,27 +11,8 @@ import {
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
-
-const BALACLAVA_TIER_1 = [
-  'balaclava', 'st kilda', 'prahran', 'windsor', 'elsternwick', 'elwood', 
-  'caulfield', 'malvern', 'armadale', 'toorak', 'south yarra', 'port melbourne', 
-  'south melbourne', 'albert park', 'bentleigh', 'brighton'
-];
-
-const BALACLAVA_TIER_2 = [
-  'melbourne cbd', 'cbd', 'melbourne', 'southbank', 'docklands', 'cremorne', 'richmond'
-];
-
-const getProximityDistanceKm = (locationStr = '') => {
-  const loc = locationStr.toLowerCase();
-  for (const suburb of BALACLAVA_TIER_1) {
-    if (loc.includes(suburb)) return 3;
-  }
-  for (const suburb of BALACLAVA_TIER_2) {
-    if (loc.includes(suburb)) return 8;
-  }
-  return 20;
-};
+import { calculateCandidateJobMatch, calculateCandidateDistanceKm } from '../services/scoringEngine';
+import { getActiveProfile } from '../services/profileService';
 
 const getAgeInDays = (dateStr) => {
   if (!dateStr) return 0;
@@ -110,12 +91,14 @@ export const JobSeeker = ({
   jobs, 
   onSelectJob, 
   baseLocation = 'BALACLAVA VIC 3183', 
+  activeProfile,
   onRejectJob, 
   onUnrejectJob,
   onDispatchAsyncApplication,
   asyncGeneratingIds = new Set(),
   onJobStatusUpdate
 }) => {
+  const currentProfile = activeProfile || getActiveProfile();
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [activeStreamTab, setActiveStreamTab] = useState('All');
@@ -207,7 +190,19 @@ export const JobSeeker = ({
   const seekerJobs = useMemo(() => {
     const sourcePool = activeStreamTab === 'Rejected Jobs' ? rejectedJobs : unsubmittedJobs;
 
-    const filtered = sourcePool.filter(job => {
+    // Enriched with active candidate dynamic ATS match & commute distance
+    const enrichedPool = sourcePool.map(job => {
+      const match = calculateCandidateJobMatch(job, currentProfile);
+      return {
+        ...job,
+        score: match.score,
+        matchedSkills: match.matchedSkills,
+        distanceKm: match.distanceKm,
+        matchTier: match.matchTier
+      };
+    });
+
+    const filtered = enrichedPool.filter(job => {
       const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
                             job.title.toLowerCase().includes(search.toLowerCase()) ||
                             job.notes.toLowerCase().includes(search.toLowerCase()) ||
@@ -254,9 +249,9 @@ export const JobSeeker = ({
         matchesWorkMode = !job.remote && !(job.location || '').toLowerCase().includes('remote');
       }
 
-      // Distance Filter (Balaclava VIC)
+      // Distance Filter (Relative to Candidate Profile Location)
       let matchesDistance = true;
-      const distKm = getProximityDistanceKm(job.location);
+      const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, currentProfile.location);
       if (maxDistanceFilter === '5km') {
         matchesDistance = distKm <= 5;
       } else if (maxDistanceFilter === '10km') {
@@ -290,7 +285,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy]);
+  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile]);
 
   // Paginated Sliced Jobs
   const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
@@ -946,7 +941,7 @@ export const JobSeeker = ({
                             <button
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf);
+                                dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
                               }}
                               className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
                               title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"

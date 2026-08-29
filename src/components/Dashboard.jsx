@@ -10,11 +10,14 @@ import { KanbanBoard } from './KanbanBoard';
 import { CommandPalette } from './CommandPalette';
 import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
+import { ProfileSwitcher } from './ProfileSwitcher';
+import { ProfileModal } from './ProfileModal';
 import { generateApplicationDocs } from '../services/generationService';
+import { getActiveProfile } from '../services/profileService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Download, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table 
+  Sliders, TrendingUp, Table, User
 } from 'lucide-react';
 
 export const Dashboard = () => {
@@ -25,6 +28,11 @@ export const Dashboard = () => {
   const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
+
+  // Candidate Personalization Profile State
+  const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(null);
 
   // Background Async Application Generation Queue
   const [asyncGeneratingIds, setAsyncGeneratingIds] = useState(new Set());
@@ -40,7 +48,7 @@ export const Dashboard = () => {
     });
 
     try {
-      const result = await generateApplicationDocs(job);
+      const result = await generateApplicationDocs(job, null, null, activeProfile);
       
       if (result && result.resume && result.coverLetter) {
         updateJobStatus(jobId, 'Package Prepared / To Submit', {
@@ -49,7 +57,7 @@ export const Dashboard = () => {
           coverLetterText: result.coverLetter,
           docsModel: result.model,
           docsGeneratedAt: new Date().toISOString(),
-          driveFolder: 'Job Applications - Sam Ludwig',
+          driveFolder: `Job Applications - ${activeProfile.name}`,
           driveStatus: 'Synced to Google Drive / Ready for Submission'
         });
 
@@ -247,10 +255,27 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
+        <div className="flex items-center gap-2.5 shrink-0 font-mono text-[11px]">
+          {/* Active Candidate Profile Switcher & Customizer */}
+          <ProfileSwitcher 
+            activeProfile={activeProfile}
+            onProfileChange={(p) => {
+              setActiveProfile(p);
+              if (p.suburb || p.location) {
+                setBaseLocation(p.suburb || p.location);
+              }
+            }}
+            onOpenProfileModal={(p) => {
+              setEditingProfile(p);
+              setIsProfileModalOpen(true);
+            }}
+          />
+
+          <span className="text-slate-800">|</span>
+
           <button
             onClick={() => setIsBatchApplyOpen(true)}
-            className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950 border border-emerald-500/40 px-2 py-0.5 rounded"
+            className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950 border border-emerald-500/40 px-2 py-1 rounded-xl shadow-xs"
             title="Dispatch 1-Click Batch Automated Applications"
           >
             <Zap size={12} className="animate-bounce text-emerald-400" /> BATCH AUTO-APPLY
@@ -258,27 +283,15 @@ export const Dashboard = () => {
 
           <button
             onClick={() => setIsCommandPaletteOpen(true)}
-            className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950 border border-indigo-500/40 px-2 py-0.5 rounded"
+            className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950 border border-indigo-500/40 px-2 py-1 rounded-xl"
             title="Open Command Palette (Ctrl+K)"
           >
             <Command size={12} /> ⌘K
           </button>
 
-          <span className="text-slate-800">|</span>
-
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold"
-            title="Export all database postings to CSV"
-          >
-            <Download size={12} /> CSV
-          </button>
-
-          <span className="text-slate-800">|</span>
-
           <button 
             onClick={refetch}
-            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold"
+            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-slate-900 border border-slate-800"
           >
             <RefreshCw size={12} /> SYNC
           </button>
@@ -399,6 +412,7 @@ export const Dashboard = () => {
         {activeSection === 'seeker' && (
           <JobSeeker 
             jobs={jobs} 
+            activeProfile={activeProfile}
             onSelectJob={(job) => setSelectedJob(job)} 
             onRejectJob={rejectJob}
             onUnrejectJob={unrejectJob}
@@ -517,6 +531,26 @@ export const Dashboard = () => {
               updateJobStatus(res.job.id || res.job.title, 'Applied / Confirmation Received', res.result);
             }
           });
+        }}
+      />
+
+      {/* Candidate Personalization & Resume Upload Modal */}
+      <ProfileModal 
+        isOpen={isProfileModalOpen}
+        profile={editingProfile}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setEditingProfile(null);
+        }}
+        onProfileSaved={(savedProfile) => {
+          if (savedProfile) {
+            setActiveProfile(savedProfile);
+            if (savedProfile.suburb || savedProfile.location) {
+              setBaseLocation(savedProfile.suburb || savedProfile.location);
+            }
+          } else {
+            setActiveProfile(getActiveProfile());
+          }
         }}
       />
 

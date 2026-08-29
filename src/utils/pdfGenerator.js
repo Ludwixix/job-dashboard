@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { getActiveProfile } from '../services/profileService';
 
 /**
  * Format string safely for filenames
@@ -10,8 +11,9 @@ const sanitizeFilename = (str) => {
 /**
  * Executive Resume PDF Generator
  */
-export const downloadResumePdf = (resumeText, job, filename) => {
+export const downloadResumePdf = (resumeText, job, candidateProfile, filename) => {
   if (!resumeText) return;
+  const profile = candidateProfile || getActiveProfile();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -19,7 +21,8 @@ export const downloadResumePdf = (resumeText, job, filename) => {
   });
 
   const company = job?.company || 'Target_Employer';
-  const defaultFilename = filename || `Sam_Ludwig_${sanitizeFilename(company)}_Resume.pdf`;
+  const candNameSafe = sanitizeFilename(profile?.name || 'Candidate');
+  const defaultFilename = filename || `${candNameSafe}_${sanitizeFilename(company)}_Resume.pdf`;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -45,9 +48,10 @@ export const downloadResumePdf = (resumeText, job, filename) => {
 
     // Clean markdown bold/italic artifacts if needed for detection
     const cleanHeaderTest = line.replace(/[*#_]/g, '').trim().toUpperCase();
+    const candidateNameUpper = (profile?.name || 'Candidate').toUpperCase();
 
-    // 1. Top Candidate Name (H1: # Candidate Name or SAM LUDWIG)
-    if (line.startsWith('# ') || cleanHeaderTest === 'SAM LUDWIG' || (cleanHeaderTest.startsWith('SAM LUDWIG') && cleanHeaderTest.length < 30)) {
+    // 1. Top Candidate Name (H1: # Candidate Name or Candidate Name)
+    if (line.startsWith('# ') || cleanHeaderTest === candidateNameUpper || (cleanHeaderTest.startsWith(candidateNameUpper) && cleanHeaderTest.length < 40) || cleanHeaderTest === 'SAM LUDWIG') {
       checkPageBreak(14);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(18);
@@ -173,8 +177,9 @@ export const downloadResumePdf = (resumeText, job, filename) => {
 /**
  * Executive Cover Letter PDF Generator
  */
-export const downloadCoverLetterPdf = (coverLetterText, job, filename) => {
+export const downloadCoverLetterPdf = (coverLetterText, job, candidateProfile, filename) => {
   if (!coverLetterText) return;
+  const profile = candidateProfile || getActiveProfile();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -183,7 +188,8 @@ export const downloadCoverLetterPdf = (coverLetterText, job, filename) => {
 
   const company = job?.company || 'Target_Employer';
   const roleTitle = job?.title || 'Target Role';
-  const defaultFilename = filename || `Sam_Ludwig_${sanitizeFilename(company)}_CoverLetter.pdf`;
+  const candNameSafe = sanitizeFilename(profile?.name || 'Candidate');
+  const defaultFilename = filename || `${candNameSafe}_${sanitizeFilename(company)}_CoverLetter.pdf`;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -202,13 +208,14 @@ export const downloadCoverLetterPdf = (coverLetterText, job, filename) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(15, 23, 42);
-  doc.text('SAM LUDWIG', margin, y);
+  doc.text((profile?.name || 'CANDIDATE NAME').toUpperCase(), margin, y);
   y += 5;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(71, 85, 105);
-  doc.text('Melbourne, VIC | 0405 993 245 | sam.ludwig@gmail.com | Australian Citizen (Baseline/NV1 Eligible)', margin, y);
+  const contactLine = `${profile?.location || 'Melbourne, VIC'} | ${profile?.phone || ''} | ${profile?.email || ''} | ${profile?.workRights || 'Australian Citizen'}`;
+  doc.text(contactLine, margin, y);
   y += 3;
 
   doc.setDrawColor(203, 213, 225);

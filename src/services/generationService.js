@@ -3,6 +3,7 @@
  * Handles AI-powered resume + cover letter generation, Interview Prep,
  * Market Intelligence, and Autonomous Agent Heuristics.
  */
+import { getActiveProfile } from './profileService';
 
 const MASTER_RESUME_HIGHLIGHTS = `
 SAM LUDWIG — Senior IT Infrastructure & M365 Engineer
@@ -20,58 +21,6 @@ CAREER METRICS (real, verified):
 - 100+ clinical endpoints migrated: Windows 11 at St John of God with zero patient care disruption
 - 5+ bespoke SPFx solutions: For Victoria Police, Transurban, Cimic Group
 - 200+ SharePoint sites automated: MFA compliance audit automation (PnP PowerShell)
-
-PROFESSIONAL EXPERIENCE:
-1. L2/L3 Technical Support Engineer | Australia Post (via Capgemini) | Feb 2026–Jun 2026
-   - Engineered keystroke injection automation in ServiceNow → eliminated hundreds of hours/month of manual data entry
-   - Managed complete endpoint lifecycle: OS migrations, Autopilot enrolment, compliant disposal
-   - Primary escalation point for complex L2/L3 faults, collaborating with cloud engineering teams
-   - Led self-service kiosk programme rollout reducing walk-in service desk volume
-
-2. Endpoint Migration Engineer | St John of God Health Care | Oct 2025–Jan 2026
-   - Led Windows 11 enterprise migration across 100+ clinical endpoints, zero patient care disruption
-   - Maintained 100% SOE compliance via Autopilot provisioning in live hospital environment
-   - Primary liaison between clinical staff and engineering team (EMR, PACS compatibility)
-
-3. Senior Managed Services Engineer | Capgemini (to Dept. Education VIC) | Dec 2021–Dec 2023
-   - Managed 660k+ user SharePoint farm (Southern Hemisphere's largest), 99.9% uptime
-   - MFA compliance automation: PnP PowerShell auditing 200+ SharePoint sites, eliminated month-long manual cycle
-   - Built ServiceNow workload distribution engine integrating M365 presence data → prevented SLA breaches
-   - 15% reduction in repeat incidents through systematic RCA and permanent preventive measures
-   - Managed hybrid identity: On-premises AD + Entra ID + Google Workspace sync
-   - Azure cloud adoption and ACSC Essential 8 alignment
-
-4. Application Support Engineer | Knosys | Dec 2020–Dec 2021
-   - 95% SLA resolution for GreenOrbit enterprise intranet (Cotton On, Harvey Norman, Healthscope)
-   - 87% processing time reduction via PowerShell automation (2 hours → 15 minutes per migration batch)
-   - Contributed to AWS cloud migration and authored RCA documentation resolving recurring version conflicts
-
-5. SharePoint Developer | Engage Squared | Mar 2018–Dec 2020
-   - Delivered 5+ bespoke SharePoint Online intranets using SPFx/React/TypeScript (Victoria Police, Transurban)
-   - 25% deployment cycle reduction via Azure DevOps CI/CD pipeline implementation
-   - Led end-to-end SharePoint migrations to M365 with ISO 27001 governance compliance
-   - 20% increase in M365 adoption through client technical workshops
-
-6. Telecommunications Technician | NBN | Oct 2016–Nov 2017
-   - Layer 1 infrastructure deployment (fibre optic/copper structured cabling)
-
-SKILLS:
-M365: SharePoint Online/Server, Exchange Hybrid, Teams, OneDrive, Entra ID, Intune, Autopilot, Power Automate, Power Apps, Purview, Defender
-Azure: Azure VMs, Azure Functions, Azure DevOps, Azure Automation, Azure Monitor
-Identity: Entra ID (Azure AD), Azure AD Connect, ADFS, PHS, PTA, Conditional Access, MFA, SSPR
-Security: ACSC Essential 8, ISO 27001, NIST, Conditional Access, Defender for Endpoint/Office 365
-Automation: PowerShell 5.1/7 (Expert), PnP PowerShell, Graph API, Python 3, Selenium
-Development: React, TypeScript, JavaScript, SPFx, CI/CD, Azure DevOps, Git
-Service Mgmt: ServiceNow, ITIL 4, Incident/Problem/Change Management, SLA Management, RCA
-Infrastructure: Windows Server 2012R2–2022, Active Directory, VMware vSphere, Hyper-V, DNS/DHCP
-
-CERTIFICATIONS:
-- Microsoft Certified: Azure Administrator Associate (AZ-104) | 2025
-- ITIL 4 Foundation | AXELOS | 2025
-- Microsoft Certified: Azure Fundamentals (AZ-900) | 2022
-
-EDUCATION:
-- Diploma of Information Technology | Coder Academy | Melbourne | 2019
 `;
 
 export const CANDIDATE_PROFILE = {
@@ -284,10 +233,11 @@ Australian Citizen | Unrestricted Work Rights`;
  * Calls OpenRouter directly via HTTPS CORS with GLM 5.3 Flash.
  * Falls back seamlessly to grounded client-side generation if offline.
  */
-export const generateApplicationDocs = async (job, onProgress, onLog) => {
+export const generateApplicationDocs = async (job, onProgress, onLog, candidateProfile) => {
   const apiKey = getActiveApiKey();
   const model = getActiveModel() || 'z-ai/glm-5.3-flash';
   const startTime = Date.now();
+  const profile = candidateProfile || getActiveProfile();
 
   const log = (msg, type = 'info') => {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
@@ -300,71 +250,56 @@ export const generateApplicationDocs = async (job, onProgress, onLog) => {
     throw new Error('OpenRouter API key is required. Please paste your key in Settings or the key box.');
   }
 
-  log(`Initializing OpenRouter API stream [Model: ${model}]`, 'init');
+  log(`Initializing OpenRouter API stream for ${profile.name} [Model: ${model}]`, 'init');
   log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
 
-  const systemPrompt = `You are an elite, top-tier executive ATS resume and cover letter architect for Sam Ludwig.
+  const candidateSummary = profile.fullWorkExperienceText || profile.workHistorySummary || MASTER_RESUME_HIGHLIGHTS;
+
+  const systemPrompt = `You are an elite, top-tier executive ATS resume and cover letter architect for ${profile.name}.
 
 CANDIDATE MASTER PROFILE & VERIFIED CAREER RECORD:
-${MASTER_RESUME_HIGHLIGHTS}
+Name: ${profile.name}
+Title: ${profile.title}
+Location: ${profile.location}
+Phone: ${profile.phone}
+Email: ${profile.email}
+Work Rights: ${profile.workRights}
+Clearance: ${profile.clearance}
+Core Skills: ${(profile.coreSkills || []).join(', ')}
+Certifications: ${(profile.certifications || []).join(', ')}
+
+CAREER & WORK EXPERIENCE HISTORY:
+${candidateSummary}
 
 STRICT ARCHITECTURAL REQUIREMENTS:
 
 1. RESUME FORMATTING & STRUCTURE (Markdown):
-   # SAM LUDWIG
+   # ${(profile.name || 'Candidate Name').toUpperCase()}
    [Mirror Target Role Title EXACTLY from the job ad]
-   Melbourne, VIC | 0405 993 245 | sam.ludwig@gmail.com | Australian Citizen | Baseline / NV1 Ready
+   ${profile.location} | ${profile.phone} | ${profile.email} | ${profile.workRights} | ${profile.clearance}
 
    ## PROFESSIONAL SUMMARY
-   Write a compelling 3-sentence executive summary emphasizing deep expertise in enterprise IT systems, M365/Azure, automation, and proven scale (660,000+ users, 99.9% uptime). Tailor directly to the target employer's core mission.
+   Write a compelling 3-sentence executive summary emphasizing deep expertise in ${(profile.coreSkills || []).slice(0, 5).join(', ')}, proven achievements, and career impact. Tailor directly to the target employer's core mission and job ad requirements.
 
    ## CORE TECHNICAL COMPETENCIES
-   Organize into categorized bulleted clusters:
-   - Cloud & Identity: Microsoft 365, Azure, Entra ID (Azure AD), Intune, Autopilot, Exchange Online, Hybrid Identity
-   - Systems & Workplace Infrastructure: Windows Server 2016-2022, Active Directory, Group Policy, VMware, SOE Deployment
-   - Automation & Tooling: PowerShell 7, PnP PowerShell, Azure DevOps (CI/CD), Graph API, ServiceNow Automation
-   - Security & Governance: ACSC Essential 8, MFA Compliance, Endpoint Hardening, Least Privilege Access
-   - Service Delivery: Incident & Problem Management (ITIL v4), Root Cause Analysis (RCA), SLA Assurance, ServiceNow
+   Organize into categorized bulleted clusters aligned with the candidate's skills and the target role.
 
    ## PROFESSIONAL EXPERIENCE
-   Include all 5 relevant professional roles with clear chronology and dates. For EACH role, provide 3 to 4 substantial, impact-driven bullet points structured with measurable metrics and action verbs:
-   
-   ### L2/L3 Technical Support Engineer | Australia Post (via Capgemini)
-   *Feb 2026 – Jun 2026 | Melbourne, VIC*
-   - [3-4 detailed bullets highlighting ServiceNow keystroke automation, Windows 11 endpoint provisioning, L2/L3 escalations, and kiosk rollout]
-
-   ### Endpoint Migration Engineer | St John of God Health Care
-   *Oct 2025 – Jan 2026 | Melbourne, VIC*
-   - [3 detailed bullets highlighting 100+ clinical endpoint migration, zero patient care disruption, SOE compliance, and EMR/PACS compatibility]
-
-   ### Senior Managed Services Engineer | Capgemini (to Dept. of Education VIC)
-   *Dec 2021 – Dec 2023 | Melbourne, VIC*
-   - [4 detailed bullets highlighting 660k+ user SharePoint farm operations, 99.9% uptime, 200+ site MFA audit automation, 15% repeat incident reduction via RCA, and hybrid identity]
-
-   ### Application Support Engineer | Knosys
-   *Dec 2020 – Dec 2021 | Melbourne, VIC*
-   - [3-4 detailed bullets highlighting 95% SLA resolution, 87% batch processing time reduction via PowerShell 7 (2hr to 15min), and cloud migration support]
-
-   ### SharePoint & Cloud Solutions Consultant | Engage Squared
-   *Nov 2018 – Dec 2020 | Melbourne, VIC*
-   - [3 detailed bullets highlighting 25% deployment cycle reduction via Azure DevOps CI/CD, 5+ bespoke SPFx solutions for Victoria Police/Transurban, and Essential 8 hardening]
+   Include all relevant professional roles with clear chronology and dates from the candidate's career history. For EACH role, provide 3 to 4 substantial, impact-driven bullet points structured with measurable metrics and action verbs tailored to this target job.
 
    ## CERTIFICATIONS & EDUCATION
-   - Microsoft Certified: Azure Administrator Associate (AZ-104)
-   - ITIL 4 Foundation in IT Service Management (AXELOS)
-   - Microsoft Certified: Azure Fundamentals (AZ-900)
-   - Diploma of Information Technology | Coder Academy Melbourne
+   ${(profile.certifications && profile.certifications.length > 0) ? profile.certifications.map(c => `- ${c}`).join('\n') : '- Professional Certifications and Relevant Industry Training'}
 
 2. COVER LETTER FORMATTING & STRUCTURE:
    - 3 impactful paragraphs (250–350 words):
-     * Paragraph 1 (The Hook): Acknowledge the target employer by name, the exact role title, and lead with Sam's standout scale metric (660,000+ users, 99.9% uptime).
-     * Paragraph 2 (The Proof Points): Highlight two distinct achievements directly addressing the employer's needs (e.g. 87% PowerShell automation reduction and 15% RCA incident reduction, or clinical endpoint migration).
-     * Paragraph 3 (The Close): Highlight Melbourne location, Australian Citizenship with Baseline/NV1 eligibility, remote/hybrid readiness, and a direct, polite call to action for a 20-minute discussion.
+     * Paragraph 1 (The Hook): Acknowledge the target employer by name, the exact role title, and lead with a standout metric or accomplishment from ${profile.name}'s career.
+     * Paragraph 2 (The Proof Points): Highlight two distinct achievements directly addressing the employer's needs and core responsibilities.
+     * Paragraph 3 (The Close): Highlight ${profile.location} location, ${profile.workRights}, readiness, and a direct, polite call to action for a 20-minute discussion.
    - Tone: Confident, calm, highly competent, zero fluffy buzzwords.
 
 3. CRITICAL RULES:
    - Australian English spelling (organisation, prioritise, analyse, centre).
-   - Zero hallucinations — use only the verified facts and metrics provided.
+   - Zero hallucinations — use only the verified facts, roles, and skills provided.
    - SEPARATION: Output the complete Tailored Resume, followed by EXACTLY the separator line \`===COVER_LETTER===\`, followed by the Tailored Cover Letter.`;
 
   const userPrompt = `TARGET JOB:
@@ -842,13 +777,14 @@ export const runDocumentQualityAudit = (job, resumeText = '', coverLetterText = 
  * Robust Client-Side Automated Application Pipeline
  * Gracefully executes in production static environments (GitHub Pages) and local dev servers.
  */
-export const executeClientSideAutoApply = async (job) => {
+export const executeClientSideAutoApply = async (job, candidateProfile) => {
+  const profile = candidateProfile || getActiveProfile();
   // 1. Try local dev server endpoint if available
   try {
     const res = await fetch('/api/auto-apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(job)
+      body: JSON.stringify({ ...job, candidateProfile: profile })
     });
     const contentType = res.headers.get('content-type') || '';
     if (res.ok && contentType.includes('application/json')) {
@@ -862,18 +798,18 @@ export const executeClientSideAutoApply = async (job) => {
   }
 
   // 2. Production Static / Client-Side Grounded Automated Pipeline
-  const docResult = await generateApplicationDocs(job);
+  const docResult = await generateApplicationDocs(job, null, null, profile);
   const auditResult = runDocumentQualityAudit(job, docResult.resume, docResult.coverLetter);
 
   const submittedFields = {
-    "Full Name": CANDIDATE_PROFILE.name,
-    "Email Address": CANDIDATE_PROFILE.email,
-    "Mobile Phone": CANDIDATE_PROFILE.phone,
-    "Current Location": CANDIDATE_PROFILE.location,
-    "Work Rights": "Australian Citizen (Unrestricted)",
-    "Security Clearance": "Baseline / NV1 Ready",
+    "Full Name": profile.name,
+    "Email Address": profile.email,
+    "Mobile Phone": profile.phone,
+    "Current Location": profile.location,
+    "Work Rights": profile.workRights || "Australian Citizen (Unrestricted)",
+    "Security Clearance": profile.clearance || "Baseline / NV1 Ready",
     "Notice Period": "Immediate / <2 Weeks",
-    "Target Salary": job.salary || "$115,000 + Super"
+    "Target Salary": job.salary || profile.targetSalary || "$115,000 + Super"
   };
 
   const receipt = {
@@ -921,18 +857,19 @@ export const hasGeneratedApplicationDocs = (job) => {
  * 3. Copying applicant details & cover letter to clipboard for 2-second form filling
  * 4. Updating local state and Google Sheet to "Applied / Confirmation Received"
  */
-export const dispatchDirectApplicationSubmission = (job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf) => {
+export const dispatchDirectApplicationSubmission = (job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, candidateProfile) => {
   if (!job) return;
+  const profile = candidateProfile || getActiveProfile();
 
   // 1. Download Resume PDF
   if (job.resumeText && downloadResumePdf) {
-    downloadResumePdf(job.resumeText, job);
+    downloadResumePdf(job.resumeText, job, profile);
   }
 
   // 2. Download Cover Letter PDF (slight timeout so browser handles multi-file downloads smoothly)
   if ((job.coverLetterText || job.coverLetter) && downloadCoverLetterPdf) {
     setTimeout(() => {
-      downloadCoverLetterPdf(job.coverLetterText || job.coverLetter, job);
+      downloadCoverLetterPdf(job.coverLetterText || job.coverLetter, job, profile);
     }, 400);
   }
 
@@ -944,13 +881,13 @@ export const dispatchDirectApplicationSubmission = (job, onJobStatusUpdate, down
   }
 
   // 4. Copy Application Details to Clipboard
-  const candidateText = `Full Name: Sam Ludwig
-Email: sam.ludwig@gmail.com
-Phone: 0405 993 245
-Location: Balaclava VIC 3183
-Work Rights: Australian Citizen (Unrestricted)
-Security Clearance: Baseline / NV1 Ready
-Target Salary: ${job.salary || '$115,000 + Super'}
+  const candidateText = `Full Name: ${profile.name}
+Email: ${profile.email}
+Phone: ${profile.phone}
+Location: ${profile.location}
+Work Rights: ${profile.workRights || 'Australian Citizen (Unrestricted)'}
+Security Clearance: ${profile.clearance || 'Baseline / NV1 Ready'}
+Target Salary: ${job.salary || profile.targetSalary || '$115,000 + Super'}
 
 --- TAILORED COVER LETTER ---
 ${job.coverLetterText || job.coverLetter || ''}`;

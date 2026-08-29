@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { MULTI_INDUSTRY_JOBS } from './multiIndustryJobData';
 
 const CSV_URL = '/api/sheet-csv';
 const FALLBACK_CSV_URL = 'https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv';
@@ -191,14 +192,22 @@ export const fetchJobsData = async () => {
     fetchStoredScrapedJobs()
   ]);
 
-  const existingKeys = new Set(sheetJobs.map(j => `${j.company.toLowerCase()}_${j.title.toLowerCase()}`));
+  const existingKeys = new Set(sheetJobs.map(j => `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`));
   
   const uniqueScrapedJobs = scrapedJobs.filter(j => {
-    const key = `${j.company.toLowerCase()}_${j.title.toLowerCase()}`;
+    const key = `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`;
     return !existingKeys.has(key);
   });
 
-  return [...sheetJobs, ...uniqueScrapedJobs];
+  const allCombined = [...sheetJobs, ...uniqueScrapedJobs];
+  const combinedKeys = new Set(allCombined.map(j => `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`));
+
+  const uniqueMultiIndustry = (MULTI_INDUSTRY_JOBS || []).filter(j => {
+    const key = `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`;
+    return !combinedKeys.has(key);
+  });
+
+  return [...allCombined, ...uniqueMultiIndustry];
 };
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');

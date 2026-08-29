@@ -4,7 +4,7 @@ import {
   MapPin, DollarSign, Briefcase, Mail, Phone, ShieldCheck, 
   Trash2, Plus, Tag, RefreshCw, AlertCircle
 } from 'lucide-react';
-import { parseResumeWithAI, parseResumeTextClientSide, saveProfile, deleteProfile } from '../services/profileService';
+import { parseResumeWithAI, parseResumeTextClientSide, saveProfile, deleteProfile, DEFAULT_PROFILES } from '../services/profileService';
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
 
 export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
@@ -287,6 +287,52 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                   </>
                 )}
               </button>
+
+              {/* Multi-Industry Preset Candidates Quick Loader */}
+              <div className="pt-3 border-t border-slate-800 space-y-2 font-mono text-xs">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag size={12} className="text-indigo-400" /> OR LOAD A TEST CANDIDATE ACROSS MAJOR INDUSTRIES:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {DEFAULT_PROFILES.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setFormData({
+                          id: preset.id,
+                          name: preset.name,
+                          title: preset.title,
+                          email: preset.email,
+                          phone: preset.phone,
+                          location: preset.location,
+                          suburb: preset.suburb,
+                          workRights: preset.workRights,
+                          clearance: preset.clearance,
+                          targetSalary: preset.targetSalary,
+                          industry: preset.industry || 'Technology & IT',
+                          targetTitles: [...preset.targetTitles],
+                          coreSkills: [...preset.coreSkills],
+                          certifications: preset.certifications ? [...preset.certifications] : [],
+                          workHistorySummary: preset.workHistorySummary,
+                          fullWorkExperienceText: preset.fullWorkExperienceText
+                        });
+                        setResumeText(preset.fullWorkExperienceText || '');
+                        setActiveTab('edit');
+                      }}
+                      className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/50 transition-colors text-left flex items-start gap-2.5 cursor-pointer group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600/30 text-indigo-300 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-500/30 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        {preset.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-white text-[11px] truncate group-hover:text-indigo-300">{preset.name}</div>
+                        <div className="text-[10px] text-slate-400 truncate">{preset.title}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -296,7 +342,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
               {/* Basic Contact Info Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
                     <User size={13} /> FULL NAME
                   </label>
                   <input
@@ -304,8 +350,30 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:border-indigo-500 focus:outline-none"
-                    placeholder="e.g. Sam Ludwig"
+                    placeholder="e.g. Emma Watson"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                    <Tag size={13} /> INDUSTRY / SECTOR
+                  </label>
+                  <select
+                    value={formData.industry || 'Technology & IT'}
+                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-indigo-500/50 text-indigo-300 font-bold focus:border-indigo-400 focus:outline-none"
+                  >
+                    <option value="Healthcare & Medical">🏥 Healthcare & Medical</option>
+                    <option value="Finance & Accounting">📈 Finance, Accounting & Banking</option>
+                    <option value="Marketing & Sales">📣 Marketing, Sales & Growth</option>
+                    <option value="Construction & Trades">🏗️ Construction, Trades & Engineering</option>
+                    <option value="HR & Operations">👥 Human Resources & People Ops</option>
+                    <option value="Legal & Governance">⚖️ Legal, Governance & Compliance</option>
+                    <option value="Technology & IT">💻 Technology, Software & IT</option>
+                    <option value="Education & Training">🎓 Education & Training</option>
+                    <option value="Hospitality & Retail">🛍️ Hospitality, Retail & Customer Service</option>
+                    <option value="General & Professional">🌐 General Professional / Other</option>
+                  </select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -317,7 +385,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:border-indigo-500 focus:outline-none"
-                    placeholder="e.g. Senior Systems Engineer"
+                    placeholder="e.g. Clinical Nurse Specialist"
                   />
                 </div>
 

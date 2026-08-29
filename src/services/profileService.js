@@ -131,6 +131,166 @@ PROFESSIONAL EXPERIENCE:
 2. Metro Health Analytics — Data Analyst (2019 – 2022)
 - Maintained SQL data warehouses and automated compliance reports for healthcare operations.
 `
+    ,
+    industry: 'Technology & IT'
+  },
+  {
+    id: 'emma_watson_health',
+    name: 'Emma Watson',
+    title: 'Clinical Nurse Specialist & Associate Nurse Unit Manager',
+    email: 'emma.watson.rn@gmail.com',
+    phone: '0434 567 890',
+    location: 'Parkville, VIC 3052',
+    suburb: 'Parkville',
+    workRights: 'Australian Citizen (Unrestricted)',
+    clearance: 'Working with Children / Police Check Cleared',
+    targetSalary: '$105,000 + Super',
+    industry: 'Healthcare & Medical',
+    targetTitles: [
+      'Clinical Nurse Specialist', 'Associate Nurse Unit Manager (ANUM)',
+      'Registered Nurse — Emergency / Acute Care', 'Clinical Care Coordinator', 'Nurse Educator'
+    ],
+    coreSkills: [
+      'AHPRA Registered Nurse', 'Acute Patient Assessment', 'Emergency Triage',
+      'Clinical Governance', 'Medication Administration', 'Multidisciplinary Team Leadership',
+      'EMR / Cerner / Epic', 'Patient Safety & Quality Care', 'Preceptorship / Mentoring'
+    ],
+    certifications: ['Postgraduate Certificate in Acute Care Nursing', 'Advanced Life Support (ALS 2)'],
+    workHistorySummary: `
+- 7+ years acute clinical nursing and shift leadership across major Victorian public hospitals.
+- Led surgical and emergency ward shifts of 12+ nurses maintaining 100% medication safety standards.
+- Preceptored 25+ graduate nurses and developed standardized clinical triage training workflows.
+`,
+    fullWorkExperienceText: `
+EMMA WATSON — Clinical Nurse Specialist / RN
+Location: Melbourne, VIC | Phone: 0434 567 890 | Email: emma.watson.rn@gmail.com
+
+PROFESSIONAL EXPERIENCE:
+1. Royal Melbourne Hospital — Clinical Nurse Specialist (2021 – Present)
+- Delivered advanced acute nursing care and stepped in as acting Nurse Unit Manager.
+- Coordinated rapid response protocols and multidisciplinary patient discharge pathways.
+
+2. Epworth Healthcare — Registered Nurse (2018 – 2021)
+- Managed complex post-operative surgical patients and supervised junior nursing staff.
+`
+  },
+  {
+    id: 'david_park_finance',
+    name: 'David Park',
+    title: 'Senior Financial Analyst & CPA',
+    email: 'david.park.cpa@gmail.com',
+    phone: '0445 678 901',
+    location: 'Melbourne CBD, VIC 3000',
+    suburb: 'Melbourne CBD',
+    workRights: 'Australian Citizen (Unrestricted)',
+    clearance: 'None / Citizen',
+    targetSalary: '$130,000 + Super',
+    industry: 'Finance & Accounting',
+    targetTitles: [
+      'Senior Financial Analyst', 'FP&A Manager', 'Commercial Finance Analyst',
+      'Senior Management Accountant', 'Finance Business Partner'
+    ],
+    coreSkills: [
+      'CPA Qualified', 'Financial Modeling (3-Statement)', 'FP&A & Budgeting',
+      'Variance Analysis', 'SAP ERP', 'Power BI / Advanced Excel', 'Cashflow Forecasting',
+      'Commercial Advisory', 'IFRS Compliance', 'Stakeholder Management'
+    ],
+    certifications: ['Certified Practising Accountant (CPA Australia)', 'FMVA (Financial Modeling & Valuation)'],
+    workHistorySummary: `
+- Led annual budgeting & rolling 5-year financial planning cycles for $85M+ enterprise business units.
+- Built automated Power BI financial reporting models reducing month-end close by 3 days.
+- Delivered commercial pricing sensitivity models boosting gross margins by 4.2%.
+`,
+    fullWorkExperienceText: `
+DAVID PARK — Senior Financial Analyst (CPA)
+Location: Melbourne, VIC | Phone: 0445 678 901 | Email: david.park.cpa@gmail.com
+
+PROFESSIONAL EXPERIENCE:
+1. Telstra Enterprise — Senior Commercial Analyst (2022 – Present)
+- Built financial models evaluating multi-million dollar telecommunications bids.
+- Partnered with product executives on quarterly OPEX/CAPEX variance forecasting.
+
+2. Deloitte Australia — Financial Advisory Consultant (2019 – 2022)
+- Prepared valuation models, statutory balance sheets, and working capital optimization analyses.
+`
+  },
+  {
+    id: 'jessica_taylor_mkt',
+    name: 'Jessica Taylor',
+    title: 'Senior Digital Marketing & Growth Manager',
+    email: 'jessica.taylor.mkt@gmail.com',
+    phone: '0456 789 012',
+    location: 'South Yarra, VIC 3141',
+    suburb: 'South Yarra',
+    workRights: 'Australian Citizen (Unrestricted)',
+    clearance: 'None / Citizen',
+    targetSalary: '$125,000 + Super',
+    industry: 'Marketing & Sales',
+    targetTitles: [
+      'Digital Marketing Manager', 'Growth Marketing Lead', 'Head of Performance Marketing',
+      'Brand & Acquisition Specialist', 'Campaign Manager'
+    ],
+    coreSkills: [
+      'Performance Marketing', 'Google Ads / Meta Ads', 'SEO / SEM Strategy',
+      'HubSpot / Marketo', 'Growth Funnel Optimization', 'Content Marketing',
+      'Google Analytics 4', 'A/B Testing & CRO', 'Paid Acquisition ROI', 'Brand Strategy'
+    ],
+    certifications: ['Google Ads Search & Measurement Certified', 'HubSpot Inbound Marketing'],
+    workHistorySummary: `
+- Scaled digital acquisition channels delivering 42% YoY revenue growth across ANZ markets.
+- Managed $1.2M+ annual performance ad budgets achieving 4.1x blended ROAS.
+- Spearheaded omnichannel SEO and content overhaul generating 180k+ monthly organic visitors.
+`,
+    fullWorkExperienceText: `
+JESSICA TAYLOR — Senior Digital Marketing & Growth Lead
+Location: Melbourne, VIC | Phone: 0456 789 012 | Email: jessica.taylor.mkt@gmail.com
+
+PROFESSIONAL EXPERIENCE:
+1. Kogan.com — Senior Performance Marketing Specialist (2022 – Present)
+- Optimized paid search, social, and programmatic ad funnels across 5,000+ SKU categories.
+
+2. Agency 360 Digital — Digital Strategy Lead (2019 – 2022)
+- Orchestrated full-funnel B2B and B2C campaigns for high-growth Australian brands.
+`
+  },
+  {
+    id: 'michael_thompson_con',
+    name: 'Michael Thompson',
+    title: 'Senior Construction Project Manager & Civil Engineer',
+    location: 'Hawthorn, VIC 3122',
+    suburb: 'Hawthorn',
+    email: 'michael.thompson.pm@gmail.com',
+    phone: '0467 890 123',
+    workRights: 'Australian Citizen (Unrestricted)',
+    clearance: 'White Card / Rail Industry Worker Cleared',
+    targetSalary: '$165,000 + Super',
+    industry: 'Construction & Trades',
+    targetTitles: [
+      'Construction Project Manager', 'Senior Project Engineer', 'Site Manager — Tier 1 Commercial',
+      'Civil Project Manager', 'Contracts Administrator'
+    ],
+    coreSkills: [
+      'Tier 1 Commercial Delivery', 'Project Scheduling (MS Project/Primavera)', 'Procore',
+      'Contract Administration (AS4000/AS2124)', 'Subcontractor Procurement', 'Site WHS Compliance',
+      'Budget Management ($40M+)', 'Civil Engineering', 'Structural QA / Inspections'
+    ],
+    certifications: ['Engineers Australia (MIEAust CPEng)', 'White Card / First Aid Level 2'],
+    workHistorySummary: `
+- 10+ years delivering major commercial, transport, and structural high-rise building projects.
+- Successfully delivered a $65M commercial office tower in Melbourne CBD on time and 3% under budget.
+- Championed zero-LTI safety protocols across 140+ on-site personnel and trade subcontractors.
+`,
+    fullWorkExperienceText: `
+MICHAEL THOMPSON — Construction Project Manager (CPEng)
+Location: Melbourne, VIC | Phone: 0467 890 123 | Email: michael.thompson.pm@gmail.com
+
+PROFESSIONAL EXPERIENCE:
+1. John Holland Group — Senior Project Manager (2021 – Present)
+- Overseeing structural and civil construction works for transport and commercial hub packages.
+
+2. Probuild Constructions — Project Engineer (2017 – 2021)
+- Managed site QA, RFIs, subcontract packages, and handover schedules on multi-level developments.
+`
   }
 ];
 

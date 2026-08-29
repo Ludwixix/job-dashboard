@@ -6,7 +6,9 @@ import {
   DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
-  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap
+  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
+  ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap,
+  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -40,51 +42,111 @@ const formatDaysAgo = (dateStr) => {
   }
 };
 
-// Categorize jobs into expanded granular sub-streams
+// Categorize jobs into expanded multi-industry streams
 const getJobSubStream = (job) => {
   const title = (job.title || '').toLowerCase();
   const notes = (job.notes || '').toLowerCase();
   const company = (job.company || '').toLowerCase();
   const source = (job.source || '').toLowerCase();
   const stream = (job.stream || '').toLowerCase();
+  const industry = (job.industry || '').toLowerCase();
 
-  // Field Technician, Outdoor, Low Skill, Labour & Physical Work
+  // 1. Healthcare & Medical
+  if (
+    industry.includes('health') || stream.includes('health') || 
+    title.includes('nurse') || title.includes('clinical') || title.includes('medical') || 
+    title.includes('health') || title.includes('physio') || title.includes('hospital') ||
+    title.includes('allied health') || title.includes('care coordinator')
+  ) {
+    return 'Healthcare & Medical';
+  }
+
+  // 2. Finance, Accounting & Banking
+  if (
+    industry.includes('finance') || industry.includes('account') || stream.includes('finance') || 
+    title.includes('accountant') || title.includes('financial') || title.includes('fp&a') || 
+    title.includes('cpa') || title.includes('tax') || title.includes('credit risk') || 
+    title.includes('banking') || title.includes('auditor')
+  ) {
+    return 'Finance & Accounting';
+  }
+
+  // 3. Sales, Marketing & Growth
+  if (
+    industry.includes('marketing') || industry.includes('sales') || stream.includes('marketing') || 
+    title.includes('marketing') || title.includes('growth') || title.includes('seo') || 
+    title.includes('brand') || title.includes('account executive') || title.includes('sales') ||
+    title.includes('content') || title.includes('copywriter')
+  ) {
+    return 'Marketing & Sales';
+  }
+
+  // 4. Construction, Engineering & Trades
+  if (
+    industry.includes('construction') || stream.includes('construction') || 
+    title.includes('construction') || title.includes('site manager') || title.includes('site engineer') || 
+    title.includes('project engineer') || title.includes('civil') || title.includes('trades') || 
+    title.includes('electrician') || title.includes('builder') || title.includes('estimator')
+  ) {
+    return 'Construction & Trades';
+  }
+
+  // 5. Human Resources & People
+  if (
+    industry.includes('hr') || industry.includes('people') || stream.includes('hr') || 
+    title.includes('hr') || title.includes('talent') || title.includes('recruitment') || 
+    title.includes('people & culture') || title.includes('hrbp') || title.includes('people business partner')
+  ) {
+    return 'HR & Operations';
+  }
+
+  // 6. Legal, Governance & Compliance
+  if (
+    industry.includes('legal') || stream.includes('legal') || 
+    title.includes('legal') || title.includes('counsel') || title.includes('lawyer') || 
+    title.includes('compliance') || title.includes('solicitor')
+  ) {
+    return 'Legal & Governance';
+  }
+
+  // 7. Education & Academic
+  if (
+    industry.includes('education') || stream.includes('education') || 
+    title.includes('education') || title.includes('teacher') || title.includes('curriculum') || 
+    title.includes('academic') || title.includes('learning & development')
+  ) {
+    return 'Education & Training';
+  }
+
+  // 8. Field Tech, Outdoor, Labour & Physical Work
   if (
     title.includes('technician') || title.includes('field') || title.includes('labour') || title.includes('labourer') ||
     title.includes('outdoor') || title.includes('cabling') || title.includes('physical') || title.includes('depot') ||
-    title.includes('warehouse') || title.includes('assembler') || title.includes('handyman') || title.includes('gardener') ||
-    title.includes('maintenance') || title.includes('installer') || title.includes('av tech') || title.includes('rigging') ||
-    title.includes('driver') || title.includes('storeperson') || title.includes('trades assistant')
+    title.includes('warehouse') || title.includes('assembler') || title.includes('maintenance') || title.includes('driver') || title.includes('storeperson')
   ) {
-    return 'Field Tech, Labour & Physical';
+    return 'Field Tech & Labour';
   }
 
-  // Government, Council, Outdoor & Physical Work
+  // 9. Government, Council & Public Sector
   if (
     source.includes('vic') || source.includes('careers vic') ||
     company.includes('council') || company.includes('government') || company.includes('vic gov') || company.includes('city of') ||
-    title.includes('council') || title.includes('park') || title.includes('ranger') ||
-    title.includes('conservation') || title.includes('field officer') || title.includes('horticulture') || title.includes('works officer') || title.includes('civil')
+    title.includes('council') || title.includes('park') || title.includes('ranger')
   ) {
-    return 'Gov & Council Pathways';
+    return 'Gov & Public Sector';
   }
 
-  if (title.includes('cyber') || title.includes('security') || title.includes('soc') || notes.includes('cybersecurity')) {
-    return 'Cybersecurity';
+  // 10. Technology, Software & Cloud
+  if (
+    title.includes('cloud') || title.includes('azure') || title.includes('devops') || 
+    title.includes('aws') || title.includes('software') || title.includes('developer') || 
+    title.includes('react') || title.includes('engineer') || title.includes('cyber') || 
+    title.includes('data') || title.includes('systems') || title.includes('m365') || title.includes('it support')
+  ) {
+    return 'Tech & Software';
   }
-  if (title.includes('cloud') || title.includes('azure') || title.includes('devops') || title.includes('intune') || title.includes('aws') || title.includes('terraform')) {
-    return 'Cloud & DevOps';
-  }
-  if (title.includes('data') || title.includes('analytics') || title.includes('bi analyst') || title.includes('sql')) {
-    return 'Data & Analytics';
-  }
-  if (stream.includes('traineeship') || stream.includes('trade') || title.includes('apprentice') || title.includes('trainee') || title.includes('electrical')) {
-    return 'Traineeships & Trades';
-  }
-  if (stream.includes('bridge') || stream.includes('casual') || title.includes('retail') || title.includes('sales') || title.includes('assistant') || title.includes('casual') || title.includes('hospitality')) {
-    return 'Local Bridge & Casual';
-  }
-  return 'Core IT & Systems';
+
+  return 'General & Professional';
 };
 
 export const JobSeeker = ({ 
@@ -167,25 +229,33 @@ export const JobSeeker = ({
   const streamCounts = useMemo(() => {
     const counts = { 
       All: unsubmittedJobs.length,
+      TopFit: 0,
       ReadyForSubmission: readyToSubmitCount,
-      'Field Tech, Labour & Physical': 0,
-      'Gov & Council Pathways': 0,
-      'Core IT & Systems': 0,
-      'Cloud & DevOps': 0,
-      'Cybersecurity': 0,
-      'Data & Analytics': 0,
-      'Local Bridge & Casual': 0,
-      'Traineeships & Trades': 0,
+      'Healthcare & Medical': 0,
+      'Finance & Accounting': 0,
+      'Marketing & Sales': 0,
+      'Construction & Trades': 0,
+      'HR & Operations': 0,
+      'Legal & Governance': 0,
+      'Education & Training': 0,
+      'Tech & Software': 0,
+      'Gov & Public Sector': 0,
+      'Field Tech & Labour': 0,
+      'General & Professional': 0,
       'Rejected Jobs': rejectedJobs.length,
     };
 
     unsubmittedJobs.forEach(j => {
+      const match = calculateCandidateJobMatch(j, currentProfile);
+      if (match.score >= 85) {
+        counts.TopFit = (counts.TopFit || 0) + 1;
+      }
       const subStream = getJobSubStream(j);
       counts[subStream] = (counts[subStream] || 0) + 1;
     });
 
     return counts;
-  }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs]);
+  }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs, currentProfile]);
 
   const seekerJobs = useMemo(() => {
     const sourcePool = activeStreamTab === 'Rejected Jobs' ? rejectedJobs : unsubmittedJobs;
@@ -212,11 +282,15 @@ export const JobSeeker = ({
 
       // Stream Tab filter
       let matchesStream = true;
-      if (activeStreamTab === 'ReadyForSubmission') {
+      if (activeStreamTab === 'TopFit') {
+        matchesStream = (job.score || 0) >= 85;
+      } else if (activeStreamTab === 'ReadyForSubmission') {
         matchesStream = hasGeneratedApplicationDocs(job);
       } else if (activeStreamTab !== 'All' && activeStreamTab !== 'Rejected Jobs') {
         const subStream = getJobSubStream(job);
-        matchesStream = subStream === activeStreamTab || (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase());
+        matchesStream = subStream === activeStreamTab || 
+                        (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
+                        (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
       }
 
       // Dedicated Docs Ready filter toggle
@@ -405,16 +479,19 @@ export const JobSeeker = ({
   const endJobNum = pageSize === 'All' ? seekerJobs.length : Math.min(seekerJobs.length, currentPage * Number(pageSize));
 
   const STREAM_TAB_DEFINITIONS = [
-    { id: 'All', name: 'ALL STREAMS', icon: Layers, color: 'indigo' },
-    { id: 'ReadyForSubmission', name: '✨ READY TO SUBMIT', icon: Sparkles, color: 'emerald', highlight: true },
-    { id: 'Field Tech, Labour & Physical', name: 'FIELD TECH & LABOUR', icon: Wrench, color: 'emerald' },
-    { id: 'Gov & Council Pathways', name: 'GOV & COUNCIL', icon: Building2, color: 'amber' },
-    { id: 'Core IT & Systems', name: 'CORE IT & SYSTEMS', icon: Server, color: 'blue' },
-    { id: 'Cloud & DevOps', name: 'CLOUD & DEVOPS', icon: Cloud, color: 'sky' },
-    { id: 'Cybersecurity', name: 'CYBERSECURITY', icon: ShieldCheck, color: 'rose' },
-    { id: 'Data & Analytics', name: 'DATA & ANALYTICS', icon: Database, color: 'purple' },
-    { id: 'Local Bridge & Casual', name: 'LOCAL BRIDGE & CASUAL', icon: ShoppingBag, color: 'amber' },
-    { id: 'Traineeships & Trades', name: 'TRAINEESHIPS & TRADES', icon: Wrench, color: 'emerald' },
+    { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
+    { id: 'TopFit', name: '⭐ MY TOP MATCHES', icon: Star, color: 'amber', highlight: true },
+    { id: 'ReadyForSubmission', name: '✨ READY TO SUBMIT', icon: Sparkles, color: 'emerald' },
+    { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
+    { id: 'Finance & Accounting', name: 'FINANCE & BANKING', icon: TrendingUp, color: 'emerald' },
+    { id: 'Marketing & Sales', name: 'MARKETING & GROWTH', icon: Megaphone, color: 'amber' },
+    { id: 'Construction & Trades', name: 'CONSTRUCTION & TRADES', icon: HardHat, color: 'orange' },
+    { id: 'HR & Operations', name: 'HR & PEOPLE OPS', icon: Users, color: 'purple' },
+    { id: 'Legal & Governance', name: 'LEGAL & COMPLIANCE', icon: Scale, color: 'blue' },
+    { id: 'Tech & Software', name: 'TECH & SOFTWARE', icon: Server, color: 'sky' },
+    { id: 'Gov & Public Sector', name: 'GOV & PUBLIC SECTOR', icon: Building2, color: 'slate' },
+    { id: 'Field Tech & Labour', name: 'FIELD TECH & LABOUR', icon: Wrench, color: 'teal' },
+    { id: 'Education & Training', name: 'EDUCATION & TRAINING', icon: GraduationCap, color: 'indigo' },
     { id: 'Rejected Jobs', name: 'REJECTED JOBS', icon: Trash2, color: 'rose' },
   ];
 

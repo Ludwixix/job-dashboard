@@ -7,12 +7,9 @@ import {
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
-  ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap,
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText
 } from 'lucide-react';
 
-import { parseISO, isValid, differenceInDays } from 'date-fns';
-import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
 import { calculateCandidateJobMatch, calculateCandidateDistanceKm } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
@@ -484,7 +481,6 @@ export const JobSeeker = ({
     { id: 'TopFit', name: '⭐ MY TOP MATCHES', icon: Star, color: 'amber', highlight: true },
     { id: 'ReadyForSubmission', name: '📄 GENERATED (CV & COVER LETTER)', icon: FileText, color: 'emerald', highlight: true },
     { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
-    { id: 'Finance & Accounting', name: 'FINANCE & BANKING', icon: TrendingUp, color: 'emerald' },
     { id: 'Marketing & Sales', name: 'MARKETING & GROWTH', icon: Megaphone, color: 'amber' },
     { id: 'Construction & Trades', name: 'CONSTRUCTION & TRADES', icon: HardHat, color: 'orange' },
     { id: 'HR & Operations', name: 'HR & PEOPLE OPS', icon: Users, color: 'purple' },
@@ -563,13 +559,13 @@ export const JobSeeker = ({
         </div>
       </div>
 
-
       {scrapeSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-mono font-bold flex items-center gap-2 animate-in fade-in duration-200">
           <CheckCircle2 size={16} className="text-emerald-600" />
           SCRAPER SUCCESS // FETCHED {scrapedCount || 25} POSTINGS FROM SEEK & TARGET BOARDS.
         </div>
       )}
+
 
       {/* 2-Column Workspace Layout (Left Sidebar + Right Main Grid) */}
       <div className="flex flex-col lg:flex-row items-start gap-6" ref={gridTopRef}>

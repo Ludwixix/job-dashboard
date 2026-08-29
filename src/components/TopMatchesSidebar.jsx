@@ -28,6 +28,18 @@ const getProximityTier = (locationStr = '') => {
 
 const IT_KEYWORDS = ['engineer', 'developer', 'sysadmin', 'systems admin', 'network', 'cloud', 'azure', 'devops', 'software', 'database', 'it support', 'help desk', 'cyber', 'intune', 'm365'];
 
+const getAgeInDays = (dateStr) => {
+  if (!dateStr) return 0;
+  try {
+    const d = parseISO(dateStr);
+    if (!isValid(d)) return 0;
+    const diff = differenceInDays(new Date(), d);
+    return diff >= 0 ? diff : 0;
+  } catch {
+    return 0;
+  }
+};
+
 const formatDaysAgo = (dateStr) => {
   if (!dateStr) return 'Recently';
   try {
@@ -41,6 +53,7 @@ const formatDaysAgo = (dateStr) => {
     return 'Recently';
   }
 };
+
 
 export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
   const [showTopMatches, setShowTopMatches] = useState(true); // Open by default

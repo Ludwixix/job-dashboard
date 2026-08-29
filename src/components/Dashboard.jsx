@@ -110,30 +110,43 @@ export const Dashboard = () => {
     'SOUTH YARRA VIC 3141'
   ];
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-slate-100 gap-4 font-mono">
-      <div className="relative flex items-center justify-center">
-        <div className="animate-ping absolute inline-flex h-12 w-12 rounded-full bg-indigo-500/20"></div>
-        <Cpu size={32} className="text-indigo-400 animate-pulse" />
-      </div>
-      <p className="text-xs font-bold tracking-widest uppercase text-slate-400">INITIALIZING V2.0 AUTONOMOUS CAREER ENGINE...</p>
-    </div>
-  );
+  // Real-time live derived modal targets
+  const liveSelectedJob = useMemo(() => {
+    if (!selectedJob) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedJob.id)) ||
+      `${j.company}_${j.title}` === `${selectedJob.company}_${selectedJob.title}`
+    );
+    return match || selectedJob;
+  }, [selectedJob, jobs]);
 
-  if (error) return (
-    <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-950 text-rose-200 rounded-xl border border-rose-800 font-mono text-xs shadow-lg">
-      <h2 className="text-sm font-bold tracking-widest uppercase mb-1">SYSTEM ERROR // FETCH FAILED</h2>
-      <p>{error}</p>
-    </div>
-  );
+  const liveSelectedForGenerator = useMemo(() => {
+    if (!selectedForGenerator) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForGenerator.id)) ||
+      `${j.company}_${j.title}` === `${selectedForGenerator.company}_${selectedForGenerator.title}`
+    );
+    return match || selectedForGenerator;
+  }, [selectedForGenerator, jobs]);
 
-  const preparedCount = jobs.filter(j => 
-    !j.isRejected && (
-      j.status.toLowerCase().includes('package prepared') || 
-      j.status.toLowerCase().includes('to submit') ||
-      j.status.toLowerCase().includes('discovered')
-    )
-  ).length;
+  const liveSelectedForInterviewPrep = useMemo(() => {
+    if (!selectedForInterviewPrep) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForInterviewPrep.id)) ||
+      `${j.company}_${j.title}` === `${selectedForInterviewPrep.company}_${selectedForInterviewPrep.title}`
+    );
+    return match || selectedForInterviewPrep;
+  }, [selectedForInterviewPrep, jobs]);
+
+  const preparedCount = useMemo(() => {
+    return jobs.filter(j => 
+      !j.isRejected && (
+        j.status.toLowerCase().includes('package prepared') || 
+        j.status.toLowerCase().includes('to submit') ||
+        j.status.toLowerCase().includes('discovered')
+      )
+    ).length;
+  }, [jobs]);
 
   const handleExportCSV = () => {
     if (!jobs || jobs.length === 0) return;
@@ -163,6 +176,23 @@ export const Dashboard = () => {
     document.body.removeChild(link);
   };
 
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-slate-100 gap-4 font-mono">
+      <div className="relative flex items-center justify-center">
+        <div className="animate-ping absolute inline-flex h-12 w-12 rounded-full bg-indigo-500/20"></div>
+        <Cpu size={32} className="text-indigo-400 animate-pulse" />
+      </div>
+      <p className="text-xs font-bold tracking-widest uppercase text-slate-400">INITIALIZING V2.0 AUTONOMOUS CAREER ENGINE...</p>
+    </div>
+  );
+
+  if (error) return (
+    <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-950 text-rose-200 rounded-xl border border-rose-800 font-mono text-xs shadow-lg">
+      <h2 className="text-sm font-bold tracking-widest uppercase mb-1">SYSTEM ERROR // FETCH FAILED</h2>
+      <p>{error}</p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-950 font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
       {/* Top Live Engine Status Bar */}
@@ -178,49 +208,36 @@ export const Dashboard = () => {
           <span className="text-slate-700 hidden md:inline">|</span>
           
           {/* Location Bound selector */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-500 font-bold">BASE:</span>
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="text-slate-500 font-bold hidden lg:inline">LOCATION BASE:</span>
             {isEditingLocation ? (
-              <form onSubmit={handleSaveLocation} className="flex items-center gap-1.5">
+              <form onSubmit={handleSaveLocation} className="flex items-center gap-1">
                 <input
                   type="text"
                   value={tempLocationInput}
                   onChange={(e) => setTempLocationInput(e.target.value)}
-                  className="bg-slate-800 text-emerald-300 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/50 focus:outline-none"
-                  placeholder="ENTER SUBURB / POSTCODE..."
+                  className="bg-slate-800 border border-indigo-500 text-emerald-300 px-2 py-0.5 rounded text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
+                  placeholder="SUBURB POSTCODE"
                   autoFocus
                 />
-                <button 
-                  type="submit" 
-                  className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 transition-colors cursor-pointer"
-                  title="Save Location"
-                >
-                  <Check size={12} />
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsEditingLocation(false)} 
-                  className="p-1 bg-slate-800 text-slate-400 rounded hover:text-white transition-colors cursor-pointer"
-                  title="Cancel"
-                >
-                  <X size={12} />
-                </button>
+                <button type="submit" className="text-emerald-400 hover:text-emerald-300 font-bold px-1 cursor-pointer">✓</button>
+                <button type="button" onClick={() => setIsEditingLocation(false)} className="text-rose-400 hover:text-rose-300 font-bold px-1 cursor-pointer">✕</button>
               </form>
             ) : (
-              <button
+              <button 
                 onClick={() => { setTempLocationInput(baseLocation); setIsEditingLocation(true); }}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 transition-all font-bold cursor-pointer group text-[11px]"
-                title="Click to change your location bound base"
+                className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700"
+                title="Click to change your primary location radius baseline"
               >
-                <MapPin size={11} className="text-emerald-400" />
-                <span>{baseLocation}</span>
-                <Edit2 size={10} className="text-emerald-400 opacity-60 group-hover:opacity-100 transition-opacity ml-0.5" />
+                <MapPin size={11} className="text-indigo-400" />
+                <span className="truncate max-w-[140px] sm:max-w-[200px]">{baseLocation}</span>
+                <span className="text-[9px] text-slate-400 font-normal">✎</span>
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
           <button
             onClick={() => setIsBatchApplyOpen(true)}
             className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950 border border-emerald-500/40 px-2 py-0.5 rounded"
@@ -421,9 +438,9 @@ export const Dashboard = () => {
       )}
 
       {/* Job Details Modal */}
-      {selectedJob && (
+      {liveSelectedJob && (
         <JobModal 
-          job={selectedJob} 
+          job={liveSelectedJob} 
           onClose={() => setSelectedJob(null)} 
           onOpenGenerator={(j) => setSelectedForGenerator(j)}
           onJobStatusUpdate={(updated) => {
@@ -442,9 +459,9 @@ export const Dashboard = () => {
       )}
 
       {/* Generator Modal */}
-      {selectedForGenerator && (
+      {liveSelectedForGenerator && (
         <GeneratorModal 
-          job={selectedForGenerator} 
+          job={liveSelectedForGenerator} 
           onClose={() => setSelectedForGenerator(null)} 
           onUpdateStatus={(jobId, status, extraData) => {
             updateJobStatus(jobId, status, extraData);
@@ -462,9 +479,9 @@ export const Dashboard = () => {
       )}
 
       {/* Interview Prep Super Intelligence Modal */}
-      {selectedForInterviewPrep && (
+      {liveSelectedForInterviewPrep && (
         <InterviewPrepModal 
-          job={selectedForInterviewPrep} 
+          job={liveSelectedForInterviewPrep} 
           onClose={() => setSelectedForInterviewPrep(null)} 
         />
       )}

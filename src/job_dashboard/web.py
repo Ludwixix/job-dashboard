@@ -34,10 +34,11 @@ from .scrape_config import DEFAULT_QUERIES
 from .predictive_analytics import get_predictive_analytics
 from .career_recommender import get_career_recommender
 from .ai_resume_analyzer import get_resume_analyzer
-from .interview_simulator import get_interview_simulator
 from .smart_applications import get_smart_application_tracker
+from .auto_apply import auto_apply_manager
 
 TRACKER_CSV_URL = "https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv&gid=0"
+
 
 
 class DashboardApp:
@@ -966,6 +967,16 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, result)
                 return
             
+            if path.startswith("/api/auto-apply/") and path.endswith("/status"):
+                task_id = path.removeprefix("/api/auto-apply/").removesuffix("/status")
+                task = auto_apply_manager.get_task(task_id)
+                if not task:
+                    self.send_json(404, {"error": "Auto-apply task not found"})
+                    return
+                self.send_json(200, task.to_dict())
+                return
+
+            
             if path.startswith("/applications/"):
                 target = (app.data_dir / path.removeprefix("/applications/")).resolve()
                 if target.parent == (app.data_dir / "applications").resolve() and target.is_file():
@@ -1217,6 +1228,16 @@ def make_handler(app: DashboardApp):
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     self.send_json(200, {"queries": app.update_search_queries(payload.get("queries", []))})
                     return
+
+                if path == "/api/auto-apply/start":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job = payload.get("job", {})
+                    profile = payload.get("profile", {})
+                    task = auto_apply_manager.create_task(job, profile)
+                    self.send_json(200, {"success": True, "task": task.to_dict()})
+                    return
+
 
                 # Handle POST generation endpoints
                 if path.startswith("/api/jobs/") and path.endswith("/generate"):

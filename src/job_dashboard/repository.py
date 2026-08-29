@@ -113,21 +113,22 @@ class JobRepository:
                         url=excluded.url, posted=excluded.posted, remote=excluded.remote, stream=excluded.stream,
                         score=excluded.score, data_json=excluded.data_json, updated_at=excluded.updated_at
                     """, {
-                        "id": job["id"],
-                        "title": job.get("title", ""),
-                        "company": job.get("company", ""),
-                        "location": job.get("location", ""),
-                        "description": job.get("description", ""),
-                        "source": job.get("source", ""),
-                        "url": job.get("url", ""),
-                        "posted": job.get("posted", ""),
+                        "id": str(job.get("id") or f"{job.get('company', '')}_{job.get('title', '')}"),
+                        "title": str(job.get("title") or "Unknown Title"),
+                        "company": str(job.get("company") or "Unknown Company"),
+                        "location": str(job.get("location") or "Melbourne, VIC"),
+                        "description": str(job.get("description") or ""),
+                        "source": str(job.get("source") or "Job Board"),
+                        "url": str(job.get("url") or job.get("link") or ""),
+                        "posted": str(job.get("posted") or job.get("date") or ""),
                         "remote": int(bool(job.get("remote", False))),
-                        "stream": job.get("stream", ""),
-                        "score": job.get("score", 0),
+                        "stream": str(job.get("stream") or "core-it"),
+                        "score": int(job.get("score") or 0),
                         "data_json": json.dumps(job, ensure_ascii=False),
                         "created_at": now,
                         "updated_at": now
                     })
+
         
         duration = (datetime.now() - start_time).total_seconds()
         logger.info(f"Replaced {len(jobs)} jobs in {duration:.3f}s")

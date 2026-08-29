@@ -34,15 +34,18 @@ RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 # Install Playwright Chromium browser
 RUN playwright install chromium --with-deps 2>/dev/null || true
 
-# Copy application source
+# Copy application source and data
 COPY src/ src/
+COPY data/ data/
+COPY job_profile.json .
 COPY pyproject.toml .
 
 # Install the package itself (editable-style)
 RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir src/
 
-# Create data directories
-RUN mkdir -p /app/data /app/logs
+# Create logs directory
+RUN mkdir -p /app/logs
+
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

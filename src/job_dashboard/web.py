@@ -330,7 +330,16 @@ class DashboardApp:
     def _load_jobs(self):
         if not self.jobs_path.exists():
             return []
-        return json.loads(self.jobs_path.read_text(encoding="utf-8")).get("jobs", [])
+        try:
+            raw_data = json.loads(self.jobs_path.read_text(encoding="utf-8"))
+            if isinstance(raw_data, list):
+                return raw_data
+            if isinstance(raw_data, dict):
+                return raw_data.get("jobs", [])
+            return []
+        except Exception:
+            return []
+
 
     def save_jobs(self):
         self.jobs_path.write_text(json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

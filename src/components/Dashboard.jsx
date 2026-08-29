@@ -12,12 +12,16 @@ import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { ProfileModal } from './ProfileModal';
+import { AuthModal } from './AuthModal';
+import { GoogleIntegrationModal } from './GoogleIntegrationModal';
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile } from '../services/profileService';
+import { getAuthenticatedUser } from '../services/googleAuthService';
+import { appendApplicationToSheet } from '../services/googleSheetService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
-  MapPin, Download, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, User
+  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
+  Sliders, TrendingUp, Table, Lock, Mail
 } from 'lucide-react';
 
 export const Dashboard = () => {
@@ -33,6 +37,11 @@ export const Dashboard = () => {
   const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
+
+  // Google Authentication & Integration State
+  const [authUser, setAuthUser] = useState(() => getAuthenticatedUser());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isGoogleIntegrationOpen, setIsGoogleIntegrationOpen] = useState(false);
 
   // Background Async Application Generation Queue
   const [asyncGeneratingIds, setAsyncGeneratingIds] = useState(new Set());
@@ -51,7 +60,7 @@ export const Dashboard = () => {
       const result = await generateApplicationDocs(job, null, null, activeProfile);
       
       if (result && result.resume && result.coverLetter) {
-        updateJobStatus(jobId, 'Package Prepared / To Submit', {
+        const appPayload = {
           hasCustomDocs: true,
           resumeText: result.resume,
           coverLetterText: result.coverLetter,
@@ -59,7 +68,14 @@ export const Dashboard = () => {
           docsGeneratedAt: new Date().toISOString(),
           driveFolder: `Job Applications - ${activeProfile.name}`,
           driveStatus: 'Synced to Google Drive / Ready for Submission'
-        });
+        };
+
+        updateJobStatus(jobId, 'Package Prepared / To Submit', appPayload);
+
+        // Auto append to Google Sheet if user has an active spreadsheet
+        if (authUser?.accessToken && authUser?.spreadsheetId) {
+          appendApplicationToSheet(authUser.accessToken, authUser.spreadsheetId, { ...job, ...appPayload }, activeProfile);
+        }
 
         const notif = {
           id: Date.now(),
@@ -255,7 +271,7 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 font-mono text-[11px]">
+        <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
           {/* Active Candidate Profile Switcher & Customizer */}
           <ProfileSwitcher 
             activeProfile={activeProfile}
@@ -273,12 +289,34 @@ export const Dashboard = () => {
 
           <span className="text-slate-800">|</span>
 
+          {/* Google Auth & Cloud Sync Buttons */}
+          {authUser ? (
+            <button
+              onClick={() => setIsGoogleIntegrationOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 hover:text-white hover:bg-emerald-900 transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+              title="Open Personal Google Sheet Tracker & Gmail Scanner"
+            >
+              <Table size={12} className="text-emerald-400" />
+              <span className="hidden sm:inline">MY GOOGLE TRACKER</span>
+              <span className="sm:hidden">TRACKER</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors font-bold text-[10px] cursor-pointer"
+              title="Sign in with Google to sync personal sheets and scan Gmail"
+            >
+              <Lock size={12} className="text-indigo-400" />
+              <span>SIGN IN</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsBatchApplyOpen(true)}
             className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950 border border-emerald-500/40 px-2 py-1 rounded-xl shadow-xs"
             title="Dispatch 1-Click Batch Automated Applications"
           >
-            <Zap size={12} className="animate-bounce text-emerald-400" /> BATCH AUTO-APPLY
+            <Zap size={12} className="animate-bounce text-emerald-400" /> BATCH APPLY
           </button>
 
           <button
@@ -551,6 +589,32 @@ export const Dashboard = () => {
           } else {
             setActiveProfile(getActiveProfile());
           }
+        }}
+      />
+
+      {/* Google Authentication & Client Config Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthChange={(user) => {
+          setAuthUser(user);
+          if (user) {
+            setIsGoogleIntegrationOpen(true);
+          }
+        }}
+      />
+
+      {/* Google Sheets Tracker & Gmail Scanner Integration Modal */}
+      <GoogleIntegrationModal 
+        isOpen={isGoogleIntegrationOpen}
+        onClose={() => setIsGoogleIntegrationOpen(false)}
+        jobs={jobs}
+        activeProfile={activeProfile}
+        onImportGmailJobs={(importedJobs) => {
+          importedJobs.forEach(j => {
+            updateJobStatus(j.id, j.status, j);
+          });
+          setActiveSection('tracker');
         }}
       />
 

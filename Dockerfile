@@ -7,11 +7,13 @@ FROM python:3.11-slim
 ENV PORT=8080 \
     HOST=0.0.0.0 \
     PYTHONPATH=/app/src \
+    DEBIAN_FRONTEND=noninteractive \
     PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
+
 
 
 # System deps needed for playwright + jobspy

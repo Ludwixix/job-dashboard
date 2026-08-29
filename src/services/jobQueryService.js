@@ -398,24 +398,33 @@ export const pushQueriesToBackend = async (profile) => {
 };
 
 /**
- * Trigger a live rescrape via POST /api/refresh using profile-derived queries.
- * This can take 30–120 seconds as the backend scrapes multiple job boards.
+ * Trigger an intelligent query refresh via POST /api/refresh using profile-derived queries.
+ * Queries recent database cache first; only performs external board scraping for new/stale terms.
  */
-export const triggerProfileScrape = async (profile) => {
+export const triggerProfileScrape = async (profile, options = {}) => {
   const queries = buildQueriesFromProfile(profile);
   if (!queries.length) return { success: false, jobs: [] };
   try {
     const res = await fetch(`${SCRAPER_BASE_URL}/api/refresh`, {
-
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ queries }),
+      body: JSON.stringify({ 
+        queries, 
+        force: Boolean(options.force),
+        ttl_hours: options.ttl_hours || 12.0
+      }),
       signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return { success: true, jobs: data.jobs || [], errors: data.errors || [] };
+    return { 
+      success: true, 
+      jobs: data.jobs || [], 
+      errors: data.errors || [],
+      cacheStats: data.cache_stats || null
+    };
   } catch (err) {
     return { success: false, jobs: [], error: err.message };
   }
 };
+

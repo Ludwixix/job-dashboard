@@ -215,23 +215,29 @@ export const fetchJobsData = async () => {
 
 /**
  * Fetch jobs personalised to a user profile.
- * On localhost with the Python backend running: triggers a live rescrape via
- * POST /api/refresh using profile-derived search queries.
- * Everywhere else: filters existing jobs by profile industry/skills.
+ * When the Python backend is available (local dev or Cloud Run API):
+ * triggers an intelligent query refresh via POST /api/refresh using profile-derived search queries.
+ * Reuses recent database cached scrapes to prevent unnecessary bandwidth consumption.
  *
  * @param {object} profile - Active user profile from profileService
- * @returns {{ jobs: object[], queriesUsed: object[], liveScraped: boolean }}
+ * @returns {{ jobs: object[], queriesUsed: object[], liveScraped: boolean, cacheStats: object }}
  */
 export const fetchJobsForProfile = async (profile) => {
   const queriesUsed = buildQueriesFromProfile(profile);
 
-  // Attempt a live rescrape if we're on localhost (Python backend available)
-  if (isLocalHost) {
+  // Attempt backend refresh if localhost or cloud backend configured
+  if (isLocalHost || SCRAPER_BASE_URL) {
     try {
       const result = await triggerProfileScrape(profile);
       if (result.success && result.jobs.length > 0) {
         const parsed = result.jobs.map((item, idx) => parseMetadata(item, `ps_${idx}`));
-        return { jobs: parsed, queriesUsed, liveScraped: true, errors: result.errors };
+        return { 
+          jobs: parsed, 
+          queriesUsed, 
+          liveScraped: true, 
+          errors: result.errors,
+          cacheStats: result.cacheStats 
+        };
       }
     } catch {
       // Fall through to static path
@@ -240,8 +246,9 @@ export const fetchJobsForProfile = async (profile) => {
 
   // Static fallback: return all jobs (Dashboard scoring will still rank by profile)
   const all = await fetchJobsData();
-  return { jobs: all, queriesUsed, liveScraped: false };
+  return { jobs: all, queriesUsed, liveScraped: false, cacheStats: null };
 };
+
 
 
 

@@ -161,15 +161,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     setProfileScrapeMsg(`🔄 Fetching ${industry} jobs matched to your profile…`);
     setSuggestedTitles(suggestRelatedTitles(activeProfile));
 
-    fetchJobsForProfile(activeProfile).then(({ liveScraped, queriesUsed }) => {
+    fetchJobsForProfile(activeProfile).then(({ liveScraped, queriesUsed, cacheStats }) => {
       // Smoothly shift to the industry color theme as results return
       applyIndustryTheme(industry);
 
-      if (liveScraped) {
-        setProfileScrapeMsg(`✅ Live scraped ${queriesUsed.length} search terms for ${industry}`);
+      if (cacheStats?.cache_hit) {
+        setProfileScrapeMsg(`⚡ Instant Match: ${cacheStats.queries_cached} queries retrieved from recent database cache (0 bandwidth used)`);
+        refetch();
+      } else if (liveScraped) {
+        const scrapedCount = cacheStats?.queries_scraped ?? queriesUsed.length;
+        const cachedCount = cacheStats?.queries_cached ?? 0;
+        setProfileScrapeMsg(`✅ Updated database: ${scrapedCount} terms freshly scraped${cachedCount > 0 ? `, ${cachedCount} reused from cache` : ''}`);
         refetch(); // reload job list from updated backend data
       } else {
-        setProfileScrapeMsg(`🎯 Profile active — ${queriesUsed.length} query terms for ${industry} (connect backend for live scrape)`);
+        setProfileScrapeMsg(`🎯 Profile active — ${queriesUsed.length} query terms for ${industry}`);
       }
       setProfileScrapeStatus('done');
       setShowSuggestions(true);
@@ -180,6 +185,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       setProfileScrapeMsg('⚠️ Could not fetch profile-matched jobs');
       setTimeout(() => setProfileScrapeStatus(null), 5000);
     });
+
   // Only re-run when Google auth user changes (not on every activeProfile edit)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser?.accessToken]);

@@ -159,12 +159,15 @@ export const JobSeeker = ({
   onSelectJob, 
   baseLocation = 'BALACLAVA VIC 3183', 
   activeProfile,
+  scrapeProgress,
+  onTriggerScrape,
   onRejectJob, 
   onUnrejectJob,
   onDispatchAsyncApplication,
   asyncGeneratingIds = new Set(),
   onJobStatusUpdate
 }) => {
+
   const currentProfile = activeProfile || getActiveProfile();
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
@@ -518,8 +521,48 @@ export const JobSeeker = ({
 
   return (
     <div className="space-y-6 font-sans">
+      {/* Ambient Live Background Scraper Progress Notification */}
+      {scrapeProgress?.isActive && seekerJobs.length > 0 && (
+        <div className="bg-slate-900 border-2 border-indigo-500/60 rounded-2xl p-4 text-white shadow-xl font-mono flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-600/30 text-indigo-300 rounded-xl border border-indigo-400/50 animate-pulse shrink-0">
+              <RefreshCw size={18} className="animate-spin text-indigo-400" />
+            </div>
+            <div>
+              <div className="text-xs font-black text-white flex items-center gap-2">
+                <span>⚡ LIVE BACKGROUND SCRAPER ACTIVE</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-500/40">
+                  {seekerJobs.length} CACHED ROLES READY
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {scrapeProgress.stage || 'Scanning employment boards across SEEK, LinkedIn & Indeed in background...'}
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full md:w-72 space-y-1.5 shrink-0">
+            <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+              <span>DISCOVERY PROGRESS</span>
+              <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-300"
+                style={{ width: `${scrapeProgress.percent}%` }}
+              />
+            </div>
+            <div className="text-[9px] text-slate-500 flex justify-between">
+              <span>ELAPSED: {scrapeProgress.elapsedSec}s</span>
+              <span>ESTIMATED: ~15s</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Command Banner with Live Scraper Progress Bar */}
       <div className="bg-slate-900 rounded-2xl p-6 text-white border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-md relative overflow-hidden">
+
         {scraping && (
           <div 
             className="absolute bottom-0 left-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
@@ -810,68 +853,106 @@ export const JobSeeker = ({
 
           {/* Dynamic & High-Impact Job Cards Grid */}
           {seekerJobs.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 border border-amber-200 bg-amber-50/40 text-amber-950 font-mono shadow-2xs space-y-4 animate-in fade-in duration-200">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0 border border-amber-300">
-                  <AlertCircle size={20} />
+            scrapeProgress?.isActive ? (
+              <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-8 sm:p-12 text-center text-white space-y-6 shadow-2xl font-mono animate-in fade-in duration-300">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center shadow-lg">
+                  <RefreshCw size={28} className="animate-spin text-indigo-400" />
                 </div>
-                <div>
-                  <h4 className="text-sm font-extrabold uppercase tracking-wider text-amber-950">FILTER DIAGNOSTIC // 0 MATCHES RETURNED</h4>
-                  <p className="text-xs font-bold text-amber-900 mt-1 leading-relaxed">
-                    {filterDiagnostic?.summaryText}.
+                <div className="space-y-2">
+                  <h2 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">
+                    SCANNING LIVE EMPLOYMENT GATEWAYS
+                  </h2>
+                  <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+                    Autonomous scrapers are indexing positions tailored to your profile (<span className="text-indigo-300 font-bold">{currentProfile?.industry || 'Technology'}</span>). Matching opportunities will appear below immediately upon completion.
                   </p>
                 </div>
+
+                {/* Active Progress Bar */}
+                <div className="max-w-md mx-auto space-y-2.5 bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-inner">
+                  <div className="flex justify-between text-xs text-slate-300 font-bold">
+                    <span className="flex items-center gap-1.5 truncate max-w-[280px]">
+                      <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse shrink-0" />
+                      <span className="truncate">{scrapeProgress.stage || 'Scanning Gateways...'}</span>
+                    </span>
+                    <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                    <div 
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-300"
+                      style={{ width: `${scrapeProgress.percent}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-500 flex justify-between">
+                    <span>ELAPSED: {scrapeProgress.elapsedSec}s</span>
+                    <span>ESTIMATED DURATION: ~15s</span>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-8 border border-amber-200 bg-amber-50/40 text-amber-950 font-mono shadow-2xs space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0 border border-amber-300">
+                    <AlertCircle size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold uppercase tracking-wider text-amber-950">FILTER DIAGNOSTIC // 0 MATCHES RETURNED</h4>
+                    <p className="text-xs font-bold text-amber-900 mt-1 leading-relaxed">
+                      {filterDiagnostic?.summaryText}.
+                    </p>
+                  </div>
+                </div>
 
-              {/* 1-Click Quick Resolution Buttons */}
-              <div className="pt-3 border-t border-amber-200/80 flex flex-wrap items-center gap-2 text-xs font-bold">
-                <span className="text-[11px] text-amber-800 uppercase tracking-wider font-extrabold mr-1">QUICK RESOLUTIONS:</span>
-                
-                {filterDiagnostic?.hasDistanceFilter && (
+                {/* 1-Click Quick Resolution Buttons */}
+                <div className="pt-3 border-t border-amber-200/80 flex flex-wrap items-center gap-2 text-xs font-bold">
+                  <span className="text-[11px] text-amber-800 uppercase tracking-wider font-extrabold mr-1">QUICK RESOLUTIONS:</span>
+                  
+                  {filterDiagnostic?.hasDistanceFilter && (
+                    <button
+                      onClick={() => setMaxDistanceFilter('10km')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+                    >
+                      WIDEN DISTANCE TO &lt; 10 KM
+                    </button>
+                  )}
+
+                  {filterDiagnostic?.hasStreamFilter && (
+                    <button
+                      onClick={() => setActiveStreamTab('All')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+                    >
+                      SWITCH TO ALL STREAMS
+                    </button>
+                  )}
+
+                  {filterDiagnostic?.hasAgeFilter && (
+                    <button
+                      onClick={() => setMaxAgeFilter('All')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+                    >
+                      SHOW ALL DATES (NO 13-DAY LIMIT)
+                    </button>
+                  )}
+
+                  {filterDiagnostic?.hasSearchFilter && (
+                    <button
+                      onClick={() => setSearch('')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+                    >
+                      CLEAR SEARCH KEYWORD
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => setMaxDistanceFilter('10km')}
-                    className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+                    onClick={resetAllFilters}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors cursor-pointer ml-auto"
                   >
-                    WIDEN DISTANCE TO &lt; 10 KM
+                    <RotateCcw size={12} className="inline mr-1" /> RESET ALL FILTERS
                   </button>
-                )}
-
-                {filterDiagnostic?.hasStreamFilter && (
-                  <button
-                    onClick={() => setActiveStreamTab('All')}
-                    className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                  >
-                    SWITCH TO ALL STREAMS
-                  </button>
-                )}
-
-                {filterDiagnostic?.hasAgeFilter && (
-                  <button
-                    onClick={() => setMaxAgeFilter('All')}
-                    className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                  >
-                    SHOW ALL DATES (NO 13-DAY LIMIT)
-                  </button>
-                )}
-
-                {filterDiagnostic?.hasSearchFilter && (
-                  <button
-                    onClick={() => setSearch('')}
-                    className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                  >
-                    CLEAR SEARCH KEYWORD
-                  </button>
-                )}
-
-                <button
-                  onClick={resetAllFilters}
-                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors cursor-pointer ml-auto"
-                >
-                  <RotateCcw size={12} className="inline mr-1" /> RESET ALL FILTERS
-                </button>
+                </div>
               </div>
-            </div>
+            )
           ) : (
+
             <div className="space-y-6">
               <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
                 {paginatedJobs.map(job => {

@@ -89,6 +89,30 @@ export const CANDIDATE_PROFILE = {
   certifications: ['AZ-104 (Azure Administrator)', 'ITIL 4 Foundation', 'AZ-900 (Azure Fundamentals)']
 };
 
+export const AVAILABLE_MODELS = [
+  { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Active Default)', description: 'Fast, reasoning-capable, high-precision technical output' },
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat', description: 'Exceptional ATS keyword reasoning & structural flow' },
+  { id: 'google/gemini-2.0-flash-001', name: 'Google Gemini 2.0 Flash', description: 'Ultra-fast, high structured compliance' },
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Elite executive voice & cover letter craftsmanship' }
+];
+
+export const getActiveApiKey = () => {
+  return localStorage.getItem('openrouter_api_key') || '';
+};
+
+export const setActiveApiKey = (key) => {
+  if (key) localStorage.setItem('openrouter_api_key', key.trim());
+  else localStorage.removeItem('openrouter_api_key');
+};
+
+export const getActiveModel = () => {
+  return localStorage.getItem('openrouter_model') || 'z-ai/glm-5.3-flash';
+};
+
+export const setActiveModel = (model) => {
+  localStorage.setItem('openrouter_model', model.trim());
+};
+
 /**
  * Extract key terms from a job description for ATS scoring
  */
@@ -136,7 +160,6 @@ export const calculateAtsScore = (jobDescription) => {
 
 /**
  * Client-Side Grounded Document Generator (Fast, Reliable Fallback)
- * Formulates best-in-class ATS-tailored resume and cover letter using verified career record.
  */
 export const generateClientSideTailoredDocs = (job) => {
   const title = job.title || 'Senior Systems & Infrastructure Engineer';
@@ -255,46 +278,91 @@ Australian Citizen | Unrestricted Work Rights`;
 };
 
 /**
- * Main generation function — tries local API, returns grounded tailored documents on static host or network error
+ * Main Direct Online Generation Function
+ * Calls OpenRouter directly via HTTPS CORS with GLM 5.3 Flash.
+ * Falls back seamlessly to grounded client-side generation if offline.
  */
 export const generateApplicationDocs = async (job, onProgress) => {
-  try {
-    onProgress?.('Connecting to AI generation engine...');
+  const apiKey = getActiveApiKey();
+  const model = getActiveModel();
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+  if (apiKey) {
+    try {
+      onProgress?.(`Calling OpenRouter API directly (${model})…`);
+      const startTime = Date.now();
 
-    const res = await fetch('/api/generate-docs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        job: {
-          title: job.title,
-          company: job.company,
-          location: job.location || 'Melbourne, VIC',
-          salary: job.salary || '',
-          description: job.notes || job.description || '',
-          source: job.source || '',
-          portalLink: job.portalLink || '',
+      const systemPrompt = `You are an elite resume and cover letter architect specializing in Australian enterprise IT and cloud infrastructure hiring.
+You strictly enforce:
+1. Pass ATS keyword matching: naturally weave exact technical terms from the job description into summary, skills, and experience.
+2. The top third of the resume must hook immediately with real numbers and outcomes.
+3. Use result-first bullet structure: lead with the metric/outcome, then the action.
+4. Professional title on line 2 must mirror the target job ad title exactly.
+5. Draw exclusively from the candidate's verified career record — NEVER invent facts, metrics, or dates.
+6. Cover letter in 3 paragraphs (250-350 words): Hook -> Value fit -> CTA.
+7. Australian English spelling throughout (organisation, prioritise, analyse).
+8. Return resume, then exactly ===COVER_LETTER===, then cover letter.`;
+
+      const userPrompt = `TARGET ROLE:
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || 'Melbourne, VIC'}
+${job.salary ? `Salary: ${job.salary}` : ''}
+
+JOB DESCRIPTION & KEYWORDS:
+${job.notes || job.description || 'Enterprise IT infrastructure, systems engineering, and workplace support.'}
+
+CANDIDATE MASTER RECORD:
+${MASTER_RESUME_HIGHLIGHTS}
+
+Generate: (1) ATS Tailored Resume, (2) separator ===COVER_LETTER===, (3) Tailored Cover Letter.`;
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://ludwixix.github.io/job-dashboard-react/',
+          'X-Title': 'Job Dashboard Application Studio'
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 4500
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content || '';
+        if (content) {
+          const sepIdx = content.indexOf('===COVER_LETTER===');
+          let resume = '', coverLetter = '';
+          if (sepIdx !== -1) {
+            resume = content.slice(0, sepIdx).trim();
+            coverLetter = content.slice(sepIdx + '===COVER_LETTER==='.length).trim();
+          } else {
+            resume = content.trim();
+          }
+          return {
+            success: true,
+            resume,
+            coverLetter,
+            model: `${model} (Live API)`,
+            elapsedMs: Date.now() - startTime
+          };
         }
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.success && data.resume) {
-        return data;
       }
+    } catch (err) {
+      console.warn('Direct OpenRouter call error, falling back:', err);
     }
-  } catch (err) {
-    console.warn('API endpoint unavailable or static host, switching to client-side grounded generator:', err);
   }
 
-  // Graceful, guaranteed fallback for GitHub Pages (405) or local proxy failure
-  onProgress?.('Synthesizing verified career metrics & ATS keywords...');
+  // Graceful grounded fallback
+  onProgress?.('Synthesizing verified career metrics…');
   await new Promise(r => setTimeout(r, 600));
   return generateClientSideTailoredDocs(job);
 };
@@ -356,7 +424,7 @@ export const generateInterviewGuide = async (job, onProgress) => {
 };
 
 /**
- * Market Intelligence Aggregator: Scans jobs dataset to find skill demand, salary ranges, and hot streams
+ * Market Intelligence Aggregator
  */
 export const analyzeMarketTrends = (jobs = []) => {
   const skillCounts = {};
@@ -365,22 +433,18 @@ export const analyzeMarketTrends = (jobs = []) => {
   const locationCounts = {};
 
   jobs.forEach(job => {
-    // Stream
     const stream = job.stream || 'Core IT & Systems';
     streamCounts[stream] = (streamCounts[stream] || 0) + 1;
 
-    // Location
     const loc = (job.location || 'Melbourne, VIC').split(',')[0].trim();
     locationCounts[loc] = (locationCounts[loc] || 0) + 1;
 
-    // Skills
     const text = `${job.title} ${job.company} ${job.notes || ''}`.toLowerCase();
     const extracted = extractJobKeywords(text);
     extracted.forEach(skill => {
       skillCounts[skill] = (skillCounts[skill] || 0) + 1;
     });
 
-    // Salary parsing
     if (job.salary) {
       const match = job.salary.match(/\$?(\d{2,3}),?(\d{3})/);
       if (match) {
@@ -390,7 +454,6 @@ export const analyzeMarketTrends = (jobs = []) => {
     }
   });
 
-  // Top skills sorted
   const topSkills = Object.entries(skillCounts)
     .sort((a, b) => b[1] - a[1])
     .map(([skill, count]) => ({
@@ -420,7 +483,7 @@ export const analyzeMarketTrends = (jobs = []) => {
 };
 
 /**
- * Skill Gap & Career Driver Analyzer: compares current market requirements with candidate credentials
+ * Skill Gap & Career Driver Analyzer
  */
 export const generateSkillGapReport = (jobs = []) => {
   const trends = analyzeMarketTrends(jobs);
@@ -471,7 +534,7 @@ export const generateSkillGapReport = (jobs = []) => {
 };
 
 /**
- * Autonomous Agent Copilot: Generates proactive strategic actions for today's pipeline
+ * Autonomous Agent Copilot
  */
 export const generateAgentInsights = (jobs = [], overrides = {}) => {
   const highMatchJobs = jobs.filter(j => j.score >= 85 && !j.isRejected && overrides[j.id]?.status !== 'Applied');
@@ -517,12 +580,8 @@ export const generateAgentInsights = (jobs = [], overrides = {}) => {
   };
 };
 
-export { MASTER_RESUME_HIGHLIGHTS };
-
 /**
  * Pre-Submission Adversarial Quality Gate & Double-Check Engine
- * Verifies that application documents satisfy ATS requirements, recruiter psychology,
- * verified career metrics, Australian English spelling, and zero-cliché standards.
  */
 export const runDocumentQualityAudit = (job, resumeText = '', coverLetterText = '') => {
   const resume = resumeText || '';
@@ -541,9 +600,9 @@ export const runDocumentQualityAudit = (job, resumeText = '', coverLetterText = 
   
   // 3. Outcome-Led Metric Verification
   const metricPatterns = [
-    /\b\d{2,3}%\b/g,               // percentages (e.g. 87%, 99.9%)
-    /\b\d{1,3}(?:,\d{3})+\+?\b/g,   // large scale counts (e.g. 660,000+)
-    /\b\$\d+[\d,]*\b/g,             // dollar amounts
+    /\b\d{2,3}%\b/g,
+    /\b\d{1,3}(?:,\d{3})+\+?\b/g,
+    /\b\$\d+[\d,]*\b/g,
     /\b\d+\+\s*(?:clinical|endpoints|users|sites|devices)\b/gi,
     /\b\d+hr\s*→\s*\d+min\b/gi
   ];

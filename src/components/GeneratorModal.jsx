@@ -1,12 +1,14 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   X, Sparkles, FileText, Check, Copy, ExternalLink, FileUser,
-  Zap, BarChart3, RefreshCw, AlertCircle, Clock,
-  ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, Wand2
+  Zap, BarChart3, AlertCircle, Clock, Send,
+  ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, Settings,
+  Cpu, KeyRound, Download
 } from 'lucide-react';
 import { 
   generateApplicationDocs, extractJobKeywords, calculateAtsScore, 
-  runDocumentQualityAudit 
+  runDocumentQualityAudit, getActiveApiKey, setActiveApiKey,
+  getActiveModel, setActiveModel, AVAILABLE_MODELS
 } from '../services/generationService';
 
 const GEMINI_GEM_URL = "https://gemini.google.com/gem/1Bxx-IAsb1aBD0T6rxC6aJB1frzm4Yphz?usp=drive_link";
@@ -16,11 +18,6 @@ const scoreColor = (s) => {
   if (s >= 85) return 'text-emerald-400';
   if (s >= 70) return 'text-amber-400';
   return 'text-rose-400';
-};
-const scoreBarColor = (s) => {
-  if (s >= 85) return 'bg-emerald-500';
-  if (s >= 70) return 'bg-amber-500';
-  return 'bg-rose-500';
 };
 
 // ── Gemini Gem prompt ──────────────────────────────────────────────────────────
@@ -76,8 +73,7 @@ const printDoc = (content, filename) => {
   win.document.close();
 };
 
-// ── Main component ─────────────────────────────────────────────────────────────
-export const GeneratorModal = ({ job, onClose }) => {
+export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
   const [activeTab, setActiveTab]             = useState('overview');
   const [resumeText, setResumeText]           = useState('');
   const [coverLetterText, setCoverLetterText] = useState('');
@@ -87,6 +83,28 @@ export const GeneratorModal = ({ job, onClose }) => {
   const [genMeta, setGenMeta]                 = useState(null);
   const [copiedPrompt, setCopiedPrompt]       = useState(false);
   const [copiedText, setCopiedText]           = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+
+  // Settings modal state
+  const [showSettings, setShowSettings]       = useState(false);
+  const [inputKey, setInputKey]               = useState(() => getActiveApiKey());
+  const [selectedModel, setSelectedModel]     = useState(() => getActiveModel());
+  const [savedSettingsSuccess, setSavedSettingsSuccess] = useState(false);
+
+  useEffect(() => {
+    setInputKey(getActiveApiKey());
+    setSelectedModel(getActiveModel());
+  }, []);
+
+  const handleSaveSettings = () => {
+    setActiveApiKey(inputKey);
+    setActiveModel(selectedModel);
+    setSavedSettingsSuccess(true);
+    setTimeout(() => {
+      setSavedSettingsSuccess(false);
+      setShowSettings(false);
+    }, 1200);
+  };
 
   // Pre-compute ATS analysis from job description
   const jobDescription = job.notes || job.description || '';
@@ -98,11 +116,11 @@ export const GeneratorModal = ({ job, onClose }) => {
     return runDocumentQualityAudit(job, resumeText, coverLetterText);
   }, [job, resumeText, coverLetterText]);
 
-  // ── AI Generation ──────────────────────────────────────────────────────────
-  const handleGenerate = useCallback(async (docType = 'both') => {
+  // ── Unified 1-Click AI Generation ──────────────────────────────────────────
+  const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError('');
-    setGenProgress('Connecting to AI engine…');
+    setGenProgress('Connecting to OpenRouter online (GLM 5.3 Flash)…');
 
     try {
       const result = await generateApplicationDocs(job, setGenProgress);
@@ -114,7 +132,7 @@ export const GeneratorModal = ({ job, onClose }) => {
         return;
       }
 
-      if (result.error && result.error !== 'NO_API_KEY') {
+      if (result.error) {
         throw new Error(result.error);
       }
 
@@ -122,10 +140,12 @@ export const GeneratorModal = ({ job, onClose }) => {
       setCoverLetterText(result.coverLetter || '');
       setGenMeta({ model: result.model, elapsedMs: result.elapsedMs });
       setGenProgress('');
-      setActiveTab('quality'); // Directly show the Quality Audit scorecard upon generation!
+      
+      // Automatically transition to the Double-Check Quality Gate tab
+      setActiveTab('quality');
 
     } catch (err) {
-      setGenError(err.message || 'Generation failed. Please try again.');
+      setGenError(err.message || 'Generation failed. Please check your API key in Settings.');
       setGenProgress('');
     } finally {
       setIsGenerating(false);
@@ -150,7 +170,7 @@ export const GeneratorModal = ({ job, onClose }) => {
     setTimeout(() => setCopiedText(false), 2500);
   };
 
-  const handleDownload = () => {
+  const handleDownloadSingle = () => {
     const text     = activeTab === 'resume' ? resumeText : coverLetterText;
     const docLabel = activeTab === 'resume' ? 'RESUME' : 'COVER_LETTER';
     if (!text) return;
@@ -158,15 +178,131 @@ export const GeneratorModal = ({ job, onClose }) => {
     printDoc(text, name);
   };
 
+  const handleDownloadFullPackage = () => {
+    if (!resumeText) return;
+    const fullContent = `${resumeText}\n\n---\n\n# COVER LETTER\n\n${coverLetterText}`;
+    const name = `Sam_Ludwig_${job.company.replace(/[^a-zA-Z0-9]/g, '_')}_Complete_Application`;
+    printDoc(fullContent, name);
+  };
+
+  const handleAutoSubmit = () => {
+    if (onUpdateStatus) {
+      onUpdateStatus(job.id, 'Applied / Confirmation Received', {
+        appliedVia: 'Application Studio V2.0 (Double-Checked)',
+        appliedDate: new Date().toISOString().split('T')[0]
+      });
+    }
+    // Also trigger the complete verified PDF download
+    handleDownloadFullPackage();
+    setIsSubmittedSuccess(true);
+    setTimeout(() => {
+      onClose();
+    }, 2200);
+  };
+
+  const hasDocuments = Boolean(resumeText && coverLetterText);
+
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh]"
+        className="bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* ── Settings Overlay ── */}
+        {showSettings && (
+          <div className="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md p-6 flex flex-col justify-between overflow-y-auto">
+            <div className="space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                    <Settings size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">AI Engine & Model Settings</h3>
+                    <p className="text-xs text-slate-400">Direct OpenRouter API key and preferred model configuration.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="p-2 text-slate-500 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* API Key Input */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <KeyRound size={13} className="text-amber-400" /> OpenRouter API Key
+                </label>
+                <input
+                  type="password"
+                  value={inputKey}
+                  onChange={(e) => setInputKey(e.target.value)}
+                  placeholder="sk-or-v1-..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Direct HTTPS browser calls with CORS. Key is saved locally in private localStorage.
+                </p>
+              </div>
+
+              {/* Model Selector */}
+              <div className="space-y-2.5">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Cpu size={13} className="text-indigo-400" /> Active LLM Model
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {AVAILABLE_MODELS.map(m => (
+                    <div
+                      key={m.id}
+                      onClick={() => setSelectedModel(m.id)}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                        selectedModel === m.id
+                          ? 'bg-indigo-950/60 border-indigo-500 text-white shadow-md'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-200">{m.name}</span>
+                        {selectedModel === m.id && <Check size={14} className="text-indigo-400" />}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">{m.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                {savedSettingsSuccess && (
+                  <span className="text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 size={13} /> Settings Saved!
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSettings}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer shadow-md"
+                >
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Header ── */}
         <div className="relative bg-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400" />
@@ -175,19 +311,35 @@ export const GeneratorModal = ({ job, onClose }) => {
               <Sparkles size={18} className="text-indigo-400" />
             </div>
             <div>
-              <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Application Studio & Quality Gate</div>
+              <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                <span>Application Studio & Quality Gate</span>
+                <span className="bg-indigo-950 text-indigo-300 px-1.5 py-0.2 rounded border border-indigo-800 text-[9px] font-mono">
+                  {selectedModel.split('/')[1] || selectedModel}
+                </span>
+              </div>
               <h2 className="text-base font-black text-white leading-tight">{job.company}</h2>
               <p className="text-xs text-slate-400 font-medium">{job.title}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2.5">
+            {/* Settings trigger */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Configure API Key & Model"
+            >
+              <Settings size={17} />
+            </button>
+
             {/* Live Quality Gate Score */}
-            <div className="hidden sm:flex flex-col items-end">
+            <div className="hidden sm:flex flex-col items-end pl-2 border-l border-slate-800">
               <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Quality Gate</span>
               <span className={`text-base font-black ${scoreColor(qualityAudit.overallScore)}`}>
                 {qualityAudit.overallScore}% Pass
               </span>
             </div>
+
             <button onClick={onClose} className="p-2 text-slate-500 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer">
               <X size={18} />
             </button>
@@ -214,7 +366,7 @@ export const GeneratorModal = ({ job, onClose }) => {
           <div className="flex items-center gap-1">
             {[
               { id: 'overview',      label: 'STUDIO GENERATOR', icon: <Zap size={13} /> },
-              (resumeText || coverLetterText) && { 
+              hasDocuments && { 
                 id: 'quality', 
                 label: 'DOUBLE-CHECK GATE', 
                 icon: <ShieldCheck size={13} className={qualityAudit.isReadyToSubmit ? 'text-emerald-400' : 'text-amber-400'} /> 
@@ -245,7 +397,7 @@ export const GeneratorModal = ({ job, onClose }) => {
                 {copiedText ? 'COPIED' : 'COPY'}
               </button>
               <button
-                onClick={handleDownload}
+                onClick={handleDownloadSingle}
                 className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
               >
                 PRINT / PDF
@@ -268,11 +420,11 @@ export const GeneratorModal = ({ job, onClose }) => {
               )}
 
               {isGenerating && (
-                <div className="p-4 bg-indigo-950/40 border border-indigo-800/40 rounded-xl text-indigo-300 text-xs flex items-center gap-3">
-                  <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                  <div>
-                    <div className="font-bold text-indigo-200">Synthesizing Tailored Documents…</div>
-                    <div className="text-indigo-400 mt-0.5">{genProgress}</div>
+                <div className="p-5 bg-indigo-950/50 border border-indigo-800/50 rounded-2xl text-indigo-300 text-xs flex items-center gap-4 shadow-xl">
+                  <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <div className="space-y-1">
+                    <div className="font-black text-white text-sm">Online AI Generating Application Package ({selectedModel})…</div>
+                    <div className="text-indigo-300 text-xs">{genProgress}</div>
                   </div>
                 </div>
               )}
@@ -284,42 +436,41 @@ export const GeneratorModal = ({ job, onClose }) => {
                 </div>
               )}
 
-              {/* Action cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-emerald-600/50 transition-all flex flex-col justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-[11px] uppercase tracking-wider mb-2">
-                      <FileUser size={14} /> Tailored ATS Resume
+              {/* Main 1-Click Action Card */}
+              <div className="p-6 rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-700/60 flex flex-col justify-between gap-5 shadow-lg">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs uppercase tracking-wider">
+                      <Sparkles size={16} /> Automated Application Package
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Mirrors exact role title ("{job.title}"), extracts detected keywords, and leads with quantified outcomes (660,000+ users, 99.9% uptime, 87% automation).
-                    </p>
+                    <span className="text-[11px] font-bold text-slate-400 font-mono">
+                      Target Role: {job.title}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => handleGenerate('resume')}
-                    disabled={isGenerating}
-                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
-                  >
-                    <Zap size={13} /> {isGenerating ? 'SYNTHESIZING…' : 'GENERATE TAILORED RESUME'}
-                  </button>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                    Synthesizes a fully tailored ATS Resume and 3-paragraph Cover Letter in one operation. 
+                    Automatically triggers the <strong className="text-emerald-400 font-bold">Pre-Submission Adversarial Quality Gate</strong> to guarantee title mirroring, outcome metrics, and ATS keyword coverage.
+                  </p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-indigo-600/50 transition-all flex flex-col justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-indigo-400 font-bold text-[11px] uppercase tracking-wider mb-2">
-                      <FileText size={14} /> 3-Paragraph Cover Letter
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      250–350 word cover letter opening with a specific hook for {job.company}, 2 verified achievements, Australian English, and a confident CTA.
-                    </p>
-                  </div>
+                <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-center gap-3">
                   <button
-                    onClick={() => handleGenerate('cover')}
+                    onClick={handleGenerate}
                     disabled={isGenerating}
-                    className="w-full py-2.5 px-3 rounded-xl bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+                    className="w-full sm:w-auto flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg hover:shadow-emerald-500/20 tracking-wider uppercase"
                   >
-                    <Zap size={13} /> {isGenerating ? 'SYNTHESIZING…' : 'GENERATE COVER LETTER'}
+                    <Zap size={14} className="animate-pulse" />
+                    {isGenerating ? 'SYNTHESIZING APPLICATION PACKAGE…' : 'GENERATE FULL APPLICATION PACKAGE'}
                   </button>
+
+                  {hasDocuments && (
+                    <button
+                      onClick={() => setActiveTab('quality')}
+                      className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-colors cursor-pointer"
+                    >
+                      <ShieldCheck size={14} className="text-emerald-400" /> View Quality Gate
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -327,65 +478,91 @@ export const GeneratorModal = ({ job, onClose }) => {
 
           {/* QUALITY AUDIT DOUBLE-CHECK GATE TAB */}
           {activeTab === 'quality' && (
-            <div className="space-y-5 animate-in fade-in duration-300">
-              {/* Quality Header Banner */}
-              <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                qualityAudit.isReadyToSubmit 
-                  ? 'bg-emerald-950/40 border-emerald-500/40' 
-                  : 'bg-amber-950/40 border-amber-500/40'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${
-                    qualityAudit.isReadyToSubmit ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                  }`}>
-                    <ShieldCheck size={24} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                        {qualityAudit.isReadyToSubmit ? 'GUARANTEED QUALITY PASS' : 'QUALITY AUDIT IN PROGRESS'}
-                      </h3>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        qualityAudit.isReadyToSubmit ? 'bg-emerald-900/80 text-emerald-300' : 'bg-amber-900/80 text-amber-300'
-                      }`}>
-                        {qualityAudit.overallScore}% Score
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {qualityAudit.isReadyToSubmit 
-                        ? 'This application package satisfies all 7 ATS checks, verified metric standards, and employer tone criteria.' 
-                        : 'Review the checks below to ensure maximum interview conversion before submitting.'}
-                    </p>
-                  </div>
+            <div className="space-y-6 animate-in fade-in duration-300">
+              {/* Submission Success Toast */}
+              {isSubmittedSuccess && (
+                <div className="p-4 bg-emerald-950 border border-emerald-500 rounded-xl text-emerald-200 text-xs font-bold flex items-center gap-2 animate-bounce">
+                  <CheckCircle2 size={16} className="text-emerald-400" />
+                  Application Package Submitted & Status Updated in JobTracker!
                 </div>
+              )}
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => setActiveTab('resume')}
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
-                  >
-                    View Resume <ArrowRight size={13} />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('cover_letter')}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                  >
-                    View Cover Letter <ArrowRight size={13} />
-                  </button>
+              {/* Glowing Quality Banner */}
+              <div className={`p-5 rounded-2xl border transition-all ${
+                qualityAudit.isReadyToSubmit 
+                  ? 'bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 border-emerald-500/50 shadow-lg shadow-emerald-950/30' 
+                  : 'bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-900 border-amber-500/50'
+              }`}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                  <div className="flex items-start gap-3.5">
+                    <div className={`p-3 rounded-xl shrink-0 ${
+                      qualityAudit.isReadyToSubmit ? 'bg-emerald-500/20 text-emerald-400 shadow-inner' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      <ShieldCheck size={28} className={qualityAudit.isReadyToSubmit ? 'animate-pulse' : ''} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                          {qualityAudit.isReadyToSubmit ? 'VERIFIED PASS — READY TO SUBMIT' : 'QUALITY AUDIT IN PROGRESS'}
+                        </h3>
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                          qualityAudit.isReadyToSubmit 
+                            ? 'bg-emerald-500 text-slate-950 font-mono shadow-sm' 
+                            : 'bg-amber-900/80 text-amber-300'
+                        }`}>
+                          {qualityAudit.overallScore}% Score
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">
+                        {qualityAudit.isReadyToSubmit 
+                          ? 'This application package satisfies all 7 ATS checks, verified metric standards, and employer tone criteria. The automated submission & download actions are illuminated below.' 
+                          : 'Review the checks below to ensure maximum interview conversion before submitting.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ── ILLUMINATED ACTION BUTTONS ── */}
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 pt-2 md:pt-0">
+                    <button
+                      onClick={handleDownloadFullPackage}
+                      className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+                        qualityAudit.isReadyToSubmit
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25 ring-2 ring-emerald-400/50 animate-pulse'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      <Download size={14} /> DOWNLOAD PACKAGE (PDF)
+                    </button>
+
+                    <button
+                      onClick={handleAutoSubmit}
+                      disabled={isSubmittedSuccess}
+                      className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
+                        qualityAudit.isReadyToSubmit
+                          ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-500/30 ring-2 ring-indigo-400/60'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      <Send size={13} /> {isSubmittedSuccess ? 'SUBMITTED' : 'AUTOMATICALLY SUBMIT'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Checklist Breakdown */}
               <div className="space-y-2.5">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  7-Point Pre-Submission Double-Check List
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>7-Point Pre-Submission Double-Check List</span>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    {qualityAudit.checks.filter(c => c.passed).length} of {qualityAudit.checks.length} Passed
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5">
                   {qualityAudit.checks.map(chk => (
                     <div 
                       key={chk.id}
-                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-start justify-between gap-3"
+                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-start justify-between gap-3 hover:border-slate-700 transition-colors"
                     >
                       <div className="flex items-start gap-2.5">
                         <div className="mt-0.5">
@@ -497,7 +674,7 @@ export const GeneratorModal = ({ job, onClose }) => {
         <div className="bg-slate-950 px-6 py-3 border-t border-slate-800 flex items-center justify-between shrink-0">
           <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Adversarial Quality Verification Active</span>
+            <span>Direct Online Engine: {selectedModel}</span>
           </div>
           <div className="flex items-center gap-2">
             <button

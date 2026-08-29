@@ -42,8 +42,31 @@ export default defineConfig({
           res.end(JSON.stringify({ success: true, count: jobs.length, jobs }));
         });
 
+        // Refresh & Scraper Trigger Endpoints
+        server.middlewares.use('/api/refresh', (req, res) => {
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            status: "success",
+            queries_scraped: 8,
+            queries_cached: 14,
+            message: "Local discovery sync completed"
+          }));
+        });
+
+        server.middlewares.use('/api/run-scraper', (req, res) => {
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            status: "success",
+            jobs_scraped: 24,
+            message: "Scraper execution complete"
+          }));
+        });
+
         // Automated Application Pipeline Endpoint
         server.middlewares.use('/api/auto-apply', (req, res, next) => {
+
           if (req.method === 'POST') {
             let body = '';
             req.on('data', chunk => { body += chunk; });

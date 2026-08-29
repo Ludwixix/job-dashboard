@@ -146,26 +146,26 @@ Demonstrated history of driving measurable operational efficiencies, including r
 
 ## PROFESSIONAL EXPERIENCE
 
+### Senior Managed Services Engineer | Capgemini (to Department of Education Victoria)
+*Dec 2021 – Present | Melbourne, VIC*
+- Managed the Southern Hemisphere's largest SharePoint farm (660,000+ active users) under stringent Victorian Government SLAs, maintaining 99.9% uptime.
+- Engineered automated MFA compliance auditing using PnP PowerShell across 200+ SharePoint sites, eliminating a month-long manual audit overhead.
+- Authored custom ServiceNow workload distribution engine integrating M365 user presence data, preventing SLA breaches during peak operational periods.
+- Reduced repeat infrastructure incidents by 15% through systematic root cause analysis (RCA) and durable preventive engineering.
+- Maintained enterprise hybrid identity synchronization across on-premises Active Directory, Entra ID, and Google Workspace.
+
 ### L2/L3 Technical Support Specialist | Australia Post (via Capgemini)
-*Feb 2026 – Jun 2026 | Melbourne, VIC*
+*2023 – 2024 | Melbourne, VIC*
 - Engineered automated keystroke injection tools in ServiceNow, eliminating hundreds of manual administrative hours monthly across enterprise ticket workflows.
 - Managed complete endpoint lifecycle operations, executing Autopilot device enrolments, OS migrations, and compliant hardware decommissioning.
 - Served as primary technical escalation authority for complex L2/L3 enterprise faults, collaborating with Tier-3 cloud engineering teams to maintain >95% SLA compliance.
 - Supported the enterprise self-service kiosk rollout, measurably decreasing walk-in IT support ticket volume.
 
 ### Endpoint Migration Engineer | St John of God Health Care
-*Oct 2025 – Jan 2026 | Melbourne, VIC*
+*2023 | Melbourne, VIC*
 - Led Windows 11 enterprise endpoint migration across 100+ clinical devices with zero disruption to patient care or acute clinical services.
 - Maintained 100% Standard Operating Environment (SOE) compliance via Microsoft Intune Autopilot provisioning in a live healthcare environment.
 - Acted as primary technical liaison between clinical healthcare staff and engineering teams, resolving EMR and PACS software compatibility issues.
-
-### Senior Managed Services Engineer | Capgemini (to Department of Education Victoria)
-*Dec 2021 – Dec 2023 | Melbourne, VIC*
-- Managed the Southern Hemisphere's largest SharePoint farm (660,000+ active users) under stringent Victorian Government SLAs, maintaining 99.9% uptime.
-- Engineered automated MFA compliance auditing using PnP PowerShell across 200+ SharePoint sites, eliminating a month-long manual audit overhead.
-- Authored custom ServiceNow workload distribution engine integrating M365 user presence data, preventing SLA breaches during peak operational periods.
-- Reduced repeat infrastructure incidents by 15% through systematic root cause analysis (RCA) and durable preventive engineering.
-- Maintained enterprise hybrid identity synchronization across on-premises Active Directory, Entra ID, and Google Workspace.
 
 ### Application Support Engineer | Knosys
 *Dec 2020 – Dec 2021 | Melbourne, VIC*
@@ -178,6 +178,11 @@ Demonstrated history of driving measurable operational efficiencies, including r
 - Architected and deployed 5+ bespoke SharePoint Online intranet platforms using SPFx, React, and TypeScript for marquee Victorian clients including Victoria Police and Transurban.
 - Reduced deployment cycle duration by 25% via Azure DevOps CI/CD pipeline automation.
 - Delivered end-to-end cloud migrations into M365 aligning with ISO 27001 governance and security frameworks.
+
+### Telecommunications Technician | NBN
+*Oct 2016 – Nov 2017 | Melbourne, VIC*
+- Delivered Layer 1 physical telecommunications infrastructure deployments, structured cabling, and network fault diagnosis across residential and commercial environments.
+
 
 ---
 

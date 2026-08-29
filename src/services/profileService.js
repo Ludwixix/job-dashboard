@@ -36,26 +36,41 @@ export const DEFAULT_PROFILES = [
 - 100+ clinical endpoints migrated: Windows 11 at St John of God with zero patient care disruption
 `,
     fullWorkExperienceText: `
-SAM LUDWIG — Senior IT Infrastructure & M365 Engineer
+SAM LUDWIG — Senior IT Infrastructure & M365 Systems Specialist
 Location: Melbourne, VIC | Phone: 0405 993 245 | Email: sam.ludwig@gmail.com
-Australian Citizen | Clearance Eligible: Baseline / NV1 | LinkedIn: linkedin.com/in/sam-ludwig
+Australian Citizen | Clearance: Baseline / NV1 Eligible | LinkedIn: linkedin.com/in/sam-ludwig
 
 PROFESSIONAL EXPERIENCE:
-1. Knosys — Senior Application Support Engineer (2025 – Present)
-- Delivered tier-3 application support and systems engineering for SaaS knowledge management platforms.
-- Automated bulk tenant configurations with PowerShell, reducing deployment cycle times by 87%.
+1. Capgemini (Department of Education Victoria) — Senior Managed Services Engineer (Dec 2021 – Present)
+- Managed the Southern Hemisphere's largest SharePoint farm (660,000+ active users, 1,000+ sites) with 99.9% uptime under stringent Victorian Government SLAs.
+- Acted as Tier-3 escalation authority across Microsoft 365, SharePoint Online, Exchange Hybrid, and Google Workspace.
+- Engineered automated PnP PowerShell compliance frameworks to audit and enforce MFA policies across 200+ enterprise workspaces.
+- Achieved a 15% reduction in recurring incidents through systematic Root Cause Analysis (RCA) and preventive engineering.
+- Enforced ACSC Essential 8 endpoint and cloud security controls across all regional education hubs.
 
-2. Engage Squared — Microsoft 365 / SharePoint Systems Consultant (2022 – 2024)
-- Engineered scalable M365 and SharePoint enterprise intranets across enterprise clients.
-- Automated governance workflows and tenant migrations with PowerShell and Power Automate.
+2. Australia Post (via Capgemini) — L2/L3 Technical Support Specialist (2023 – 2024)
+- Provided expert L1/L2/L3 support at MyITHub, overseeing hardware repair, OS reimaging, Autopilot provisioning, and loan device management.
+- Engineered automated keystroke injection tools in ServiceNow, eliminating manual ticket handling overhead.
+- Managed endpoint lifecycle operations including Windows Autopilot enrolments, Intune policy compliance, and secure asset disposal.
 
-3. Capgemini — Systems & Application Engineer (Contract: Dept of Education VIC) (2020 – 2022)
-- Managed core infrastructure for 660,000+ student and teacher accounts with 99.9% SLA uptime.
-- Enforced ACSC Essential 8 endpoint and access security across all education regional hubs.
+3. St John of God Health Care — Endpoint Migration Engineer (2023)
+- Led Windows 11 enterprise migration across 100+ clinical endpoints with 100% Autopilot adherence in live hospital environments with zero patient care disruption.
+- Served as primary technical liaison between clinical healthcare staff and engineering teams, resolving EMR and diagnostic software compatibility issues.
 
-4. St John of God Health Care — Clinical Systems Deployment Specialist (2019 – 2020)
-- Upgraded 100+ clinical endpoint workstations to Windows 11 with zero interruption to medical operations.
+4. Knosys — Application Support Engineer / Systems Automation (Dec 2020 – Dec 2021)
+- Delivered tier-3 application support and systems engineering for GreenOrbit intranet SaaS platforms with 95% SLA first-contact resolution (Cotton On, Harvey Norman, Healthscope).
+- Rebuilt manual batch processing operations with custom multi-threaded PowerShell 7 automation, reducing processing time by 87% (from 2 hours to 15 minutes).
+- Authored comprehensive RCA runbooks resolving complex multi-tenant versioning and migration bottlenecks.
+
+5. Engage Squared — SharePoint Developer & Cloud Deployment Consultant (Mar 2018 – Dec 2020)
+- Architected and delivered 5+ enterprise SharePoint Online intranet platforms for Victoria Police, Transurban, and Cimic Group using SPFx, React, and TypeScript.
+- Implemented Azure DevOps CI/CD pipelines, accelerating release cycles by 25% under ISO 27001 compliance standards.
+- Led technical client discovery workshops driving a 20% increase in Microsoft 365 enterprise feature adoption.
+
+6. NBN — Telecommunications Technician (Oct 2016 – Nov 2017)
+- Delivered Layer 1 physical telecommunications infrastructure deployments, structured cabling, and network fault diagnosis across Melbourne.
 `
+
   }
 ];
 

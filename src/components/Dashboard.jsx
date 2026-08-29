@@ -10,6 +10,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { CommandPalette } from './CommandPalette';
 import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
+import { generateApplicationDocs } from '../services/generationService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Download, Command, Zap, LayoutGrid, CheckCircle2,
@@ -30,8 +31,13 @@ export const Dashboard = () => {
   const [backgroundNotifications, setBackgroundNotifications] = useState([]);
 
   const handleDispatchAsyncApplication = useCallback(async (job) => {
-    const jobId = job.id;
-    setAsyncGeneratingIds(prev => new Set(prev).add(jobId));
+    const jobId = job.id || `${job.company}_${job.title}`;
+    setAsyncGeneratingIds(prev => {
+      const next = new Set(prev);
+      if (job.id) next.add(job.id).add(String(job.id));
+      next.add(`${job.company}_${job.title}`);
+      return next;
+    });
 
     try {
       const result = await generateApplicationDocs(job);
@@ -63,7 +69,11 @@ export const Dashboard = () => {
     } finally {
       setAsyncGeneratingIds(prev => {
         const next = new Set(prev);
-        next.delete(jobId);
+        if (job.id) {
+          next.delete(job.id);
+          next.delete(String(job.id));
+        }
+        next.delete(`${job.company}_${job.title}`);
         return next;
       });
     }

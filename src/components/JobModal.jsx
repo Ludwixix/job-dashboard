@@ -8,6 +8,7 @@ import {
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
+import { hasGeneratedApplicationDocs } from './JobSeeker';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob }) => {
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
@@ -122,7 +123,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                   {job.source}
                 </span>
               )}
-              {job.hasCustomDocs && (
+              {hasGeneratedApplicationDocs(job) && (
                 <span className="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 flex items-center gap-1 shadow-xs animate-pulse">
                   <Sparkles size={11} className="text-slate-950" /> TAILORED ASSETS READY (PDFs)
                 </span>
@@ -143,9 +144,9 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
               <button
                 onClick={() => onUnrejectJob && onUnrejectJob(job.id || `${job.company}_${job.title}`)}
                 className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs font-black shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-                title="Un-reject and restore this job"
+                title="Restore this job to active list"
               >
-                <span>↩️ RESTORE JOB</span>
+                RESTORE
               </button>
             ) : (
               <button
@@ -153,21 +154,21 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                 className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-mono text-xs font-black shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
                 title="Reject and remove this job"
               >
-                <span>🚫 REJECT JOB</span>
+                REJECT
               </button>
             )}
 
             <button 
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Interactive Tabbed Navigation */}
-        <div className="bg-slate-100 border-b border-slate-200 px-6 py-2 flex items-center gap-2 font-mono text-xs font-extrabold shrink-0">
+        {/* Modal Sub-Navigation Tabs */}
+        <div className="flex border-b border-slate-200 bg-slate-100/80 px-6 pt-2 font-mono text-xs font-bold gap-2">
           <button
             onClick={() => setActiveTab('fit')}
             className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
@@ -201,14 +202,14 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
             }`}
           >
             <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-500"} />
-            ASSETS & ACTIONS {job.hasCustomDocs && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
+            ASSETS & ACTIONS {hasGeneratedApplicationDocs(job) && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
           </button>
         </div>
 
         {/* Modal Scrollable Body */}
         <div className="p-6 space-y-6 overflow-y-auto flex-1 font-sans">
           {/* Prominent Custom Documents Ready Banner */}
-          {job.hasCustomDocs && (
+          {hasGeneratedApplicationDocs(job) && (
             <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white border-2 border-emerald-500 shadow-md font-mono space-y-3 animate-in fade-in duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">

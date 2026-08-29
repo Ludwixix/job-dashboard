@@ -1,8 +1,9 @@
 import React from 'react';
 import { Badge } from './Badge';
-import { ExternalLink, FileText, DollarSign, MapPin, Award, Clock, Download, Sparkles } from 'lucide-react';
+import { ExternalLink, FileText, DollarSign, MapPin, Award, Clock, Download } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
+import { hasGeneratedApplicationDocs } from './JobSeeker';
 
 export const TableView = ({ jobs, onSelectJob }) => {
   const formatDaysAgo = (dateStr) => {
@@ -45,7 +46,7 @@ export const TableView = ({ jobs, onSelectJob }) => {
           </thead>
           <tbody className="divide-y divide-slate-200/70 text-xs">
             {jobs.map((job) => {
-              const hasCustomDocs = Boolean(job.hasCustomDocs && job.resumeText);
+              const hasCustomDocs = hasGeneratedApplicationDocs(job);
               return (
                 <tr 
                   key={job.id} 

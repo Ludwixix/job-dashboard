@@ -58,6 +58,21 @@ const formatDaysAgo = (dateStr) => {
   }
 };
 
+// Strict check: Both resume and cover letter must be generated and non-empty
+export const hasGeneratedApplicationDocs = (job) => {
+  return Boolean(
+    job && 
+    job.hasCustomDocs && 
+    job.resumeText && 
+    typeof job.resumeText === 'string' &&
+    job.resumeText.trim().length > 0 &&
+    (
+      (job.coverLetterText && typeof job.coverLetterText === 'string' && job.coverLetterText.trim().length > 0) ||
+      (job.coverLetter && typeof job.coverLetter === 'string' && job.coverLetter.trim().length > 0)
+    )
+  );
+};
+
 // Categorize jobs into expanded granular sub-streams
 const getJobSubStream = (job) => {
   const title = (job.title || '').toLowerCase();
@@ -175,7 +190,7 @@ export const JobSeeker = ({
   }, [jobs]);
 
   const readyToSubmitCount = useMemo(() => {
-    return unsubmittedJobs.filter(j => Boolean(j.hasCustomDocs && j.resumeText) || (j.status || '').toLowerCase().includes('package prepared')).length;
+    return unsubmittedJobs.filter(hasGeneratedApplicationDocs).length;
   }, [unsubmittedJobs]);
 
   // Stream counts for expanded quick tabs
@@ -216,7 +231,7 @@ export const JobSeeker = ({
       // Stream Tab filter
       let matchesStream = true;
       if (activeStreamTab === 'ReadyForSubmission') {
-        matchesStream = Boolean((job.hasCustomDocs && job.resumeText) || (job.status || '').toLowerCase().includes('package prepared'));
+        matchesStream = hasGeneratedApplicationDocs(job);
       } else if (activeStreamTab !== 'All' && activeStreamTab !== 'Rejected Jobs') {
         const subStream = getJobSubStream(job);
         matchesStream = subStream === activeStreamTab || (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase());
@@ -225,7 +240,7 @@ export const JobSeeker = ({
       // Dedicated Docs Ready filter toggle
       let matchesDocsReady = true;
       if (docsReadyFilter) {
-        matchesDocsReady = Boolean((job.hasCustomDocs && job.resumeText) || (job.status || '').toLowerCase().includes('package prepared'));
+        matchesDocsReady = hasGeneratedApplicationDocs(job);
       }
 
       // Salary filter
@@ -758,7 +773,7 @@ export const JobSeeker = ({
               <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
                 {paginatedJobs.map(job => {
                   const isTopFit = (job.score || 0) >= 90;
-                  const hasCustomDocs = Boolean(job.hasCustomDocs && job.resumeText);
+                  const hasCustomDocs = hasGeneratedApplicationDocs(job);
                   const isGeneratingThisJob = Boolean(
                     asyncGeneratingIds?.has(job.id) || 
                     asyncGeneratingIds?.has(String(job.id)) || 

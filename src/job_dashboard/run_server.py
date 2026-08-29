@@ -4,6 +4,7 @@ import threading
 import time
 from pathlib import Path
 
+from .config import settings
 from .llm import OpenRouterDocumentGenerator
 from .profile import load_profile
 from .scrape_config import DEFAULT_QUERIES
@@ -11,51 +12,56 @@ from .sources import AdzunaApiSource, IndeedJobSpySource, LinkedInBrowserSource,
 from .web import DashboardApp, serve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SYNC_INTERVAL_SECONDS = 30 * 60
-
-
-def load_dotenv(path: Path):
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key and key not in os.environ:
-            os.environ[key] = value.strip().strip("\"'")
+SYNC_INTERVAL_SECONDS = settings.sync_interval_seconds
 
 
 def main():
-    load_dotenv(PROJECT_ROOT / ".env")
-    parser = argparse.ArgumentParser(description="Run the local job dashboard")
-    parser.add_argument("--profile", type=Path, default=PROJECT_ROOT.parent / "job-dashboard-site" / "job_profile.json")
-    parser.add_argument("--data-dir", type=Path, default=PROJECT_ROOT / "data")
-    parser.add_argument("--port", type=int, default=8787)
+    parser = argparse.ArgumentParser(description="Run the job dashboard server")
+    parser.add_argument("--profile", type=Path, default=None)
+    parser.add_argument("--data-dir", type=Path, default=settings.data_dir)
+    parser.add_argument("--port", type=int, default=None)
+    parser.add_argument("--host", type=str, default=None)
     parser.add_argument("--no-linkedin", action="store_true")
-    parser.add_argument("--source-dir", type=Path, default=PROJECT_ROOT / "Source of truth")
-    parser.add_argument("--guidelines-dir", type=Path, default=PROJECT_ROOT / "Guidelines")
-    parser.add_argument("--examples-dir", type=Path, default=PROJECT_ROOT / "data" / "Examples")
+    parser.add_argument("--source-dir", type=Path, default=settings.source_dir)
+    parser.add_argument("--guidelines-dir", type=Path, default=settings.guidelines_dir)
+    parser.add_argument("--examples-dir", type=Path, default=settings.examples_dir)
     args = parser.parse_args()
-    profile = load_profile(args.profile)
-    seek_enabled = os.getenv("SEEK_ENABLED", "1").lower() not in {"0", "false", "no"}
+
+    # Cloud Run injects $PORT; fall back to arg, then settings, then 8080
+    port = int(os.environ.get("PORT", args.port or settings.port or 8080))
+    # Cloud Run requires binding to 0.0.0.0
+    host = os.environ.get("HOST", args.host or settings.host or "0.0.0.0")
+
+    # Profile is optional on Cloud Run — use empty profile if not found
+    profile_path = args.profile or (PROJECT_ROOT.parent / "job-dashboard-site" / "job_profile.json")
+    profile = load_profile(profile_path) if profile_path.exists() else {}
+
     sources = [IndeedJobSpySource()]
-    if seek_enabled:
+    if settings.seek_enabled:
         sources.append(SeekApiSource(
-            max_pages=int(os.getenv("SEEK_MAX_PAGES", "3")),
-            max_results=int(os.getenv("SEEK_MAX_RESULTS", "60")),
-            pause_seconds=float(os.getenv("SEEK_PAUSE_SECONDS", "1.5")),
-            endpoint=os.getenv("SEEK_API_ENDPOINT") or None,
-            allow_browser_fallback=os.getenv("SEEK_BROWSER_FALLBACK", "true").lower() in {"1", "true", "yes"},
-            cache_path=os.getenv("SEEK_CACHE_PATH") or PROJECT_ROOT.parent / "job-dashboard-site" / "scrapers" / "jobs_seek.json",
-            allow_cache_fallback=os.getenv("SEEK_CACHE_FALLBACK", "true").lower() in {"1", "true", "yes"},
+            max_pages=settings.seek_max_pages,
+            max_results=settings.seek_max_results,
+            pause_seconds=settings.seek_pause_seconds,
+            endpoint=settings.seek_api_endpoint,
+            allow_browser_fallback=settings.seek_browser_fallback,
+            cache_path=settings.seek_cache_path,
+            allow_cache_fallback=settings.seek_cache_fallback,
         ))
-    sources.extend([AdzunaApiSource(), RemoteOkApiSource()])
-    if not args.no_linkedin:
+    sources.extend([AdzunaApiSource(
+        app_id=settings.adzuna_app_id,
+        api_key=settings.adzuna_api_key,
+    ), RemoteOkApiSource()])
+    if not args.no_linkedin and settings.linkedin_enabled:
         sources.append(LinkedInBrowserSource())
-    generator = OpenRouterDocumentGenerator(args.source_dir, args.guidelines_dir, examples_dir=args.examples_dir)
+    generator = OpenRouterDocumentGenerator(
+        args.source_dir,
+        args.guidelines_dir,
+        model=settings.llm_model,
+        api_key=settings.openrouter_api_key,
+        examples_dir=args.examples_dir
+    )
     app = DashboardApp(profile, sources, args.data_dir, generator, DEFAULT_QUERIES)
+
     def synchronize():
         try:
             app.refresh(app.search_queries)
@@ -81,10 +87,11 @@ def main():
             synchronize()
 
     threading.Thread(target=sync_loop, daemon=True).start()
-    print("Automatic source refresh, Gmail scan, and tracker sync enabled (on launch and every 30 minutes).")
+    print(f"Job dashboard starting on http://{host}:{port}")
+    print("Automatic source refresh, Gmail scan, and tracker sync enabled.")
     if not app.jobs:
-        print("No saved jobs yet. Use Refresh in the dashboard to scrape configured queries.")
-    serve(app, port=args.port)
+        print("No saved jobs yet. Use /api/refresh to scrape configured queries.")
+    serve(app, host=host, port=port)
 
 
 if __name__ == "__main__":

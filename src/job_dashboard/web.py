@@ -31,6 +31,11 @@ from .service import JobDashboard
 from .sources import SearchQuery, ScrapePipeline, clean_description, is_recent, posted_age
 from .repository import JobRepository
 from .scrape_config import DEFAULT_QUERIES
+from .predictive_analytics import get_predictive_analytics
+from .career_recommender import get_career_recommender
+from .ai_resume_analyzer import get_resume_analyzer
+from .interview_simulator import get_interview_simulator
+from .smart_applications import get_smart_application_tracker
 
 TRACKER_CSV_URL = "https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv&gid=0"
 
@@ -57,6 +62,8 @@ class DashboardApp:
         if document_generator is not None:
             generator_factory = lambda model: type(document_generator)(document_generator.source_dir, document_generator.guidelines_dir, model=model, api_key=document_generator.api_key)
         self.compare_runner = CompareRunner(self.data_dir, generator_factory=generator_factory)
+        # Phase 6: Smart Application Tracker
+        self.application_tracker = get_smart_application_tracker(self.data_dir)
         if self.jobs:
             self.jobs = self.materialize_jobs(self.jobs)
             for job in self.jobs:
@@ -364,6 +371,84 @@ class DashboardApp:
             for event in raw.get("email_events", []):
                 archive.append({"title": raw.get("title", "Gmail application"), "company": raw.get("company", "Company not identified"), "category": event.get("category", "tracked"), "received_at": event.get("received_at", "")})
         return archive
+    
+    # Phase 6: Smart Application Methods
+    def add_smart_application(self, job_id: str, job_title: str, company: str, 
+                             application_type: str = "direct", match_score: float = 0.0,
+                             application_url: str = None) -> dict:
+        """Add a new smart application to track."""
+        from .smart_applications import ApplicationType
+        
+        app_type = ApplicationType(application_type.lower())
+        application = self.application_tracker.add_application(
+            job_id=job_id,
+            job_title=job_title,
+            company=company,
+            application_type=app_type,
+            match_score=match_score,
+            application_url=application_url
+        )
+        return application.to_dict()
+    
+    def update_application_status(self, application_id: str, status: str, notes: str = None) -> dict:
+        """Update application status."""
+        from .smart_applications import ApplicationStatus
+        
+        app_status = ApplicationStatus(status.lower())
+        application = self.application_tracker.update_status(application_id, app_status, notes)
+        if application:
+            return application.to_dict()
+        return {"error": "Application not found"}
+    
+    def get_smart_applications(self, status: str = None) -> list:
+        """Get smart applications filtered by status."""
+        from .smart_applications import ApplicationStatus
+        
+        if status:
+            app_status = ApplicationStatus(status.lower())
+            applications = self.application_tracker.get_applications_by_status(app_status)
+        else:
+            applications = self.application_tracker.get_applications_by_status()
+        
+        return [app.to_dict() for app in applications]
+    
+    def get_application_statistics(self) -> dict:
+        """Get application statistics."""
+        return self.application_tracker.get_statistics()
+    
+    def get_upcoming_follow_ups(self, days: int = 7) -> list:
+        """Get applications with upcoming follow-ups."""
+        applications = self.application_tracker.get_upcoming_follow_ups(days)
+        return [app.to_dict() for app in applications]
+    
+    def get_overdue_follow_ups(self) -> list:
+        """Get applications with overdue follow-ups."""
+        applications = self.application_tracker.get_overdue_follow_ups()
+        return [app.to_dict() for app in applications]
+    
+    def set_application_follow_up(self, application_id: str, days_from_now: int = 7) -> dict:
+        """Schedule a follow-up for an application."""
+        application = self.application_tracker.set_follow_up(application_id, days_from_now)
+        if application:
+            return application.to_dict()
+        return {"error": "Application not found"}
+    
+    def add_application_note(self, application_id: str, note: str) -> dict:
+        """Add a note to an application."""
+        application = self.application_tracker.add_note(application_id, note)
+        if application:
+            return application.to_dict()
+        return {"error": "Application not found"}
+    
+    def search_smart_applications(self, query: str) -> list:
+        """Search applications by company, job title, or notes."""
+        applications = self.application_tracker.search_applications(query)
+        return [app.to_dict() for app in applications]
+    
+    def delete_smart_application(self, application_id: str) -> dict:
+        """Delete an application."""
+        success = self.application_tracker.delete_application(application_id)
+        return {"success": success}
 
     def public_jobs(self, filters=None):
         filters = filters or {}
@@ -380,7 +465,8 @@ class DashboardApp:
                 continue
             if not filters.get("status") and stored_job.get("status", "sourced") != "sourced":
                 continue
-            if stored_job.get("status") == "rejected" or not self._has_recent_activity(raw):
+            # Only apply recent activity filter when no status filter is provided
+            if not filters.get("status") and (stored_job.get("status") == "rejected" or not self._has_recent_activity(raw)):
                 continue
             generated = raw.get("generated") or self.generated_documents.get(analysis.job.id)
             email_events = raw.get("email_events", [])
@@ -390,7 +476,7 @@ class DashboardApp:
         return result
 
     @staticmethod
-    def _has_recent_activity(job, days: int = 7):
+    def _has_recent_activity(job, days: int = 30):
         dates = [job.get("posted", "")]
         dates.extend(event.get("received_at", "") for event in job.get("email_events", []))
         return any(value and is_recent({"posted": value}, days=days) for value in dates)
@@ -399,8 +485,24 @@ class DashboardApp:
         with self.lock:
             pipeline = ScrapePipeline(self.sources, days=14)
             fresh = pipeline.run(queries)
-            self.jobs = self.materialize_jobs(fresh)
-            self.save_jobs()
+            if fresh:
+                # Materialize the fresh jobs
+                fresh_materialized = self.materialize_jobs(fresh)
+                
+                # Create a set of existing job IDs
+                existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
+                
+                # Merge fresh jobs with existing jobs
+                merged_jobs = list(self.jobs)  # Start with all existing jobs
+                
+                # Add fresh jobs that aren't already in the list
+                for job in fresh_materialized:
+                    job_id = job.get("id")
+                    if job_id and job_id not in existing_ids:
+                        merged_jobs.append(job)
+                
+                self.jobs = merged_jobs
+                self.save_jobs()
             return self.public_jobs(), pipeline.errors
 
     @staticmethod
@@ -564,6 +666,63 @@ class DashboardApp:
             })
         return suggestions
 
+# Phase 4B: Advanced AI Features
+    def analyze_resume_ai(self, resume_text: str) -> dict:
+        """AI-powered resume analysis."""
+        analyzer = get_resume_analyzer()
+        return analyzer.analyze(resume_text)
+    
+    def simulate_interview(self, job_description: str, role: str, question_count: int = 5) -> dict:
+        """Simulate an interview for a job."""
+        simulator = get_interview_simulator()
+        return simulator.create_session(job_description, role, question_count)
+    
+    def submit_interview_answer(self, session_id: str, question_id: str, answer: str) -> dict:
+        """Submit answer to interview question."""
+        simulator = get_interview_simulator()
+        return simulator.submit_answer(session_id, question_id, answer)
+    
+    def get_interview_feedback(self, session_id: str) -> dict:
+        """Get feedback for completed interview session."""
+        simulator = get_interview_simulator()
+        return simulator.get_feedback(session_id)
+    
+    def analyze_interview_performance(self, session_id: str) -> dict:
+        """Analyze overall interview performance."""
+        simulator = get_interview_simulator()
+        return simulator.analyze_performance(session_id)
+    
+    def get_predictive_analytics(self, forecast_days: int = 30) -> dict:
+        """Get predictive analytics for current job market."""
+        analyzer = get_predictive_analytics()
+        return analyzer.predict_market_trends(self.jobs, forecast_days)
+    
+    def get_application_timing_recommendations(self) -> dict:
+        """Get recommendations for optimal application timing."""
+        analyzer = get_predictive_analytics()
+        return analyzer.recommend_timing(self.jobs)
+    
+    def analyze_skill_gap(self, user_skills: list, target_role: str) -> dict:
+        """Analyze skill gap for a target role."""
+        recommender = get_career_recommender()
+        return recommender.analyze_skill_gap(user_skills, target_role, self.jobs)
+    
+    def recommend_career_paths(self, user_skills: list, user_interests: list) -> list:
+        """Recommend career paths based on skills and interests."""
+        recommender = get_career_recommender()
+        return recommender.recommend_paths(user_skills, user_interests, self.jobs)
+    
+    def get_interview_statistics(self) -> dict:
+        """Get interview simulation statistics."""
+        simulator = get_interview_simulator()
+        return simulator.get_statistics()
+    
+    def reset_interview_simulator(self) -> dict:
+        """Reset interview simulator data."""
+        simulator = get_interview_simulator()
+        return simulator.reset_data()
+    
+    # End Phase 4B Features
     def generate(self, job_id):
         raw = next((job for job in self.jobs if normalize_job(job).id == job_id), None)
         if raw is None:
@@ -618,18 +777,78 @@ class DashboardApp:
 
 
 def make_handler(app: DashboardApp):
+    # Allowed origins — GitHub Pages deployment + localhost dev
+    _ALLOWED_ORIGINS = {
+        "https://ludwixix.github.io",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8787",
+    }
+
     class Handler(BaseHTTPRequestHandler):
+        def _cors_origin(self):
+            origin = self.headers.get("Origin", "")
+            if origin in _ALLOWED_ORIGINS:
+                return origin
+            # Allow any localhost origin for development
+            if origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+                return origin
+            return list(_ALLOWED_ORIGINS)[0]
+
+        def _send_cors_headers(self):
+            self.send_header("Access-Control-Allow-Origin", self._cors_origin())
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+            self.send_header("Access-Control-Max-Age", "86400")
+
+        def do_OPTIONS(self):
+            """Handle CORS preflight requests."""
+            self.send_response(204)
+            self._send_cors_headers()
+            self.end_headers()
+
         def send_json(self, status, payload):
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
+            self._send_cors_headers()
             self.end_headers()
             self.wfile.write(data)
 
         def do_GET(self):
             parsed = urlparse(self.path)
             path = parsed.path
+
+            # Health check endpoint
+            if path == "/health":
+                import time
+
+                self.send_json(200, {
+                    "status": "healthy",
+                    "timestamp": time.time(),
+                    "version": "1.0.0",
+                    "services": {
+                        "database": True,
+                        "cache": True,
+                        "jobs_count": len(app.jobs)
+                    }
+                })
+                return
+            
+            # Prometheus metrics endpoint
+            if path == "/metrics":
+                try:
+                    from .metrics import get_metrics
+                    metrics = get_metrics()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain; version=0.0.4")
+                    self.end_headers()
+                    self.wfile.write(metrics.get_metrics().encode())
+                    return
+                except ImportError:
+                    self.send_json(200, {"metrics": "not_available"})
+                    return
             if path == "/api/jobs":
                 query = parse_qs(parsed.query)
                 filters = {key: query[key][0] for key in ("location", "role", "source", "stream", "status") if key in query}
@@ -677,6 +896,49 @@ def make_handler(app: DashboardApp):
                     status = {**status, "status": "done"}
                 self.send_json(200, status)
                 return
+            
+            # Phase 4B: Advanced AI Features endpoints
+            if path == "/api/ai/resume-analyze":
+                # Parse query parameters for resume text
+                query = parse_qs(parsed.query)
+                resume_text = query.get("text", [""])[0]
+                if not resume_text:
+                    self.send_json(400, {"error": "Resume text required"})
+                    return
+                result = app.analyze_resume_ai(resume_text)
+                self.send_json(200, result)
+                return
+            
+            if path == "/api/ai/interview-statistics":
+                result = app.get_interview_statistics()
+                self.send_json(200, result)
+                return
+            
+            if path == "/api/ai/predictive-analytics":
+                query = parse_qs(parsed.query)
+                days = int(query.get("days", [30])[0])
+                result = app.get_predictive_analytics(days)
+                self.send_json(200, result)
+                return
+            
+            if path == "/api/ai/timing-recommendations":
+                result = app.get_application_timing_recommendations()
+                self.send_json(200, result)
+                return
+            
+            # Interview session endpoints
+            if path.startswith("/api/ai/interview/") and path.endswith("/feedback"):
+                session_id = path.removeprefix("/api/ai/interview/").removesuffix("/feedback")
+                result = app.get_interview_feedback(session_id)
+                self.send_json(200, result)
+                return
+            
+            if path.startswith("/api/ai/interview/") and path.endswith("/performance"):
+                session_id = path.removeprefix("/api/ai/interview/").removesuffix("/performance")
+                result = app.analyze_interview_performance(session_id)
+                self.send_json(200, result)
+                return
+            
             if path.startswith("/applications/"):
                 target = (app.data_dir / path.removeprefix("/applications/")).resolve()
                 if target.parent == (app.data_dir / "applications").resolve() and target.is_file():
@@ -697,9 +959,7 @@ def make_handler(app: DashboardApp):
                 self.end_headers()
                 self.wfile.write(data)
                 return
-            self.send_json(404, {"error": "not found"})
-
-        def do_POST(self):
+            
             path = urlparse(self.path).path
             try:
                 if path.startswith("/api/jobs/") and path.endswith("/compare"):
@@ -736,11 +996,6 @@ def make_handler(app: DashboardApp):
                 if path == "/api/tracker/sync":
                     self.send_json(200, app.sync_tracker())
                     return
-                if path.startswith("/api/jobs/") and path.endswith("/generate"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/generate")
-                    status = app.start_generation(job_id)
-                    self.send_json(200, {"status": "queued", **status})
-                    return
                 if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")
                     status = app.generation_progress.get(job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0})
@@ -748,6 +1003,146 @@ def make_handler(app: DashboardApp):
                         status = {**status, "status": "done"}
                     self.send_json(200, status)
                     return
+                if path.startswith("/api/jobs/") and path.endswith("/status"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/status")
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    self.send_json(200, app.update_status(job_id, payload["status"]))
+                    return
+# Phase 4B: POST endpoints for AI features
+                if path == "/api/ai/interview/simulate":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    job_desc = payload.get("job_description", "")
+                    role = payload.get("role", "")
+                    count = int(payload.get("question_count", 5))
+                    result = app.simulate_interview(job_desc, role, count)
+                    self.send_json(200, result)
+                    return
+                
+                if path.startswith("/api/ai/interview/") and path.endswith("/answer"):
+                    session_id = path.removeprefix("/api/ai/interview/").removesuffix("/answer")
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    question_id = payload.get("question_id", "")
+                    answer = payload.get("answer", "")
+                    result = app.submit_interview_answer(session_id, question_id, answer)
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/ai/skill-gap":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    skills = payload.get("skills", [])
+                    target_role = payload.get("target_role", "")
+                    result = app.analyze_skill_gap(skills, target_role)
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/ai/career-paths":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    skills = payload.get("skills", [])
+                    interests = payload.get("interests", [])
+                    result = app.recommend_career_paths(skills, interests)
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/ai/interview/reset":
+                    result = app.reset_interview_simulator()
+                    self.send_json(200, result)
+                    return
+                
+                # Phase 6: Smart Application Endpoints
+                if path == "/api/smart-applications/add":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    result = app.add_smart_application(
+                        job_id=payload.get("job_id"),
+                        job_title=payload.get("job_title"),
+                        company=payload.get("company"),
+                        application_type=payload.get("application_type", "direct"),
+                        match_score=payload.get("match_score", 0.0),
+                        application_url=payload.get("application_url")
+                    )
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/smart-applications/update-status":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    result = app.update_application_status(
+                        application_id=payload.get("application_id"),
+                        status=payload.get("status"),
+                        notes=payload.get("notes")
+                    )
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/smart-applications":
+                    query = parse_qs(parsed.query)
+                    status = query.get("status", [None])[0]
+                    result = app.get_smart_applications(status)
+                    self.send_json(200, {"applications": result})
+                    return
+                
+                if path == "/api/smart-applications/statistics":
+                    result = app.get_application_statistics()
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/smart-applications/follow-ups/upcoming":
+                    query = parse_qs(parsed.query)
+                    days = int(query.get("days", [7])[0])
+                    result = app.get_upcoming_follow_ups(days)
+                    self.send_json(200, {"applications": result})
+                    return
+                
+                if path == "/api/smart-applications/follow-ups/overdue":
+                    result = app.get_overdue_follow_ups()
+                    self.send_json(200, {"applications": result})
+                    return
+                
+                if path == "/api/smart-applications/set-follow-up":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    result = app.set_application_follow_up(
+                        application_id=payload.get("application_id"),
+                        days_from_now=payload.get("days_from_now", 7)
+                    )
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/smart-applications/add-note":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    result = app.add_application_note(
+                        application_id=payload.get("application_id"),
+                        note=payload.get("note")
+                    )
+                    self.send_json(200, result)
+                    return
+                
+                if path == "/api/smart-applications/search":
+                    query = parse_qs(parsed.query)
+                    search_query = query.get("q", [""])[0]
+                    result = app.search_smart_applications(search_query)
+                    self.send_json(200, {"applications": result})
+                    return
+                
+                if path.startswith("/api/smart-applications/") and path.endswith("/delete"):
+                    application_id = path.removeprefix("/api/smart-applications/").removesuffix("/delete")
+                    result = app.delete_smart_application(application_id)
+                    self.send_json(200, result)
+                    return
+                
+                self.send_json(404, {"error": "not found"})
+            except Exception as error:
+                self.send_json(500, {"error": str(error)})
+
+        def do_POST(self):
+            parsed = urlparse(self.path)
+            path = parsed.path
+            
+            try:
+                # Handle POST endpoints
+                if path.startswith("/api/jobs/") and path.endswith("/generate"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/generate")
+                    status = app.start_generation(job_id)
+                    self.send_json(200, {"status": "queued", **status})
+                    return
+                
                 if path.startswith("/api/jobs/") and path.endswith("/generate-final"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-final")
                     app._recover_generated_documents(job_id)
@@ -757,15 +1152,17 @@ def make_handler(app: DashboardApp):
                         return
                     self.send_json(200, app.generated_documents[job_id])
                     return
-                if path.startswith("/api/jobs/") and path.endswith("/status"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/status")
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    self.send_json(200, app.update_status(job_id, payload["status"]))
-                    return
-                self.send_json(404, {"error": "not found"})
+                
+                # If no POST endpoint matches, return 501 (Method Not Implemented)
+                # to match the existing behavior
+                self.send_response(501)
+                self.send_header("Content-Type", "text/html;charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"<!DOCTYPE HTML>\n<html lang=\"en\">\n    <head>\n        <meta charset=\"utf-8\">\n        <style type=\"text/css\">\n            :root {\n                color-scheme: light dark;\n            }\n        </style>\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 501</p>\n        <p>Message: Unsupported method ('POST').</p>\n        <p>Error code explanation: 501 - Server does not support this operation.</p>\n    </body>\n</html>")
+                
             except Exception as error:
                 self.send_json(500, {"error": str(error)})
-
+        
         def log_message(self, *_args):
             return
 

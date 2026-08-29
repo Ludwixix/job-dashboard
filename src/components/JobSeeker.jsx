@@ -721,6 +721,11 @@ export const JobSeeker = ({
                 {paginatedJobs.map(job => {
                   const isTopFit = (job.score || 0) >= 90;
                   const hasCustomDocs = Boolean(job.hasCustomDocs && job.resumeText);
+                  const isGeneratingThisJob = Boolean(
+                    asyncGeneratingIds?.has(job.id) || 
+                    asyncGeneratingIds?.has(String(job.id)) || 
+                    asyncGeneratingIds?.has(`${job.company}_${job.title}`)
+                  );
                   const matchedSkills = job.audit?.matched_terms || job.tags || [];
 
                   return (
@@ -730,22 +735,31 @@ export const JobSeeker = ({
                       className={`rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between space-y-4 group cursor-pointer relative overflow-hidden card-hover-lift ${
                         hasCustomDocs
                           ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 border-2 border-emerald-500 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-500/30'
+                          : isGeneratingThisJob
+                          ? 'bg-gradient-to-br from-amber-50/90 via-white to-orange-50/50 border-2 border-amber-500 shadow-xl ring-4 ring-amber-400/40 animate-pulse'
                           : isTopFit
                           ? 'bg-gradient-to-br from-emerald-50/80 via-white to-indigo-50/50 border-2 border-emerald-500/80 shadow-md shadow-emerald-500/10 ring-2 ring-emerald-500/20'
                           : 'bg-white border border-slate-200/90 shadow-2xs hover:border-indigo-400 hover:shadow-md'
                       }`}
                     >
-                      {/* Top Gradient Line (Highlighted for Top Fits & Custom Docs) */}
+                      {/* Top Gradient Line */}
                       <div className={`absolute top-0 left-0 right-0 h-1.5 ${
                         hasCustomDocs
                           ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500'
+                          : isGeneratingThisJob
+                          ? 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600 animate-pulse'
                           : isTopFit
                           ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-600'
                           : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-400'
                       }`} />
 
-                      {/* Top Standout Badge for Custom Docs or Best Ones */}
-                      {hasCustomDocs ? (
+                      {/* Top Standout Badge */}
+                      {isGeneratingThisJob ? (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider w-max shadow-sm animate-pulse">
+                          <RefreshCw size={12} className="animate-spin text-slate-950" />
+                          ⚡ AI SYNTHESIZING ASSETS...
+                        </div>
+                      ) : hasCustomDocs ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider w-max shadow-2xs">
                           <CheckCircle2 size={12} className="text-slate-950" />
                           ✨ TAILORED ASSETS READY (PDFs)
@@ -895,13 +909,14 @@ export const JobSeeker = ({
                             <Sparkles size={13} className="text-emerald-200" /> 
                             <span>STUDIO (READY)</span>
                           </button>
-                        ) : asyncGeneratingIds?.has(job.id) ? (
+                        ) : isGeneratingThisJob ? (
                           <button
                             disabled
-                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center gap-1.5 shadow-inner cursor-wait animate-pulse"
+                            className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-2 shadow-inner cursor-not-allowed font-mono animate-pulse"
+                            title="Application synthesis in progress..."
                           >
-                            <RefreshCw size={13} className="animate-spin text-amber-400" />
-                            <span>CREATING ASYNC…</span>
+                            <RefreshCw size={13} className="animate-spin text-slate-950" />
+                            <span>SYNTHESIZING (0–25s)…</span>
                           </button>
                         ) : (
                           <button

@@ -14,6 +14,8 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   const [copiedSubject, setCopiedSubject] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isAutoApplying, setIsAutoApplying] = useState(false);
+  const [pipelineStage, setPipelineStage] = useState(1);
+  const [pipelineMsg, setPipelineMsg] = useState('');
   const [autoApplyReceipt, setAutoApplyReceipt] = useState(null);
   const [activeReceiptTab, setActiveReceiptTab] = useState('fields'); // 'fields', 'resume', 'cover'
 
@@ -431,16 +433,53 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                   Generates tailored PDF Resume & Cover Letter aligned to candidate profile, populates contact/work-rights/salary fields, and dispatches/stages your application automatically.
                 </p>
 
+                {isAutoApplying && (
+                  <div className="p-4 rounded-xl bg-slate-900 border border-emerald-500/60 text-slate-200 text-xs font-mono space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-emerald-400 font-bold text-xs border-b border-slate-800 pb-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <Zap size={14} className="animate-spin text-emerald-400" />
+                        APPLICATION PIPELINE ACTIVE
+                      </span>
+                      <span className="text-[10px] text-slate-400">STAGE {pipelineStage} / 3</span>
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className={`flex items-center gap-2 ${pipelineStage >= 1 ? 'text-emerald-300 font-bold' : 'text-slate-500'}`}>
+                        <span>{pipelineStage > 1 ? '✓' : '⚡'}</span>
+                        <span>1. Extracting candidate profile & ATS job specifications</span>
+                      </div>
+                      <div className={`flex items-center gap-2 ${pipelineStage >= 2 ? 'text-emerald-300 font-bold' : 'text-slate-500'}`}>
+                        <span>{pipelineStage > 2 ? '✓' : pipelineStage === 2 ? '⚡' : '○'}</span>
+                        <span>2. Synthesizing tailored ATS Resume & Executive Cover Letter</span>
+                      </div>
+                      <div className={`flex items-center gap-2 ${pipelineStage >= 3 ? 'text-emerald-300 font-bold' : 'text-slate-500'}`}>
+                        <span>{pipelineStage === 3 ? '⚡' : '○'}</span>
+                        <span>3. Rendering A4 PDFs and syncing to Google Drive / Sheets</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={async () => {
                     setIsAutoApplying(true);
+                    setPipelineStage(1);
                     setAutoApplyReceipt(null);
+
+                    setTimeout(() => setPipelineStage(2), 600);
+                    setTimeout(() => setPipelineStage(3), 1800);
+
                     try {
                       const data = await executeClientSideAutoApply(job);
                       if (data && data.success) {
                         const updatedJob = {
                           ...job,
                           status: 'Applied / Confirmation Received',
+                          hasCustomDocs: true,
+                          resumeText: data.pipeline_result?.resume_text || '',
+                          coverLetterText: data.pipeline_result?.cover_text || '',
+                          docsModel: 'Automated Application Pipeline',
+                          docsGeneratedAt: new Date().toISOString(),
                           date: new Date().toISOString().split('T')[0]
                         };
                         if (onJobStatusUpdate) {
@@ -454,13 +493,17 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                       alert(`Auto-apply pipeline failed: ${e.message}`);
                     } finally {
                       setIsAutoApplying(false);
+                      setPipelineStage(1);
                     }
                   }}
                   disabled={isAutoApplying}
                   className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isAutoApplying ? (
-                    <span>DISPATCHING AUTOMATED PIPELINE & GENERATING ASSETS...</span>
+                    <span className="flex items-center gap-2">
+                      <Zap size={14} className="animate-spin text-emerald-200" />
+                      SYNTHESIZING & DISPATCHING APPLICATION PIPELINE...
+                    </span>
                   ) : (
                     <span>🚀 EXECUTE AUTOMATED APPLICATION PIPELINE</span>
                   )}

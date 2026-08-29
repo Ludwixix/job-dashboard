@@ -178,8 +178,9 @@ export const JobSeeker = ({
   const [workModeFilter, setWorkModeFilter] = useState('All');
   const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
   const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
-  const [sortBy, setSortBy] = useState('date'); // DEFAULTS TO MOST RECENT BY USER DIRECTIVE
+  const [sortBy, setSortBy] = useState('best_and_newest'); // DEFAULT: BEST MATCHES & MOST RECENT
   const [showSidebar, setShowSidebar] = useState(true);
+
 
   // Interactive Pagination & Batch Loading State
   const [currentPage, setCurrentPage] = useState(1);
@@ -365,10 +366,27 @@ export const JobSeeker = ({
       return matchesSearch && matchesSource && matchesStream && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
     });
 
-    // Sorting logic (Defaults to Most Recent Date)
+    // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
     return filtered.sort((a, b) => {
-      if (sortBy === 'date') {
-        return (b.date || '').localeCompare(a.date || '');
+      if (sortBy === 'best_and_newest' || !sortBy) {
+        const scoreA = a.score || 0;
+        const scoreB = b.score || 0;
+        const tierA = scoreA >= 80 ? 3 : (scoreA >= 65 ? 2 : 1);
+        const tierB = scoreB >= 80 ? 3 : (scoreB >= 65 ? 2 : 1);
+        
+        if (tierA !== tierB) {
+          return tierB - tierA; // Higher match tier first
+        }
+        
+        // Within the same match tier, sort newest date first
+        const dateA = a.date || a.posted || '';
+        const dateB = b.date || b.posted || '';
+        const dateComp = dateB.localeCompare(dateA);
+        if (dateComp !== 0) return dateComp;
+        
+        return scoreB - scoreA;
+      } else if (sortBy === 'date') {
+        return (b.date || b.posted || '').localeCompare(a.date || a.posted || '');
       } else if (sortBy === 'score') {
         return (b.score || 0) - (a.score || 0);
       } else if (sortBy === 'company') {
@@ -377,6 +395,7 @@ export const JobSeeker = ({
       return 0;
     });
   }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile]);
+
 
   // Paginated Sliced Jobs
   const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
@@ -815,7 +834,23 @@ export const JobSeeker = ({
                   <option value="onsite">ONSITE</option>
                 </select>
               </div>
+
+              {/* Intelligent Sort Selector */}
+              <div className="flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-200 rounded-xl px-2.5 py-2 text-xs font-bold">
+                <ArrowUpDown size={13} className="text-indigo-600 shrink-0" />
+                <select
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-indigo-950 w-full truncate cursor-pointer"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="best_and_newest">⭐ BEST & MOST RECENT</option>
+                  <option value="date">📅 MOST RECENT DATE</option>
+                  <option value="score">🎯 HIGHEST ATS FIT SCORE</option>
+                  <option value="company">🏢 COMPANY (A-Z)</option>
+                </select>
+              </div>
             </div>
+
 
             {/* Active Filter & Page Size Selector Bar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-mono gap-2 pt-1 text-slate-600 border-t border-slate-100">

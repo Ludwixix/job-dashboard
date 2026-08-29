@@ -6,7 +6,7 @@ import {
   DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
-  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, ShoppingBag, Server, Flame, Building2, Trash2, Download
+  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -105,7 +105,15 @@ const getJobSubStream = (job) => {
   return 'Core IT & Systems';
 };
 
-export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 3183', onRejectJob, onUnrejectJob }) => {
+export const JobSeeker = ({ 
+  jobs, 
+  onSelectJob, 
+  baseLocation = 'BALACLAVA VIC 3183', 
+  onRejectJob, 
+  onUnrejectJob,
+  onDispatchAsyncApplication,
+  asyncGeneratingIds = new Set()
+}) => {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [activeStreamTab, setActiveStreamTab] = useState('All');
@@ -879,19 +887,39 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
 
                       {/* Action Buttons */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
-                          className={`flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1 cursor-pointer ${
-                            hasCustomDocs
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-2xs'
-                              : isTopFit
-                              ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-2xs'
-                              : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
-                          }`}
-                        >
-                          <Sparkles size={13} className={hasCustomDocs ? "text-emerald-200" : isTopFit ? "text-indigo-200 animate-spin-slow" : "text-indigo-600"} /> 
-                          {hasCustomDocs ? 'STUDIO (READY)' : 'PACK'}
-                        </button>
+                        {hasCustomDocs ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
+                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1 cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-2xs"
+                          >
+                            <Sparkles size={13} className="text-emerald-200" /> 
+                            <span>STUDIO (READY)</span>
+                          </button>
+                        ) : asyncGeneratingIds?.has(job.id) ? (
+                          <button
+                            disabled
+                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center gap-1.5 shadow-inner cursor-wait animate-pulse"
+                          >
+                            <RefreshCw size={13} className="animate-spin text-amber-400" />
+                            <span>CREATING ASYNC…</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onDispatchAsyncApplication) {
+                                onDispatchAsyncApplication(job);
+                              } else {
+                                setSelectedForGenerator(job);
+                              }
+                            }}
+                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-500 shadow-md hover:shadow-indigo-500/20 tracking-wide uppercase"
+                            title="Dispatch 1-Click Background Application Generation & Google Drive Sync"
+                          >
+                            <Zap size={13} className="text-amber-300" />
+                            <span>CREATE APPLICATION</span>
+                          </button>
+                        )}
 
                         <button
                           onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}

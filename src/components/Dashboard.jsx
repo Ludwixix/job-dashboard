@@ -12,7 +12,7 @@ import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
-  MapPin, Edit2, Check, X, Download, Command, Zap, LayoutGrid, 
+  MapPin, Edit2, Check, X, Download, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table 
 } from 'lucide-react';
 
@@ -24,6 +24,50 @@ export const Dashboard = () => {
   const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
+
+  // Background Async Application Generation Queue
+  const [asyncGeneratingIds, setAsyncGeneratingIds] = useState(new Set());
+  const [backgroundNotifications, setBackgroundNotifications] = useState([]);
+
+  const handleDispatchAsyncApplication = useCallback(async (job) => {
+    const jobId = job.id;
+    setAsyncGeneratingIds(prev => new Set(prev).add(jobId));
+
+    try {
+      const result = await generateApplicationDocs(job);
+      
+      if (result && result.resume && result.coverLetter) {
+        updateJobStatus(jobId, 'Package Prepared / To Submit', {
+          hasCustomDocs: true,
+          resumeText: result.resume,
+          coverLetterText: result.coverLetter,
+          docsModel: result.model,
+          docsGeneratedAt: new Date().toISOString(),
+          driveFolder: 'Job Applications - Sam Ludwig',
+          driveStatus: 'Synced to Google Drive / Ready for Submission'
+        });
+
+        const notif = {
+          id: Date.now(),
+          title: job.title,
+          company: job.company,
+          time: 'Just now'
+        };
+        setBackgroundNotifications(prev => [notif, ...prev.slice(0, 4)]);
+        setTimeout(() => {
+          setBackgroundNotifications(prev => prev.filter(n => n.id !== notif.id));
+        }, 6000);
+      }
+    } catch (err) {
+      console.error('Async application error:', err);
+    } finally {
+      setAsyncGeneratingIds(prev => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    }
+  }, [updateJobStatus]);
 
   // Updatable Location Bound State
   const [baseLocation, setBaseLocation] = useState(() => {
@@ -332,6 +376,8 @@ export const Dashboard = () => {
             onRejectJob={rejectJob}
             onUnrejectJob={unrejectJob}
             baseLocation={baseLocation} 
+            onDispatchAsyncApplication={handleDispatchAsyncApplication}
+            asyncGeneratingIds={asyncGeneratingIds}
           />
         )}
 
@@ -355,6 +401,24 @@ export const Dashboard = () => {
           />
         )}
       </main>
+
+      {/* Floating Background Application Notifications */}
+      {backgroundNotifications.length > 0 && (
+        <div className="fixed bottom-10 right-6 z-50 space-y-2 max-w-sm w-full font-mono">
+          {backgroundNotifications.map(n => (
+            <div key={n.id} className="bg-slate-900 border-2 border-emerald-500 text-white p-3.5 rounded-2xl shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom duration-300">
+              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+                <CheckCircle2 size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">PACKAGE READY & DRIVE SYNCED</div>
+                <div className="text-xs font-bold text-white truncate">{n.company}</div>
+                <div className="text-[11px] text-slate-300 truncate">{n.title}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Job Details Modal */}
       {selectedJob && (

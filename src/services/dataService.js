@@ -335,7 +335,7 @@ const fetchStoredScrapedJobs = async () => {
       const res = await fetch(`${apiBase}/api/scraped-jobs`, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.jobs)) {
+        if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
           return data.jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
         }
       }
@@ -343,18 +343,21 @@ const fetchStoredScrapedJobs = async () => {
   }
 
   // Static fallback: bundled jobs_combined.json copied to public/ at build time
-  try {
-    const base = import.meta.env.BASE_URL || '/';
-    const res = await fetch(`${base}jobs_combined.json`);
-    if (res.ok) {
-      const data = await res.json();
-      const jobs = Array.isArray(data) ? data : (data.jobs || []);
-      return jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
-    }
-  } catch (err) {
-    console.warn('Static jobs fallback also unavailable:', err);
+  const fallbackPaths = ['./jobs_combined.json', 'jobs_combined.json', `${import.meta.env.BASE_URL || '/'}jobs_combined.json`];
+  for (const path of fallbackPaths) {
+    try {
+      const res = await fetch(path);
+      if (res.ok) {
+        const data = await res.json();
+        const jobs = Array.isArray(data) ? data : (data.jobs || []);
+        if (jobs.length > 0) {
+          return jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
+        }
+      }
+    } catch {}
   }
 
   return [];
 };
+
 

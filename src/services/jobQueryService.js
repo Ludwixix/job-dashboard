@@ -13,13 +13,12 @@
 //   gcloud run services describe job-dashboard --region australia-southeast1 --format "value(status.url)"
 // ---------------------------------------------------------------------------
 const CLOUD_RUN_URL = import.meta.env.VITE_SCRAPER_API_URL || 'https://job-dashboard-6xrdvjlrcq-ts.a.run.app';
-const isLocalDev = typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+export const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 export const SCRAPER_BASE_URL = isLocalDev ? '' : CLOUD_RUN_URL;
 
 
 
-// ---------------------------------------------------------------------------
+
 // Industry → related job titles map
 // Keep titles concise — passed directly to job-board search APIs
 // ---------------------------------------------------------------------------

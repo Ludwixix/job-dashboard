@@ -8,6 +8,8 @@ import {
 import { loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPersona } from '../services/authService';
 import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES } from '../services/profileService';
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
+import { loginWithBrowserPasskey, isPasskeySupported, storeBrowserCredentials } from '../services/passkeyService';
+import { Key } from 'lucide-react';
 
 const INDUSTRY_OPTIONS = [
   { id: 'Healthcare & Medical', name: 'Healthcare & Medical', icon: HeartPulse, color: 'from-rose-500/20 to-pink-500/10 border-rose-500/40 text-rose-300', defaultTitles: ['Clinical Nurse Specialist', 'Associate Nurse Unit Manager', 'Registered Nurse', 'Physiotherapist'] },
@@ -74,8 +76,10 @@ export const OnboardingFlow = ({ onComplete }) => {
       let sessionUser;
       if (authMode === 'signup') {
         sessionUser = await registerWithEmail(authName, authEmail, authPassword);
+        storeBrowserCredentials(authEmail, authPassword, authName);
       } else {
         sessionUser = await loginWithEmail(authEmail, authPassword);
+        storeBrowserCredentials(authEmail, authPassword, sessionUser.name);
       }
 
       setProfileData(prev => ({
@@ -93,6 +97,19 @@ export const OnboardingFlow = ({ onComplete }) => {
       setStep(2);
     } catch (err) {
       setAuthError(err.message || 'Authentication failed.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    setAuthError('');
+    setAuthLoading(true);
+    try {
+      const user = await loginWithBrowserPasskey();
+      if (onComplete) onComplete(user);
+    } catch (err) {
+      setAuthError(err.message || 'Passkey authentication was not completed.');
     } finally {
       setAuthLoading(false);
     }
@@ -308,6 +325,18 @@ export const OnboardingFlow = ({ onComplete }) => {
                 >
                   {authLoading ? <RefreshCw size={16} className="animate-spin text-indigo-200" /> : <ArrowRight size={16} />}
                   <span>{authMode === 'signup' ? 'CREATE ACCOUNT & CONTINUE' : 'SIGN IN & BUILD PROFILE'}</span>
+                </button>
+
+                {/* Passkey / Stored Browser Creds Button */}
+                <button
+                  type="button"
+                  onClick={handlePasskeyLogin}
+                  disabled={authLoading}
+                  className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-emerald-500/50 text-emerald-300 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                  title="Authenticate using stored browser password manager, Touch ID, Face ID, Windows Hello, or Passkey"
+                >
+                  <Key size={14} className="text-emerald-400" />
+                  <span>🔑 SIGN IN WITH PASSKEY / STORED BROWSER CREDS</span>
                 </button>
 
                 <div className="text-center pt-1 text-slate-400 text-xs">

@@ -8,6 +8,7 @@ import {
   requestGoogleAuthToken, getGoogleClientId, setGoogleClientId,
   isValidGoogleClientId, simulateGoogleWorkspaceAuth 
 } from '../services/googleAuthService';
+import { loginWithBrowserPasskey } from '../services/passkeyService';
 
 export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
   const [user, setUser] = useState(() => getAuthenticatedUser());
@@ -18,6 +19,22 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
   const [showSetupGuide, setShowSetupGuide] = useState(false);
 
   if (!isOpen) return null;
+
+  const handlePasskeyAuth = async () => {
+    setIsConnecting(true);
+    setErrorMsg('');
+    try {
+      const passkeyUser = await loginWithBrowserPasskey();
+      const authUser = simulateGoogleWorkspaceAuth(passkeyUser);
+      setUser(authUser);
+      setSuccessMsg(`Authenticated via Browser Passkey as ${passkeyUser.name}!`);
+      if (onAuthChange) onAuthChange(authUser);
+    } catch (err) {
+      setErrorMsg(err.message || 'Passkey authentication failed.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const handleInstantConnect = () => {
     try {
@@ -220,12 +237,23 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <button
                 type="button"
+                onClick={handlePasskeyAuth}
+                disabled={isConnecting}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/50 text-emerald-300 font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                title="Sign in with browser passkey or saved credentials"
+              >
+                <Key size={14} className="text-emerald-400" />
+                <span>🔑 PASSKEY / BROWSER SIGN-IN</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleInstantConnect}
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 title="Connect instant cloud sync without Google Cloud project setup"
               >
                 <Zap size={14} className="text-amber-300" />
-                <span>⚡ 1-CLICK INSTANT CONNECT</span>
+                <span>⚡ INSTANT SYNC</span>
               </button>
 
               {clientIdInput && (

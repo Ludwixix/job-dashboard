@@ -8,7 +8,8 @@ set -e
 PROJECT_ID="${1:-$(gcloud config get-value project 2>/dev/null)}"
 REGION="australia-southeast1"
 SERVICE_NAME="job-dashboard"
-IMAGE="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
+REPO_NAME="cloud-run-source-deploy"
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}"
 
 if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
     echo "❌ No GCP project set. Run: gcloud config set project YOUR_PROJECT_ID"
@@ -21,12 +22,23 @@ echo "   Region  : ${REGION}"
 echo "   Image   : ${IMAGE}"
 echo ""
 
-# Enable required APIs
-echo "▶ Enabling Cloud Run & Container Registry APIs…"
-gcloud services enable run.googleapis.com containerregistry.googleapis.com cloudbuild.googleapis.com \
+# Enable required APIs (Updated for Artifact Registry)
+echo "▶ Enabling Cloud Run, Artifact Registry & Cloud Build APIs…"
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com \
     --project="${PROJECT_ID}" --quiet
 
-# Build & push image via Cloud Build (no local Docker needed)
+# Ensure Artifact Registry repository exists
+echo "▶ Checking/Creating Artifact Registry repository…"
+if ! gcloud artifacts repositories describe "${REPO_NAME}" --location="${REGION}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
+    gcloud artifacts repositories create "${REPO_NAME}" \
+        --repository-format=docker \
+        --location="${REGION}" \
+        --project="${PROJECT_ID}" \
+        --description="Docker repository for Cloud Run deployments" \
+        --quiet
+fi
+
+# Build & push image via Cloud Build
 echo "▶ Building container image via Cloud Build…"
 gcloud builds submit \
     --tag "${IMAGE}" \
@@ -37,7 +49,6 @@ gcloud builds submit \
 echo "▶ Deploying to Cloud Run (${REGION})…"
 gcloud run deploy "${SERVICE_NAME}" \
     --image "${IMAGE}" \
-    --platform managed \
     --region "${REGION}" \
     --allow-unauthenticated \
     --timeout 300 \
@@ -47,8 +58,10 @@ gcloud run deploy "${SERVICE_NAME}" \
     --min-instances 0 \
     --max-instances 5 \
     --port 8080 \
+    --set-env-vars="HOST=0.0.0.0" \
     --project="${PROJECT_ID}" \
     --quiet
+
 
 # Get service URL
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \

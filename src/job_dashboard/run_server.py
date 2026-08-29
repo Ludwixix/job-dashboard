@@ -28,9 +28,10 @@ def main():
     args = parser.parse_args()
 
     # Cloud Run injects $PORT; fall back to arg, then settings, then 8080
-    port = int(os.environ.get("PORT", args.port or settings.port or 8080))
+    port = int(os.environ.get("PORT") or args.port or settings.port or 8080)
     # Cloud Run requires binding to 0.0.0.0
-    host = os.environ.get("HOST", args.host or settings.host or "0.0.0.0")
+    host = os.environ.get("HOST") or args.host or "0.0.0.0"
+
 
     # Profile is optional on Cloud Run — use empty profile if not found
     profile_path = args.profile or (PROJECT_ROOT.parent / "job-dashboard-site" / "job_profile.json")

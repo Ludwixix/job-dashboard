@@ -5,11 +5,14 @@ FROM python:3.11-slim
 
 # Cloud Run injects PORT env var; default 8080
 ENV PORT=8080 \
+    HOST=0.0.0.0 \
+    PYTHONPATH=/app/src \
     PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
+
 
 # System deps needed for playwright + jobspy
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -46,4 +49,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 EXPOSE ${PORT}
 
 # Cloud Run: bind to 0.0.0.0 and read $PORT from environment
-CMD ["sh", "-c", "python -m job_dashboard.run_server --port ${PORT}"]
+CMD ["sh", "-c", "python -m job_dashboard.run_server --host 0.0.0.0 --port ${PORT}"]
+

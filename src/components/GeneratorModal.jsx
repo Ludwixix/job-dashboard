@@ -1,9 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   X, Sparkles, FileText, Check, Copy, ExternalLink, FileUser,
-  Download, Zap, ShieldAlert, BarChart3, RefreshCw, AlertCircle, Clock
+  Zap, BarChart3, RefreshCw, AlertCircle, Clock,
+  ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, Wand2
 } from 'lucide-react';
-import { generateApplicationDocs, extractJobKeywords, calculateAtsScore } from '../services/generationService';
+import { 
+  generateApplicationDocs, extractJobKeywords, calculateAtsScore, 
+  runDocumentQualityAudit 
+} from '../services/generationService';
 
 const GEMINI_GEM_URL = "https://gemini.google.com/gem/1Bxx-IAsb1aBD0T6rxC6aJB1frzm4Yphz?usp=drive_link";
 
@@ -48,7 +52,6 @@ Now generate: (1) a tailored resume, then the separator ===COVER_LETTER===, then
 const printDoc = (content, filename) => {
   const win = window.open('', '_blank');
   if (!win) return;
-  // Convert markdown-style headers to HTML for clean print
   const html = content
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
@@ -75,20 +78,25 @@ const printDoc = (content, filename) => {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export const GeneratorModal = ({ job, onClose }) => {
-  const [activeTab, setActiveTab]           = useState('overview');
-  const [resumeText, setResumeText]         = useState('');
+  const [activeTab, setActiveTab]             = useState('overview');
+  const [resumeText, setResumeText]           = useState('');
   const [coverLetterText, setCoverLetterText] = useState('');
-  const [isGenerating, setIsGenerating]     = useState(false);
-  const [genProgress, setGenProgress]       = useState('');
-  const [genError, setGenError]             = useState('');
-  const [genMeta, setGenMeta]               = useState(null);   // { model, elapsedMs }
-  const [copiedPrompt, setCopiedPrompt]     = useState(false);
-  const [copiedText, setCopiedText]         = useState(false);
+  const [isGenerating, setIsGenerating]       = useState(false);
+  const [genProgress, setGenProgress]         = useState('');
+  const [genError, setGenError]               = useState('');
+  const [genMeta, setGenMeta]                 = useState(null);
+  const [copiedPrompt, setCopiedPrompt]       = useState(false);
+  const [copiedText, setCopiedText]           = useState(false);
 
   // Pre-compute ATS analysis from job description
   const jobDescription = job.notes || job.description || '';
   const matchedKeywords = extractJobKeywords(jobDescription);
   const atsScore = calculateAtsScore(jobDescription);
+
+  // Live adversarial quality audit calculation
+  const qualityAudit = useMemo(() => {
+    return runDocumentQualityAudit(job, resumeText, coverLetterText);
+  }, [job, resumeText, coverLetterText]);
 
   // ── AI Generation ──────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async (docType = 'both') => {
@@ -97,46 +105,24 @@ export const GeneratorModal = ({ job, onClose }) => {
     setGenProgress('Connecting to AI engine…');
 
     try {
-      const progressSteps = [
-        'Analysing job requirements…',
-        'Extracting ATS keywords…',
-        'Tailoring professional summary…',
-        'Crafting experience bullets…',
-        'Writing cover letter…',
-        'Finalising output…',
-      ];
-      let stepIdx = 0;
-      const progressTimer = setInterval(() => {
-        stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
-        setGenProgress(progressSteps[stepIdx]);
-      }, 4500);
-
       const result = await generateApplicationDocs(job, setGenProgress);
 
-      clearInterval(progressTimer);
-
       if (!result) {
-        // Static host — no API available
-        setGenError('AI generation requires the local dev server. Use the Gemini Gem button to generate on this device, or run the dashboard locally with "npm run dev".');
+        setGenError('Unable to connect to generation engine.');
         setGenProgress('');
         setIsGenerating(false);
         return;
       }
 
-      if (result.error === 'NO_API_KEY') {
-        setGenError('OpenRouter API key not configured. Use the Gemini Gem button to generate via your custom Gem.');
-        setGenProgress('');
-        setIsGenerating(false);
-        return;
+      if (result.error && result.error !== 'NO_API_KEY') {
+        throw new Error(result.error);
       }
-
-      if (result.error) throw new Error(result.error);
 
       setResumeText(result.resume || '');
       setCoverLetterText(result.coverLetter || '');
       setGenMeta({ model: result.model, elapsedMs: result.elapsedMs });
       setGenProgress('');
-      setActiveTab(docType === 'cover' ? 'cover_letter' : 'resume');
+      setActiveTab('quality'); // Directly show the Quality Audit scorecard upon generation!
 
     } catch (err) {
       setGenError(err.message || 'Generation failed. Please try again.');
@@ -165,14 +151,12 @@ export const GeneratorModal = ({ job, onClose }) => {
   };
 
   const handleDownload = () => {
-    const text    = activeTab === 'resume' ? resumeText : coverLetterText;
+    const text     = activeTab === 'resume' ? resumeText : coverLetterText;
     const docLabel = activeTab === 'resume' ? 'RESUME' : 'COVER_LETTER';
     if (!text) return;
     const name = `Sam_Ludwig_${job.company.replace(/[^a-zA-Z0-9]/g, '_')}_${docLabel}`;
     printDoc(text, name);
   };
-
-  const hasOutput = resumeText || coverLetterText;
 
   return (
     <div
@@ -191,16 +175,18 @@ export const GeneratorModal = ({ job, onClose }) => {
               <Sparkles size={18} className="text-indigo-400" />
             </div>
             <div>
-              <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Application Studio</div>
+              <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Application Studio & Quality Gate</div>
               <h2 className="text-base font-black text-white leading-tight">{job.company}</h2>
               <p className="text-xs text-slate-400 font-medium">{job.title}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* ATS Score badge */}
+            {/* Live Quality Gate Score */}
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider">ATS Match</span>
-              <span className={`text-lg font-black ${scoreColor(atsScore)}`}>{atsScore}%</span>
+              <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Quality Gate</span>
+              <span className={`text-base font-black ${scoreColor(qualityAudit.overallScore)}`}>
+                {qualityAudit.overallScore}% Pass
+              </span>
             </div>
             <button onClick={onClose} className="p-2 text-slate-500 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer">
               <X size={18} />
@@ -209,38 +195,63 @@ export const GeneratorModal = ({ job, onClose }) => {
         </div>
 
         {/* ── Gemini Gem Banner ── */}
-        <div className="bg-gradient-to-r from-indigo-950/80 to-purple-950/80 px-5 py-3 border-b border-indigo-900/50 flex items-center justify-between gap-3 shrink-0">
+        <div className="bg-gradient-to-r from-indigo-950/80 to-purple-950/80 px-5 py-2.5 border-b border-indigo-900/50 flex items-center justify-between gap-3 shrink-0">
           <div>
             <div className="text-[10px] font-black text-amber-400 uppercase tracking-wider">💎 Gemini Gem — Full Career Bio Tailoring</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Copies full job context + career record to clipboard, opens your custom Gem</p>
+            <p className="text-[11px] text-slate-400">Copies full job context + verified career record to clipboard, opens custom Gem</p>
           </div>
           <button
             onClick={handleLaunchGem}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
           >
-            {copiedPrompt ? <Check size={13} className="text-emerald-300" /> : <ExternalLink size={13} />}
-            {copiedPrompt ? 'PROMPT COPIED — OPENING GEM…' : 'LAUNCH GEM'}
+            {copiedPrompt ? <Check size={12} className="text-emerald-300" /> : <ExternalLink size={12} />}
+            {copiedPrompt ? 'PROMPT COPIED' : 'LAUNCH GEM'}
           </button>
         </div>
 
         {/* ── Tab bar ── */}
-        <div className="bg-slate-900 border-b border-slate-800 px-5 py-2 flex items-center gap-1 shrink-0">
-          {[
-            { id: 'overview',      label: 'GENERATE',     icon: <Zap size={13} /> },
-            resumeText     && { id: 'resume',       label: 'RESUME',       icon: <FileUser size={13} className="text-emerald-400" /> },
-            coverLetterText && { id: 'cover_letter', label: 'COVER LETTER', icon: <FileText size={13} className="text-indigo-400" /> },
-            matchedKeywords.length && { id: 'ats', label: 'ATS ANALYSIS',  icon: <BarChart3 size={13} className="text-amber-400" /> },
-          ].filter(Boolean).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeTab === tab.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              {tab.icon} {tab.label}
-            </button>
-          ))}
+        <div className="bg-slate-900 border-b border-slate-800 px-5 py-2 flex items-center justify-between gap-1 shrink-0 overflow-x-auto">
+          <div className="flex items-center gap-1">
+            {[
+              { id: 'overview',      label: 'STUDIO GENERATOR', icon: <Zap size={13} /> },
+              (resumeText || coverLetterText) && { 
+                id: 'quality', 
+                label: 'DOUBLE-CHECK GATE', 
+                icon: <ShieldCheck size={13} className={qualityAudit.isReadyToSubmit ? 'text-emerald-400' : 'text-amber-400'} /> 
+              },
+              resumeText     && { id: 'resume',       label: 'RESUME',       icon: <FileUser size={13} className="text-emerald-400" /> },
+              coverLetterText && { id: 'cover_letter', label: 'COVER LETTER', icon: <FileText size={13} className="text-indigo-400" /> },
+              matchedKeywords.length && { id: 'ats', label: 'ATS SPECS',  icon: <BarChart3 size={13} className="text-amber-400" /> },
+            ].filter(Boolean).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
+                  activeTab === tab.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {(activeTab === 'resume' || activeTab === 'cover_letter') && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleCopy}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
+              >
+                {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                {copiedText ? 'COPIED' : 'COPY'}
+              </button>
+              <button
+                onClick={handleDownload}
+                className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+              >
+                PRINT / PDF
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Content ── */}
@@ -249,7 +260,6 @@ export const GeneratorModal = ({ job, onClose }) => {
           {/* GENERATE tab */}
           {activeTab === 'overview' && (
             <div className="space-y-4">
-              {/* Error / Status */}
               {genError && (
                 <div className="flex items-start gap-3 p-4 bg-rose-950/40 border border-rose-800/50 rounded-xl text-rose-300 text-xs">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -257,235 +267,245 @@ export const GeneratorModal = ({ job, onClose }) => {
                 </div>
               )}
 
-              {/* Generation progress */}
               {isGenerating && (
                 <div className="p-4 bg-indigo-950/40 border border-indigo-800/40 rounded-xl text-indigo-300 text-xs flex items-center gap-3">
                   <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
                   <div>
-                    <div className="font-bold text-indigo-200">AI Generating…</div>
+                    <div className="font-bold text-indigo-200">Synthesizing Tailored Documents…</div>
                     <div className="text-indigo-400 mt-0.5">{genProgress}</div>
                   </div>
                 </div>
               )}
 
-              {/* Gen meta */}
               {genMeta && !isGenerating && (
                 <div className="flex items-center gap-2 text-[11px] text-slate-500 px-1">
                   <Clock size={12} />
-                  <span>Generated in {(genMeta.elapsedMs / 1000).toFixed(1)}s via {genMeta.model}</span>
+                  <span>Synthesized via {genMeta.model} in {(genMeta.elapsedMs / 1000).toFixed(1)}s</span>
                 </div>
               )}
 
               {/* Action cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Resume card */}
-                <div className="p-5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-emerald-600/50 transition-all flex flex-col gap-4">
+                <div className="p-5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-emerald-600/50 transition-all flex flex-col justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-[11px] uppercase tracking-wider mb-2">
-                      <FileUser size={14} /> Tailored Resume
+                      <FileUser size={14} /> Tailored ATS Resume
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      AI-generated, ATS-optimised resume tailored to this exact listing. Mirrors the job title,
-                      extracts and weaves in job ad keywords, uses result-first bullets with real metrics.
+                      Mirrors exact role title ("{job.title}"), extracts detected keywords, and leads with quantified outcomes (660,000+ users, 99.9% uptime, 87% automation).
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleGenerate('resume')}
-                      disabled={isGenerating}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <Zap size={13} /> {isGenerating ? 'GENERATING…' : 'GENERATE RESUME'}
-                    </button>
-                    {resumeText && (
-                      <button onClick={() => handleGenerate('resume')} disabled={isGenerating} className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors cursor-pointer" title="Regenerate">
-                        <RefreshCw size={13} />
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    onClick={() => handleGenerate('resume')}
+                    disabled={isGenerating}
+                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+                  >
+                    <Zap size={13} /> {isGenerating ? 'SYNTHESIZING…' : 'GENERATE TAILORED RESUME'}
+                  </button>
                 </div>
 
-                {/* Cover letter card */}
-                <div className="p-5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-indigo-600/50 transition-all flex flex-col gap-4">
+                <div className="p-5 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-indigo-600/50 transition-all flex flex-col justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 text-indigo-400 font-bold text-[11px] uppercase tracking-wider mb-2">
-                      <FileText size={14} /> Cover Letter
+                      <FileText size={14} /> 3-Paragraph Cover Letter
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      250–350 word cover letter with a specific hook (not "I am writing to…"), one achievement
-                      with a real number, and a confident CTA. Mirrors the company's tone.
+                      250–350 word cover letter opening with a specific hook for {job.company}, 2 verified achievements, Australian English, and a confident CTA.
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleGenerate('cover')}
-                      disabled={isGenerating}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <Zap size={13} /> {isGenerating ? 'GENERATING…' : 'GENERATE COVER LETTER'}
-                    </button>
-                    {coverLetterText && (
-                      <button onClick={() => handleGenerate('cover')} disabled={isGenerating} className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors cursor-pointer" title="Regenerate">
-                        <RefreshCw size={13} />
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    onClick={() => handleGenerate('cover')}
+                    disabled={isGenerating}
+                    className="w-full py-2.5 px-3 rounded-xl bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+                  >
+                    <Zap size={13} /> {isGenerating ? 'SYNTHESIZING…' : 'GENERATE COVER LETTER'}
+                  </button>
                 </div>
-              </div>
-
-              {/* Generate both */}
-              {!hasOutput && !isGenerating && (
-                <button
-                  onClick={() => handleGenerate('both')}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-600 hover:to-purple-600 text-white font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                >
-                  <Sparkles size={14} /> GENERATE BOTH (RESUME + COVER LETTER)
-                </button>
-              )}
-
-              {/* Info notice */}
-              <div className="flex items-start gap-3 p-3 bg-slate-800/40 border border-slate-700/30 rounded-xl text-[11px] text-slate-500">
-                <ShieldAlert size={14} className="shrink-0 mt-0.5 text-amber-500" />
-                <span>AI generation calls OpenRouter (local dev server only). Only verified career facts are used — no invented achievements. For GitHub Pages, use the Gemini Gem button above.</span>
               </div>
             </div>
           )}
 
-          {/* RESUME / COVER LETTER tab */}
-          {(activeTab === 'resume' || activeTab === 'cover_letter') && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  {activeTab === 'resume'
-                    ? <><FileUser size={14} className="text-emerald-400" /> Resume for {job.company}</>
-                    : <><FileText size={14} className="text-indigo-400" /> Cover Letter for {job.company}</>
-                  }
+          {/* QUALITY AUDIT DOUBLE-CHECK GATE TAB */}
+          {activeTab === 'quality' && (
+            <div className="space-y-5 animate-in fade-in duration-300">
+              {/* Quality Header Banner */}
+              <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                qualityAudit.isReadyToSubmit 
+                  ? 'bg-emerald-950/40 border-emerald-500/40' 
+                  : 'bg-amber-950/40 border-amber-500/40'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${
+                    qualityAudit.isReadyToSubmit ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                  }`}>
+                    <ShieldCheck size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                        {qualityAudit.isReadyToSubmit ? 'GUARANTEED QUALITY PASS' : 'QUALITY AUDIT IN PROGRESS'}
+                      </h3>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        qualityAudit.isReadyToSubmit ? 'bg-emerald-900/80 text-emerald-300' : 'bg-amber-900/80 text-amber-300'
+                      }`}>
+                        {qualityAudit.overallScore}% Score
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {qualityAudit.isReadyToSubmit 
+                        ? 'This application package satisfies all 7 ATS checks, verified metric standards, and employer tone criteria.' 
+                        : 'Review the checks below to ensure maximum interview conversion before submitting.'}
+                    </p>
+                  </div>
                 </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setActiveTab('resume')}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+                  >
+                    View Resume <ArrowRight size={13} />
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('cover_letter')}
+                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  >
+                    View Cover Letter <ArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Checklist Breakdown */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  7-Point Pre-Submission Double-Check List
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5">
+                  {qualityAudit.checks.map(chk => (
+                    <div 
+                      key={chk.id}
+                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-start justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className="mt-0.5">
+                          {chk.passed ? (
+                            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                          ) : (
+                            <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-white">{chk.name}</span>
+                            <span className="text-[10px] text-slate-500 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">
+                              {chk.category}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{chk.detail}</p>
+                          {chk.missing && chk.missing.length > 0 && (
+                            <div className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                              <span>Suggested keywords to incorporate:</span>
+                              <span className="font-semibold">{chk.missing.slice(0, 4).join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 ${
+                        chk.passed ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/40' : 'bg-amber-950 text-amber-300 border border-amber-800/40'
+                      }`}>
+                        {chk.passed ? 'PASS' : 'REVIEW'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* RESUME tab */}
+          {activeTab === 'resume' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleCopy}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    {copiedText ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                    {copiedText ? 'COPIED' : 'COPY'}
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    <Download size={12} /> PRINT / PDF
-                  </button>
-                  <button
-                    onClick={() => handleGenerate(activeTab === 'resume' ? 'resume' : 'cover')}
-                    disabled={isGenerating}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-40"
-                    title="Regenerate"
-                  >
-                    <RefreshCw size={12} className={isGenerating ? 'animate-spin' : ''} /> REGEN
-                  </button>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tailored Master Resume</span>
+                  <span className="text-[10px] text-slate-500 font-mono">({qualityAudit.wordCount.resumeWords} words)</span>
                 </div>
+                <button
+                  onClick={() => setActiveTab('quality')}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
+                </button>
               </div>
 
               <textarea
+                value={resumeText}
+                onChange={(e) => setResumeText(e.target.value)}
                 rows={22}
-                className="w-full p-4 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 font-mono text-[11px] leading-relaxed focus:outline-none focus:border-indigo-600 resize-none"
-                value={activeTab === 'resume' ? resumeText : coverLetterText}
-                onChange={(e) => activeTab === 'resume' ? setResumeText(e.target.value) : setCoverLetterText(e.target.value)}
-                placeholder={`Generated ${activeTab === 'resume' ? 'resume' : 'cover letter'} will appear here…`}
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
               />
+            </div>
+          )}
 
-              {/* Word count */}
-              <div className="text-[11px] text-slate-600 text-right">
-                {(activeTab === 'resume' ? resumeText : coverLetterText).split(/\s+/).filter(Boolean).length} words
+          {/* COVER LETTER tab */}
+          {activeTab === 'cover_letter' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tailored 3-Paragraph Cover Letter</span>
+                  <span className="text-[10px] text-slate-500 font-mono">({qualityAudit.wordCount.coverLetterWords} words)</span>
+                </div>
+                <button
+                  onClick={() => setActiveTab('quality')}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
+                </button>
               </div>
+
+              <textarea
+                value={coverLetterText}
+                onChange={(e) => setCoverLetterText(e.target.value)}
+                rows={18}
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
+              />
             </div>
           )}
 
           {/* ATS ANALYSIS tab */}
           {activeTab === 'ats' && (
-            <div className="space-y-5">
-              {/* Score */}
-              <div className="flex items-center gap-5 p-4 bg-slate-800/60 border border-slate-700/50 rounded-xl">
-                <div className="text-center shrink-0">
-                  <div className={`text-4xl font-black ${scoreColor(atsScore)}`}>{atsScore}%</div>
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">ATS Match</div>
-                </div>
-                <div className="flex-1">
-                  <div className="w-full bg-slate-700 rounded-full h-2 mb-3">
-                    <div className={`${scoreBarColor(atsScore)} h-2 rounded-full transition-all`} style={{ width: `${atsScore}%` }} />
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Based on keyword overlap between this listing and Sam Ludwig's career record.
-                    Higher scores indicate stronger keyword alignment — the generated resume will
-                    weave these terms naturally throughout to maximise ATS pass rate.
-                  </p>
-                </div>
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Detected Job Keywords</h3>
+                <span className={`text-xs font-black ${scoreColor(atsScore)}`}>{atsScore}% Base Fit</span>
               </div>
-
-              {/* Matched keywords */}
-              <div>
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Check size={13} className="text-emerald-400" /> Detected Keywords ({matchedKeywords.length})
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {matchedKeywords.map(kw => (
-                    <span key={kw} className="px-2.5 py-1 bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-[11px] font-medium rounded-lg">
-                      {kw}
-                    </span>
-                  ))}
-                  {matchedKeywords.length === 0 && (
-                    <span className="text-xs text-slate-500">No specific technical keywords detected in this listing.</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Tactics applied */}
-              <div>
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                  Evidence-Based Tactics Applied in Generation
-                </div>
-                <div className="space-y-2">
-                  {[
-                    ['Mirror exact job title', 'Resume line 2 matches the job ad title exactly — single highest-impact ATS tactic'],
-                    ['Result-first bullets', 'Every experience bullet leads with metric/outcome, then action — scannable in 7 seconds'],
-                    ['Keyword weaving', 'Detected terms appear in summary, skills, AND experience bullets (not just a bottom list)'],
-                    ['Quantified achievements only', '87% reduction, 660k users, 99.9% uptime — every number is verified from career record'],
-                    ['Specific cover letter opener', 'Hook references something real from this listing — not "I am writing to apply for..."'],
-                    ['3-paragraph cover structure', 'Hook → Value fit → CTA | 250–350 words optimal per hiring manager research'],
-                    ['Australian English', 'organisation, standardised, prioritise, analyse throughout'],
-                    ['Zero clichés', 'No "passionate", "team player", "results-driven", "synergy" or similar filler'],
-                  ].map(([tactic, detail]) => (
-                    <div key={tactic} className="flex items-start gap-3 p-3 bg-slate-800/40 rounded-lg">
-                      <Check size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="text-[11px] font-bold text-slate-200">{tactic}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{detail}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {matchedKeywords.map((kw, idx) => (
+                  <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-indigo-300 border border-slate-700">
+                    {kw}
+                  </span>
+                ))}
               </div>
             </div>
           )}
+
         </div>
 
         {/* ── Footer ── */}
-        <div className="bg-slate-950 px-5 py-3 border-t border-slate-800 flex items-center justify-between shrink-0">
-          <span className="text-[11px] text-slate-600 font-mono uppercase">
-            {job.company} — {job.title}
-          </span>
+        <div className="bg-slate-950 px-6 py-3 border-t border-slate-800 flex items-center justify-between shrink-0">
+          <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Adversarial Quality Verification Active</span>
+          </div>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-700 text-slate-400 hover:text-white font-bold text-xs transition-colors cursor-pointer">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer"
+            >
               CLOSE
             </button>
-            {hasOutput && (
-              <button
-                onClick={handleDownload}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs transition-colors cursor-pointer"
-              >
-                <Download size={13} /> DOWNLOAD PDF
-              </button>
-            )}
           </div>
         </div>
       </div>

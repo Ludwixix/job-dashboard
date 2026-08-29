@@ -895,3 +895,61 @@ export const executeClientSideAutoApply = async (job) => {
     pipeline_result: receipt
   };
 };
+
+/**
+ * 1-Click Direct Application Dispatcher
+ * Automatically triggers:
+ * 1. Resume & Cover Letter PDF downloads to browser / file explorer
+ * 2. Opening the employer job ad / application portal in a new tab
+ * 3. Copying applicant details & cover letter to clipboard for 2-second form filling
+ * 4. Updating local state and Google Sheet to "Applied / Confirmation Received"
+ */
+export const dispatchDirectApplicationSubmission = (job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf) => {
+  if (!job) return;
+
+  // 1. Download Resume PDF
+  if (job.resumeText && downloadResumePdf) {
+    downloadResumePdf(job.resumeText, job);
+  }
+
+  // 2. Download Cover Letter PDF (slight timeout so browser handles multi-file downloads smoothly)
+  if ((job.coverLetterText || job.coverLetter) && downloadCoverLetterPdf) {
+    setTimeout(() => {
+      downloadCoverLetterPdf(job.coverLetterText || job.coverLetter, job);
+    }, 400);
+  }
+
+  // 3. Open Employer Job Portal in New Browser Tab
+  const link = job.portalLink || job.link;
+  if (link) {
+    const targetUrl = link.startsWith('http') ? link : `https://${link}`;
+    window.open(targetUrl, '_blank');
+  }
+
+  // 4. Copy Application Details to Clipboard
+  const candidateText = `Full Name: Sam Ludwig
+Email: sam.ludwig@gmail.com
+Phone: 0405 993 245
+Location: Balaclava VIC 3183
+Work Rights: Australian Citizen (Unrestricted)
+Security Clearance: Baseline / NV1 Ready
+Target Salary: ${job.salary || '$115,000 + Super'}
+
+--- TAILORED COVER LETTER ---
+${job.coverLetterText || job.coverLetter || ''}`;
+
+  try {
+    navigator.clipboard.writeText(candidateText);
+  } catch (e) {
+    console.warn('Clipboard write error:', e);
+  }
+
+  // 5. Update Status to Applied
+  if (onJobStatusUpdate) {
+    onJobStatusUpdate({
+      ...job,
+      status: 'Applied / Confirmation Received',
+      date: new Date().toISOString().split('T')[0]
+    });
+  }
+};

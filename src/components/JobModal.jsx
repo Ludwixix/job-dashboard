@@ -8,7 +8,6 @@ import {
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
-import { hasGeneratedApplicationDocs } from './JobSeeker';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob }) => {
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
@@ -482,9 +481,48 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                           docsGeneratedAt: new Date().toISOString(),
                           date: new Date().toISOString().split('T')[0]
                         };
+
                         if (onJobStatusUpdate) {
                           onJobStatusUpdate(updatedJob);
                         }
+
+                        // 1. Download Resume PDF to computer
+                        if (data.pipeline_result?.resume_text) {
+                          downloadResumePdf(data.pipeline_result.resume_text, job);
+                        }
+
+                        // 2. Download Cover Letter PDF to computer
+                        if (data.pipeline_result?.cover_text) {
+                          setTimeout(() => {
+                            downloadCoverLetterPdf(data.pipeline_result.cover_text, job);
+                          }, 400);
+                        }
+
+                        // 3. Open Employer Job Ad / Portal in new tab
+                        const link = job.portalLink || job.link;
+                        if (link) {
+                          const targetUrl = link.startsWith('http') ? link : `https://${link}`;
+                          window.open(targetUrl, '_blank');
+                        }
+
+                        // 4. Copy candidate profile details & cover letter to clipboard
+                        const candidateText = `Full Name: Sam Ludwig
+Email: sam.ludwig@gmail.com
+Phone: 0405 993 245
+Location: Balaclava VIC 3183
+Work Rights: Australian Citizen (Unrestricted)
+Security Clearance: Baseline / NV1 Ready
+Target Salary: ${job.salary || '$115,000 + Super'}
+
+--- TAILORED COVER LETTER ---
+${data.pipeline_result?.cover_text || ''}`;
+
+                        try {
+                          navigator.clipboard.writeText(candidateText);
+                        } catch (e) {
+                          console.warn('Clipboard write error:', e);
+                        }
+
                         setAutoApplyReceipt(data.pipeline_result || null);
                       } else {
                         alert(`Auto-apply pipeline error: ${data?.error || 'Unable to complete'}`);
@@ -518,6 +556,26 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                       <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded">
                         SPREADSHEET SYNCED ✅
                       </span>
+                    </div>
+
+                    {/* Dispatch Success Highlights */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div className="p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-500/40 flex items-center gap-2 text-emerald-300">
+                        <Download size={15} className="text-emerald-400 shrink-0" />
+                        <span>PDFs Downloaded to Downloads / File Explorer</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-indigo-950/60 border border-indigo-500/40 flex items-center gap-2 text-indigo-300">
+                        <ExternalLink size={15} className="text-indigo-400 shrink-0" />
+                        <span>Employer Portal Opened in New Tab</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-purple-950/60 border border-purple-500/40 flex items-center gap-2 text-purple-300">
+                        <Copy size={15} className="text-purple-400 shrink-0" />
+                        <span>Applicant Details & Cover Copied to Clipboard</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-teal-950/60 border border-teal-500/40 flex items-center gap-2 text-teal-300">
+                        <CheckCircle2 size={15} className="text-teal-400 shrink-0" />
+                        <span>Marked as Applied in Table & Google Sheet</span>
+                      </div>
                     </div>
 
                     {/* Receipt Sub-Tabs */}

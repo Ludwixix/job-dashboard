@@ -10,7 +10,6 @@ import { KanbanBoard } from './KanbanBoard';
 import { CommandPalette } from './CommandPalette';
 import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
-import { generateApplicationDocs } from '../services/generationService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Download, Command, Zap, LayoutGrid, CheckCircle2,
@@ -405,6 +404,7 @@ export const Dashboard = () => {
             baseLocation={baseLocation} 
             onDispatchAsyncApplication={handleDispatchAsyncApplication}
             asyncGeneratingIds={asyncGeneratingIds}
+            onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
           />
         )}
 

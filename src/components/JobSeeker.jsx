@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
+import { dispatchDirectApplicationSubmission } from '../services/generationService';
 
 const BALACLAVA_TIER_1 = [
   'balaclava', 'st kilda', 'prahran', 'windsor', 'elsternwick', 'elwood', 
@@ -127,7 +128,8 @@ export const JobSeeker = ({
   onRejectJob, 
   onUnrejectJob,
   onDispatchAsyncApplication,
-  asyncGeneratingIds = new Set()
+  asyncGeneratingIds = new Set(),
+  onJobStatusUpdate
 }) => {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
@@ -955,13 +957,26 @@ export const JobSeeker = ({
                       {/* Action Buttons */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
                         {hasCustomDocs ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
-                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1 cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-2xs"
-                          >
-                            <Sparkles size={13} className="text-emerald-200" /> 
-                            <span>STUDIO (READY)</span>
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf);
+                              }}
+                              className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
+                              title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
+                            >
+                              <Zap size={13} className="text-amber-300" /> 
+                              <span>APPLY (1-CLICK)</span>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
+                              className="py-2 px-2.5 rounded-xl font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
+                              title="Open in AI Studio to edit or customize"
+                            >
+                              <Sparkles size={13} className="text-emerald-700" />
+                            </button>
+                          </>
                         ) : isGeneratingThisJob ? (
                           <button
                             disabled
@@ -1002,9 +1017,9 @@ export const JobSeeker = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                            className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            JOB AD <ExternalLink size={13} />
+                            <ExternalLink size={13} />
                           </a>
                         )}
                       </div>

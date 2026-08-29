@@ -24,28 +24,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-          cache-dependency-path: job-dashboard-react/package-lock.json
 
       - name: Install dependencies
         run: npm ci
-        working-directory: job-dashboard-react
 
-      - name: Copy scraped jobs into public/
+      - name: Prepare static job data
         run: |
-          mkdir -p job-dashboard-react/public
-          if [ -f job-dashboard-site/scrapers/jobs_combined.json ]; then
-            cp job-dashboard-site/scrapers/jobs_combined.json job-dashboard-react/public/jobs_combined.json
-            echo "Copied jobs_combined.json ($(wc -c < job-dashboard-site/scrapers/jobs_combined.json) bytes)"
-          else
-            echo '{"jobs":[],"count":0}' > job-dashboard-react/public/jobs_combined.json
-            echo "Warning: jobs_combined.json not found, using empty fallback"
-          fi
+          echo '{"count":0,"jobs":[]}' > public/jobs_combined.json
+          echo "Placed empty jobs_combined.json (scraper runs locally)"
 
       - name: Build
         run: npm run build
-        working-directory: job-dashboard-react
         env:
           GITHUB_PAGES: true
 
@@ -55,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: job-dashboard-react/dist
+          path: dist
 
   deploy:
     environment:

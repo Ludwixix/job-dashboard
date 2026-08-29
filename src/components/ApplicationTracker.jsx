@@ -44,34 +44,36 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
       .slice(0, 8);
   }, [jobs]);
 
-  // Interactive status category filtering
+  // Interactive status category filtering (Default newest applications first)
   const trackerJobs = useMemo(() => {
-    return jobs.filter(job => {
-      const isTrackerJob = !job.status.toLowerCase().includes('package prepared') && 
-                           !job.status.toLowerCase().includes('to submit');
+    return jobs
+      .filter(job => {
+        const isTrackerJob = !job.status.toLowerCase().includes('package prepared') && 
+                             !job.status.toLowerCase().includes('to submit');
 
-      const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
-                            job.title.toLowerCase().includes(search.toLowerCase());
-      
-      let matchesStatus = true;
-      if (statusFilter !== 'All') {
-        const s = job.status.toLowerCase();
-        const f = statusFilter.toLowerCase();
-        if (f.includes('interview')) {
-          matchesStatus = s.includes('interview');
-        } else if (f.includes('action required') || f.includes('verification')) {
-          matchesStatus = s.includes('action required') || s.includes('verification');
-        } else if (f.includes('closed') || f.includes('expired') || f.includes('unsuccessful')) {
-          matchesStatus = s.includes('closed') || s.includes('expired') || s.includes('unsuccessful');
-        } else {
-          matchesStatus = job.status === statusFilter;
+        const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
+                              job.title.toLowerCase().includes(search.toLowerCase());
+        
+        let matchesStatus = true;
+        if (statusFilter !== 'All') {
+          const s = job.status.toLowerCase();
+          const f = statusFilter.toLowerCase();
+          if (f.includes('interview')) {
+            matchesStatus = s.includes('interview');
+          } else if (f.includes('action required') || f.includes('verification')) {
+            matchesStatus = s.includes('action required') || s.includes('verification');
+          } else if (f.includes('closed') || f.includes('expired') || f.includes('unsuccessful')) {
+            matchesStatus = s.includes('closed') || s.includes('expired') || s.includes('unsuccessful');
+          } else {
+            matchesStatus = job.status === statusFilter;
+          }
         }
-      }
 
-      const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
+        const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
 
-      return isTrackerJob && matchesSearch && matchesStatus && matchesSource;
-    });
+        return isTrackerJob && matchesSearch && matchesStatus && matchesSource;
+      })
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   }, [jobs, search, statusFilter, sourceFilter]);
 
   const trackerStats = useMemo(() => {

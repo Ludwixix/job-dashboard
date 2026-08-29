@@ -8,8 +8,10 @@ import {
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
+import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply }) => {
+
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
   const [copiedSubject, setCopiedSubject] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -662,6 +664,32 @@ ${data.pipeline_result?.cover_text || ''}`;
 
               {/* Quick Action Buttons */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
+                {/* 1-Click Quick Apply Button */}
+                <button
+                  onClick={() => {
+                    if (onOpenAutoApply) {
+                      onClose();
+                      onOpenAutoApply(job);
+                    } else {
+                      setIsAutoApplying(true);
+                      executeClientSideAutoApply(job).then(receipt => {
+                        setIsAutoApplying(false);
+                        setAutoApplyReceipt(receipt);
+                        if (onJobStatusUpdate) onJobStatusUpdate({ ...job, status: 'Applied' });
+                      });
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 hover:from-indigo-800 hover:to-purple-800 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer border border-indigo-500/50 col-span-1 sm:col-span-2 group"
+                >
+                  <Zap size={16} className="text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform animate-pulse" />
+                  <span className="tracking-wide">
+                    LAUNCH {getQuickApplyPlatform(job).toUpperCase()} AUTO-APPLY
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 font-black ml-1">
+                    ⚡ 1-CLICK
+                  </span>
+                </button>
+
                 {job.portalLink && (
                   <a
                     href={job.portalLink.startsWith('http') ? job.portalLink : `http://${job.portalLink}`}
@@ -756,7 +784,22 @@ ${data.pipeline_result?.cover_text || ''}`;
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-100 px-6 py-3.5 border-t border-slate-200 flex justify-end font-mono shrink-0">
+        <div className="bg-slate-100 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between font-mono shrink-0">
+          <button
+            onClick={() => {
+              if (onOpenAutoApply) {
+                onClose();
+                onOpenAutoApply(job);
+              } else {
+                setActiveTab('assets');
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 hover:from-indigo-900 hover:to-purple-900 text-indigo-300 hover:text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer border border-indigo-500/40 flex items-center gap-1.5"
+          >
+            <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse" />
+            <span>⚡ {getQuickApplyPlatform(job).toUpperCase()} QUICK APPLY</span>
+          </button>
+
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 font-extrabold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
@@ -764,6 +807,7 @@ ${data.pipeline_result?.cover_text || ''}`;
             CLOSE MODAL
           </button>
         </div>
+
       </div>
     </div>
   );

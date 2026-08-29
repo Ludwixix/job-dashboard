@@ -14,6 +14,8 @@ import { ProfileSwitcher } from './ProfileSwitcher';
 import { ProfileModal } from './ProfileModal';
 import { AuthModal } from './AuthModal';
 import { GoogleIntegrationModal } from './GoogleIntegrationModal';
+import { AutoApplyModal } from './AutoApplyModal';
+
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
@@ -36,6 +38,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
+  const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
+
 
   // Candidate Personalization Profile State
   const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
@@ -693,6 +697,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           job={liveSelectedJob} 
           onClose={() => setSelectedJob(null)} 
           onOpenGenerator={(j) => setSelectedForGenerator(j)}
+          onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
           onJobStatusUpdate={(updated) => {
             updateJobStatus(updated.id || updated.title, updated.status, updated);
             setSelectedJob(updated);
@@ -707,6 +712,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           }}
         />
       )}
+
+      {/* 1-Click Auto-Apply Execution Modal */}
+      {selectedAutoApplyJob && (
+        <AutoApplyModal
+          job={selectedAutoApplyJob}
+          onClose={() => setSelectedAutoApplyJob(null)}
+          onJobStatusUpdate={(updated) => {
+            updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
+            setSelectedAutoApplyJob(updated);
+          }}
+        />
+      )}
+
 
       {/* Generator Modal */}
       {liveSelectedForGenerator && (

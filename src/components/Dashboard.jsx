@@ -20,11 +20,13 @@ import { getAuthenticatedUser } from '../services/googleAuthService';
 import { logoutUser } from '../services/authService';
 import { fetchJobsForProfile } from '../services/dataService';
 import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
+import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon
 } from 'lucide-react';
+
 
 export const Dashboard = ({ currentUser, onSignOut }) => {
   const { jobs, loading, error, refetch, updateJobStatus, rejectJob, unrejectJob } = useJobs();
@@ -135,6 +137,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Derive current industry theme
+  const currentIndustryTheme = useMemo(() => {
+    return getIndustryTheme(activeProfile?.industry);
+  }, [activeProfile?.industry]);
+
+  // Apply subtle industry theme CSS variables smoothly whenever the active profile changes or loads
+  useEffect(() => {
+    if (activeProfile?.industry) {
+      applyIndustryTheme(activeProfile.industry);
+    }
+  }, [activeProfile?.industry]);
+
   // Trigger profile-aware scrape when Google auth connects
   useEffect(() => {
     if (!authUser || !activeProfile) return;
@@ -148,6 +162,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     setSuggestedTitles(suggestRelatedTitles(activeProfile));
 
     fetchJobsForProfile(activeProfile).then(({ liveScraped, queriesUsed }) => {
+      // Smoothly shift to the industry color theme as results return
+      applyIndustryTheme(industry);
+
       if (liveScraped) {
         setProfileScrapeMsg(`✅ Live scraped ${queriesUsed.length} search terms for ${industry}`);
         refetch(); // reload job list from updated backend data
@@ -166,6 +183,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   // Only re-run when Google auth user changes (not on every activeProfile edit)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser?.accessToken]);
+
 
   /** Add a suggested title to the active profile's targetTitles */
   const handleAddSuggestedTitle = useCallback((title) => {
@@ -283,8 +301,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
+    <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
       {/* Top Live Engine Status Bar */}
+
       <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[11px] border-b border-slate-800 flex items-center justify-between font-semibold">
         <div className="flex items-center gap-4 truncate">
           <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0">
@@ -505,8 +524,49 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </div>
         </div>
       </header>
+ 
+      {/* Dynamic Industry Theme & Live Profile Scrape Banner */}
+      {(profileScrapeStatus || (showSuggestions && suggestedTitles.length > 0)) && (
+        <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-4 sm:px-6 lg:px-8 xl:px-10 py-3 animate-in slide-in-from-top-2 duration-300 font-mono text-xs shadow-lg">
+          <div className="max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider industry-accent-badge shadow-xs">
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: currentIndustryTheme.accent }} />
+                {currentIndustryTheme.name}
+              </span>
+              <span className="text-slate-300 font-bold flex items-center gap-2">
+                {profileScrapeMsg || `Profile Scraper Active — Theme aligned to ${currentIndustryTheme.name}`}
+              </span>
+            </div>
+
+            {suggestedTitles.length > 0 && showSuggestions && (
+              <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                <span className="text-slate-400 font-bold uppercase shrink-0">SUGGESTED TITLES:</span>
+                {suggestedTitles.slice(0, 4).map(title => (
+                  <button
+                    key={title}
+                    onClick={() => handleAddSuggestedTitle(title)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-700 hover:border-indigo-400 text-slate-300 hover:text-white transition-all cursor-pointer font-bold group"
+                    title={`Add "${title}" to target titles`}
+                  >
+                    <span>+ {title}</span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => setShowSuggestions(false)}
+                  className="text-slate-500 hover:text-slate-300 p-1 rounded-lg hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+                  title="Dismiss title suggestions"
+                >
+                  <XIcon size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Workspace Dashboard Container */}
+
       <main className="w-full max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 space-y-6 flex-1">
         {/* Proactive Agent Copilot Intelligence Bar */}
         <CopilotBar 

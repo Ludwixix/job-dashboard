@@ -1,15 +1,69 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --industry-accent: #6366f1;
+    --industry-accent-rgb: 99, 102, 241;
+    --industry-light: #818cf8;
+    --industry-glow: rgba(99, 102, 241, 0.15);
+    --industry-border: rgba(99, 102, 241, 0.35);
+    --industry-subtle: rgba(99, 102, 241, 0.05);
+    --industry-badge-bg: rgba(49, 46, 129, 0.6);
+    --industry-badge-text: #a5b4fc;
+  }
+
   body {
     margin: 0;
     font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    background-color: #1e1e2e;
+    background-color: #0f172a;
     color: #cdd6f4;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 1s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
+
+/* Subtle Industry Ambient Glow & Theme Transitions */
+.industry-ambient-bg {
+  position: relative;
+  transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.industry-ambient-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 480px;
+  background: radial-gradient(ellipse 80% 60% at 50% -20%, var(--industry-glow), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
+}
+
+.industry-accent-text {
+  color: var(--industry-light);
+  transition: color 1s ease;
+}
+
+.industry-accent-border {
+  border-color: var(--industry-border);
+  transition: border-color 1s ease, box-shadow 1s ease;
+}
+
+.industry-accent-badge {
+  background-color: var(--industry-badge-bg);
+  color: var(--industry-badge-text);
+  border: 1px solid var(--industry-border);
+  transition: all 1s ease;
+}
+
+.industry-glow-shadow {
+  box-shadow: 0 0 20px var(--industry-glow);
+  transition: box-shadow 1s ease;
+}
+
 
 /* VS Code Editor Scrollbar */
 ::-webkit-scrollbar {

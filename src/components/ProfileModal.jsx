@@ -155,7 +155,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
     }
   };
 
-  const isDefaultProfile = ['sam_ludwig', 'alex_chen_dev', 'sarah_miller_data'].includes(formData.id);
+  const isDefaultProfile = formData.id === 'sam_ludwig';
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 font-sans">

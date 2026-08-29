@@ -358,31 +358,36 @@ export const OnboardingFlow = ({ onComplete }) => {
                 </div>
               </form>
 
-              {/* 1-Click Demo Personas Selector */}
+              {/* 1-Click Sam Ludwig Profile Quick-Launch */}
               <div className="pt-6 border-t border-slate-800 space-y-3 font-mono">
                 <div className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  ⚡ OR QUICK-TEST WITH A PRE-CONFIGURED INDUSTRY PERSONA:
+                  ⚡ OR QUICK-LAUNCH WITH SAM LUDWIG PROFILE:
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {DEFAULT_PROFILES.slice(0, 6).map(preset => (
+                <div className="flex justify-center">
+                  {DEFAULT_PROFILES.map(preset => (
                     <button
                       key={preset.id}
                       onClick={() => handleSelectDemoPersona(preset.id)}
-                      className="p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/50 transition-all text-left flex items-start gap-2.5 cursor-pointer group"
+                      className="w-full sm:max-w-md p-3.5 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-indigo-500/40 hover:border-indigo-400 transition-all text-left flex items-center gap-3 cursor-pointer group shadow-md"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-300 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-400/30 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        {preset.name.split(' ').map(n => n[0]).join('')}
+                      <div className="w-10 h-10 rounded-xl bg-indigo-600/30 text-indigo-300 font-black text-sm flex items-center justify-center shrink-0 border border-indigo-400/50 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        SL
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-white text-xs truncate group-hover:text-indigo-300">{preset.name}</div>
-                        <div className="text-[10px] text-slate-400 truncate">{preset.title.split('&')[0]}</div>
+                        <div className="font-black text-white text-sm group-hover:text-indigo-300 flex items-center gap-1.5">
+                          {preset.name}
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 font-mono">ORIGINAL PROFILE</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">{preset.title}</div>
                       </div>
+                      <ArrowRight size={16} className="text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
                     </button>
                   ))}
                 </div>
               </div>
             </div>
           )}
+
 
           {/* STEP 2: CHOOSE INDUSTRY */}
           {step === 2 && (

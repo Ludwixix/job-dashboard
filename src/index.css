@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* VS Code Editor Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #181825;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c084fc;
+}
+
+/* VS Code Tech Grid Pattern */
+.bg-tech-grid {
+  background-image: linear-gradient(to right, rgba(205, 214, 244, 0.04) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(205, 214, 244, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* VS Code Card Hover Animation */
+.card-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+}
+
+/* VS Code Diagnostics & Token Highlights */
+.vscode-token-keyword { color: #c084fc; font-weight: 700; }
+.vscode-token-string { color: #a6e3a1; }
+.vscode-token-function { color: #89b4fa; font-weight: 700; }
+.vscode-token-number { color: #fab387; font-weight: 700; }
+.vscode-token-comment { color: #6c7086; font-style: italic; }
+
+.pulse-emerald {
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
+}
+
+.pulse-indigo {
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.4);
+}

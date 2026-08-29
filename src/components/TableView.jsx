@@ -5,7 +5,7 @@ import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { hasGeneratedApplicationDocs } from '../services/generationService';
 
-export const TableView = ({ jobs, onSelectJob }) => {
+export const TableView = ({ jobs, onSelectJob, onResetDateFilter }) => {
   const formatDaysAgo = (dateStr) => {
     if (!dateStr) return 'Recently';
     try {
@@ -22,8 +22,16 @@ export const TableView = ({ jobs, onSelectJob }) => {
 
   if (jobs.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-12 text-center border border-slate-200 shadow-2xs font-mono text-xs text-slate-500 font-semibold">
-        NO RECORDS MATCH CURRENT SELECTION FILTER.
+      <div className="bg-white rounded-xl p-12 text-center border border-slate-200 shadow-2xs font-mono text-xs text-slate-500 font-semibold space-y-3">
+        <div className="text-slate-600 font-bold">NO APPLICATION RECORDS MATCH THE CURRENT FILTER (DEFAULT: APPLIED TODAY).</div>
+        {onResetDateFilter && (
+          <button
+            onClick={onResetDateFilter}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-mono text-xs font-black shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            VIEW ALL-TIME APPLICATION RECORDS
+          </button>
+        )}
       </div>
     );
   }

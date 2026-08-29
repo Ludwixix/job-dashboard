@@ -29,6 +29,7 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
+  const [appliedDateFilter, setAppliedDateFilter] = useState('today'); // 'today' (DEFAULT), '7days', '30days', 'all'
 
   // Recently Applied Submissions list (Sorted newest first)
   const recentlyAppliedJobs = useMemo(() => {
@@ -44,19 +45,34 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
       .slice(0, 8);
   }, [jobs]);
 
-  // Interactive status category filtering (Default newest applications first)
+  // Applied Today Count
+  const appliedTodayCount = useMemo(() => {
+    return jobs.filter(j => {
+      const s = (j.status || '').toLowerCase();
+      const isTrackerJob = !s.includes('package prepared') && 
+                           !s.includes('to submit') && 
+                           !s.includes('discovered') && 
+                           !s.includes('draft');
+      const isToday = formatDaysAgo(j.date) === 'Today' || (j.date && j.date.startsWith(new Date().toISOString().split('T')[0]));
+      return isTrackerJob && isToday;
+    }).length;
+  }, [jobs]);
+
+  // Interactive status category & date filtering (Default newest applications first)
   const trackerJobs = useMemo(() => {
     return jobs
       .filter(job => {
-        const isTrackerJob = !job.status.toLowerCase().includes('package prepared') && 
-                             !job.status.toLowerCase().includes('to submit');
+        const s = (job.status || '').toLowerCase();
+        const isTrackerJob = !s.includes('package prepared') && 
+                             !s.includes('to submit') && 
+                             !s.includes('discovered') && 
+                             !s.includes('draft');
 
         const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
                               job.title.toLowerCase().includes(search.toLowerCase());
         
         let matchesStatus = true;
         if (statusFilter !== 'All') {
-          const s = job.status.toLowerCase();
           const f = statusFilter.toLowerCase();
           if (f.includes('interview')) {
             matchesStatus = s.includes('interview');
@@ -71,16 +87,39 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
 
         const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
 
-        return isTrackerJob && matchesSearch && matchesStatus && matchesSource;
+        // Date Applied Filter (Default: Today)
+        let matchesDate = true;
+        if (appliedDateFilter === 'today') {
+          matchesDate = formatDaysAgo(job.date) === 'Today' || (job.date && job.date.startsWith(new Date().toISOString().split('T')[0]));
+        } else if (appliedDateFilter === '7days') {
+          try {
+            const d = parseISO(job.date);
+            matchesDate = isValid(d) && differenceInDays(new Date(), d) <= 7;
+          } catch {
+            matchesDate = true;
+          }
+        } else if (appliedDateFilter === '30days') {
+          try {
+            const d = parseISO(job.date);
+            matchesDate = isValid(d) && differenceInDays(new Date(), d) <= 30;
+          } catch {
+            matchesDate = true;
+          }
+        }
+
+        return isTrackerJob && matchesSearch && matchesStatus && matchesSource && matchesDate;
       })
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  }, [jobs, search, statusFilter, sourceFilter]);
+  }, [jobs, search, statusFilter, sourceFilter, appliedDateFilter]);
 
   const trackerStats = useMemo(() => {
-    const totalSubmitted = jobs.filter(j => 
-      !j.status.toLowerCase().includes('package prepared') && 
-      !j.status.toLowerCase().includes('to submit')
-    ).length;
+    const totalSubmitted = jobs.filter(j => {
+      const s = (j.status || '').toLowerCase();
+      return !s.includes('package prepared') && 
+             !s.includes('to submit') && 
+             !s.includes('discovered') && 
+             !s.includes('draft');
+    }).length;
 
     const interviews = jobs.filter(j => j.status.toLowerCase().includes('interview')).length;
     
@@ -346,7 +385,18 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="px-3 py-1.5 text-xs font-mono font-extrabold border border-purple-500/50 rounded bg-[#1e1e2e] text-purple-300 focus:outline-none focus:border-purple-400 cursor-pointer shadow-xs"
+                  value={appliedDateFilter}
+                  onChange={(e) => setAppliedDateFilter(e.target.value)}
+                >
+                  <option value="today">📅 APPLIED TODAY ({appliedTodayCount})</option>
+                  <option value="7days">📅 PAST 7 DAYS</option>
+                  <option value="30days">📅 PAST 30 DAYS</option>
+                  <option value="all">📅 ALL-TIME SUBMISSIONS ({trackerStats.totalSubmitted})</option>
+                </select>
+
                 <select
                   className="px-3 py-1.5 text-xs font-mono font-extrabold border border-[#313244] rounded bg-[#1e1e2e] text-slate-200 focus:outline-none focus:border-purple-400 cursor-pointer"
                   value={statusFilter}
@@ -366,9 +416,29 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
             </div>
           </div>
 
+          {/* Active Applied Date Filter Info Banner */}
+          {appliedDateFilter !== 'all' && (
+            <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs font-mono font-bold text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Calendar size={14} className="text-indigo-400" />
+                <span>FILTERING: <span className="text-white uppercase">{appliedDateFilter === 'today' ? 'APPLIED TODAY (DEFAULT)' : `PAST ${appliedDateFilter}`}</span> — {trackerJobs.length} application{trackerJobs.length === 1 ? '' : 's'}</span>
+              </span>
+              <button
+                onClick={() => setAppliedDateFilter('all')}
+                className="text-[11px] text-indigo-300 hover:text-white underline cursor-pointer self-start sm:self-auto"
+              >
+                Show All-Time Applications ({trackerStats.totalSubmitted})
+              </button>
+            </div>
+          )}
+
           {/* Main View Display */}
           {viewMode === 'table' ? (
-            <TableView jobs={trackerJobs} onSelectJob={onSelectJob} />
+            <TableView 
+              jobs={trackerJobs} 
+              onSelectJob={onSelectJob} 
+              onResetDateFilter={() => setAppliedDateFilter('all')}
+            />
           ) : (
             <KanbanView jobs={trackerJobs} statuses={trackerStatuses} onSelectJob={onSelectJob} />
           )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  ArrowRight, Sparkles, Bot, Clock, AlertCircle, RotateCcw
+  ArrowRight, Sparkles, Bot, AlertCircle, RotateCcw, CheckCircle2
 } from 'lucide-react';
 
 const STAGES = [
@@ -99,6 +99,12 @@ export const KanbanBoard = ({
                     <span className="truncate">{job.location || 'Melbourne'}</span>
                     <span className="shrink-0">{job.salary ? job.salary.split(' ')[0] : 'Standard'}</span>
                   </div>
+
+                  {job.hasCustomDocs && (
+                    <div className="text-[9px] text-emerald-300 font-bold bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/40 flex items-center gap-1">
+                      <CheckCircle2 size={10} className="text-emerald-400" /> Tailored PDFs Ready
+                    </div>
+                  )}
 
                   {job.status === 'Non-Responsive Employer (Closed)' && (
                     <div className="text-[9px] text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/30 flex items-center gap-1">

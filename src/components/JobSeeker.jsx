@@ -6,9 +6,10 @@ import {
   DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
-  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, ShoppingBag, Server, Flame, Building2, Trash2
+  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, ShoppingBag, Server, Flame, Building2, Trash2, Download
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
+import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 
 const BALACLAVA_TIER_1 = [
   'balaclava', 'st kilda', 'prahran', 'windsor', 'elsternwick', 'elwood', 
@@ -711,6 +712,7 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
               <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
                 {paginatedJobs.map(job => {
                   const isTopFit = (job.score || 0) >= 90;
+                  const hasCustomDocs = Boolean(job.hasCustomDocs && job.resumeText);
                   const matchedSkills = job.audit?.matched_terms || job.tags || [];
 
                   return (
@@ -718,25 +720,34 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
                       key={job.id}
                       onClick={() => onSelectJob(job)}
                       className={`rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between space-y-4 group cursor-pointer relative overflow-hidden card-hover-lift ${
-                        isTopFit
+                        hasCustomDocs
+                          ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 border-2 border-emerald-500 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-500/30'
+                          : isTopFit
                           ? 'bg-gradient-to-br from-emerald-50/80 via-white to-indigo-50/50 border-2 border-emerald-500/80 shadow-md shadow-emerald-500/10 ring-2 ring-emerald-500/20'
                           : 'bg-white border border-slate-200/90 shadow-2xs hover:border-indigo-400 hover:shadow-md'
                       }`}
                     >
-                      {/* Top Gradient Line (Highlighted for Top Fits) */}
+                      {/* Top Gradient Line (Highlighted for Top Fits & Custom Docs) */}
                       <div className={`absolute top-0 left-0 right-0 h-1.5 ${
-                        isTopFit
+                        hasCustomDocs
+                          ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500'
+                          : isTopFit
                           ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-600'
                           : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-400'
                       }`} />
 
-                      {/* Top Standout Badge for Best Ones */}
-                      {isTopFit && (
+                      {/* Top Standout Badge for Custom Docs or Best Ones */}
+                      {hasCustomDocs ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider w-max shadow-2xs">
+                          <CheckCircle2 size={12} className="text-slate-950" />
+                          ✨ TAILORED ASSETS READY (PDFs)
+                        </div>
+                      ) : isTopFit ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider w-max shadow-2xs animate-pulse">
                           <Flame size={12} className="text-amber-900 fill-amber-900" />
                           🏆 TOP FIT OPPORTUNITY
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Card Header & Scores */}
                       <div className="space-y-2.5">
@@ -840,17 +851,46 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
                         </div>
                       </div>
 
+                      {/* Direct PDF Quick-Download Bar for Generated Docs */}
+                      {hasCustomDocs && (
+                        <div className="pt-2 border-t border-emerald-200/80 flex items-center gap-2 font-mono">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadResumePdf(job.resumeText, job);
+                            }}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                            title="Download Tailored Resume PDF"
+                          >
+                            <Download size={11} /> RESUME (PDF)
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadCoverLetterPdf(job.coverLetterText, job);
+                            }}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                            title="Download Tailored Cover Letter PDF"
+                          >
+                            <Download size={11} /> COVER (PDF)
+                          </button>
+                        </div>
+                      )}
+
                       {/* Action Buttons */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
                           className={`flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1 cursor-pointer ${
-                            isTopFit
+                            hasCustomDocs
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-2xs'
+                              : isTopFit
                               ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-2xs'
                               : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
                           }`}
                         >
-                          <Sparkles size={13} className={isTopFit ? "text-indigo-200 animate-spin-slow" : "text-indigo-600"} /> PACK
+                          <Sparkles size={13} className={hasCustomDocs ? "text-emerald-200" : isTopFit ? "text-indigo-200 animate-spin-slow" : "text-indigo-600"} /> 
+                          {hasCustomDocs ? 'STUDIO (READY)' : 'PACK'}
                         </button>
 
                         <button

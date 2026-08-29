@@ -46,14 +46,14 @@ KEY INSTRUCTIONS (apply all of these):
 
 Now generate: (1) a tailored resume, then the separator ===COVER_LETTER===, then (2) a tailored cover letter.`;
 
-export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
-  const [activeTab, setActiveTab]             = useState('overview');
-  const [resumeText, setResumeText]           = useState('');
-  const [coverLetterText, setCoverLetterText] = useState('');
+export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs }) => {
+  const [activeTab, setActiveTab]             = useState(job.hasCustomDocs ? 'quality' : 'overview');
+  const [resumeText, setResumeText]           = useState(job.resumeText || '');
+  const [coverLetterText, setCoverLetterText] = useState(job.coverLetterText || '');
   const [isGenerating, setIsGenerating]       = useState(false);
   const [genProgress, setGenProgress]         = useState('');
   const [genError, setGenError]               = useState('');
-  const [genMeta, setGenMeta]                 = useState(null);
+  const [genMeta, setGenMeta]                 = useState(job.hasCustomDocs ? { model: job.docsModel || 'GLM 5.3 Flash', elapsedMs: 0 } : null);
   const [copiedPrompt, setCopiedPrompt]       = useState(false);
   const [copiedText, setCopiedText]           = useState(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
@@ -124,6 +124,16 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
       setGenMeta({ model: result.model, elapsedMs: result.elapsedMs });
       setGenProgress('');
       
+      // Persist generated assets to job record and local storage
+      if (onSaveCustomDocs) {
+        onSaveCustomDocs(job.id, {
+          resumeText: result.resume || '',
+          coverLetterText: result.coverLetter || '',
+          model: result.model,
+          generatedAt: new Date().toISOString()
+        });
+      }
+
       // Automatically transition to the Double-Check Quality Gate tab
       setTimeout(() => {
         setActiveTab('quality');
@@ -135,7 +145,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus }) => {
     } finally {
       setIsGenerating(false);
     }
-  }, [job]);
+  }, [job, onSaveCustomDocs]);
 
   // ── Gemini Gem ─────────────────────────────────────────────────────────────
   const handleLaunchGem = () => {

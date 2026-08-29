@@ -382,6 +382,18 @@ export const Dashboard = () => {
         <GeneratorModal 
           job={selectedForGenerator} 
           onClose={() => setSelectedForGenerator(null)} 
+          onUpdateStatus={(jobId, status, extraData) => {
+            updateJobStatus(jobId, status, extraData);
+          }}
+          onSaveCustomDocs={(jobId, docData) => {
+            updateJobStatus(jobId, 'Package Prepared / To Submit', {
+              hasCustomDocs: true,
+              resumeText: docData.resumeText,
+              coverLetterText: docData.coverLetterText,
+              docsModel: docData.model,
+              docsGeneratedAt: docData.generatedAt || new Date().toISOString()
+            });
+          }}
         />
       )}
 

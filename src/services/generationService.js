@@ -90,10 +90,12 @@ export const CANDIDATE_PROFILE = {
 };
 
 export const AVAILABLE_MODELS = [
-  { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Active Default)', description: 'Fast, reasoning-capable, high-precision technical output' },
-  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat', description: 'Exceptional ATS keyword reasoning & structural flow' },
-  { id: 'google/gemini-2.0-flash-001', name: 'Google Gemini 2.0 Flash', description: 'Ultra-fast, high structured compliance' },
-  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Elite executive voice & cover letter craftsmanship' }
+  { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet (⭐ Recommended Elite Writer)', description: 'Industry-leading executive voice, nuanced ATS keyword tailoring, and high-impact accomplishment bullets' },
+  { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o (High-Precision ATS)', description: 'Top-tier structural precision, strong metric extraction, and flawless formatting' },
+  { id: 'google/gemini-2.5-pro', name: 'Google Gemini 2.5 Pro (Deep Technical)', description: 'Deep technical reasoning and thorough skill alignment' },
+  { id: 'google/gemini-2.0-flash-001', name: 'Google Gemini 2.0 Flash (Fast & Sharp)', description: 'Ultra-fast token synthesis with robust structured markdown compliance' },
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat (High Performance)', description: 'Exceptional ATS keyword mapping and dense achievement bullets' },
+  { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Fast Flash Tier)', description: 'Rapid, lightweight generation' }
 ];
 
 export const getActiveApiKey = () => {
@@ -301,24 +303,69 @@ export const generateApplicationDocs = async (job, onProgress, onLog) => {
   log(`Initializing OpenRouter API stream [Model: ${model}]`, 'init');
   log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
 
-  const systemPrompt = `You are an elite ATS resume and executive cover letter architect for Sam Ludwig.
-Candidate Background: Senior IT Systems & Infrastructure Specialist (Melbourne, VIC, 0405 993 245, sam.ludwig@gmail.com, Australian Citizen, Baseline/NV1 Eligible).
-Verified Career Record:
-- 660,000+ users: Managed Southern Hemisphere's largest SharePoint farm (Dept. Education VIC), 99.9% uptime
-- 87% batch processing time reduction: PowerShell automation at Knosys (2hr → 15min)
-- 100+ clinical endpoints migrated: Windows 11 at St John of God with zero clinical disruption
-- 25% deployment cycle reduction: Azure DevOps CI/CD at Engage Squared
-- 15% repeat incident reduction: RCA at Capgemini
-- ACSC Essential 8, Microsoft 365, Azure, Entra ID, Intune, Autopilot, Windows Server, PowerShell 7, ServiceNow
+  const systemPrompt = `You are an elite, top-tier executive ATS resume and cover letter architect for Sam Ludwig.
 
-Strict Rules:
-1. Line 2 of resume must mirror the target job ad title EXACTLY.
-2. Every bullet must lead with the metric/outcome first, then the action.
-3. Naturally weave the job ad's exact technical keywords throughout summary, skills, and experience.
-4. Zero invented facts, dates, or metrics. Zero clichés (no "passionate", "team player", "results-driven").
-5. Cover letter in 3 paragraphs (250-350 words): Hook -> Value match with 2 metrics -> Direct CTA.
-6. Australian English spelling (organisation, prioritise, analyse).
-7. Format: Return the Tailored Resume, then exactly ===COVER_LETTER===, then the Tailored Cover Letter.`;
+CANDIDATE MASTER PROFILE & VERIFIED CAREER RECORD:
+${MASTER_RESUME_HIGHLIGHTS}
+
+STRICT ARCHITECTURAL REQUIREMENTS:
+
+1. RESUME FORMATTING & STRUCTURE (Markdown):
+   # SAM LUDWIG
+   [Mirror Target Role Title EXACTLY from the job ad]
+   Melbourne, VIC | 0405 993 245 | sam.ludwig@gmail.com | Australian Citizen | Baseline / NV1 Ready
+
+   ## PROFESSIONAL SUMMARY
+   Write a compelling 3-sentence executive summary emphasizing deep expertise in enterprise IT systems, M365/Azure, automation, and proven scale (660,000+ users, 99.9% uptime). Tailor directly to the target employer's core mission.
+
+   ## CORE TECHNICAL COMPETENCIES
+   Organize into categorized bulleted clusters:
+   - Cloud & Identity: Microsoft 365, Azure, Entra ID (Azure AD), Intune, Autopilot, Exchange Online, Hybrid Identity
+   - Systems & Workplace Infrastructure: Windows Server 2016-2022, Active Directory, Group Policy, VMware, SOE Deployment
+   - Automation & Tooling: PowerShell 7, PnP PowerShell, Azure DevOps (CI/CD), Graph API, ServiceNow Automation
+   - Security & Governance: ACSC Essential 8, MFA Compliance, Endpoint Hardening, Least Privilege Access
+   - Service Delivery: Incident & Problem Management (ITIL v4), Root Cause Analysis (RCA), SLA Assurance, ServiceNow
+
+   ## PROFESSIONAL EXPERIENCE
+   Include all 5 relevant professional roles with clear chronology and dates. For EACH role, provide 3 to 4 substantial, impact-driven bullet points structured with measurable metrics and action verbs:
+   
+   ### L2/L3 Technical Support Engineer | Australia Post (via Capgemini)
+   *Feb 2026 – Jun 2026 | Melbourne, VIC*
+   - [3-4 detailed bullets highlighting ServiceNow keystroke automation, Windows 11 endpoint provisioning, L2/L3 escalations, and kiosk rollout]
+
+   ### Endpoint Migration Engineer | St John of God Health Care
+   *Oct 2025 – Jan 2026 | Melbourne, VIC*
+   - [3 detailed bullets highlighting 100+ clinical endpoint migration, zero patient care disruption, SOE compliance, and EMR/PACS compatibility]
+
+   ### Senior Managed Services Engineer | Capgemini (to Dept. of Education VIC)
+   *Dec 2021 – Dec 2023 | Melbourne, VIC*
+   - [4 detailed bullets highlighting 660k+ user SharePoint farm operations, 99.9% uptime, 200+ site MFA audit automation, 15% repeat incident reduction via RCA, and hybrid identity]
+
+   ### Application Support Engineer | Knosys
+   *Dec 2020 – Dec 2021 | Melbourne, VIC*
+   - [3-4 detailed bullets highlighting 95% SLA resolution, 87% batch processing time reduction via PowerShell 7 (2hr to 15min), and cloud migration support]
+
+   ### SharePoint & Cloud Solutions Consultant | Engage Squared
+   *Nov 2018 – Dec 2020 | Melbourne, VIC*
+   - [3 detailed bullets highlighting 25% deployment cycle reduction via Azure DevOps CI/CD, 5+ bespoke SPFx solutions for Victoria Police/Transurban, and Essential 8 hardening]
+
+   ## CERTIFICATIONS & EDUCATION
+   - Microsoft Certified: Azure Administrator Associate (AZ-104)
+   - ITIL 4 Foundation in IT Service Management (AXELOS)
+   - Microsoft Certified: Azure Fundamentals (AZ-900)
+   - Diploma of Information Technology | Coder Academy Melbourne
+
+2. COVER LETTER FORMATTING & STRUCTURE:
+   - 3 impactful paragraphs (250–350 words):
+     * Paragraph 1 (The Hook): Acknowledge the target employer by name, the exact role title, and lead with Sam's standout scale metric (660,000+ users, 99.9% uptime).
+     * Paragraph 2 (The Proof Points): Highlight two distinct achievements directly addressing the employer's needs (e.g. 87% PowerShell automation reduction and 15% RCA incident reduction, or clinical endpoint migration).
+     * Paragraph 3 (The Close): Highlight Melbourne location, Australian Citizenship with Baseline/NV1 eligibility, remote/hybrid readiness, and a direct, polite call to action for a 20-minute discussion.
+   - Tone: Confident, calm, highly competent, zero fluffy buzzwords.
+
+3. CRITICAL RULES:
+   - Australian English spelling (organisation, prioritise, analyse, centre).
+   - Zero hallucinations — use only the verified facts and metrics provided.
+   - SEPARATION: Output the complete Tailored Resume, followed by EXACTLY the separator line \`===COVER_LETTER===\`, followed by the Tailored Cover Letter.`;
 
   const userPrompt = `TARGET JOB:
 Title: ${job.title}

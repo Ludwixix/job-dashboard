@@ -23,13 +23,33 @@ const formatDaysAgo = (dateStr) => {
   }
 };
 
+const getJobTimestamp = (job) => {
+  if (job.appliedDate) {
+    const t = new Date(job.appliedDate).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (job.statusUpdatedAt) {
+    const t = new Date(job.statusUpdatedAt).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (job.date) {
+    const t = new Date(job.date).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (job.created_at) {
+    const t = new Date(job.created_at).getTime();
+    if (!isNaN(t)) return t;
+  }
+  return 0;
+};
+
 export const ApplicationTracker = ({ jobs, onSelectJob }) => {
   const [viewMode, setViewMode] = useState('table');
   const [showMetricsPanel, setShowMetricsPanel] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
-  const [appliedDateFilter, setAppliedDateFilter] = useState('today'); // 'today' (DEFAULT), '7days', '30days', 'all'
+  const [appliedDateFilter, setAppliedDateFilter] = useState('all'); // 'all' (DEFAULT: most recent first), 'today', '7days', '30days'
 
   // Recently Applied Submissions list (Sorted newest first)
   const recentlyAppliedJobs = useMemo(() => {
@@ -41,8 +61,8 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
                !s.includes('discovered') &&
                !s.includes('draft');
       })
-      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-      .slice(0, 8);
+      .sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a))
+      .slice(0, 15);
   }, [jobs]);
 
   // Applied Today Count
@@ -57,6 +77,7 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
       return isTrackerJob && isToday;
     }).length;
   }, [jobs]);
+
 
   // Interactive status category & date filtering (Default newest applications first)
   const trackerJobs = useMemo(() => {
@@ -109,8 +130,9 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
 
         return isTrackerJob && matchesSearch && matchesStatus && matchesSource && matchesDate;
       })
-      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      .sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
   }, [jobs, search, statusFilter, sourceFilter, appliedDateFilter]);
+
 
   const trackerStats = useMemo(() => {
     const totalSubmitted = jobs.filter(j => {

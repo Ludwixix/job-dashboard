@@ -1,11 +1,65 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Badge } from './Badge';
-import { ExternalLink, FileText, DollarSign, MapPin, Award, Clock, Download } from 'lucide-react';
+import { ExternalLink, FileText, DollarSign, MapPin, Award, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { hasGeneratedApplicationDocs } from '../services/generationService';
 
+const getJobTimestamp = (job) => {
+  if (job.appliedDate) {
+    const t = new Date(job.appliedDate).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (job.statusUpdatedAt) {
+    const t = new Date(job.statusUpdatedAt).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (job.date) {
+    const t = new Date(job.date).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (job.created_at) {
+    const t = new Date(job.created_at).getTime();
+    if (!isNaN(t)) return t;
+  }
+  return 0;
+};
+
 export const TableView = ({ jobs, onSelectJob, onResetDateFilter }) => {
+  const [sortField, setSortField] = useState('date');
+  const [sortDir, setSortDir] = useState('desc'); // 'asc' | 'desc'
+
+  const handleHeaderClick = (field) => {
+    if (sortField === field) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir(field === 'score' || field === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const sortedJobs = useMemo(() => {
+    return [...jobs].sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'date') {
+        comparison = getJobTimestamp(b) - getJobTimestamp(a);
+      } else if (sortField === 'score') {
+        comparison = (b.score || 0) - (a.score || 0);
+      } else if (sortField === 'company') {
+        comparison = (a.company || '').localeCompare(b.company || '');
+      } else if (sortField === 'title') {
+        comparison = (a.title || '').localeCompare(b.title || '');
+      } else if (sortField === 'location') {
+        comparison = (a.location || '').localeCompare(b.location || '');
+      } else if (sortField === 'status') {
+        comparison = (a.status || '').localeCompare(b.status || '');
+      } else if (sortField === 'source') {
+        comparison = (a.source || '').localeCompare(b.source || '');
+      }
+      return sortDir === 'asc' ? -comparison : comparison;
+    });
+  }, [jobs, sortField, sortDir]);
+
   const formatDaysAgo = (dateStr) => {
     if (!dateStr) return 'Recently';
     try {
@@ -36,24 +90,64 @@ export const TableView = ({ jobs, onSelectJob, onResetDateFilter }) => {
     );
   }
 
+  const renderSortIcon = (field) => {
+    if (sortField !== field) {
+      return <ArrowUpDown size={11} className="text-slate-400 opacity-60 group-hover/th:opacity-100" />;
+    }
+    return sortDir === 'desc' 
+      ? <ArrowDown size={12} className="text-indigo-600" />
+      : <ArrowUp size={12} className="text-indigo-600" />;
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden font-sans">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-100/80 border-b border-slate-200 text-xs font-mono font-extrabold text-slate-700 uppercase tracking-widest">
-              <th scope="col" className="py-3.5 px-6">MATCH</th>
-              <th scope="col" className="py-3.5 px-6">APPLICATION DATE</th>
-              <th scope="col" className="py-3.5 px-6">COMPANY & JOB TITLE</th>
-              <th scope="col" className="py-3.5 px-6">LOCATION</th>
-              <th scope="col" className="py-3.5 px-6">STATUS</th>
+            <tr className="bg-slate-100/80 border-b border-slate-200 text-xs font-mono font-extrabold text-slate-700 uppercase tracking-widest select-none">
+              <th scope="col" onClick={() => handleHeaderClick('score')} className="py-3.5 px-6 cursor-pointer hover:bg-slate-200/70 transition-colors group/th">
+                <div className="flex items-center gap-1.5">
+                  <span>MATCH</span>
+                  {renderSortIcon('score')}
+                </div>
+              </th>
+              <th scope="col" onClick={() => handleHeaderClick('date')} className="py-3.5 px-6 cursor-pointer hover:bg-slate-200/70 transition-colors group/th">
+                <div className="flex items-center gap-1.5">
+                  <span>APPLICATION DATE</span>
+                  {renderSortIcon('date')}
+                </div>
+              </th>
+              <th scope="col" onClick={() => handleHeaderClick('company')} className="py-3.5 px-6 cursor-pointer hover:bg-slate-200/70 transition-colors group/th">
+                <div className="flex items-center gap-1.5">
+                  <span>COMPANY & JOB TITLE</span>
+                  {renderSortIcon('company')}
+                </div>
+              </th>
+              <th scope="col" onClick={() => handleHeaderClick('location')} className="py-3.5 px-6 cursor-pointer hover:bg-slate-200/70 transition-colors group/th">
+                <div className="flex items-center gap-1.5">
+                  <span>LOCATION</span>
+                  {renderSortIcon('location')}
+                </div>
+              </th>
+              <th scope="col" onClick={() => handleHeaderClick('status')} className="py-3.5 px-6 cursor-pointer hover:bg-slate-200/70 transition-colors group/th">
+                <div className="flex items-center gap-1.5">
+                  <span>STATUS</span>
+                  {renderSortIcon('status')}
+                </div>
+              </th>
               <th scope="col" className="py-3.5 px-6">COMPENSATION</th>
-              <th scope="col" className="py-3.5 px-6">SOURCE</th>
+              <th scope="col" onClick={() => handleHeaderClick('source')} className="py-3.5 px-6 cursor-pointer hover:bg-slate-200/70 transition-colors group/th">
+                <div className="flex items-center gap-1.5">
+                  <span>SOURCE</span>
+                  {renderSortIcon('source')}
+                </div>
+              </th>
               <th scope="col" className="py-3.5 px-6 text-right">ACTIONS & ASSETS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/70 text-xs">
-            {jobs.map((job) => {
+            {sortedJobs.map((job) => {
+
               const hasCustomDocs = hasGeneratedApplicationDocs(job);
               return (
                 <tr 

@@ -11,10 +11,12 @@ import {
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText
 } from 'lucide-react';
 
-
+import { AutoApplyModal } from './AutoApplyModal';
+import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
 import { calculateCandidateJobMatch, calculateCandidateDistanceKm } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
+
 
 const getAgeInDays = (dateStr) => {
   if (!dateStr) return 0;
@@ -179,6 +181,7 @@ export const JobSeeker = ({
   const gridTopRef = useRef(null);
 
   const [selectedForGenerator, setSelectedForGenerator] = useState(null);
+  const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
   const [scraping, setScraping] = useState(false);
   const [scrapeSuccess, setScrapeSuccess] = useState(false);
   const [scrapedCount, setScrapedCount] = useState(null);
@@ -230,6 +233,7 @@ export const JobSeeker = ({
     const counts = { 
       All: unsubmittedJobs.length,
       TopFit: 0,
+      QuickApply: 0,
       ReadyForSubmission: readyToSubmitCount,
       'Healthcare & Medical': 0,
       'Finance & Accounting': 0,
@@ -250,12 +254,16 @@ export const JobSeeker = ({
       if (match.score >= 85) {
         counts.TopFit = (counts.TopFit || 0) + 1;
       }
+      if (isQuickApplyEligible(j)) {
+        counts.QuickApply = (counts.QuickApply || 0) + 1;
+      }
       const subStream = getJobSubStream(j);
       counts[subStream] = (counts[subStream] || 0) + 1;
     });
 
     return counts;
   }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs, currentProfile]);
+
 
   const seekerJobs = useMemo(() => {
     const sourcePool = activeStreamTab === 'Rejected Jobs' ? rejectedJobs : unsubmittedJobs;
@@ -284,6 +292,8 @@ export const JobSeeker = ({
       let matchesStream = true;
       if (activeStreamTab === 'TopFit') {
         matchesStream = (job.score || 0) >= 85;
+      } else if (activeStreamTab === 'QuickApply') {
+        matchesStream = isQuickApplyEligible(job);
       } else if (activeStreamTab === 'ReadyForSubmission') {
         matchesStream = hasGeneratedApplicationDocs(job);
       } else if (activeStreamTab !== 'All' && activeStreamTab !== 'Rejected Jobs') {
@@ -292,6 +302,7 @@ export const JobSeeker = ({
                         (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
                         (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
       }
+
 
       // Dedicated Docs Ready filter toggle
       let matchesDocsReady = true;
@@ -481,8 +492,10 @@ export const JobSeeker = ({
   const STREAM_TAB_DEFINITIONS = [
     { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
     { id: 'TopFit', name: '⭐ MY TOP MATCHES', icon: Star, color: 'amber', highlight: true },
+    { id: 'QuickApply', name: '⚡ AUTO-APPLY (LINKEDIN & SEEK)', icon: Zap, color: 'indigo', highlight: true },
     { id: 'ReadyForSubmission', name: '📄 GENERATED (CV & COVER LETTER)', icon: FileText, color: 'emerald', highlight: true },
     { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
+    { id: 'Finance & Accounting', name: 'FINANCE & BANKING', icon: TrendingUp, color: 'emerald' },
     { id: 'Marketing & Sales', name: 'MARKETING & GROWTH', icon: Megaphone, color: 'amber' },
     { id: 'Construction & Trades', name: 'CONSTRUCTION & TRADES', icon: HardHat, color: 'orange' },
     { id: 'HR & Operations', name: 'HR & PEOPLE OPS', icon: Users, color: 'purple' },
@@ -493,6 +506,7 @@ export const JobSeeker = ({
     { id: 'Education & Training', name: 'EDUCATION & TRAINING', icon: GraduationCap, color: 'indigo' },
     { id: 'Rejected Jobs', name: 'REJECTED JOBS', icon: Trash2, color: 'rose' },
   ];
+
 
   return (
     <div className="space-y-6 font-sans">
@@ -1035,6 +1049,19 @@ export const JobSeeker = ({
 
                       {/* Action Buttons */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
+                        {/* Auto-Apply Launcher Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAutoApplyJob(job);
+                          }}
+                          className="py-2 px-2.5 rounded-xl font-bold text-xs bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-500/40 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                          title={`Launch Auto-Apply for ${getQuickApplyPlatform(job)}`}
+                        >
+                          <Zap size={12} className="text-amber-400 animate-pulse" />
+                          <span>AUTO-APPLY</span>
+                        </button>
+
                         {hasCustomDocs ? (
                           <>
                             <button
@@ -1042,28 +1069,28 @@ export const JobSeeker = ({
                                 e.stopPropagation(); 
                                 dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
                               }}
-                              className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
+                              className="flex-1 py-2 px-2.5 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
                               title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
                             >
-                              <Zap size={13} className="text-amber-300" /> 
-                              <span>APPLY (1-CLICK)</span>
+                              <CheckCircle2 size={12} className="text-emerald-200" /> 
+                              <span>APPLY</span>
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
-                              className="py-2 px-2.5 rounded-xl font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
+                              className="py-2 px-2 rounded-xl font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
                               title="Open in AI Studio to edit or customize"
                             >
-                              <Sparkles size={13} className="text-emerald-700" />
+                              <Sparkles size={12} className="text-emerald-700" />
                             </button>
                           </>
                         ) : isGeneratingThisJob ? (
                           <button
                             disabled
-                            className="flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-2 shadow-inner cursor-not-allowed font-mono animate-pulse"
+                            className="flex-1 py-2 px-2 rounded-xl font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 shadow-inner cursor-not-allowed font-mono animate-pulse"
                             title="Application synthesis in progress..."
                           >
-                            <RefreshCw size={13} className="animate-spin text-slate-950" />
-                            <span>SYNTHESIZING (0–25s)…</span>
+                            <RefreshCw size={12} className="animate-spin text-slate-950" />
+                            <span>SYNTHESIZING…</span>
                           </button>
                         ) : (
                           <button
@@ -1075,19 +1102,19 @@ export const JobSeeker = ({
                                 setSelectedForGenerator(job);
                               }
                             }}
-                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-500 shadow-md hover:shadow-indigo-500/20 tracking-wide uppercase"
+                            className="flex-1 py-2 px-2 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1 cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-500 shadow-md hover:shadow-indigo-500/20 tracking-wide uppercase"
                             title="Dispatch 1-Click Background Application Generation & Google Drive Sync"
                           >
-                            <Zap size={13} className="text-amber-300" />
-                            <span>CREATE APPLICATION</span>
+                            <Sparkles size={12} className="text-amber-300" />
+                            <span>PREP DOCS</span>
                           </button>
                         )}
 
                         <button
                           onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
-                          className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1 cursor-pointer"
+                          className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <Eye size={13} className="text-slate-600" /> INFO
+                          <Eye size={12} className="text-slate-600" />
                         </button>
 
                         {job.portalLink && (
@@ -1096,15 +1123,16 @@ export const JobSeeker = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                            className="py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            <ExternalLink size={13} />
+                            <ExternalLink size={12} />
                           </a>
                         )}
                       </div>
                     </div>
                   );
                 })}
+
               </div>
 
               {/* Interactive Pagination Navigation Bar */}
@@ -1202,6 +1230,16 @@ export const JobSeeker = ({
           onClose={() => setSelectedForGenerator(null)} 
         />
       )}
+
+      {/* Auto-Apply Engine Modal (LinkedIn Easy Apply & SEEK Quick Apply) */}
+      {selectedAutoApplyJob && (
+        <AutoApplyModal 
+          job={selectedAutoApplyJob} 
+          onClose={() => setSelectedAutoApplyJob(null)}
+          onJobStatusUpdated={onJobStatusUpdate}
+        />
+      )}
     </div>
   );
 };
+

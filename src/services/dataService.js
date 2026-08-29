@@ -48,8 +48,52 @@ export const calculateCandidateMatchScore = (row) => {
   return Math.min(98, Math.max(55, matchScore));
 };
 
+/**
+ * Validates whether a URL points to an actual external job listing
+ * and NOT to candidate Google Docs, Google Drive, or user profile pages.
+ */
+export const isJobAdUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const clean = url.trim().toLowerCase();
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) return false;
+  if (clean.includes('docs.google.com') || clean.includes('drive.google.com')) return false;
+  if (clean.includes('linkedin.com/in/') || clean.includes('samludwig.au') || clean.includes('github.com/ludwixix')) return false;
+  return true;
+};
+
+/**
+ * Resolves a direct job ad URL, extracting from candidate row, notes, or generating a direct SEEK / employer search link.
+ */
+export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '') => {
+  if (isJobAdUrl(rawLink)) {
+    return rawLink.trim();
+  }
+
+  // Extract from notes text if present
+  if (notesStr) {
+    const matchedUrls = notesStr.match(/https?:\/\/[^\s|)]+/gi) || [];
+    for (const u of matchedUrls) {
+      if (isJobAdUrl(u)) {
+        return u.trim();
+      }
+    }
+  }
+
+  // Fallback: direct targeted SEEK search link for this exact company & position
+  const comp = String(company || '').trim();
+  const tit = String(title || '').trim();
+  if (tit || comp) {
+    const query = encodeURIComponent(`${tit} ${comp} Melbourne`.trim());
+    return `https://www.seek.com.au/jobs?keywords=${query}`;
+  }
+
+  return 'https://www.seek.com.au';
+};
+
 const parseMetadata = (row, index) => {
   const notesStr = row['Notes & Next Steps'] || row['notes'] || row['description'] || row['why'] || '';
+  const company = row['Company'] || row['company'] || 'Unknown Company';
+  const title = row['Job Title'] || row['title'] || 'Unknown Title';
   
   let salary = row['salary'] || null;
   if (!salary || salary === '') {
@@ -78,6 +122,10 @@ const parseMetadata = (row, index) => {
     }
   }
 
+  // Direct Job Ad portal link resolution (strictly excludes google docs / profile links)
+  const rawPortal = row['Email / Portal Link'] || row['portalLink'] || row['url'] || row['application_route'] || row['link'] || '';
+  const portalLink = resolveJobAdLink(rawPortal, notesStr, company, title);
+
   // Parse rich audit & score
   const matchScore = calculateCandidateMatchScore(row);
   const location = row['location'] || row['Location'] || 'Melbourne, VIC';
@@ -85,16 +133,17 @@ const parseMetadata = (row, index) => {
   const tags = Array.isArray(row['tags']) ? row['tags'] : [];
   const audit = row['audit'] || null;
   const remote = row['remote'] || false;
+  const status = row['Status'] || row['status'] || 'Package Prepared / To Submit';
 
   return {
     id: String(index),
     date: row['Date'] || row['date'] || row['posted'] || new Date().toISOString().split('T')[0],
-    company: row['Company'] || row['company'] || 'Unknown Company',
-    title: row['Job Title'] || row['title'] || 'Unknown Title',
-    status: row['Status'] || row['status'] || 'Package Prepared / To Submit',
+    company,
+    title,
+    status,
     source: row['Source'] || row['source'] || 'SEEK',
     emailSubject: row['Email Subject'] || row['emailSubject'] || '',
-    portalLink: row['Email / Portal Link'] || row['portalLink'] || row['url'] || row['application_route'] || row['link'] || '',
+    portalLink,
     notes: notesStr,
     salary,
     coverLetterLink,
@@ -115,9 +164,11 @@ const parseSuggestionRow = (row, index) => {
 
   const location = row['Location'] || row['location'] || 'Melbourne, VIC';
   const source = row['Source / Platform'] || row['Source'] || 'Suggested Role';
-  const portalLink = row['Job Ad / Email Link'] || row['portalLink'] || '';
+  const rawPortal = row['Job Ad / Email Link'] || row['portalLink'] || '';
   const notes = row['Key Highlights'] || row['notes'] || '';
   const date = row['Date'] || new Date().toISOString().split('T')[0];
+
+  const portalLink = resolveJobAdLink(rawPortal, notes, company, title);
 
   const candidateRow = {
     'Company': company,

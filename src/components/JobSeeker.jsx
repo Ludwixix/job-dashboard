@@ -4,7 +4,7 @@ import { TopMatchesSidebar } from './TopMatchesSidebar';
 import { 
   Sparkles, Search, Filter, 
   DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
-  SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, Briefcase, ExternalLink,
+  SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, ShoppingBag, Server, Flame, Building2, Trash2
 } from 'lucide-react';
@@ -265,7 +265,7 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
       }
       return 0;
     });
-  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy]);
+  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy]);
 
   // Paginated Sliced Jobs
   const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
@@ -868,7 +868,7 @@ export const JobSeeker = ({ jobs, onSelectJob, baseLocation = 'BALACLAVA VIC 318
                             onClick={(e) => e.stopPropagation()}
                             className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            APPLY <ExternalLink size={13} />
+                            JOB AD <ExternalLink size={13} />
                           </a>
                         )}
                       </div>

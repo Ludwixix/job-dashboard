@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, BookOpen, MessageSquare, Check, Copy, HelpCircle, Trophy, Layers } from 'lucide-react';
+import { X, Sparkles, MessageSquare, Check, Copy, HelpCircle, Trophy } from 'lucide-react';
 import { generateInterviewGuide } from '../services/generationService';
 
 export const InterviewPrepModal = ({ job, onClose }) => {

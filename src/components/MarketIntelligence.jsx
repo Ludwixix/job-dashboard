@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { 
   TrendingUp, Award, CheckCircle2, AlertTriangle, ShieldCheck, 
-  DollarSign, MapPin, Layers, Target, Compass, Sparkles, BookOpen 
+  Target, Sparkles, BookOpen 
 } from 'lucide-react';
 import { analyzeMarketTrends, generateSkillGapReport } from '../services/generationService';
 

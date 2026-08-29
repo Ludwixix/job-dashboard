@@ -508,7 +508,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer col-span-1 sm:col-span-2"
                   >
-                    <ExternalLink size={16} /> OPEN DIRECT APPLICATION LINK
+                    <ExternalLink size={16} /> OPEN DIRECT JOB AD
                   </a>
                 )}
 

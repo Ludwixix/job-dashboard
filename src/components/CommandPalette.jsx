@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Sparkles, Zap, Briefcase, X, ArrowRight, Sliders, ExternalLink } from 'lucide-react';
+import { Search, Sparkles, Briefcase, ArrowRight, Sliders } from 'lucide-react';
 
 export const CommandPalette = ({ isOpen, onClose, jobs = [], onSelectJob, onNavigateView }) => {
   const [query, setQuery] = useState('');

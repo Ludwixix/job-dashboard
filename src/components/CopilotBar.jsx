@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Bot, Sparkles, ArrowRight, Zap, ShieldCheck, Search, Activity } from 'lucide-react';
+import { Bot, Search, Zap } from 'lucide-react';
 import { generateAgentInsights } from '../services/generationService';
 
 export const CopilotBar = ({ 

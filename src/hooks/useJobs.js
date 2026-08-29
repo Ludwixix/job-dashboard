@@ -62,20 +62,60 @@ export const useJobs = () => {
 
   const refetch = loadData;
 
-  // ── Merge overrides + rejection flags on top of remote data ───────────────
+  // ── Merge overrides + non-responsive policy + rejection flags ──────────────
+  const [currentTime] = useState(() => Date.now());
+
   const enrichedJobs = useMemo(() => {
+    const now = currentTime;
+
     return rawJobs.map(j => {
       const key   = jobKey(j);
       const patch = overrides[key] || {};
       const merged = { ...j, ...patch };
+
+      let status = merged.status || 'Package Prepared / To Submit';
+      const statusLower = status.toLowerCase();
+
+      // Non-responsive employer auto-closing rule:
+      // If applied >= 14 days ago and no subsequent status update (e.g. interview/offer), auto-close.
+      const isApplied = statusLower.includes('applied') || statusLower.includes('submitted');
+      const isInterviewOrOffer = statusLower.includes('interview') || 
+                                 statusLower.includes('offer') || 
+                                 statusLower.includes('unsuccessful') || 
+                                 statusLower.includes('closed') ||
+                                 statusLower.includes('non-responsive');
+
+      let isNonResponsive = false;
+      if (isApplied && !isInterviewOrOffer && merged.date) {
+        try {
+          const appliedDate = new Date(merged.date);
+          const diffDays = Math.floor((now - appliedDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays >= 14) {
+            status = 'Non-Responsive Employer (Closed)';
+            isNonResponsive = true;
+          }
+        } catch {
+          // ignore date parse errors
+        }
+      }
+
       const isRejected =
         rejectedIds.includes(String(j.id)) ||
         rejectedIds.includes(`${j.company}_${j.title}`) ||
-        (merged.status || '').toLowerCase().includes('rejected') ||
-        (merged.status || '').toLowerCase().includes('dismissed');
-      return { ...merged, isRejected };
+        statusLower.includes('rejected') ||
+        statusLower.includes('dismissed');
+
+      const isClosed = isNonResponsive || statusLower.includes('closed') || statusLower.includes('unsuccessful');
+
+      return { 
+        ...merged, 
+        status, 
+        isRejected,
+        isNonResponsive,
+        isClosed 
+      };
     });
-  }, [rawJobs, overrides, rejectedIds]);
+  }, [rawJobs, overrides, rejectedIds, currentTime]);
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
 
@@ -118,7 +158,6 @@ export const useJobs = () => {
 
   const unrejectJob = useCallback((targetJobIdentifier) => {
     setRejectedIds(prev => prev.filter(id => id !== String(targetJobIdentifier)));
-    // Remove the status override so the job reverts to its original status
     setOverrides(prev => {
       const next  = { ...prev };
       const match = rawJobs.find(j =>
@@ -137,6 +176,20 @@ export const useJobs = () => {
       return next;
     });
   }, [rawJobs]);
+
+  /** Batch closes all applied jobs that have had no updates for >= 14 days */
+  const closeNonResponsiveJobs = useCallback(() => {
+    setOverrides(prev => {
+      const next = { ...prev };
+      enrichedJobs.forEach(job => {
+        if (job.isNonResponsive) {
+          const key = jobKey(job);
+          next[key] = { ...(prev[key] || {}), status: 'Non-Responsive Employer (Closed)' };
+        }
+      });
+      return next;
+    });
+  }, [enrichedJobs]);
 
   // ── Filtered view for ApplicationTracker ─────────────────────────────────
   const filteredJobs = useMemo(() => {
@@ -166,6 +219,7 @@ export const useJobs = () => {
     rejectedIds,
     rejectJob,
     unrejectJob,
+    closeNonResponsiveJobs,
     loading,
     error,
     refetch,

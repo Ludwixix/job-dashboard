@@ -15,7 +15,6 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isAutoApplying, setIsAutoApplying] = useState(false);
   const [pipelineStage, setPipelineStage] = useState(1);
-  const [pipelineMsg, setPipelineMsg] = useState('');
   const [autoApplyReceipt, setAutoApplyReceipt] = useState(null);
   const [activeReceiptTab, setActiveReceiptTab] = useState('fields'); // 'fields', 'resume', 'cover'
 

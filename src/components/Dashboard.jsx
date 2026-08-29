@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useJobs } from '../hooks/useJobs';
 import { ApplicationTracker } from './ApplicationTracker';
 import { JobSeeker } from './JobSeeker';
@@ -12,7 +12,7 @@ import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
-  MapPin, Edit2, Check, X, Download, Command, Zap, LayoutGrid, CheckCircle2,
+  MapPin, Download, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table 
 } from 'lucide-react';
 

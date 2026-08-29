@@ -813,23 +813,18 @@ def make_handler(app: DashboardApp):
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8787",
-    }
-
     class Handler(BaseHTTPRequestHandler):
         def _cors_origin(self):
             origin = self.headers.get("Origin", "")
-            if origin in _ALLOWED_ORIGINS:
-                return origin
-            # Allow any localhost origin for development
-            if origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
-                return origin
-            return list(_ALLOWED_ORIGINS)[0]
+            return origin or "*"
+
 
         def _send_cors_headers(self):
             self.send_header("Access-Control-Allow-Origin", self._cors_origin())
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
             self.send_header("Access-Control-Max-Age", "86400")
+
 
         def do_OPTIONS(self):
             """Handle CORS preflight requests."""
@@ -879,12 +874,14 @@ def make_handler(app: DashboardApp):
                 except ImportError:
                     self.send_json(200, {"metrics": "not_available"})
                     return
-            if path == "/api/jobs":
+            if path in ("/api/jobs", "/api/scraped-jobs"):
                 query = parse_qs(parsed.query)
                 filters = {key: query[key][0] for key in ("location", "role", "source", "stream", "status") if key in query}
                 filters["match_score_min"] = int(query.get("match_score_min", [0])[0])
-                self.send_json(200, {"jobs": app.public_jobs(filters)})
+                jobs = app.public_jobs(filters)
+                self.send_json(200, {"success": True, "jobs": jobs})
                 return
+
             if path == "/api/metrics/summary":
                 metrics = app.repository.metrics()
                 metrics["tracker_state"] = app.tracker_state
@@ -1174,7 +1171,39 @@ def make_handler(app: DashboardApp):
             path = parsed.path
             
             try:
-                # Handle POST endpoints
+                if path == "/api/refresh":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    queries = [
+                        SearchQuery(
+                            item["term"],
+                            item.get("location", "Melbourne, VIC"),
+                            item.get("stream", "core-it"),
+                            item.get("group", ""),
+                            float(item.get("weight", 1.0)),
+                            tuple(item.get("exclude_terms", [])),
+                            bool(item.get("enabled", True))
+                        )
+                        for item in payload.get("queries", [])
+                    ]
+                    force = bool(payload.get("force", False))
+                    ttl_hours = float(payload.get("ttl_hours", 12.0))
+                    jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                    self.send_json(200, {
+                        "jobs": jobs,
+                        "errors": errors,
+                        "cache_stats": cache_stats,
+                        "success": True
+                    })
+                    return
+
+                if path == "/api/search-criteria":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    self.send_json(200, {"queries": app.update_search_queries(payload.get("queries", []))})
+                    return
+
+                # Handle POST generation endpoints
                 if path.startswith("/api/jobs/") and path.endswith("/generate"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/generate")
                     status = app.start_generation(job_id)
@@ -1191,15 +1220,11 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, app.generated_documents[job_id])
                     return
                 
-                # If no POST endpoint matches, return 501 (Method Not Implemented)
-                # to match the existing behavior
-                self.send_response(501)
-                self.send_header("Content-Type", "text/html;charset=utf-8")
-                self.end_headers()
-                self.wfile.write(b"<!DOCTYPE HTML>\n<html lang=\"en\">\n    <head>\n        <meta charset=\"utf-8\">\n        <style type=\"text/css\">\n            :root {\n                color-scheme: light dark;\n            }\n        </style>\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 501</p>\n        <p>Message: Unsupported method ('POST').</p>\n        <p>Error code explanation: 501 - Server does not support this operation.</p>\n    </body>\n</html>")
+                self.send_json(404, {"error": f"Endpoint not found: {path}"})
                 
             except Exception as error:
                 self.send_json(500, {"error": str(error)})
+
         
         def log_message(self, *_args):
             return

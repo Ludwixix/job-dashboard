@@ -814,10 +814,13 @@ def make_handler(app: DashboardApp):
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8787",
+    }
+
     class Handler(BaseHTTPRequestHandler):
         def _cors_origin(self):
             origin = self.headers.get("Origin", "")
             return origin or "*"
+
 
 
         def _send_cors_headers(self):

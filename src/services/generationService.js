@@ -284,87 +284,103 @@ Australian Citizen | Unrestricted Work Rights`;
  */
 export const generateApplicationDocs = async (job, onProgress) => {
   const apiKey = getActiveApiKey();
-  const model = getActiveModel();
+  const model = getActiveModel() || 'z-ai/glm-5.3-flash';
 
-  if (apiKey) {
-    try {
-      onProgress?.(`Calling OpenRouter API directly (${model})…`);
-      const startTime = Date.now();
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is required for live AI generation. Please enter your key in the box below or in Settings.');
+  }
 
-      const systemPrompt = `You are an elite resume and cover letter architect specializing in Australian enterprise IT and cloud infrastructure hiring.
-You strictly enforce:
-1. Pass ATS keyword matching: naturally weave exact technical terms from the job description into summary, skills, and experience.
-2. The top third of the resume must hook immediately with real numbers and outcomes.
-3. Use result-first bullet structure: lead with the metric/outcome, then the action.
-4. Professional title on line 2 must mirror the target job ad title exactly.
-5. Draw exclusively from the candidate's verified career record — NEVER invent facts, metrics, or dates.
-6. Cover letter in 3 paragraphs (250-350 words): Hook -> Value fit -> CTA.
-7. Australian English spelling throughout (organisation, prioritise, analyse).
-8. Return resume, then exactly ===COVER_LETTER===, then cover letter.`;
+  onProgress?.(`Contacting OpenRouter (${model})…`);
+  const startTime = Date.now();
 
-      const userPrompt = `TARGET ROLE:
+  const systemPrompt = `You are an elite ATS resume and executive cover letter architect for Sam Ludwig.
+Candidate Background: Senior IT Systems & Infrastructure Specialist (Melbourne, VIC, 0405 993 245, sam.ludwig@gmail.com, Australian Citizen, Baseline/NV1 Eligible).
+Verified Career Record:
+- 660,000+ users: Managed Southern Hemisphere's largest SharePoint farm (Dept. Education VIC), 99.9% uptime
+- 87% batch processing time reduction: PowerShell automation at Knosys (2hr → 15min)
+- 100+ clinical endpoints migrated: Windows 11 at St John of God with zero clinical disruption
+- 25% deployment cycle reduction: Azure DevOps CI/CD at Engage Squared
+- 15% repeat incident reduction: RCA at Capgemini
+- ACSC Essential 8, Microsoft 365, Azure, Entra ID, Intune, Autopilot, Windows Server, PowerShell 7, ServiceNow
+
+Strict Rules:
+1. Line 2 of resume must mirror the target job ad title EXACTLY.
+2. Every bullet must lead with the metric/outcome first, then the action.
+3. Naturally weave the job ad's exact technical keywords throughout summary, skills, and experience.
+4. Zero invented facts, dates, or metrics. Zero clichés (no "passionate", "team player", "results-driven").
+5. Cover letter in 3 paragraphs (250-350 words): Hook -> Value match with 2 metrics -> Direct CTA.
+6. Australian English spelling (organisation, prioritise, analyse).
+7. Format: Return the Tailored Resume, then exactly ===COVER_LETTER===, then the Tailored Cover Letter.`;
+
+  const userPrompt = `TARGET JOB:
 Title: ${job.title}
 Company: ${job.company}
 Location: ${job.location || 'Melbourne, VIC'}
 ${job.salary ? `Salary: ${job.salary}` : ''}
-
-JOB DESCRIPTION & KEYWORDS:
+Job Details & Requirements:
 ${job.notes || job.description || 'Enterprise IT infrastructure, systems engineering, and workplace support.'}
 
-CANDIDATE MASTER RECORD:
-${MASTER_RESUME_HIGHLIGHTS}
+Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover Letter.`;
 
-Generate: (1) ATS Tailored Resume, (2) separator ===COVER_LETTER===, (3) Tailored Cover Letter.`;
+  onProgress?.(`GLM 5.3 Flash is reasoning and drafting tailored application…`);
 
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://ludwixix.github.io/job-dashboard-react/',
-          'X-Title': 'Job Dashboard Application Studio'
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 4500
-        })
-      });
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://ludwixix.github.io/job-dashboard-react/',
+      'X-Title': 'Job Dashboard Application Studio'
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 4500
+    })
+  });
 
-      if (res.ok) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content || '';
-        if (content) {
-          const sepIdx = content.indexOf('===COVER_LETTER===');
-          let resume = '', coverLetter = '';
-          if (sepIdx !== -1) {
-            resume = content.slice(0, sepIdx).trim();
-            coverLetter = content.slice(sepIdx + '===COVER_LETTER==='.length).trim();
-          } else {
-            resume = content.trim();
-          }
-          return {
-            success: true,
-            resume,
-            coverLetter,
-            model: `${model} (Live API)`,
-            elapsedMs: Date.now() - startTime
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('Direct OpenRouter call error, falling back:', err);
-    }
+  if (!res.ok) {
+    let errDetail = `HTTP ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (errJson?.error?.message) errDetail = errJson.error.message;
+    } catch {}
+    throw new Error(`OpenRouter API Error: ${errDetail}`);
   }
 
-  // Graceful grounded fallback
-  onProgress?.('Synthesizing verified career metrics…');
-  await new Promise(r => setTimeout(r, 600));
-  return generateClientSideTailoredDocs(job);
+  const data = await res.json();
+  const choice = data?.choices?.[0];
+  const msg = choice?.message || {};
+  let content = msg.content || choice?.text || '';
+
+  if (!content && msg.reasoning) {
+    content = msg.reasoning;
+  }
+
+  if (!content) {
+    throw new Error('OpenRouter returned an empty response. Please check model quota or try again.');
+  }
+
+  const sepIdx = content.indexOf('===COVER_LETTER===');
+  let resume = '', coverLetter = '';
+  if (sepIdx !== -1) {
+    resume = content.slice(0, sepIdx).trim();
+    coverLetter = content.slice(sepIdx + '===COVER_LETTER==='.length).trim();
+  } else {
+    resume = content.trim();
+  }
+
+  return {
+    success: true,
+    resume,
+    coverLetter,
+    model: `${model} (Live OpenRouter API)`,
+    elapsedMs: Date.now() - startTime
+  };
 };
 
 /**

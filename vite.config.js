@@ -246,7 +246,7 @@ Return the resume first, then exactly ===COVER_LETTER=== on its own line, then o
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Length': Buffer.byteLength(postData),
                     'HTTP-Referer': 'http://localhost:5173',
-                    'X-Title': 'Job Dashboard — Document Generator',
+                    'X-Title': 'Job Dashboard - Document Generator',
                   },
                 };
 

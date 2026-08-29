@@ -10,6 +10,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { CommandPalette } from './CommandPalette';
 import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
+import { generateApplicationDocs } from '../services/generationService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Download, Command, Zap, LayoutGrid, CheckCircle2,

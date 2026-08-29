@@ -15,7 +15,9 @@ export const DEFAULT_PROFILES = [
     workRights: 'Australian Citizen | Baseline / NV1 Eligible',
     clearance: 'Baseline / NV1 Ready',
     targetSalary: '$115,000 + Super',
+    industry: 'Technology & IT',
     targetTitles: [
+
       'Senior Systems Engineer', 'M365 Engineer', 'Cloud Infrastructure Engineer',
       'SharePoint Administrator', 'IT Operations Lead', 'Platform Support Engineer'
     ],

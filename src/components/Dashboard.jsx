@@ -15,13 +15,15 @@ import { ProfileModal } from './ProfileModal';
 import { AuthModal } from './AuthModal';
 import { GoogleIntegrationModal } from './GoogleIntegrationModal';
 import { generateApplicationDocs } from '../services/generationService';
-import { getActiveProfile } from '../services/profileService';
+import { getActiveProfile, saveProfile } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
 import { logoutUser } from '../services/authService';
+import { fetchJobsForProfile } from '../services/dataService';
+import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon
 } from 'lucide-react';
 
 export const Dashboard = ({ currentUser, onSignOut }) => {
@@ -43,9 +45,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isGoogleIntegrationOpen, setIsGoogleIntegrationOpen] = useState(false);
 
+  // Profile-aware scraping state
+  const [profileScrapeStatus, setProfileScrapeStatus] = useState(null); // null | 'loading' | 'done' | 'error'
+  const [profileScrapeMsg, setProfileScrapeMsg] = useState('');
+  const [suggestedTitles, setSuggestedTitles] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   // Background Async Application Generation Queue
   const [asyncGeneratingIds, setAsyncGeneratingIds] = useState(new Set());
   const [backgroundNotifications, setBackgroundNotifications] = useState([]);
+
 
   const handleDispatchAsyncApplication = useCallback(async (job) => {
     const jobId = job.id || `${job.company}_${job.title}`;
@@ -125,6 +134,52 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Trigger profile-aware scrape when Google auth connects
+  useEffect(() => {
+    if (!authUser || !activeProfile) return;
+
+    const industry = activeProfile.industry || 'Technology & IT';
+    const queries = buildQueriesFromProfile(activeProfile);
+    if (!queries.length) return;
+
+    setProfileScrapeStatus('loading');
+    setProfileScrapeMsg(`🔄 Fetching ${industry} jobs matched to your profile…`);
+    setSuggestedTitles(suggestRelatedTitles(activeProfile));
+
+    fetchJobsForProfile(activeProfile).then(({ liveScraped, queriesUsed }) => {
+      if (liveScraped) {
+        setProfileScrapeMsg(`✅ Live scraped ${queriesUsed.length} search terms for ${industry}`);
+        refetch(); // reload job list from updated backend data
+      } else {
+        setProfileScrapeMsg(`🎯 Profile active — ${queriesUsed.length} query terms for ${industry} (connect backend for live scrape)`);
+      }
+      setProfileScrapeStatus('done');
+      setShowSuggestions(true);
+      // Auto-hide banner after 8s
+      setTimeout(() => setProfileScrapeStatus(null), 8000);
+    }).catch(() => {
+      setProfileScrapeStatus('error');
+      setProfileScrapeMsg('⚠️ Could not fetch profile-matched jobs');
+      setTimeout(() => setProfileScrapeStatus(null), 5000);
+    });
+  // Only re-run when Google auth user changes (not on every activeProfile edit)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?.accessToken]);
+
+  /** Add a suggested title to the active profile's targetTitles */
+  const handleAddSuggestedTitle = useCallback((title) => {
+    if (!activeProfile) return;
+    const updated = {
+      ...activeProfile,
+      targetTitles: [...new Set([...(activeProfile.targetTitles || []), title])],
+    };
+    saveProfile(updated);
+    setActiveProfile(updated);
+    setSuggestedTitles(prev => prev.filter(t => t !== title));
+  }, [activeProfile]);
+
+
 
   const handleSaveLocation = (e) => {
     if (e) e.preventDefault();

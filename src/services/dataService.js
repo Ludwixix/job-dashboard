@@ -1,5 +1,8 @@
 import Papa from 'papaparse';
 import { MULTI_INDUSTRY_JOBS } from './multiIndustryJobData';
+import { buildQueriesFromProfile, triggerProfileScrape, SCRAPER_BASE_URL } from './jobQueryService';
+
+
 
 const CSV_URL = '/api/sheet-csv';
 const FALLBACK_CSV_URL = 'https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv';
@@ -210,6 +213,38 @@ export const fetchJobsData = async () => {
   return [...allCombined, ...uniqueMultiIndustry];
 };
 
+/**
+ * Fetch jobs personalised to a user profile.
+ * On localhost with the Python backend running: triggers a live rescrape via
+ * POST /api/refresh using profile-derived search queries.
+ * Everywhere else: filters existing jobs by profile industry/skills.
+ *
+ * @param {object} profile - Active user profile from profileService
+ * @returns {{ jobs: object[], queriesUsed: object[], liveScraped: boolean }}
+ */
+export const fetchJobsForProfile = async (profile) => {
+  const queriesUsed = buildQueriesFromProfile(profile);
+
+  // Attempt a live rescrape if we're on localhost (Python backend available)
+  if (isLocalHost) {
+    try {
+      const result = await triggerProfileScrape(profile);
+      if (result.success && result.jobs.length > 0) {
+        const parsed = result.jobs.map((item, idx) => parseMetadata(item, `ps_${idx}`));
+        return { jobs: parsed, queriesUsed, liveScraped: true, errors: result.errors };
+      }
+    } catch {
+      // Fall through to static path
+    }
+  }
+
+  // Static fallback: return all jobs (Dashboard scoring will still rank by profile)
+  const all = await fetchJobsData();
+  return { jobs: all, queriesUsed, liveScraped: false };
+};
+
+
+
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const fetchSheetData = async () => {
@@ -286,9 +321,11 @@ const fetchFallbackData = (resolve) => {
 };
 
 const fetchStoredScrapedJobs = async () => {
-  if (isLocalHost) {
+  // Try local backend (dev) or Cloud Run backend (production)
+  const apiBase = isLocalHost ? '' : SCRAPER_BASE_URL;
+  if (isLocalHost || SCRAPER_BASE_URL) {
     try {
-      const res = await fetch('/api/scraped-jobs', { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${apiBase}/api/scraped-jobs`, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.jobs)) {
@@ -313,3 +350,4 @@ const fetchStoredScrapedJobs = async () => {
 
   return [];
 };
+

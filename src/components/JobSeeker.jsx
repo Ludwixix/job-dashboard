@@ -117,6 +117,7 @@ export const JobSeeker = ({
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [activeStreamTab, setActiveStreamTab] = useState('All');
+  const [docsReadyFilter, setDocsReadyFilter] = useState(false);
   const [minSalaryFilter, setMinSalaryFilter] = useState('All');
   const [minScoreFilter, setMinScoreFilter] = useState('All');
   const [workModeFilter, setWorkModeFilter] = useState('All');
@@ -173,10 +174,15 @@ export const JobSeeker = ({
     return jobs.filter(j => j.isRejected);
   }, [jobs]);
 
+  const readyToSubmitCount = useMemo(() => {
+    return unsubmittedJobs.filter(j => Boolean(j.hasCustomDocs && j.resumeText) || (j.status || '').toLowerCase().includes('package prepared')).length;
+  }, [unsubmittedJobs]);
+
   // Stream counts for expanded quick tabs
   const streamCounts = useMemo(() => {
     const counts = { 
       All: unsubmittedJobs.length,
+      ReadyForSubmission: readyToSubmitCount,
       'Field Tech, Labour & Physical': 0,
       'Gov & Council Pathways': 0,
       'Core IT & Systems': 0,
@@ -194,7 +200,7 @@ export const JobSeeker = ({
     });
 
     return counts;
-  }, [unsubmittedJobs, rejectedJobs]);
+  }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs]);
 
   const seekerJobs = useMemo(() => {
     const sourcePool = activeStreamTab === 'Rejected Jobs' ? rejectedJobs : unsubmittedJobs;
@@ -209,9 +215,17 @@ export const JobSeeker = ({
 
       // Stream Tab filter
       let matchesStream = true;
-      if (activeStreamTab !== 'All' && activeStreamTab !== 'Rejected Jobs') {
+      if (activeStreamTab === 'ReadyForSubmission') {
+        matchesStream = Boolean((job.hasCustomDocs && job.resumeText) || (job.status || '').toLowerCase().includes('package prepared'));
+      } else if (activeStreamTab !== 'All' && activeStreamTab !== 'Rejected Jobs') {
         const subStream = getJobSubStream(job);
         matchesStream = subStream === activeStreamTab || (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase());
+      }
+
+      // Dedicated Docs Ready filter toggle
+      let matchesDocsReady = true;
+      if (docsReadyFilter) {
+        matchesDocsReady = Boolean((job.hasCustomDocs && job.resumeText) || (job.status || '').toLowerCase().includes('package prepared'));
       }
 
       // Salary filter
@@ -260,7 +274,7 @@ export const JobSeeker = ({
         matchesAge = ageDays <= 3;
       }
 
-      return matchesSearch && matchesSource && matchesStream && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
+      return matchesSearch && matchesSource && matchesStream && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
     });
 
     // Sorting logic (Defaults to Most Recent Date)
@@ -274,7 +288,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy]);
+  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy]);
 
   // Paginated Sliced Jobs
   const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
@@ -348,6 +362,7 @@ export const JobSeeker = ({
     setSearch('');
     setSourceFilter('All');
     setActiveStreamTab('All');
+    setDocsReadyFilter(false);
     setMinSalaryFilter('All');
     setMinScoreFilter('All');
     setWorkModeFilter('All');
@@ -357,7 +372,7 @@ export const JobSeeker = ({
     setCurrentPage(1);
   };
 
-  const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date';
+  const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date';
 
   const handleRunScraper = async () => {
     setScrapeElapsedSeconds(0);
@@ -394,6 +409,7 @@ export const JobSeeker = ({
 
   const STREAM_TAB_DEFINITIONS = [
     { id: 'All', name: 'ALL STREAMS', icon: Layers, color: 'indigo' },
+    { id: 'ReadyForSubmission', name: '✨ READY TO SUBMIT', icon: Sparkles, color: 'emerald', highlight: true },
     { id: 'Field Tech, Labour & Physical', name: 'FIELD TECH & LABOUR', icon: Wrench, color: 'emerald' },
     { id: 'Gov & Council Pathways', name: 'GOV & COUNCIL', icon: Building2, color: 'amber' },
     { id: 'Core IT & Systems', name: 'CORE IT & SYSTEMS', icon: Server, color: 'blue' },
@@ -515,8 +531,30 @@ export const JobSeeker = ({
                 />
               </div>
 
+              {/* Ready for Submission Filter Toggle */}
+              <button
+                onClick={() => {
+                  setDocsReadyFilter(!docsReadyFilter);
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 ${
+                  docsReadyFilter
+                    ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md ring-2 ring-emerald-500/40'
+                    : 'bg-[#181825] text-emerald-400 border-emerald-500/40 hover:bg-emerald-950/40'
+                }`}
+                title="Filter positions where custom ATS Resume and Cover Letter have been generated"
+              >
+                <Sparkles size={14} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
+                <span>READY FOR SUBMISSION</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                  docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                }`}>
+                  {readyToSubmitCount}
+                </span>
+              </button>
+
               {/* Sort By Dropdown (Defaults to Most Recent) */}
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold w-full md:w-auto">
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold w-full md:w-auto shrink-0">
                 <ArrowUpDown size={14} className="text-indigo-600 shrink-0" />
                 <span className="text-slate-500 uppercase text-[10px]">SORT:</span>
                 <select

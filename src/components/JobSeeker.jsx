@@ -901,23 +901,40 @@ export const JobSeeker = ({
                           : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-400'
                       }`} />
 
-                      {/* Top Standout Badge */}
-                      {isGeneratingThisJob ? (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider w-max shadow-sm animate-pulse">
-                          <RefreshCw size={12} className="animate-spin text-slate-950" />
-                          ⚡ AI SYNTHESIZING ASSETS...
-                        </div>
-                      ) : hasCustomDocs ? (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider w-max shadow-2xs">
-                          <CheckCircle2 size={12} className="text-slate-950" />
-                          ✨ TAILORED ASSETS READY (PDFs)
-                        </div>
-                      ) : isTopFit ? (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider w-max shadow-2xs animate-pulse">
-                          <Flame size={12} className="text-amber-900 fill-amber-900" />
-                          🏆 TOP FIT OPPORTUNITY
-                        </div>
-                      ) : null}
+                      {/* Top Standout Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {isGeneratingThisJob ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider shadow-sm animate-pulse">
+                            <RefreshCw size={12} className="animate-spin text-slate-950" />
+                            ⚡ AI SYNTHESIZING ASSETS...
+                          </div>
+                        ) : hasCustomDocs ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs">
+                            <CheckCircle2 size={12} className="text-slate-950" />
+                            ✨ TAILORED ASSETS READY (PDFs)
+                          </div>
+                        ) : isTopFit ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
+                            <Flame size={12} className="text-amber-900 fill-amber-900" />
+                            🏆 TOP FIT OPPORTUNITY
+                          </div>
+                        ) : null}
+
+                        {/* Direct Platform Quick Apply Compatibility Badge */}
+                        {isQuickApplyEligible(job) && (
+                          <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border shadow-2xs ${
+                            (job.source || '').toLowerCase().includes('linkedin') || (job.link || '').toLowerCase().includes('linkedin')
+                              ? 'bg-sky-950 text-sky-300 border-sky-500/50'
+                              : (job.source || '').toLowerCase().includes('seek') || (job.link || '').toLowerCase().includes('seek')
+                              ? 'bg-rose-950 text-rose-300 border-rose-500/50'
+                              : 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
+                          }`}>
+                            <Zap size={10} className="text-amber-400 fill-amber-400 animate-pulse" />
+                            <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
+                          </div>
+                        )}
+                      </div>
+
 
                       {/* Card Header & Scores */}
                       <div className="space-y-2.5">

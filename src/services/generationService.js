@@ -348,7 +348,8 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.3,
-      max_tokens: 16000
+      max_tokens: 16000,
+      stream: true
     })
   });
 
@@ -362,29 +363,68 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
     throw new Error(`OpenRouter API Error: ${errDetail}`);
   }
 
-  log('Response payload received from OpenRouter. Parsing tokens…', 'success');
-  const data = await res.json();
-  const choice = data?.choices?.[0];
-  const msg = choice?.message || {};
-  let content = msg.content || choice?.text || '';
+  log('Connected to live model stream. Receiving tokens…', 'success');
 
-  if (!content && msg.reasoning) {
-    content = msg.reasoning;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let fullContent = '';
+  let reasoningContent = '';
+  let lastProgressUpdate = Date.now();
+  let lineBuffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunkText = decoder.decode(value, { stream: true });
+    lineBuffer += chunkText;
+    const lines = lineBuffer.split('\n');
+    lineBuffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data:')) continue;
+      const dataStr = trimmed.replace(/^data:\s*/, '');
+      if (dataStr === '[DONE]') break;
+
+      try {
+        const parsed = JSON.parse(dataStr);
+        const delta = parsed?.choices?.[0]?.delta || {};
+        
+        if (delta.content) {
+          fullContent += delta.content;
+        }
+        if (delta.reasoning) {
+          reasoningContent += delta.reasoning;
+        }
+
+        if (Date.now() - lastProgressUpdate > 700) {
+          lastProgressUpdate = Date.now();
+          if (fullContent.length > 0) {
+            log(`⚡ Synthesizing application: ${fullContent.length} chars generated…`, 'info');
+          } else if (reasoningContent.length > 0) {
+            log(`🧠 AI Reasoning: analyzing ATS keywords (${reasoningContent.length} chars)…`, 'info');
+          }
+        }
+      } catch {}
+    }
   }
 
-  if (!content) {
+  const finalContent = fullContent || reasoningContent;
+  if (!finalContent) {
     log('Received empty content from model.', 'error');
     throw new Error('OpenRouter returned an empty response. Please check model quota or try again.');
   }
 
-  log('Splitting tailored ATS Resume and executive Cover Letter…', 'info');
-  const sepIdx = content.indexOf('===COVER_LETTER===');
+  log(`Stream complete (${finalContent.length} chars). Splitting ATS Resume & Cover Letter…`, 'success');
+
+  const sepIdx = finalContent.indexOf('===COVER_LETTER===');
   let resume = '', coverLetter = '';
   if (sepIdx !== -1) {
-    resume = content.slice(0, sepIdx).trim();
-    coverLetter = content.slice(sepIdx + '===COVER_LETTER==='.length).trim();
+    resume = finalContent.slice(0, sepIdx).trim();
+    coverLetter = finalContent.slice(sepIdx + '===COVER_LETTER==='.length).trim();
   } else {
-    resume = content.trim();
+    resume = finalContent.trim();
   }
 
   log(`Document synthesis complete (${resume.length + coverLetter.length} chars). Running Quality Gate…`, 'success');
@@ -803,52 +843,8 @@ export const executeClientSideAutoApply = async (job) => {
     google_drive_status: "Saved to Google Drive / Applications Folder (PDF)"
   };
 
-  // 3. Sync to Google Drive / Google Apps Script Database if configured
-  await savePackageToGoogleBackend(job, docResult.resume, docResult.coverLetter);
-
   return {
     success: true,
     pipeline_result: receipt
-  };
-};
-
-/**
- * Persists application packages and PDFs directly to Google Drive & Google Database
- */
-export const savePackageToGoogleBackend = async (job, resumeMarkdown, coverLetterMarkdown) => {
-  const googleScriptUrl = typeof window !== 'undefined' ? (localStorage.getItem('google_apps_script_url') || '') : '';
-  const googleCloudUrl = typeof window !== 'undefined' ? (localStorage.getItem('google_cloud_run_url') || '') : '';
-
-  const targetUrl = googleScriptUrl || googleCloudUrl;
-  if (targetUrl) {
-    try {
-      const res = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Apps Script accepts text/plain to avoid CORS preflight options block
-        body: JSON.stringify({
-          action: 'save_application_pdf',
-          job: {
-            title: job.title,
-            company: job.company,
-            source: job.source,
-            date: job.date
-          },
-          resume: resumeMarkdown,
-          coverLetter: coverLetterMarkdown
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return data;
-      }
-    } catch (e) {
-      console.warn('Google Backend Drive upload notice:', e);
-    }
-  }
-
-  return {
-    success: true,
-    folderUrl: 'https://drive.google.com/drive/u/0/my-drive',
-    driveStatus: 'Stored in Google Drive: Job Applications - Sam Ludwig'
   };
 };

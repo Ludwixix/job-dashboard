@@ -339,7 +339,7 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.3,
-      max_tokens: 4500
+      max_tokens: 16000
     })
   });
 

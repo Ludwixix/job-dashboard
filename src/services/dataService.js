@@ -265,10 +265,10 @@ export const saveUserApplication = async (jobData) => {
 
 const fetchDemoFallbackJobs = async () => {
   const fallbackPaths = [
-    `${import.meta.env.BASE_URL || '/'}demo_jobs.json`,
-    './demo_jobs.json',
     `${import.meta.env.BASE_URL || '/'}jobs_combined.json`,
-    './jobs_combined.json'
+    './jobs_combined.json',
+    `${import.meta.env.BASE_URL || '/'}demo_jobs.json`,
+    './demo_jobs.json'
   ];
 
   for (const path of fallbackPaths) {
@@ -278,7 +278,7 @@ const fetchDemoFallbackJobs = async () => {
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : (data.jobs || []);
         if (rawList.length > 0) {
-          const parsed = rawList.map((row, index) => parseMetadata(row, row.id || `demo_${index}`));
+          const parsed = rawList.map((row, index) => parseMetadata(row, row.id || `db_${index}`));
           return {
             jobs: parsed,
             total: parsed.length,
@@ -306,7 +306,7 @@ const fetchDemoFallbackJobs = async () => {
  */
 export const fetchJobsData = async () => {
   const [apiJobsResult, userApps] = await Promise.all([
-    fetchJobsFromApi({ page: 1, pageSize: 200 }),
+    fetchJobsFromApi({ page: 1, pageSize: 5000 }),
     fetchUserApplications()
   ]);
 

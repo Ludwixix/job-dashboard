@@ -72,15 +72,13 @@ class DashboardApp:
         # Phase 6: Smart Application Tracker
         self.application_tracker = get_smart_application_tracker(self.data_dir)
         if self.jobs:
-            self.jobs = self.materialize_jobs(self.jobs)
-            for job in self.jobs:
-                job_id = normalize_job(job).id
-                generated = job.get("generated") or self.generated_documents.get(job_id)
-                if generated and self._documents_exist(generated):
-                    self.generated_documents[job_id] = generated
-                    job["generated"] = generated
-            self.repository.replace_jobs(self.jobs)
+            if self.repository.count_jobs() == 0:
+                logger.info(f"Seeding database with {len(self.jobs)} scraped jobs...")
+                self.repository.upsert_scraped_jobs(self.jobs)
+            else:
+                self.repository.replace_jobs(self.jobs)
         self.lock = threading.Lock()
+
 
     def save_search_queries(self):
         payload = [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
@@ -334,17 +332,28 @@ class DashboardApp:
         return {"phase": phase, "estimate_seconds": round(estimate), "progress": pct, "started_at": started_at}
 
     def _load_jobs(self):
-        if not self.jobs_path.exists():
-            return []
-        try:
-            raw_data = json.loads(self.jobs_path.read_text(encoding="utf-8"))
-            if isinstance(raw_data, list):
-                return raw_data
-            if isinstance(raw_data, dict):
-                return raw_data.get("jobs", [])
-            return []
-        except Exception:
-            return []
+        candidate_paths = [
+            self.jobs_path,
+            Path(__file__).parent / "static" / "jobs_combined.json",
+            Path(__file__).parent / "static" / "demo_jobs.json",
+            self.data_dir / "jobs_combined.json",
+            Path("/app/src/job_dashboard/static/jobs_combined.json"),
+            Path("/app/data/jobs.json"),
+            Path(__file__).resolve().parents[3] / "job-dashboard-react" / "public" / "jobs_combined.json",
+            Path(__file__).resolve().parents[3] / "job-dashboard-site" / "scrapers" / "jobs_combined.json",
+        ]
+        for p in candidate_paths:
+            if p and p.exists():
+                try:
+                    raw_data = json.loads(p.read_text(encoding="utf-8"))
+                    jobs = raw_data if isinstance(raw_data, list) else (raw_data.get("jobs", []) if isinstance(raw_data, dict) else [])
+                    if jobs:
+                        logger.info(f"Loaded {len(jobs)} jobs from {p}")
+                        return jobs
+                except Exception as e:
+                    logger.error(f"Error loading jobs from {p}: {e}")
+        return []
+
 
 
     def save_jobs(self):
@@ -902,6 +911,14 @@ def make_handler(app: DashboardApp):
                 remote = None if remote_param is None else (remote_param.lower() in ("true", "1"))
                 sort_by = query_params.get("sortBy", ["newest"])[0]
                 
+                # If repository has 0 jobs, ensure it is seeded from in-memory jobs or fallback files
+                if app.repository.count_jobs() == 0:
+                    if not app.jobs:
+                        app.jobs = app._load_jobs()
+                    if app.jobs:
+                        logger.info(f"Seeding database with {len(app.jobs)} jobs on demand...")
+                        app.repository.upsert_scraped_jobs(app.jobs)
+
                 result = app.repository.query_jobs_paginated(
                     page=page,
                     page_size=page_size,
@@ -912,6 +929,7 @@ def make_handler(app: DashboardApp):
                 )
                 self.send_json(200, result)
                 return
+
 
             if path == "/api/applications":
                 auth_header = self.headers.get("Authorization")

@@ -69,6 +69,7 @@ class JobRepository:
                     resume_url TEXT DEFAULT '',
                     cover_letter_url TEXT DEFAULT '',
                     applied_at TEXT,
+                    job_data_json TEXT DEFAULT '{}',
                     updated_at TEXT NOT NULL,
                     UNIQUE(user_id, job_id)
                 );
@@ -88,8 +89,19 @@ class JobRepository:
                 );
                 CREATE INDEX IF NOT EXISTS idx_query_cache_term ON query_scrape_cache(term);
             """)
+            try:
+                conn.execute("ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'")
+            except Exception:
+                pass
             conn.commit()
             logger.debug(f"Database schema initialized for {self.path}")
+
+    def count_jobs(self) -> int:
+        """Return total count of jobs currently in database."""
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT COUNT(*) AS total FROM jobs").fetchone()
+            return int(row["total"]) if row else 0
+
 
     def is_query_cached(self, term: str, location: str = "", ttl_hours: float = 12.0) -> bool:
         """Check if a search query has been scraped recently to prevent redundant scraping."""
@@ -409,13 +421,26 @@ class JobRepository:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""
                 SELECT id, user_id, job_id, status, notes, resume_text, cover_letter_text,
-                       resume_url, cover_letter_url, applied_at, updated_at
+                       resume_url, cover_letter_url, applied_at, updated_at,
+                       COALESCE(job_data_json, '{}') AS job_data_json
                 FROM user_applications
                 WHERE user_id = ?
                 ORDER BY updated_at DESC
             """, (user_id,)).fetchall()
             
-        return [dict(row) for row in rows]
+        results = []
+        for row in rows:
+            d = dict(row)
+            try:
+                extra = json.loads(d.get("job_data_json") or "{}")
+                if isinstance(extra, dict):
+                    for k, v in extra.items():
+                        if k not in d or not d[k]:
+                            d[k] = v
+            except Exception:
+                pass
+            results.append(d)
+        return results
 
     def upsert_user_application(self, user_id: str, job_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """Create or update a user's private application tracking record."""
@@ -423,11 +448,12 @@ class JobRepository:
         app_id = data.get("id") or f"app_{user_id[:8]}_{job_id}"
         status = data.get("status") or "sourced"
         notes = str(data.get("notes") or "").strip()
-        resume_text = str(data.get("resume_text") or "").strip()
-        cover_letter_text = str(data.get("cover_letter_text") or "").strip()
+        resume_text = str(data.get("resume_text") or data.get("resumeText") or "").strip()
+        cover_letter_text = str(data.get("cover_letter_text") or data.get("coverLetterText") or "").strip()
         resume_url = str(data.get("resume_url") or "").strip()
         cover_letter_url = str(data.get("cover_letter_url") or "").strip()
-        applied_at = data.get("applied_at") or (now if status == "applied" else None)
+        applied_at = data.get("applied_at") or (now if status in ("applied", "Applied", "submitted", "Interviewing", "Offer") else None)
+        job_data_json = json.dumps(data.get("job_data") or data, ensure_ascii=False)
         
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
@@ -435,9 +461,9 @@ class JobRepository:
                 conn.execute("""
                     INSERT INTO user_applications (
                         id, user_id, job_id, status, notes, resume_text, cover_letter_text,
-                        resume_url, cover_letter_url, applied_at, updated_at
+                        resume_url, cover_letter_url, applied_at, job_data_json, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(user_id, job_id) DO UPDATE SET
                         status = excluded.status,
                         notes = excluded.notes,
@@ -446,10 +472,11 @@ class JobRepository:
                         resume_url = CASE WHEN excluded.resume_url != '' THEN excluded.resume_url ELSE user_applications.resume_url END,
                         cover_letter_url = CASE WHEN excluded.cover_letter_url != '' THEN excluded.cover_letter_url ELSE user_applications.cover_letter_url END,
                         applied_at = CASE WHEN excluded.applied_at IS NOT NULL THEN excluded.applied_at ELSE user_applications.applied_at END,
+                        job_data_json = excluded.job_data_json,
                         updated_at = excluded.updated_at
                 """, (
                     app_id, user_id, job_id, status, notes, resume_text, cover_letter_text,
-                    resume_url, cover_letter_url, applied_at, now
+                    resume_url, cover_letter_url, applied_at, job_data_json, now
                 ))
                 
                 # Also log to application_events
@@ -469,8 +496,10 @@ class JobRepository:
             "resume_url": resume_url,
             "cover_letter_url": cover_letter_url,
             "applied_at": applied_at,
+            "job_data": data,
             "updated_at": now
         }
+
 
     def delete_user_application(self, user_id: str, job_id: str) -> bool:
         """Remove a user's tracking entry for a job."""

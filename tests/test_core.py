@@ -30,11 +30,5 @@ def test_document_split_and_index_upsert(tmp_path: Path):
     tracker = ApplicationTracker(tmp_path)
     tracker.add_application("acme-cloud", "Cloud Engineer", "Acme")
     tracker.add_application("acme-cloud", "Cloud Engineer", "Acme")
-    # Actually add_application adds unique items each time because of uuid. We check length.
-    # So we should expect 2 or just verify it works
     assert len(tracker.applications) == 2
 
-    except RelevanceError as error:
-        assert "Resume not generated" in str(error)
-    else:
-        raise AssertionError("Expected no-match role to be blocked")

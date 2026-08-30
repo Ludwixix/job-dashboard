@@ -1342,7 +1342,18 @@ def make_handler(app: DashboardApp):
                     queries = [SearchQuery(item["term"], item.get("location", "Melbourne, VIC"), item.get("stream", "core-it"), item.get("group", ""), float(item.get("weight", 1.0)), tuple(item.get("exclude_terms", [])), bool(item.get("enabled", True))) for item in payload.get("queries", [])]
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
-                    jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                    try:
+                        jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                    except Exception as refresh_err:
+                        logger.warning(f"/api/refresh scrape failed, returning cached DB jobs: {refresh_err}")
+                        # Fall back to returning cached jobs from the SQLite database
+                        try:
+                            cached_result = app.repository.query_jobs_paginated(page=1, page_size=5000)
+                            jobs = cached_result.get("jobs", [])
+                        except Exception:
+                            jobs = []
+                        errors = [str(refresh_err)]
+                        cache_stats = {"fallback": True, "total": len(jobs)}
                     self.send_json(200, {
                         "jobs": jobs,
                         "errors": errors,
@@ -1350,6 +1361,7 @@ def make_handler(app: DashboardApp):
                         "success": True
                     })
                     return
+
 
                 if path == "/api/search-criteria":
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
@@ -1648,7 +1660,17 @@ def make_handler(app: DashboardApp):
                     ]
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
-                    jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                    try:
+                        jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                    except Exception as refresh_err:
+                        logger.warning(f"/api/refresh scrape failed, returning cached DB jobs: {refresh_err}")
+                        try:
+                            cached_result = app.repository.query_jobs_paginated(page=1, page_size=5000)
+                            jobs = cached_result.get("jobs", [])
+                        except Exception:
+                            jobs = []
+                        errors = [str(refresh_err)]
+                        cache_stats = {"fallback": True, "total": len(jobs)}
                     self.send_json(200, {
                         "jobs": jobs,
                         "errors": errors,
@@ -1656,6 +1678,7 @@ def make_handler(app: DashboardApp):
                         "success": True
                     })
                     return
+
 
                 if path == "/api/search-criteria":
                     content_len = int(self.headers.get("Content-Length", "0"))

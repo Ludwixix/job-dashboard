@@ -1,9 +1,27 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Target, TrendingUp, Users, Award, Calendar, Activity, ChevronRight } from 'lucide-react';
-import { format, subDays, parseISO, isValid, isAfter, startOfDay } from 'date-fns';
+import { 
+  Target, TrendingUp, Users, Award, Calendar, Activity, ChevronRight, 
+  Search, Filter, ExternalLink, Building2, MapPin, Clock, AlignLeft, Sparkles, CheckCircle2
+} from 'lucide-react';
+import { format, subDays, parseISO, isValid, differenceInDays } from 'date-fns';
 
-export const AnalyticsDashboard = ({ jobs = [] }) => {
+const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
+  if (!dateStr) return 'Recently';
+  try {
+    const parsed = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+    if (isValid(parsed)) {
+      return format(parsed, formatStr);
+    }
+  } catch {}
+  return 'Recently';
+};
+
+export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [stageFilter, setStageFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('newest');
+
   const getJobStage = (job) => {
     const s = (job.status || '').toLowerCase();
     if (s.includes('reject') || s.includes('unsuccessful') || s.includes('closed') || job.isRejected) return 'Rejected';
@@ -13,9 +31,21 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
     return 'Wishlist';
   };
 
+  const getStatusColor = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('reject') || s.includes('unsuccessful')) return 'bg-rose-950/60 text-rose-400 border-rose-800/50';
+    if (s.includes('offer')) return 'bg-emerald-950/60 text-emerald-400 border-emerald-800/50';
+    if (s.includes('interview')) return 'bg-amber-950/60 text-amber-400 border-amber-800/50';
+    if (s.includes('applied')) return 'bg-indigo-950/60 text-indigo-400 border-indigo-800/50';
+    return 'bg-slate-800 text-slate-300 border-slate-700';
+  };
+
+  const trackedJobs = useMemo(() => {
+    return jobs.filter(j => getJobStage(j) !== 'Wishlist');
+  }, [jobs]);
+
   const metrics = useMemo(() => {
-    const tracked = jobs.filter(j => getJobStage(j) !== 'Wishlist');
-    const total = tracked.length;
+    const total = trackedJobs.length;
     
     if (total === 0) return { total: 0, active: 0, interviewRate: 0, offerRate: 0, funnel: [], timeline: [] };
 
@@ -26,13 +56,12 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
       Rejected: 0
     };
 
-    tracked.forEach(j => {
+    trackedJobs.forEach(j => {
       stages[getJobStage(j)]++;
     });
 
-    // Funnel counts (each stage includes the ones that progressed past it)
     const offerCount = stages.Offer;
-    const interviewCount = stages.Interviewing + offerCount + (stages.Rejected * 0.2); // Rough estimation if exact history isn't tracked
+    const interviewCount = stages.Interviewing + offerCount;
     const appliedCount = total;
 
     const interviewRate = total > 0 ? (interviewCount / total) * 100 : 0;
@@ -44,7 +73,7 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
       timelineMap[format(subDays(new Date(), i), 'MMM dd')] = 0;
     }
     
-    tracked.forEach(j => {
+    trackedJobs.forEach(j => {
       const rawDate = j.applied_at || j.date || j.posted;
       if (rawDate) {
         try {
@@ -55,9 +84,7 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
               timelineMap[d]++;
             }
           }
-        } catch {
-          // Ignore invalid dates safely
-        }
+        } catch {}
       }
     });
 
@@ -72,81 +99,101 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
       interviewRate: Math.round(interviewRate),
       offerRate: Math.round(offerRate),
       funnel: [
-        { name: 'Applied', value: appliedCount, color: '#6366f1' }, // Indigo
-        { name: 'Interviewing', value: Math.round(interviewCount), color: '#f59e0b' }, // Amber
-        { name: 'Offers', value: offerCount, color: '#10b981' } // Emerald
+        { name: 'Applied', value: appliedCount, color: '#6366f1' },
+        { name: 'Interviewing', value: Math.round(interviewCount), color: '#f59e0b' },
+        { name: 'Offers', value: offerCount, color: '#10b981' }
       ],
       timeline
     };
-  }, [jobs]);
+  }, [trackedJobs]);
+
+  // Filtered & Sorted Applied Jobs List
+  const filteredAppliedJobs = useMemo(() => {
+    return trackedJobs.filter(job => {
+      const stage = getJobStage(job);
+      if (stageFilter !== 'All' && stage !== stageFilter) return false;
+
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const matchTitle = (job.title || '').toLowerCase().includes(q);
+        const matchCompany = (job.company || '').toLowerCase().includes(q);
+        const matchNotes = (job.notes || '').toLowerCase().includes(q);
+        const matchLocation = (job.location || '').toLowerCase().includes(q);
+        return matchTitle || matchCompany || matchNotes || matchLocation;
+      }
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'newest') {
+        const dateA = a.applied_at || a.date || a.posted || '';
+        const dateB = b.applied_at || b.date || b.posted || '';
+        return dateB.localeCompare(dateA);
+      } else if (sortBy === 'score') {
+        return (b.score || 0) - (a.score || 0);
+      } else if (sortBy === 'company') {
+        return (a.company || '').localeCompare(b.company || '');
+      }
+      return 0;
+    });
+  }, [trackedJobs, searchTerm, stageFilter, sortBy]);
 
   const MetricCard = ({ title, value, subtitle, icon: Icon, color }) => (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col justify-between">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-xl bg-slate-950 border border-slate-800 text-${color}-400`}>
-          <Icon size={24} />
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between font-mono">
+      <div className="flex justify-between items-start mb-3">
+        <div className={`p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-${color}-400`}>
+          <Icon size={20} />
         </div>
       </div>
       <div>
-        <h3 className="text-3xl font-black text-white tracking-tight">{value}</h3>
-        <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">{title}</p>
-        <p className="text-xs text-slate-500 mt-2 font-mono">{subtitle}</p>
+        <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">{value}</h3>
+        <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">{title}</p>
+        <p className="text-[10px] text-slate-500 mt-1 font-mono">{subtitle}</p>
       </div>
     </div>
   );
 
-  if (metrics.total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-slate-900/50 rounded-2xl border border-dashed border-slate-700">
-        <Activity size={48} className="text-slate-600 mb-2" />
-        <h2 className="text-xl font-bold text-slate-300">No Analytics Data Yet</h2>
-        <p className="text-slate-500 max-w-md">Start applying to jobs and moving them through your Kanban pipeline to unlock insights, conversion rates, and cadences.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Top Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard 
           title="Total Applications" 
           value={metrics.total} 
-          subtitle="All-time submitted"
+          subtitle="All-time tracked applications"
           icon={Target}
           color="indigo"
         />
         <MetricCard 
           title="Active Pipeline" 
           value={metrics.active} 
-          subtitle="Currently in progress"
+          subtitle="Applied & interviewing in-flight"
           icon={Activity}
           color="emerald"
         />
         <MetricCard 
-          title="Interview Rate" 
+          title="Interview Conversion" 
           value={`${metrics.interviewRate}%`} 
-          subtitle="Conversion from App to Screen"
+          subtitle="Application to screen rate"
           icon={TrendingUp}
           color="amber"
         />
         <MetricCard 
           title="Offer Rate" 
           value={`${metrics.offerRate}%`} 
-          subtitle="Total apps to final offer"
+          subtitle="Final offer acceptance rate"
           icon={Award}
           color="rose"
         />
       </div>
 
+      {/* Cadence Chart & Funnel Matrix */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Cadence Chart */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
-          <div className="flex items-center gap-2 mb-6">
-            <Calendar size={18} className="text-indigo-400" />
-            <h3 className="font-bold text-slate-200 uppercase tracking-wide">Application Velocity (Last 30 Days)</h3>
+          <div className="flex items-center gap-2 mb-6 font-mono">
+            <Calendar size={16} className="text-indigo-400" />
+            <h3 className="font-bold text-xs text-slate-200 uppercase tracking-wider">Application Velocity (Last 30 Days)</h3>
           </div>
-          <div className="h-64 w-full">
+          <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metrics.timeline} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <XAxis 
@@ -167,7 +214,7 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
                 />
                 <Tooltip 
                   cursor={{ fill: '#1e293b' }}
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
                   itemStyle={{ color: '#818cf8', fontWeight: 'bold' }}
                 />
                 <Bar dataKey="applications" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -176,39 +223,171 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
           </div>
         </div>
 
-        {/* Funnel */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col">
-          <div className="flex items-center gap-2 mb-6">
-            <Users size={18} className="text-indigo-400" />
-            <h3 className="font-bold text-slate-200 uppercase tracking-wide">Conversion Funnel</h3>
+        {/* Funnel Matrix */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col justify-between font-mono">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={16} className="text-emerald-400" />
+            <h3 className="font-bold text-xs text-slate-200 uppercase tracking-wider">Conversion Pipeline</h3>
           </div>
           
-          <div className="flex-1 flex flex-col justify-center gap-4">
-            {metrics.funnel.map((stage, i) => (
-              <div key={stage.name} className="relative group">
-                <div className="flex justify-between items-end mb-1 text-sm">
-                  <span className="font-bold text-slate-300">{stage.name}</span>
-                  <span className="font-mono font-bold text-slate-400">{stage.value}</span>
-                </div>
-                <div className="h-4 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                  <div 
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{ 
-                      width: `${(stage.value / metrics.funnel[0].value) * 100}%`,
-                      backgroundColor: stage.color
-                    }}
-                  />
-                </div>
-                {i < metrics.funnel.length - 1 && (
-                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-slate-600 flex flex-col items-center group-hover:text-slate-400 transition-colors">
-                    <span className="text-[9px] font-mono font-bold leading-none mb-0.5">
-                      {Math.round((metrics.funnel[i+1].value / stage.value) * 100) || 0}%
-                    </span>
+          <div className="space-y-4 flex-1 flex flex-col justify-center">
+            {metrics.funnel.map((stage) => {
+              const pct = metrics.total > 0 ? Math.round((stage.value / metrics.total) * 100) : 0;
+              return (
+                <div key={stage.name} className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-300">{stage.name}</span>
+                    <span className="text-slate-400 font-mono">{stage.value} ({pct}%)</span>
                   </div>
-                )}
-              </div>
-            ))}
+                  <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                    <div 
+                      className="h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${pct}%`, backgroundColor: stage.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      </div>
+
+      {/* Applied Jobs Intelligence & Tracking Explorer */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4 font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div className="text-sm font-black text-white flex items-center gap-2">
+              <Sparkles size={16} className="text-indigo-400" />
+              APPLIED POSITIONS INTELLIGENCE &amp; TRACKER
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-500/40">
+                {filteredAppliedJobs.length} APPLICATIONS
+              </span>
+            </div>
+            <div className="text-xs text-slate-400 font-sans mt-0.5">
+              Live records synced from your Gmail inbox, automated dispatchers, and manual applications.
+            </div>
+          </div>
+
+          {/* Quick Search & Sort */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="SEARCH APPLIED ROLES..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="All">ALL STAGES ({trackedJobs.length})</option>
+              <option value="Applied">APPLIED (IN REVIEW)</option>
+              <option value="Interviewing">INTERVIEWING</option>
+              <option value="Offer">OFFERS</option>
+              <option value="Rejected">REJECTED / CLOSED</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="newest">MOST RECENT</option>
+              <option value="score">HIGHEST MATCH</option>
+              <option value="company">COMPANY (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Applications Table */}
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+              <tr>
+                <th className="px-4 py-3 font-bold">Applied Date</th>
+                <th className="px-4 py-3 font-bold">Company &amp; Location</th>
+                <th className="px-4 py-3 font-bold">Position Title</th>
+                <th className="px-4 py-3 font-bold">Status Stage</th>
+                <th className="px-4 py-3 font-bold">Context &amp; Notes</th>
+                <th className="px-4 py-3 font-bold text-right">Job Link</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 font-sans">
+              {filteredAppliedJobs.map((job) => {
+                const stage = getJobStage(job);
+                return (
+                  <tr key={job.id} className="hover:bg-slate-850/60 transition-colors">
+                    <td className="px-4 py-3 font-mono text-[11px] text-slate-400">
+                      {formatDateSafe(job.applied_at || job.date || job.posted)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-white flex items-center gap-1.5 text-xs">
+                        <Building2 size={13} className="text-indigo-400 shrink-0" />
+                        <span>{job.company}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} />
+                        <span>{job.location || 'Melbourne, VIC'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-200 text-xs truncate max-w-xs">{job.title}</div>
+                      {job.salary && (
+                        <div className="text-[10px] text-emerald-400 font-mono font-bold mt-0.5">{job.salary}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-mono">
+                      <select
+                        value={job.status || 'Applied'}
+                        onChange={(e) => onUpdateStatus && onUpdateStatus(job.id, e.target.value)}
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer ${getStatusColor(job.status)}`}
+                      >
+                        <option value="Applied">Applied (In Review)</option>
+                        <option value="Interviewing">Interviewing</option>
+                        <option value="Offer Received">Offer Received</option>
+                        <option value="Rejected">Rejected / Closed</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-400 max-w-sm truncate">
+                      {job.notes ? (
+                        <span className="truncate block" title={job.notes}>{job.notes}</span>
+                      ) : (
+                        <span className="text-slate-600 italic">No notes recorded</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {(job.link || job.url) && (
+                        <a
+                          href={job.link || job.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white inline-flex items-center gap-1 text-[11px] font-mono font-bold"
+                          title="Open Original Job Ad"
+                        >
+                          <span>PORTAL</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredAppliedJobs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-10 text-slate-500 font-mono text-xs">
+                    No applied jobs found matching your search.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

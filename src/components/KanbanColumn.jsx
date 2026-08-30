@@ -2,11 +2,14 @@ import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Building2, MapPin, Clock } from 'lucide-react';
-import { parseISO, differenceInDays } from 'date-fns';
+import { Building2, MapPin, Clock, Sparkles } from 'lucide-react';
+import { parseISO, isValid, differenceInDays } from 'date-fns';
 
-const KanbanCard = ({ job, onClick }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: job.id, data: job });
+const KanbanCard = ({ job, onSelectJob }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: String(job.id), 
+    data: { ...job, stage: job.stage } 
+  });
   
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -15,8 +18,19 @@ const KanbanCard = ({ job, onClick }) => {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const daysAgo = job.date ? differenceInDays(new Date(), parseISO(job.date)) : 0;
-  const needsFollowUp = daysAgo > 7 && (job.status?.includes('Applied') || job.status?.includes('Interviewing'));
+  let daysAgo = 0;
+  try {
+    const rawDate = job.applied_at || job.date || job.posted;
+    if (rawDate) {
+      const parsed = typeof rawDate === 'string' ? parseISO(rawDate) : new Date(rawDate);
+      if (isValid(parsed)) {
+        daysAgo = Math.max(0, differenceInDays(new Date(), parsed));
+      }
+    }
+  } catch {}
+
+  const s = (job.status || '').toLowerCase();
+  const needsFollowUp = daysAgo > 7 && (s.includes('applied') || s.includes('interview'));
 
   return (
     <div
@@ -24,29 +38,36 @@ const KanbanCard = ({ job, onClick }) => {
       style={style}
       {...attributes}
       {...listeners}
-      onClick={onClick}
-      className={`p-4 rounded-xl bg-slate-800 border ${needsFollowUp ? 'border-rose-500/50' : 'border-slate-700'} shadow-sm cursor-grab hover:border-indigo-500/50 transition-colors group ${isDragging ? 'ring-2 ring-indigo-500' : ''}`}
+      onClick={(e) => {
+        // Only open job drawer if not actively dragging
+        if (!isDragging && onSelectJob) {
+          onSelectJob(job);
+        }
+      }}
+      className={`p-4 rounded-xl bg-slate-800 border ${needsFollowUp ? 'border-amber-500/50 ring-1 ring-amber-500/30' : 'border-slate-700'} shadow-sm cursor-pointer hover:border-indigo-500/60 hover:bg-slate-750 transition-all group ${isDragging ? 'ring-2 ring-indigo-500' : ''}`}
     >
-      <div className="flex justify-between items-start mb-2 gap-2">
+      <div className="flex justify-between items-start mb-1.5 gap-2">
         <h4 className="text-sm font-bold text-slate-100 leading-tight group-hover:text-indigo-300 transition-colors">{job.title}</h4>
       </div>
+      
       {needsFollowUp && (
-        <div className="inline-block mt-1 mb-2 px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded text-[10px] font-bold uppercase">
-          Action Needed
+        <div className="inline-block mt-0.5 mb-2 px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-mono font-bold uppercase">
+          Follow-Up Due ({daysAgo}d)
         </div>
       )}
-      <div className="space-y-1.5 mt-3">
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-          <Building2 size={12} className="shrink-0" />
+
+      <div className="space-y-1.5 mt-2.5">
+        <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
+          <Building2 size={13} className="text-indigo-400 shrink-0" />
           <span className="truncate">{job.company}</span>
         </div>
-        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
           <div className="flex items-center gap-1 truncate max-w-[60%]">
-            <MapPin size={10} />
-            <span className="truncate">{job.location || 'Remote'}</span>
+            <MapPin size={10} className="text-slate-500" />
+            <span className="truncate">{job.location || 'Melbourne, VIC'}</span>
           </div>
           <div className="flex items-center gap-1 whitespace-nowrap">
-            <Clock size={10} />
+            <Clock size={10} className="text-slate-500" />
             <span>{daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}</span>
           </div>
         </div>
@@ -55,9 +76,10 @@ const KanbanCard = ({ job, onClick }) => {
   );
 };
 
-export const KanbanColumn = ({ stage, jobs, onSelectJob }) => {
+export const KanbanColumn = ({ stage, jobs = [], onSelectJob }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
+    data: { type: 'column', stage: stage.id }
   });
 
   const colors = {
@@ -79,23 +101,23 @@ export const KanbanColumn = ({ stage, jobs, onSelectJob }) => {
   return (
     <div 
       ref={setNodeRef}
-      className={`flex-1 min-w-[280px] sm:min-w-[320px] max-w-[350px] flex flex-col h-full rounded-2xl border ${colors[stage.color]} ${isOver ? 'ring-2 ring-indigo-500/50 bg-slate-800/80' : ''} transition-colors snap-center shrink-0`}
+      className={`flex-1 min-w-[280px] sm:min-w-[320px] max-w-[350px] flex flex-col h-full rounded-2xl border ${colors[stage.color]} ${isOver ? 'ring-2 ring-indigo-500/50 bg-slate-850' : ''} transition-all snap-center shrink-0 shadow-lg`}
     >
-      <div className="p-3 border-b border-slate-800/60 flex items-center justify-between sticky top-0 bg-inherit z-10 rounded-t-2xl">
-        <h3 className="font-bold text-sm tracking-wide font-sans">{stage.title}</h3>
+      <div className="p-3.5 border-b border-slate-800/60 flex items-center justify-between sticky top-0 bg-inherit z-10 rounded-t-2xl">
+        <h3 className="font-bold text-xs tracking-wider uppercase font-mono">{stage.title}</h3>
         <span className={`px-2 py-0.5 rounded-lg text-xs font-mono font-black shadow-xs ${headerColors[stage.color]}`}>
           {jobs.length}
         </span>
       </div>
       
-      <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar min-h-[150px]">
-        <SortableContext items={jobs.map(j => j.id)} strategy={verticalListSortingStrategy}>
+      <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar min-h-[200px]">
+        <SortableContext items={jobs.map(j => String(j.id))} strategy={verticalListSortingStrategy}>
           {jobs.map(job => (
-            <KanbanCard key={job.id} job={job} onClick={() => onSelectJob && onSelectJob(job)} />
+            <KanbanCard key={job.id} job={job} onSelectJob={onSelectJob} />
           ))}
         </SortableContext>
         {jobs.length === 0 && (
-          <div className="h-full flex items-center justify-center text-xs font-mono text-slate-500 italic p-4 text-center opacity-50 border-2 border-dashed border-slate-700/50 rounded-xl">
+          <div className="h-full min-h-[120px] flex items-center justify-center text-xs font-mono text-slate-500 italic p-4 text-center opacity-60 border-2 border-dashed border-slate-800 rounded-xl">
             Drag jobs here
           </div>
         )}

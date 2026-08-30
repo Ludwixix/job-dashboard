@@ -1,9 +1,24 @@
-import React, { useState } from 'react';
-import { X, ExternalLink, Calendar, MapPin, DollarSign, Building2, UserCircle, Edit3, AlignLeft, Activity } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { X, ExternalLink, Calendar, MapPin, DollarSign, Building2, UserCircle, Edit3, AlignLeft, Activity, Sparkles, CheckCircle2 } from 'lucide-react';
+import { format, parseISO, isValid } from 'date-fns';
+
+const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
+  if (!dateStr) return 'Recently';
+  try {
+    const parsed = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+    if (isValid(parsed)) {
+      return format(parsed, formatStr);
+    }
+  } catch {}
+  return 'Recently';
+};
 
 export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes }) => {
   const [notes, setNotes] = useState(job?.notes || '');
+
+  useEffect(() => {
+    setNotes(job?.notes || '');
+  }, [job?.id, job?.notes]);
   
   if (!isOpen || !job) return null;
 
@@ -22,16 +37,15 @@ export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes })
     return 'bg-slate-800 text-slate-300 border-slate-700';
   };
 
-  // Mock stage history for now
   const history = job.history || [
-    { stage: 'Wishlist', date: job.date || new Date().toISOString() }
+    { stage: job.status || 'Discovered', date: job.applied_at || job.date || new Date().toISOString() }
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end">
+    <div className="fixed inset-0 z-[100] flex justify-end font-sans">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
       
@@ -39,121 +53,118 @@ export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes })
       <div className="relative w-full max-w-md h-full bg-slate-900 border-l border-slate-800 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 bg-slate-900/50">
+        <div className="p-6 border-b border-slate-800 bg-slate-900/90">
           <div className="flex justify-between items-start mb-4">
             <select
               value={job.status || 'Discovered'}
-              onChange={(e) => onUpdateStatus(job.id, e.target.value)}
+              onChange={(e) => onUpdateStatus && onUpdateStatus(job.id, e.target.value)}
               className={`text-[11px] font-mono font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer ${getStatusColor(job.status)}`}
             >
-              <option value="Discovered">Wishlist</option>
-              <option value="Applied">Applied</option>
+              <option value="Discovered">Wishlist / Discovered</option>
+              <option value="Applied">Applied (In Review)</option>
               <option value="Interviewing">Interviewing</option>
-              <option value="Offer Received">Offer</option>
-              <option value="Rejected">Rejected</option>
+              <option value="Offer Received">Offer Received</option>
+              <option value="Rejected">Rejected / Closed</option>
             </select>
             
-            <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-colors">
+            <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-colors cursor-pointer">
               <X size={16} />
             </button>
           </div>
           
-          <h2 className="text-xl font-bold text-white mb-2 leading-tight">{job.title}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-white mb-2 leading-tight">{job.title}</h2>
           
           <div className="flex items-center gap-2 text-indigo-400 font-semibold mb-4">
             <Building2 size={16} />
-            {job.company}
+            <span>{job.company}</span>
           </div>
 
           <div className="flex flex-wrap gap-y-2 gap-x-4 text-xs text-slate-400 font-mono">
             <div className="flex items-center gap-1.5">
               <MapPin size={14} className="text-slate-500" />
-              {job.location || 'Remote'}
+              <span>{job.location || 'Melbourne, VIC'}</span>
             </div>
             {job.salary && (
               <div className="flex items-center gap-1.5">
                 <DollarSign size={14} className="text-slate-500" />
-                {job.salary}
+                <span>{job.salary}</span>
               </div>
             )}
             <div className="flex items-center gap-1.5">
               <Calendar size={14} className="text-slate-500" />
-              {job.date ? format(parseISO(job.date), 'MMM d, yyyy') : 'Unknown'}
+              <span>{formatDateSafe(job.applied_at || job.date || job.posted)}</span>
             </div>
           </div>
           
-          {job.link && (
+          {(job.link || job.url) && (
             <div className="mt-4 flex gap-2">
               <a 
-                href={job.link} 
+                href={job.link || job.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-colors text-sm"
               >
-                View Job Post <ExternalLink size={14} />
+                <span>View Job Portal</span> <ExternalLink size={14} />
               </a>
-              <button
-                onClick={() => import('../services/DataPortability').then(m => m.generateICS(job, job.date || new Date().toISOString()))}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold rounded-xl transition-colors text-sm flex items-center gap-2"
-                title="Add to Calendar"
-              >
-                <Calendar size={14} />
-              </button>
             </div>
           )}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
           
           {/* Notes Section */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider text-xs">
-              <AlignLeft size={14} className="text-indigo-400" />
-              Interview Notes
+          <section className="space-y-2">
+            <div className="flex items-center justify-between text-slate-300 font-bold uppercase tracking-wider text-xs">
+              <span className="flex items-center gap-2">
+                <AlignLeft size={14} className="text-indigo-400" />
+                Tracking &amp; Interview Notes
+              </span>
+              <button 
+                onClick={handleSaveNotes} 
+                className="text-[10px] text-indigo-400 hover:underline font-mono cursor-pointer"
+              >
+                Save Notes
+              </button>
             </div>
             <div className="relative">
               <textarea 
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 onBlur={handleSaveNotes}
-                placeholder="Add prep notes, questions for the interviewer, or general thoughts..."
-                className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-4 text-sm min-h-[160px] focus:outline-none focus:border-indigo-500 resize-y custom-scrollbar"
+                placeholder="Add application notes, follow-up dates, interviewer feedback, or prep thoughts..."
+                className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-4 text-sm min-h-[140px] focus:outline-none focus:border-indigo-500 resize-y custom-scrollbar"
               />
               <Edit3 size={12} className="absolute top-3 right-3 text-slate-600" />
             </div>
           </section>
 
-          {/* Contact Person */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider text-xs">
-              <UserCircle size={14} className="text-indigo-400" />
-              Contact Person
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center gap-4 text-sm text-slate-400">
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
-                <UserCircle size={20} />
+          {/* Job Snippet / Description */}
+          {job.description && (
+            <section className="space-y-2">
+              <div className="text-slate-300 font-bold uppercase tracking-wider text-xs flex items-center gap-2">
+                <Sparkles size={14} className="text-indigo-400" />
+                Job Summary
               </div>
-              <div>
-                <p className="text-white font-semibold">Not Specified</p>
-                <p className="text-xs">No contact details found</p>
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed max-h-48 overflow-y-auto">
+                {job.description}
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* Stage History */}
-          <section className="space-y-4">
+          <section className="space-y-3">
             <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider text-xs">
               <Activity size={14} className="text-indigo-400" />
-              Stage History
+              Lifecycle History
             </div>
             
-            <div className="relative border-l border-slate-700 ml-3 space-y-6">
+            <div className="relative border-l border-slate-700 ml-3 space-y-4">
               {history.map((h, i) => (
                 <div key={i} className="relative pl-6">
                   <div className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-indigo-500 ring-4 ring-slate-900" />
                   <p className="text-sm font-bold text-white mb-0.5">{h.stage}</p>
-                  <p className="text-[11px] font-mono text-slate-500">{format(parseISO(h.date), 'MMM d, yyyy - h:mm a')}</p>
+                  <p className="text-[11px] font-mono text-slate-500">{formatDateSafe(h.date, 'MMM d, yyyy - h:mm a')}</p>
                 </div>
               ))}
             </div>

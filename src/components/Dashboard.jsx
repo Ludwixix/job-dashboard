@@ -670,6 +670,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         {activeSection === 'analytics' && (
           <AnalyticsDashboard 
             jobs={jobs} 
+            onUpdateStatus={(id, status) => updateJobStatus(id, status)}
           />
         )}
           </>

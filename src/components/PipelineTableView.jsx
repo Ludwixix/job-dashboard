@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
-import { ArrowUpDown, Building2, Calendar, MapPin } from 'lucide-react';
-import { parseISO, format } from 'date-fns';
+import { ArrowUpDown, Building2, Calendar, MapPin, ExternalLink, Sparkles } from 'lucide-react';
+import { parseISO, format, isValid } from 'date-fns';
 
-export const PipelineTableView = ({ jobs, onUpdateStatus, onSelectJob }) => {
+const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
+  if (!dateStr) return '-';
+  try {
+    const parsed = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+    if (isValid(parsed)) {
+      return format(parsed, formatStr);
+    }
+  } catch {}
+  return '-';
+};
+
+export const PipelineTableView = ({ jobs = [], onUpdateStatus, onSelectJob }) => {
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
   const handleSort = (key) => {
@@ -17,8 +28,10 @@ export const PipelineTableView = ({ jobs, onUpdateStatus, onSelectJob }) => {
     let bVal = b[sortConfig.key];
 
     if (sortConfig.key === 'date') {
-      aVal = a.date ? new Date(a.date).getTime() : 0;
-      bVal = b.date ? new Date(b.date).getTime() : 0;
+      const dateA = a.applied_at || a.date || a.posted;
+      const dateB = b.applied_at || b.date || b.posted;
+      aVal = dateA ? new Date(dateA).getTime() : 0;
+      bVal = dateB ? new Date(dateB).getTime() : 0;
     }
 
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -36,71 +49,89 @@ export const PipelineTableView = ({ jobs, onUpdateStatus, onSelectJob }) => {
   };
 
   return (
-    <div className="w-full bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden flex flex-col h-full shadow-lg">
+    <div className="w-full bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden flex flex-col h-full shadow-lg font-sans">
       <div className="overflow-x-auto flex-1 custom-scrollbar">
         <table className="w-full text-left text-sm text-slate-300 whitespace-nowrap">
-          <thead className="text-xs text-slate-400 uppercase bg-slate-950/50 font-mono sticky top-0 z-10 border-b border-slate-800">
+          <thead className="text-xs text-slate-400 uppercase bg-slate-950/80 font-mono sticky top-0 z-10 border-b border-slate-800">
             <tr>
               <th className="px-6 py-4 font-bold cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('date')}>
-                <div className="flex items-center gap-2">Date <ArrowUpDown size={12} /></div>
+                <div className="flex items-center gap-2">Applied Date <ArrowUpDown size={12} /></div>
               </th>
               <th className="px-6 py-4 font-bold cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('company')}>
                 <div className="flex items-center gap-2">Company <ArrowUpDown size={12} /></div>
               </th>
               <th className="px-6 py-4 font-bold cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('title')}>
-                <div className="flex items-center gap-2">Position <ArrowUpDown size={12} /></div>
+                <div className="flex items-center gap-2">Position / Role <ArrowUpDown size={12} /></div>
               </th>
               <th className="px-6 py-4 font-bold cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('location')}>
                 <div className="flex items-center gap-2">Location <ArrowUpDown size={12} /></div>
               </th>
               <th className="px-6 py-4 font-bold cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('status')}>
-                <div className="flex items-center gap-2">Status <ArrowUpDown size={12} /></div>
+                <div className="flex items-center gap-2">Status Stage <ArrowUpDown size={12} /></div>
+              </th>
+              <th className="px-6 py-4 font-bold text-right">
+                <span>Actions</span>
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 font-sans">
+          <tbody className="divide-y divide-slate-800/60">
             {sortedJobs.map((job) => (
               <tr 
                 key={job.id} 
-                className="hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                className="hover:bg-slate-800/60 transition-colors group cursor-pointer"
                 onClick={() => onSelectJob && onSelectJob(job)}
               >
-                <td className="px-6 py-4 font-mono text-xs">
-                  {job.date ? format(parseISO(job.date), 'MMM d, yyyy') : '-'}
+                <td className="px-6 py-4 font-mono text-xs text-slate-400">
+                  {formatDateSafe(job.applied_at || job.date || job.posted)}
                 </td>
-                <td className="px-6 py-4 font-medium text-white flex items-center gap-2">
-                  <Building2 size={14} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
-                  {job.company}
+                <td className="px-6 py-4 font-bold text-white flex items-center gap-2">
+                  <Building2 size={14} className="text-indigo-400 shrink-0" />
+                  <span>{job.company}</span>
                 </td>
                 <td className="px-6 py-4 text-slate-200 font-semibold truncate max-w-xs">
-                  {job.title}
+                  <div className="truncate">{job.title}</div>
+                  {job.notes && (
+                    <div className="text-[10px] text-slate-500 truncate max-w-xs">{job.notes}</div>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-slate-400 text-xs font-mono">
-                  <div className="flex items-center gap-1.5 truncate max-w-[150px]">
-                    <MapPin size={12} className="text-slate-500" />
-                    <span className="truncate">{job.location || 'Remote'}</span>
+                  <div className="flex items-center gap-1.5 truncate max-w-[160px]">
+                    <MapPin size={12} className="text-slate-500 shrink-0" />
+                    <span className="truncate">{job.location || 'Melbourne, VIC'}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <select
                     value={job.status || 'Discovered'}
-                    onChange={(e) => onUpdateStatus(job.id, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => onUpdateStatus && onUpdateStatus(job.id, e.target.value)}
                     className={`text-[10px] font-mono font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer ${getStatusColor(job.status)}`}
                   >
-                    <option value="Discovered">Wishlist</option>
-                    <option value="Applied">Applied</option>
+                    <option value="Discovered">Wishlist / Discovered</option>
+                    <option value="Applied">Applied (In Review)</option>
                     <option value="Interviewing">Interviewing</option>
-                    <option value="Offer Received">Offer</option>
-                    <option value="Rejected">Rejected</option>
+                    <option value="Offer Received">Offer Received</option>
+                    <option value="Rejected">Rejected / Closed</option>
                   </select>
+                </td>
+                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                  {(job.link || job.url) && (
+                    <a
+                      href={job.link || job.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white inline-flex items-center gap-1 text-xs"
+                      title="Open Job Portal"
+                    >
+                      <ExternalLink size={13} />
+                    </a>
+                  )}
                 </td>
               </tr>
             ))}
             {sortedJobs.length === 0 && (
               <tr>
-                <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-mono text-sm border-dashed">
-                  No applications found in this view.
+                <td colSpan={6} className="text-center py-12 text-slate-500 font-mono text-xs">
+                  No applications match your active search or filters.
                 </td>
               </tr>
             )}

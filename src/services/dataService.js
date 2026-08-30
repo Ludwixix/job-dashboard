@@ -1,12 +1,19 @@
-import Papa from 'papaparse';
 import { MULTI_INDUSTRY_JOBS } from './multiIndustryJobData';
 import { buildQueriesFromProfile, triggerProfileScrape, SCRAPER_BASE_URL } from './jobQueryService';
 
+const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+const getApiBase = () => {
+  return isLocalHost ? '' : (SCRAPER_BASE_URL || '');
+};
 
-const CSV_URL = '/api/sheet-csv';
-const FALLBACK_CSV_URL = import.meta.env.VITE_PERSONAL_SHEET_URL || '';
-const SUGGESTIONS_CSV_URL = import.meta.env.VITE_PERSONAL_SHEET_SUGGESTIONS_URL || '';
+const getAuthToken = () => {
+  try {
+    return localStorage.getItem('job_dashboard_auth_token') || '';
+  } catch {
+    return '';
+  }
+};
 
 const CANDIDATE_SKILLS = [
   { term: 'system administrator', weight: 15 },
@@ -94,7 +101,7 @@ export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '
   return 'https://www.seek.com.au';
 };
 
-const parseMetadata = (row, index) => {
+export const parseMetadata = (row, index) => {
   const notesStr = row['Notes & Next Steps'] || row['notes'] || row['description'] || row['why'] || '';
   const company = row['Company'] || row['company'] || 'Unknown Company';
   const title = row['Job Title'] || row['title'] || 'Unknown Title';
@@ -107,40 +114,27 @@ const parseMetadata = (row, index) => {
     }
   }
 
-  // Parse Cover Letter link
+  // Parse Cover Letter link / text
   let coverLetterLink = row['coverLetterLink'] || row['cover'] || row['cover_md'] || null;
-  if (!coverLetterLink) {
-    const clMatch = notesStr.match(/(?:Cover Letter:\s*)(https:\/\/docs\.google\.com\/document\/d\/[^\s|]+)/i) || 
-                    notesStr.match(/(https:\/\/docs\.google\.com\/document\/d\/[^\s|]+)/i);
-    if (clMatch) {
-      coverLetterLink = clMatch[1];
-    }
-  }
-
-  // Parse CV / Resume link
   let cvLink = row['cvLink'] || row['resumeLink'] || row['resume'] || row['resume_md'] || row['cv'] || row['CV'] || null;
-  if (!cvLink) {
-    const cvMatch = notesStr.match(/(?:Resume|CV):\s*(https:\/\/[^\s|]+)/i);
-    if (cvMatch) {
-      cvLink = cvMatch[1];
-    }
-  }
 
-  // Direct Job Ad portal link resolution (strictly excludes google docs / profile links)
+  // Direct Job Ad portal link resolution
   const rawPortal = row['Email / Portal Link'] || row['portalLink'] || row['url'] || row['application_route'] || row['link'] || '';
   const portalLink = resolveJobAdLink(rawPortal, notesStr, company, title);
 
   // Parse rich audit & score
   const matchScore = calculateCandidateMatchScore(row);
   const location = row['location'] || row['Location'] || 'Melbourne, VIC';
-  const stream = row['stream'] || 'Core IT & Systems';
+  const stream = row['stream'] || row['industry'] || 'Core IT & Systems';
   const tags = Array.isArray(row['tags']) ? row['tags'] : [];
   const audit = row['audit'] || null;
-  const remote = row['remote'] || false;
-  const status = row['Status'] || row['status'] || 'Package Prepared / To Submit';
+  const remote = Boolean(row['remote']);
+  const status = row['Status'] || row['status'] || 'sourced';
+
+  const rowId = row['id'] || (index !== undefined ? String(index) : `${company}_${title}`);
 
   return {
-    id: String(index),
+    id: String(rowId),
     date: row['Date'] || row['date'] || row['posted'] || new Date().toISOString().split('T')[0],
     company,
     title,
@@ -152,6 +146,8 @@ const parseMetadata = (row, index) => {
     salary,
     coverLetterLink,
     cvLink,
+    resumeText: row['resumeText'] || row['resume_text'] || '',
+    coverLetterText: row['coverLetterText'] || row['cover_letter_text'] || '',
     score: matchScore,
     location,
     stream,
@@ -161,76 +157,195 @@ const parseMetadata = (row, index) => {
   };
 };
 
-const parseSuggestionRow = (row, index) => {
-  const company = row['Company'] || row['company'] || '';
-  const title = row['Job Title'] || row['title'] || '';
-  if (!company && !title) return null;
+/**
+ * Fetch paginated & filterable public jobs from the database API
+ */
+export const fetchJobsFromApi = async ({
+  page = 1,
+  pageSize = 50,
+  search = '',
+  industry = '',
+  remote = null,
+  sortBy = 'newest'
+} = {}) => {
+  const apiBase = getApiBase();
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('pageSize', String(pageSize));
+  if (search) params.set('search', search);
+  if (industry && industry !== 'All') params.set('industry', industry);
+  if (remote !== null && remote !== undefined) params.set('remote', String(remote));
+  if (sortBy) params.set('sortBy', sortBy);
 
-  const location = row['Location'] || row['location'] || 'Melbourne, VIC';
-  const source = row['Source / Platform'] || row['Source'] || 'Suggested Role';
-  const rawPortal = row['Job Ad / Email Link'] || row['portalLink'] || '';
-  const notes = row['Key Highlights'] || row['notes'] || '';
-  const date = row['Date'] || new Date().toISOString().split('T')[0];
+  try {
+    const res = await fetch(`${apiBase}/api/jobs?${params.toString()}`, {
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.jobs)) {
+        return {
+          jobs: data.jobs.map((item, idx) => parseMetadata(item, item.id || `api_${idx}`)),
+          total: data.total || data.jobs.length,
+          page: data.page || page,
+          pageSize: data.pageSize || pageSize,
+          totalPages: data.totalPages || 1
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Backend /api/jobs fetch failed, falling back to local static payload:", err);
+  }
 
-  const portalLink = resolveJobAdLink(rawPortal, notes, company, title);
-
-  const candidateRow = {
-    'Company': company,
-    'Job Title': title,
-    'Location': location,
-    'Source': `${source} (Suggested)`,
-    'Email / Portal Link': portalLink,
-    'Notes & Next Steps': notes,
-    'Date': date,
-    'Status': 'Package Prepared / To Submit',
-    'score': 85
-  };
-
-  return parseMetadata(candidateRow, `sug_${index}`);
+  // Fallback to demo jobs if API is unreachable
+  return fetchDemoFallbackJobs();
 };
 
+/**
+ * Fetch private application tracking records for the authenticated user
+ */
+export const fetchUserApplications = async () => {
+  const token = getAuthToken();
+  if (!token) return [];
+
+  const apiBase = getApiBase();
+  try {
+    const res = await fetch(`${apiBase}/api/applications`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.applications)) {
+        return data.applications;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to fetch user applications from backend:", err);
+  }
+  return [];
+};
+
+/**
+ * Upsert private application tracking status and notes for the authenticated user
+ */
+export const saveUserApplication = async (jobData) => {
+  const token = getAuthToken();
+  if (!token) {
+    // If not logged in, persist locally in localStorage
+    const saved = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+    saved[jobData.id || `${jobData.company}_${jobData.title}`] = jobData;
+    localStorage.setItem('job_dashboard_local_applications', JSON.stringify(saved));
+    return { success: true, local: true };
+  }
+
+  const apiBase = getApiBase();
+  try {
+    const res = await fetch(`${apiBase}/api/applications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        job_id: jobData.id || `${jobData.company}_${jobData.title}`,
+        status: jobData.status || 'sourced',
+        notes: jobData.notes || '',
+        resume_text: jobData.resumeText || '',
+        cover_letter_text: jobData.coverLetterText || '',
+        applied_at: jobData.applied_at || jobData.date || null
+      })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error("Failed to save user application tracking record:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+const fetchDemoFallbackJobs = async () => {
+  const fallbackPaths = [
+    `${import.meta.env.BASE_URL || '/'}demo_jobs.json`,
+    './demo_jobs.json',
+    `${import.meta.env.BASE_URL || '/'}jobs_combined.json`,
+    './jobs_combined.json'
+  ];
+
+  for (const path of fallbackPaths) {
+    try {
+      const res = await fetch(path);
+      if (res.ok) {
+        const data = await res.json();
+        const rawList = Array.isArray(data) ? data : (data.jobs || []);
+        if (rawList.length > 0) {
+          const parsed = rawList.map((row, index) => parseMetadata(row, row.id || `demo_${index}`));
+          return {
+            jobs: parsed,
+            total: parsed.length,
+            page: 1,
+            pageSize: parsed.length,
+            totalPages: 1
+          };
+        }
+      }
+    } catch {}
+  }
+
+  return {
+    jobs: (MULTI_INDUSTRY_JOBS || []).map((row, index) => parseMetadata(row, `mi_${index}`)),
+    total: (MULTI_INDUSTRY_JOBS || []).length,
+    page: 1,
+    pageSize: (MULTI_INDUSTRY_JOBS || []).length,
+    totalPages: 1
+  };
+};
+
+/**
+ * Main fetch function for populating the active dashboard state.
+ * Queries /api/jobs (or cached jobs) and merges user-scoped applications.
+ */
 export const fetchJobsData = async () => {
-  const [sheetJobs, scrapedJobs] = await Promise.all([
-    fetchSheetData(),
-    fetchStoredScrapedJobs()
+  const [apiJobsResult, userApps] = await Promise.all([
+    fetchJobsFromApi({ page: 1, pageSize: 200 }),
+    fetchUserApplications()
   ]);
 
-  const existingKeys = new Set(sheetJobs.map(j => `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`));
-  
-  const uniqueScrapedJobs = scrapedJobs.filter(j => {
-    const key = `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`;
-    return !existingKeys.has(key);
+  const userAppsMap = new Map();
+  userApps.forEach(app => {
+    userAppsMap.set(String(app.job_id), app);
   });
 
-  const allCombined = [...sheetJobs, ...uniqueScrapedJobs];
-  const combinedKeys = new Set(allCombined.map(j => `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`));
-
-  const uniqueMultiIndustry = (MULTI_INDUSTRY_JOBS || []).filter(j => {
-    const key = `${(j.company || '').toLowerCase()}_${(j.title || '').toLowerCase()}`;
-    return !combinedKeys.has(key);
+  const mergedJobs = apiJobsResult.jobs.map(job => {
+    const userApp = userAppsMap.get(String(job.id)) || userAppsMap.get(`${job.company}_${job.title}`);
+    if (userApp) {
+      return {
+        ...job,
+        status: userApp.status || job.status,
+        notes: userApp.notes || job.notes,
+        resumeText: userApp.resume_text || job.resumeText,
+        coverLetterText: userApp.cover_letter_text || job.coverLetterText,
+        applied_at: userApp.applied_at
+      };
+    }
+    return job;
   });
 
-  return [...allCombined, ...uniqueMultiIndustry];
+  return mergedJobs;
 };
 
 /**
  * Fetch jobs personalised to a user profile.
- * When the Python backend is available (local dev or Cloud Run API):
+ * When the Python backend is available:
  * triggers an intelligent query refresh via POST /api/refresh using profile-derived search queries.
- * Reuses recent database cached scrapes to prevent unnecessary bandwidth consumption.
- *
- * @param {object} profile - Active user profile from profileService
- * @returns {{ jobs: object[], queriesUsed: object[], liveScraped: boolean, cacheStats: object }}
  */
 export const fetchJobsForProfile = async (profile) => {
   const queriesUsed = buildQueriesFromProfile(profile);
 
-  // Attempt backend refresh if localhost or cloud backend configured
   if (isLocalHost || SCRAPER_BASE_URL) {
     try {
       const result = await triggerProfileScrape(profile);
-      if (result.success && result.jobs.length > 0) {
-        const parsed = result.jobs.map((item, idx) => parseMetadata(item, `ps_${idx}`));
+      if (result.success && Array.isArray(result.jobs) && result.jobs.length > 0) {
+        const parsed = result.jobs.map((item, idx) => parseMetadata(item, item.id || `ps_${idx}`));
         return { 
           jobs: parsed, 
           queriesUsed, 
@@ -239,110 +354,10 @@ export const fetchJobsForProfile = async (profile) => {
           cacheStats: result.cacheStats 
         };
       }
-    } catch {
-      // Fall through to static path
-    }
+    } catch {}
   }
 
-  // Static fallback: return all jobs (Dashboard scoring will still rank by profile)
+  // Database API fallback
   const all = await fetchJobsData();
   return { jobs: all, queriesUsed, liveScraped: false, cacheStats: null };
 };
-
-
-
-
-const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-const fetchSheetData = async () => {
-  if (isLocalHost && FALLBACK_CSV_URL) {
-    return new Promise((resolve) => {
-      Papa.parse(FALLBACK_CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          const mainData = (results.data || [])
-            .filter(row => row['Company'] || row['Job Title'])
-            .map((row, index) => parseMetadata(row, index));
-
-          if (!SUGGESTIONS_CSV_URL) return resolve(mainData);
-
-          Papa.parse(SUGGESTIONS_CSV_URL, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: (sugResults) => {
-              const sugData = (sugResults.data || [])
-                .map((row, index) => parseSuggestionRow(row, index))
-                .filter(Boolean);
-              
-              resolve([...mainData, ...sugData]);
-            },
-            error: () => {
-              resolve(mainData);
-            }
-          });
-        },
-        error: () => {
-          fetchDemoData(resolve);
-        }
-      });
-    });
-  }
-
-  // Production or no fallback URL -> fetch from demo_jobs.json
-  return new Promise((resolve) => {
-    fetchDemoData(resolve);
-  });
-};
-
-const fetchDemoData = async (resolve) => {
-  try {
-    const res = await fetch(`${import.meta.env.BASE_URL || '/'}demo_jobs.json`);
-    if (res.ok) {
-      const data = await res.json();
-      const parsed = data.map((row, index) => parseMetadata(row, index));
-      return resolve(parsed);
-    }
-  } catch (e) {
-    console.warn("Failed to load demo jobs:", e);
-  }
-  return resolve([]);
-};
-
-
-const fetchStoredScrapedJobs = async () => {
-  // Try local backend (dev) or Cloud Run backend (production)
-  const apiBase = isLocalHost ? '' : SCRAPER_BASE_URL;
-  if (isLocalHost || SCRAPER_BASE_URL) {
-    try {
-      const res = await fetch(`${apiBase}/api/scraped-jobs`, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
-          return data.jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
-        }
-      }
-    } catch {}
-  }
-
-  // Static fallback: bundled jobs_combined.json copied to public/ at build time
-  const fallbackPaths = ['./jobs_combined.json', 'jobs_combined.json', `${import.meta.env.BASE_URL || '/'}jobs_combined.json`];
-  for (const path of fallbackPaths) {
-    try {
-      const res = await fetch(path);
-      if (res.ok) {
-        const data = await res.json();
-        const jobs = Array.isArray(data) ? data : (data.jobs || []);
-        if (jobs.length > 0) {
-          return jobs.map((item, idx) => parseMetadata(item, `scraped_${idx}`));
-        }
-      }
-    } catch {}
-  }
-
-  return [];
-};
-
-

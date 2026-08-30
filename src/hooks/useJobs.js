@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchJobsData } from '../services/dataService';
+import { fetchJobsData, saveUserApplication } from '../services/dataService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -130,6 +130,8 @@ export const useJobs = () => {
       );
       const key  = match ? jobKey(match) : String(targetJobIdentifier);
       next[key]  = { ...(prev[key] || {}), status: newStatus, ...extraData };
+      const jobObj = match ? { ...match, ...next[key] } : { id: targetJobIdentifier, status: newStatus, ...extraData };
+      saveUserApplication(jobObj);
       return next;
     });
   }, [rawJobs]);
@@ -144,6 +146,8 @@ export const useJobs = () => {
       );
       const key  = match ? jobKey(match) : String(targetJobIdentifier);
       next[key]  = { ...(prev[key] || {}), notes };
+      const jobObj = match ? { ...match, ...next[key] } : { id: targetJobIdentifier, notes };
+      saveUserApplication(jobObj);
       return next;
     });
   }, [rawJobs]);

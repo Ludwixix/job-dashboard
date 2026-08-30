@@ -42,6 +42,86 @@ export default defineConfig({
           res.end(JSON.stringify({ success: true, count: jobs.length, jobs }));
         });
 
+        // Paginated & filterable database jobs endpoint
+        server.middlewares.use('/api/jobs', (req, res, next) => {
+          if (req.method !== 'GET') { return next(); }
+          const combinedJsonPath = path.resolve(import.meta.dirname, './public/jobs_combined.json');
+          const demoJsonPath = path.resolve(import.meta.dirname, './public/demo_jobs.json');
+          let jobs = [];
+          if (fs.existsSync(combinedJsonPath)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(combinedJsonPath, 'utf8'));
+              jobs = Array.isArray(raw) ? raw : (raw.jobs || []);
+            } catch (e) {}
+          }
+          if (jobs.length === 0 && fs.existsSync(demoJsonPath)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(demoJsonPath, 'utf8'));
+              jobs = Array.isArray(raw) ? raw : (raw.jobs || []);
+            } catch (e) {}
+          }
+
+          const parsedUrl = new URL(req.url, 'http://localhost');
+          const page = parseInt(parsedUrl.searchParams.get('page') || '1', 10);
+          const pageSize = parseInt(parsedUrl.searchParams.get('pageSize') || '50', 10);
+          const search = (parsedUrl.searchParams.get('search') || '').toLowerCase();
+          const industry = (parsedUrl.searchParams.get('industry') || '').toLowerCase();
+          
+          let filtered = jobs;
+          if (search) {
+            filtered = filtered.filter(j => 
+              (j.title || '').toLowerCase().includes(search) ||
+              (j.company || '').toLowerCase().includes(search) ||
+              (j.location || '').toLowerCase().includes(search)
+            );
+          }
+          if (industry && industry !== 'all') {
+            filtered = filtered.filter(j => 
+              (j.stream || '').toLowerCase().includes(industry) ||
+              (j.industry || '').toLowerCase().includes(industry)
+            );
+          }
+          
+          const offset = (page - 1) * pageSize;
+          const sliced = filtered.slice(offset, offset + pageSize);
+          
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            jobs: sliced,
+            total: filtered.length,
+            page,
+            pageSize,
+            totalPages: Math.max(1, Math.ceil(filtered.length / pageSize))
+          }));
+        });
+
+        // User applications tracking endpoint
+        server.middlewares.use('/api/applications', (req, res, next) => {
+          if (req.method === 'GET') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, applications: [] }));
+          } else if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const appPayload = JSON.parse(body || '{}');
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, application: appPayload }));
+              } catch (e) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: e.message }));
+              }
+            });
+          } else {
+            next();
+          }
+        });
+
         // Refresh & Scraper Trigger Endpoints
         server.middlewares.use('/api/refresh', (req, res) => {
           res.statusCode = 200;

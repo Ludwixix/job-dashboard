@@ -1644,27 +1644,30 @@ def make_handler(app: DashboardApp):
                     })
                     return
 
-                elif path == "/api/refresh":
+                elif path in ("/api/refresh", "/api/scrape"):
                     content_len = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    queries = [
-                        SearchQuery(
-                            item["term"],
-                            item.get("location", "Melbourne, VIC"),
-                            item.get("stream", "core-it"),
-                            item.get("group", ""),
-                            float(item.get("weight", 1.0)),
-                            tuple(item.get("exclude_terms", [])),
-                            bool(item.get("enabled", True))
-                        )
-                        for item in payload.get("queries", [])
-                    ]
+                    raw_queries = payload.get("queries", [])
+                    queries = []
+                    for item in raw_queries:
+                        if isinstance(item, str):
+                            queries.append(SearchQuery(term=item, location="Melbourne, VIC", stream="core-it"))
+                        elif isinstance(item, dict):
+                            queries.append(SearchQuery(
+                                item.get("term", ""),
+                                item.get("location", "Melbourne, VIC"),
+                                item.get("stream", "core-it"),
+                                item.get("group", ""),
+                                float(item.get("weight", 1.0)),
+                                tuple(item.get("exclude_terms", [])),
+                                bool(item.get("enabled", True))
+                            ))
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:
                         jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
                     except Exception as refresh_err:
-                        logger.warning(f"/api/refresh scrape failed, returning cached DB jobs: {refresh_err}")
+                        logger.warning(f"{path} scrape failed, returning cached DB jobs: {refresh_err}")
                         try:
                             cached_result = app.repository.query_jobs_paginated(page=1, page_size=5000)
                             jobs = cached_result.get("jobs", [])
@@ -1679,6 +1682,7 @@ def make_handler(app: DashboardApp):
                         "success": True
                     })
                     return
+
 
 
                 if path == "/api/search-criteria":

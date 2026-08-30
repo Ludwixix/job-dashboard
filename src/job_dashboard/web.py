@@ -42,9 +42,7 @@ from .repository import JobRepository
 from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .smart_applications import get_smart_application_tracker
-from .sources import ScrapePipeline, SearchQuery, clean_description, is_recent, posted_age
-
-TRACKER_CSV_URL = "https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv&gid=0"
+TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
 
 
 
@@ -60,6 +58,7 @@ class DashboardApp:
         self.search_queries = self._load_search_queries(search_queries)
         self.jobs: list[dict] = self._load_jobs()
         self.repository = JobRepository(self.data_dir / "jobs.sqlite3")
+        self.db = self.repository
         self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
         self.generation_progress: dict[str, dict[str, object]] = {}
         self.compare_results: dict[str, dict[str, object]] = self._load_compare_results()
@@ -644,6 +643,9 @@ class DashboardApp:
 
     def sync_tracker(self):
         """Pull the shared application tracker sheet and reconcile it against current jobs."""
+        if not TRACKER_CSV_URL:
+            self.tracker_state = {**self.tracker_state, "status": "idle", "rows": 0, "matched": 0}
+            return self.tracker_state
         self.tracker_state = {**self.tracker_state, "status": "syncing"}
         try:
             request = urllib.request.Request(TRACKER_CSV_URL, headers={"User-Agent": "job-dashboard/1.0"})
@@ -890,6 +892,42 @@ def make_handler(app: DashboardApp):
                     self.send_json(401, {"error": "Invalid token"})
                 return
 
+            if path == "/api/jobs":
+                query_params = parse_qs(parsed.query)
+                page = int(query_params.get("page", ["1"])[0])
+                page_size = int(query_params.get("pageSize", ["50"])[0])
+                search = query_params.get("search", [""])[0]
+                industry = query_params.get("industry", [""])[0]
+                remote_param = query_params.get("remote", [None])[0]
+                remote = None if remote_param is None else (remote_param.lower() in ("true", "1"))
+                sort_by = query_params.get("sortBy", ["newest"])[0]
+                
+                result = app.repository.query_jobs_paginated(
+                    page=page,
+                    page_size=page_size,
+                    search=search,
+                    industry=industry,
+                    remote=remote,
+                    sort_by=sort_by
+                )
+                self.send_json(200, result)
+                return
+
+            if path == "/api/applications":
+                auth_header = self.headers.get("Authorization")
+                if not auth_header or not auth_header.startswith("Bearer "):
+                    self.send_json(401, {"error": "Missing or invalid token"})
+                    return
+                token = auth_header.split(" ")[1]
+                try:
+                    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+                    user_id = payload.get("sub")
+                    apps = app.repository.get_user_applications(user_id)
+                    self.send_json(200, {"success": True, "applications": apps})
+                except Exception as e:
+                    self.send_json(401, {"error": "Unauthorized: " + str(e)})
+                return
+
             if path == "/health":
                 import time
 
@@ -1073,6 +1111,30 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, app.select_compare_output(comparison_id, payload["model_id"]))
                     return
                 
+                if path == "/api/applications":
+                    auth_header = self.headers.get("Authorization")
+                    if not auth_header or not auth_header.startswith("Bearer "):
+                        self.send_json(401, {"error": "Missing or invalid token"})
+                        return
+                    token = auth_header.split(" ")[1]
+                    try:
+                        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+                        user_id = payload.get("sub")
+                    except Exception as e:
+                        self.send_json(401, {"error": "Unauthorized: " + str(e)})
+                        return
+                        
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = str(body.get("job_id") or "").strip()
+                    if not job_id:
+                        self.send_json(400, {"error": "Missing job_id"})
+                        return
+                        
+                    app_rec = app.repository.upsert_user_application(user_id, job_id, body)
+                    self.send_json(200, {"success": True, "application": app_rec})
+                    return
+
                 if path == "/api/register":
                     content_len = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}

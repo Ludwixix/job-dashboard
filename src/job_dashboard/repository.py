@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import hashlib
 import json
 import re
 import sqlite3
@@ -15,6 +14,12 @@ logger = get_logger("job_dashboard.repository")
 STATUSES = ("sourced", "shortlisted", "applied", "interviewing", "offer", "rejected")
 
 
+def generate_dedupe_key(company: str, title: str, url: str) -> str:
+    """Generate deterministic deduplication key for a job listing."""
+    norm = f"{(company or '').strip().lower()}|{(title or '').strip().lower()}|{(url or '').strip().lower()}"
+    return hashlib.sha256(norm.encode('utf-8')).hexdigest()[:24]
+
+
 class JobRepository:
     """SQLite persistence for jobs, Kanban status, and application events."""
 
@@ -26,6 +31,10 @@ class JobRepository:
         self._init_schema()
         
         logger.info(f"JobRepository initialized for {self.path}")
+
+    def get_connection(self):
+        """Get a database connection from the pool."""
+        return get_db_connection(self.path)
 
     def _init_schema(self):
         """Initialize database schema."""
@@ -49,6 +58,21 @@ class JobRepository:
                     password_hash TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS user_applications (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    job_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'sourced',
+                    notes TEXT DEFAULT '',
+                    resume_text TEXT DEFAULT '',
+                    cover_letter_text TEXT DEFAULT '',
+                    resume_url TEXT DEFAULT '',
+                    cover_letter_url TEXT DEFAULT '',
+                    applied_at TEXT,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(user_id, job_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_apps_user ON user_applications(user_id);
                 CREATE TABLE IF NOT EXISTS application_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
                     from_status TEXT, to_status TEXT NOT NULL, occurred_at TEXT NOT NULL,
@@ -224,3 +248,234 @@ class JobRepository:
             event_count = conn.execute("SELECT COUNT(*) FROM application_events").fetchone()[0]
             
             return {"total": total, "by_status": counts, "events": event_count}
+
+    def upsert_scraped_jobs(self, raw_jobs: list[dict[str, Any]]) -> int:
+        """Upsert a list of scraped jobs into the database with deduplication."""
+        now = datetime.now(timezone.utc).isoformat()
+        inserted_or_updated = 0
+        
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            with conn:
+                for job in raw_jobs:
+                    company = str(job.get("company") or "").strip()
+                    title = str(job.get("title") or "").strip()
+                    url = str(job.get("url") or job.get("link") or job.get("portalLink") or "").strip()
+                    
+                    if not company and not title:
+                        continue
+                        
+                    dedupe_id = job.get("id") or generate_dedupe_key(company, title, url)
+                    location = str(job.get("location") or "Melbourne, VIC").strip()
+                    source = str(job.get("source") or "Job Board").strip()
+                    description = str(job.get("description") or job.get("notes") or "").strip()
+                    posted = str(job.get("posted") or job.get("date") or "").strip()
+                    remote = 1 if bool(job.get("remote", False)) or "remote" in location.lower() else 0
+                    stream = str(job.get("stream") or job.get("industry") or "core-it").strip()
+                    score = int(job.get("score") or 0)
+                    
+                    # Store clean standardized job dictionary in data_json
+                    clean_job = dict(job)
+                    clean_job["id"] = dedupe_id
+                    clean_job["company"] = company
+                    clean_job["title"] = title
+                    clean_job["location"] = location
+                    clean_job["source"] = source
+                    clean_job["url"] = url
+                    clean_job["portalLink"] = url
+                    clean_job["date"] = posted
+                    clean_job["posted"] = posted
+                    clean_job["remote"] = bool(remote)
+                    clean_job["stream"] = stream
+                    clean_job["score"] = score
+                    clean_job["description"] = description
+                    
+                    conn.execute("""
+                        INSERT INTO jobs (id, title, company, location, description, source, url, posted, remote, stream, score, data_json, status, created_at, updated_at)
+                        VALUES (:id, :title, :company, :location, :description, :source, :url, :posted, :remote, :stream, :score, :data_json, 'sourced', :created_at, :updated_at)
+                        ON CONFLICT(id) DO UPDATE SET
+                            title = excluded.title,
+                            company = excluded.company,
+                            location = excluded.location,
+                            description = excluded.description,
+                            source = excluded.source,
+                            url = excluded.url,
+                            posted = excluded.posted,
+                            remote = excluded.remote,
+                            stream = excluded.stream,
+                            score = CASE WHEN excluded.score > 0 THEN excluded.score ELSE jobs.score END,
+                            data_json = excluded.data_json,
+                            updated_at = excluded.updated_at
+                    """, {
+                        "id": dedupe_id,
+                        "title": title or "Untitled Role",
+                        "company": company or "Confidential",
+                        "location": location,
+                        "description": description,
+                        "source": source,
+                        "url": url,
+                        "posted": posted,
+                        "remote": remote,
+                        "stream": stream,
+                        "score": score,
+                        "data_json": json.dumps(clean_job, ensure_ascii=False),
+                        "created_at": now,
+                        "updated_at": now
+                    })
+                    inserted_or_updated += 1
+                    
+        logger.info(f"Upserted {inserted_or_updated} scraped jobs into database")
+        return inserted_or_updated
+
+    def query_jobs_paginated(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        search: str = "",
+        industry: str = "",
+        remote: bool | None = None,
+        sort_by: str = "newest"
+    ) -> dict[str, Any]:
+        """Query jobs with database-level pagination, search filtering, and sorting."""
+        page = max(1, int(page))
+        page_size = max(1, min(200, int(page_size)))
+        offset = (page - 1) * page_size
+        
+        clauses = ["1=1"]
+        params: list[Any] = []
+        
+        if search:
+            search_pattern = f"%{search.strip().lower()}%"
+            clauses.append("(lower(title) LIKE ? OR lower(company) LIKE ? OR lower(location) LIKE ? OR lower(description) LIKE ?)")
+            params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
+            
+        if industry and industry.lower() != "all":
+            clauses.append("(lower(stream) LIKE ? OR lower(data_json) LIKE ?)")
+            params.extend([f"%{industry.strip().lower()}%", f"%{industry.strip().lower()}%"])
+            
+        if remote is not None:
+            clauses.append("remote = ?")
+            params.append(1 if remote else 0)
+            
+        where_sql = " AND ".join(clauses)
+        
+        # Determine sort order
+        if sort_by == "score":
+            order_sql = "score DESC, posted DESC"
+        elif sort_by == "company":
+            order_sql = "company ASC, posted DESC"
+        elif sort_by == "title":
+            order_sql = "title ASC, posted DESC"
+        else: # newest
+            order_sql = "posted DESC, created_at DESC"
+            
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Count total matching rows
+            count_row = conn.execute(f"SELECT COUNT(*) AS total FROM jobs WHERE {where_sql}", params).fetchone()
+            total_count = count_row["total"] if count_row else 0
+            
+            # Fetch slice
+            query_sql = f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?"
+            query_params = params + [page_size, offset]
+            rows = conn.execute(query_sql, query_params).fetchall()
+            
+        jobs = []
+        for row in rows:
+            try:
+                job_data = json.loads(row["data_json"])
+                job_data["status"] = row["status"]
+                jobs.append(job_data)
+            except Exception:
+                continue
+                
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        
+        return {
+            "jobs": jobs,
+            "total": total_count,
+            "page": page,
+            "pageSize": page_size,
+            "totalPages": total_pages
+        }
+
+    def get_user_applications(self, user_id: str) -> list[dict[str, Any]]:
+        """Fetch private application tracking records for a specific authenticated user."""
+        if not user_id:
+            return []
+            
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT id, user_id, job_id, status, notes, resume_text, cover_letter_text,
+                       resume_url, cover_letter_url, applied_at, updated_at
+                FROM user_applications
+                WHERE user_id = ?
+                ORDER BY updated_at DESC
+            """, (user_id,)).fetchall()
+            
+        return [dict(row) for row in rows]
+
+    def upsert_user_application(self, user_id: str, job_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Create or update a user's private application tracking record."""
+        now = datetime.now(timezone.utc).isoformat()
+        app_id = data.get("id") or f"app_{user_id[:8]}_{job_id}"
+        status = data.get("status") or "sourced"
+        notes = str(data.get("notes") or "").strip()
+        resume_text = str(data.get("resume_text") or "").strip()
+        cover_letter_text = str(data.get("cover_letter_text") or "").strip()
+        resume_url = str(data.get("resume_url") or "").strip()
+        cover_letter_url = str(data.get("cover_letter_url") or "").strip()
+        applied_at = data.get("applied_at") or (now if status == "applied" else None)
+        
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            with conn:
+                conn.execute("""
+                    INSERT INTO user_applications (
+                        id, user_id, job_id, status, notes, resume_text, cover_letter_text,
+                        resume_url, cover_letter_url, applied_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, job_id) DO UPDATE SET
+                        status = excluded.status,
+                        notes = excluded.notes,
+                        resume_text = CASE WHEN excluded.resume_text != '' THEN excluded.resume_text ELSE user_applications.resume_text END,
+                        cover_letter_text = CASE WHEN excluded.cover_letter_text != '' THEN excluded.cover_letter_text ELSE user_applications.cover_letter_text END,
+                        resume_url = CASE WHEN excluded.resume_url != '' THEN excluded.resume_url ELSE user_applications.resume_url END,
+                        cover_letter_url = CASE WHEN excluded.cover_letter_url != '' THEN excluded.cover_letter_url ELSE user_applications.cover_letter_url END,
+                        applied_at = CASE WHEN excluded.applied_at IS NOT NULL THEN excluded.applied_at ELSE user_applications.applied_at END,
+                        updated_at = excluded.updated_at
+                """, (
+                    app_id, user_id, job_id, status, notes, resume_text, cover_letter_text,
+                    resume_url, cover_letter_url, applied_at, now
+                ))
+                
+                # Also log to application_events
+                conn.execute("""
+                    INSERT INTO application_events (job_id, from_status, to_status, occurred_at)
+                    VALUES (?, 'user_action', ?, ?)
+                """, (job_id, status, now))
+                
+        return {
+            "id": app_id,
+            "user_id": user_id,
+            "job_id": job_id,
+            "status": status,
+            "notes": notes,
+            "resume_text": resume_text,
+            "cover_letter_text": cover_letter_text,
+            "resume_url": resume_url,
+            "cover_letter_url": cover_letter_url,
+            "applied_at": applied_at,
+            "updated_at": now
+        }
+
+    def delete_user_application(self, user_id: str, job_id: str) -> bool:
+        """Remove a user's tracking entry for a job."""
+        with get_db_connection(self.path) as conn:
+            with conn:
+                cur = conn.execute("DELETE FROM user_applications WHERE user_id = ? AND job_id = ?", (user_id, job_id))
+                return cur.rowcount > 0
+

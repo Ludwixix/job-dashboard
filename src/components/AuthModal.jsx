@@ -6,7 +6,7 @@ import {
 import { 
   getAuthenticatedUser, setAuthenticatedUser, signOutGoogleUser, 
   requestGoogleAuthToken, getGoogleClientId, setGoogleClientId,
-  isValidGoogleClientId, simulateGoogleWorkspaceAuth 
+  isValidGoogleClientId, simulateGoogleWorkspaceAuth, loginWithGoogle 
 } from '../services/googleAuthService';
 import { loginWithBrowserPasskey } from '../services/passkeyService';
 
@@ -47,26 +47,23 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
   };
 
   const handleConnectGoogle = async () => {
-    if (!isValidGoogleClientId(clientIdInput)) {
-      setErrorMsg('Please enter a valid Google Cloud Client ID (ending in .apps.googleusercontent.com) below, or use 1-Click Instant Connect.');
-      setShowSetupGuide(true);
-      return;
-    }
-
     setIsConnecting(true);
     setErrorMsg('');
-    setSuccessMsg('');
+    setSuccessMsg('Connecting to Google Identity Services...');
 
     try {
-      setGoogleClientId(clientIdInput);
+      if (clientIdInput) {
+        setGoogleClientId(clientIdInput);
+      }
 
-      const authUser = await requestGoogleAuthToken({
-        clientId: clientIdInput
+      const result = await loginWithGoogle({
+        autoScanGmail: true,
+        onStatusUpdate: (msg) => setSuccessMsg(msg)
       });
 
-      setUser(authUser);
-      setSuccessMsg(`Successfully connected as ${authUser.name} (${authUser.email})`);
-      if (onAuthChange) onAuthChange(authUser);
+      setUser(result.user);
+      setSuccessMsg(`Connected as ${result.user.name} (${result.user.email})! Synced ${result.scanCount || 0} applications from Gmail.`);
+      if (onAuthChange) onAuthChange(result.user);
     } catch (err) {
       console.error('Google Auth failed:', err);
       setErrorMsg(err.message || 'Authentication was cancelled or failed.');

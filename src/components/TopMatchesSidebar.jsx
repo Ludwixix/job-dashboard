@@ -70,7 +70,6 @@ const formatDaysAgo = (dateStr) => {
   return 'Recently';
 };
 
-
 export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
   const [showTopMatches, setShowTopMatches] = useState(true); // Open by default
   const [showLiveInsights, setShowLiveInsights] = useState(true);
@@ -194,6 +193,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
   }, [unsubmittedJobs]);
 
 
+
   const proximityTier = highlightedLocalJob ? getProximityTier(highlightedLocalJob.location) : 3;
 
   return (
@@ -225,14 +225,13 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
           </div>
         </div>
 
+
         {showLiveInsights && (
           <div className="space-y-2.5 pt-3 mt-2 border-t border-slate-800 animate-in fade-in duration-200">
-            {/* Telemetry Item 1: Proximity Index */}
             <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Navigation size={13} className="text-emerald-400 shrink-0" />
                 <div>
-                  <div className="text-[9px] text-slate-400 uppercase font-bold">{baseLocation.split(' ')[0]} PROXIMITY</div>
                   <div className="text-xs font-black text-emerald-300">{liveInsights.nearBalaclava} POSITIONS ({liveInsights.proximityPct}%)</div>
                 </div>
               </div>

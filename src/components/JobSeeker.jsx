@@ -1398,6 +1398,7 @@ export const JobSeeker = ({
                                 <ThumbsDown size={11} className={isJobDemoted(job) ? "fill-white" : ""} />
                                 <span className="hidden sm:inline text-[9px]">LESS</span>
                               </button>
+
                             </div>
 
                             {job.isRejected ? (
@@ -1560,6 +1561,7 @@ export const JobSeeker = ({
                         })()}
                       </div>
 
+
                       {/* Direct PDF Quick-Download Bar for Generated Docs */}
                       {hasCustomDocs && (
                         <div className="pt-2 border-t border-emerald-200/80 flex items-center gap-2 font-mono">
@@ -1671,11 +1673,8 @@ export const JobSeeker = ({
                     <span>PAGE <strong className="text-slate-900">{currentPage}</strong> OF <strong className="text-slate-900">{totalPages}</strong></span>
                     <span className="text-slate-400">({seekerJobs.length} TOTAL POSITIONS)</span>
                   </div>
-
-                  {/* Page Controls & Direct Page Number Buttons */}
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => handlePageChange(1)}
                       disabled={currentPage === 1}
                       className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-800 cursor-pointer"
                       title="First Page"
@@ -1693,6 +1692,7 @@ export const JobSeeker = ({
                     {/* Numeric Page Buttons */}
                     {Array.from({ length: totalPages }, (_, i) => i + 1)
                       .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+
                       .map((pageNum, idx, arr) => {
                         const prevPage = arr[idx - 1];
                         const showEllipsis = prevPage && pageNum - prevPage > 1;

@@ -1,41 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { OnboardingFlow } from './components/OnboardingFlow';
-import { getCurrentSession, validateSession } from './services/authService';
+import { getCurrentSession, validateSession, logoutUser } from './services/authService';
 import { Loader2 } from 'lucide-react';
 
 function App() {
-  const [session, setSession] = useState(getCurrentSession());
+  const [session, setSession] = useState(() => getCurrentSession());
   const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const checkAuth = async () => {
-      // If no local session marker exists, skip validation (forces login)
-      if (!session) {
-        setIsValidating(false);
-        return;
-      }
-      
-      // Demo users don't have a backend session to validate
-      if (session.isDemoUser) {
-        setIsValidating(false);
-        return;
-      }
+      try {
+        const local = getCurrentSession();
+        if (!local) {
+          if (isMounted) setIsValidating(false);
+          return;
+        }
 
-      // Validate real users with backend
-      const validSession = await validateSession();
-      setSession(validSession);
-      setIsValidating(false);
+        // Validate or refresh session without destroying local session
+        const restored = await validateSession();
+        if (isMounted) {
+          setSession(restored || local);
+        }
+      } catch (e) {
+        console.warn('Session verification fallback:', e);
+      } finally {
+        if (isMounted) setIsValidating(false);
+      }
     };
 
     checkAuth();
-  }, []); // Run once on mount
+    return () => { isMounted = false; };
+  }, []);
 
   if (isValidating) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
         <Loader2 className="animate-spin text-indigo-500 mb-4" size={48} />
-        <p className="text-slate-400 font-mono">Verifying Session...</p>
+        <p className="text-slate-400 font-mono">Loading Session...</p>
       </div>
     );
   }
@@ -56,10 +59,14 @@ function App() {
     <div className="App">
       <Dashboard 
         currentUser={session}
-        onSignOut={() => setSession(null)}
+        onSignOut={() => {
+          logoutUser();
+          setSession(null);
+        }}
       />
     </div>
   );
 }
 
 export default App;
+

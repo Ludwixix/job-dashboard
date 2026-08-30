@@ -43,11 +43,17 @@ export const setSession = (userData, token = null) => {
 };
 
 /**
- * Validates the session with the backend on load
+ * Validates or restores the active user session on page load / refresh
  */
 export const validateSession = async () => {
+  const current = getCurrentSession();
+  if (!current) return null;
+
+  // For demo users, Google auth, passkey or users with completed onboarding, preserve the session
   const token = localStorage.getItem(LS_TOKEN);
-  if (!token) return null;
+  if (!token) {
+    return current;
+  }
 
   try {
     const apiBase = getApiBase();
@@ -58,8 +64,6 @@ export const validateSession = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.user) {
-        // Keep onboarding state if it exists locally, but verify user details
-        const current = getCurrentSession() || {};
         const verifiedSession = {
           ...current,
           ...data.user,
@@ -70,14 +74,13 @@ export const validateSession = async () => {
       }
     }
   } catch (err) {
-    console.error("Session validation failed:", err);
+    console.warn("Backend session validation deferred (offline / network):", err);
   }
 
-
-  // If we reach here, token is invalid or expired
-  setSession(null);
-  return null;
+  // Preserve existing local session so user stays logged in across page reloads
+  return current;
 };
+
 
 /**
  * Sign In with Email & Password

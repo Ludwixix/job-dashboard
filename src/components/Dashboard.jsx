@@ -90,11 +90,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         updateJobStatus(jobId, 'Package Prepared / To Submit', appPayload);
 
         // Auto append or update to Google Sheet if user has an active spreadsheet
-        const authUser = currentUser;
-        if (authUser?.accessToken && authUser?.spreadsheetId) {
-          upsertApplicationInSheet(authUser.accessToken, authUser.spreadsheetId, { ...job, ...appPayload }, activeProfile);
+        if (currentUser?.accessToken && currentUser?.spreadsheetId) {
+          upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, { ...job, ...appPayload }, activeProfile);
         }
-
 
         const notif = {
           title: job.title,
@@ -107,6 +105,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         }, 6000);
       }
     } catch (err) {
+
       console.error('Async application error:', err);
     } finally {
       setAsyncGeneratingIds(prev => {
@@ -833,9 +832,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         }}
       />
 
-
       {/* Fixed Bottom Status Bar */}
       <footer className="fixed bottom-0 left-0 right-0 h-7 bg-slate-900 border-t border-slate-800 text-slate-400 font-mono text-[11px] font-bold px-4 flex items-center justify-between z-50 select-none shadow-md">
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1 text-emerald-400">
             <span>⚡ V2.0 AUTONOMOUS</span>

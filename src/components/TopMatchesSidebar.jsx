@@ -192,8 +192,6 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
       .slice(0, 2);
   }, [unsubmittedJobs]);
 
-
-
   const proximityTier = highlightedLocalJob ? getProximityTier(highlightedLocalJob.location) : 3;
 
   return (
@@ -225,9 +223,9 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
           </div>
         </div>
 
-
         {showLiveInsights && (
           <div className="space-y-2.5 pt-3 mt-2 border-t border-slate-800 animate-in fade-in duration-200">
+
             <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Navigation size={13} className="text-emerald-400 shrink-0" />

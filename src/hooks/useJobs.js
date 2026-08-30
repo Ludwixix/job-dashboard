@@ -121,20 +121,27 @@ export const useJobs = () => {
 
   /** Persist a status change + optional extra fields for a job. Survives page refresh. */
   const updateJobStatus = useCallback((targetJobIdentifier, newStatus, extraData = {}) => {
+    const matchedJob = rawJobs.find(j =>
+      (j.id && String(j.id) === String(targetJobIdentifier)) ||
+      `${j.company}_${j.title}` === targetJobIdentifier
+    );
+    const key = matchedJob ? jobKey(matchedJob) : String(targetJobIdentifier);
+
     setOverrides(prev => {
       const next = { ...prev };
-      next[key] = { ...(prev[key] || {}), status: newStatus, ...extraData };
+      next[key] = { ...(prev[key] || {}), ...(newStatus ? { status: newStatus } : {}), ...extraData };
       return next;
     });
 
     const jobObj = matchedJob
-      ? { ...matchedJob, status: newStatus, ...extraData }
+      ? { ...matchedJob, ...(newStatus ? { status: newStatus } : {}), ...extraData }
       : {
           id: String(targetJobIdentifier),
           company: extraData.company || (String(targetJobIdentifier).includes('_') ? String(targetJobIdentifier).split('_')[0] : 'Direct Employer'),
+          title: extraData.title || (String(targetJobIdentifier).includes('_') ? String(targetJobIdentifier).split('_')[1] : 'Direct Position'),
           date: extraData.date || new Date().toISOString().split('T')[0],
-          applied_at: extraData.applied_at || (newStatus.toLowerCase().includes('applied') ? new Date().toISOString().split('T')[0] : null),
-          status: newStatus,
+          applied_at: extraData.applied_at || (newStatus && newStatus.toLowerCase().includes('applied') ? new Date().toISOString().split('T')[0] : null),
+          status: newStatus || extraData.status || 'Applied / In Review',
           ...extraData
         };
 
@@ -154,7 +161,6 @@ export const useJobs = () => {
     });
     updateJobStatus(targetJobIdentifier, 'Rejected / Dismissed');
   }, [updateJobStatus]);
-
 
   const unrejectJob = useCallback((targetJobIdentifier) => {
     setRejectedIds(prev => prev.filter(id => id !== String(targetJobIdentifier)));
@@ -176,6 +182,7 @@ export const useJobs = () => {
       return next;
     });
   }, [rawJobs]);
+
 
   /** Batch closes all applied jobs that have had no updates for >= 14 days */
   const closeNonResponsiveJobs = useCallback(() => {

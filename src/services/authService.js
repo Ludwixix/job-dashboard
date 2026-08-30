@@ -49,7 +49,6 @@ export const validateSession = async () => {
   const current = getCurrentSession();
   if (!current) return null;
 
-  // For demo users, Google auth, passkey or users with completed onboarding, preserve the session
   const token = localStorage.getItem(LS_TOKEN);
   if (!token) {
     return current;
@@ -82,6 +81,7 @@ export const validateSession = async () => {
 };
 
 
+
 /**
  * Sign In with Email & Password
  */
@@ -89,8 +89,8 @@ export const loginWithEmail = async (email, password) => {
   const cleanEmail = (email || '').trim().toLowerCase();
   if (!cleanEmail) throw new Error('Please enter a valid email address.');
   if (!password) throw new Error('Please enter a password.');
-
   const apiBase = getApiBase();
+
   const res = await fetch(`${apiBase}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

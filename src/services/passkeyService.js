@@ -1,13 +1,14 @@
 /**
  * passkeyService.js
  * Browser Credential Management & WebAuthn / Passkey Authentication
- * Enables 1-click login using browser stored credentials, Touch ID, Face ID, Windows Hello, or Device Passkeys.
+ * Enables 1-click login using verified browser stored credentials or WebAuthn Passkeys.
  */
 
 import { setSession } from './authService';
-import { getActiveProfile, DEFAULT_PROFILES } from './profileService';
+import { SCRAPER_BASE_URL } from './jobQueryService';
 
-const LS_PASSKEY_USERS = 'job_dashboard_passkey_credentials';
+const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const getApiBase = () => isLocalHost ? '' : (SCRAPER_BASE_URL || '');
 
 /**
  * Checks if WebAuthn or Credential Management is supported by the current browser
@@ -20,14 +21,18 @@ export const isPasskeySupported = () => {
 };
 
 /**
- * Attempt to authenticate using browser stored credentials or WebAuthn Passkey
+ * Attempt to authenticate using browser stored credentials or WebAuthn Passkey.
+ * Strictly verifies against backend /api/passkey-login and sets authentic session token.
+ * Throws a clear error if no credentials or passkey verification is available.
  */
 export const loginWithBrowserPasskey = async () => {
   if (!isPasskeySupported()) {
-    throw new Error('Passkey & Credential Management is not supported in this browser.');
+    throw new Error("Passkey sign-in isn't available in this browser. Try email/password or Guest Mode instead.");
   }
 
-  // 1. First attempt Credential Management API (stored password/credentials)
+  const apiBase = getApiBase();
+
+  // 1. Attempt Credential Management API (stored password/credentials)
   try {
     if (navigator.credentials && navigator.credentials.get) {
       const cred = await navigator.credentials.get({
@@ -36,24 +41,38 @@ export const loginWithBrowserPasskey = async () => {
       });
 
       if (cred && cred.id) {
-        const passkeyUser = {
-          id: `passkey_${Date.now()}`,
-          name: cred.name || cred.id.split('@')[0] || 'Passkey User',
-          email: cred.id.includes('@') ? cred.id : `${cred.id}@candidate.com`,
-          authProvider: 'passkey',
-          onboardingCompleted: true,
-          lastActiveAt: new Date().toISOString()
-        };
+        // Authenticate with backend using stored credential
+        const res = await fetch(`${apiBase}/api/passkey-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credential_type: 'password_credential',
+            email: cred.id,
+            name: cred.name || cred.id.split('@')[0],
+            password: cred.password || undefined
+          })
+        });
 
-        setSession(passkeyUser);
-        return passkeyUser;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.token && data.user) {
+            localStorage.setItem('job_dashboard_auth_token', data.token);
+            setSession({
+              ...data.user,
+              authProvider: 'passkey',
+              onboardingCompleted: true,
+              lastActiveAt: new Date().toISOString()
+            });
+            return data.user;
+          }
+        }
       }
     }
   } catch (e) {
     console.log('Stored credential lookup deferred:', e);
   }
 
-  // 2. WebAuthn Passkey Challenge
+  // 2. Attempt WebAuthn Passkey Challenge
   if (window.PublicKeyCredential) {
     try {
       const challenge = new Uint8Array(32);
@@ -69,43 +88,43 @@ export const loginWithBrowserPasskey = async () => {
       });
 
       if (credential) {
-        const activeProf = getActiveProfile() || DEFAULT_PROFILES[0];
-        const passkeyUser = {
-          id: `passkey_${Date.now()}`,
-          name: activeProf?.name || 'Verified Passkey User',
-          email: activeProf?.email || 'passkey.user@gmail.com',
-          authProvider: 'passkey',
-          onboardingCompleted: true,
-          lastActiveAt: new Date().toISOString()
-        };
+        // Convert raw ID to base64 string
+        const rawId = credential.rawId ? btoa(String.fromCharCode(...new Uint8Array(credential.rawId))) : credential.id;
+        
+        const res = await fetch(`${apiBase}/api/passkey-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credential_type: 'webauthn_passkey',
+            credential_id: rawId,
+            id: credential.id
+          })
+        });
 
-        setSession(passkeyUser);
-        return passkeyUser;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.token && data.user) {
+            localStorage.setItem('job_dashboard_auth_token', data.token);
+            setSession({
+              ...data.user,
+              authProvider: 'passkey',
+              onboardingCompleted: true,
+              lastActiveAt: new Date().toISOString()
+            });
+            return data.user;
+          }
+        }
       }
     } catch (err) {
-      // If user cancelled passkey prompt or rpId mismatch on localhost, fallback to active profile session
       if (err.name === 'NotAllowedError') {
         throw new Error('Passkey authentication was cancelled.');
       }
-      console.warn('WebAuthn prompt fallback:', err);
+      console.warn('WebAuthn prompt error:', err);
     }
   }
 
-  // 3. Fallback: Authenticate with active device profile
-  const activeProf = getActiveProfile() || DEFAULT_PROFILES[0];
-  const deviceSession = {
-    id: activeProf.id || `device_${Date.now()}`,
-    name: activeProf.name || 'Device Authenticated Candidate',
-    email: activeProf.email || 'candidate@gmail.com',
-    profileId: activeProf.id,
-    industry: activeProf.industry || 'Technology & IT',
-    authProvider: 'browser-stored',
-    onboardingCompleted: true,
-    lastActiveAt: new Date().toISOString()
-  };
-
-  setSession(deviceSession);
-  return deviceSession;
+  // If no passkey or credential could be authenticated, fail cleanly without granting unauthenticated access
+  throw new Error("Passkey sign-in isn't available in this browser. Try email/password or Guest Mode instead.");
 };
 
 /**

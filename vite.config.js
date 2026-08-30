@@ -122,6 +122,42 @@ export default defineConfig({
           }
         });
 
+        // Passkey Authentication Endpoint
+        server.middlewares.use('/api/passkey-login', (req, res, next) => {
+          if (req.method !== 'POST') { return next(); }
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body || '{}');
+              const email = data.email || 'passkey.user@example.com';
+              const name = data.name || 'Verified Passkey User';
+              const userId = data.credential_id || `passkey_${Date.now()}`;
+              
+              const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+              const payload = Buffer.from(JSON.stringify({
+                sub: userId,
+                email,
+                name,
+                exp: Math.floor(Date.now() / 1000) + (7 * 24 * 3600)
+              })).toString('base64url');
+              const token = `${header}.${payload}.dev_passkey_signature`;
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                success: true,
+                token,
+                user: { id: userId, email, name }
+              }));
+            } catch (e) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: e.message }));
+            }
+          });
+        });
+
         // Refresh & Scraper Trigger Endpoints
         server.middlewares.use('/api/refresh', (req, res) => {
           res.statusCode = 200;

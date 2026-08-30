@@ -2,7 +2,7 @@
 
 An AI-powered job application tracking system that organizes your applications into a sleek Kanban board, surfaces market intelligence, and uses generative AI to tailor resumes and cover letters in one click.
 
-![Dashboard Preview](public/favicon.svg) <!-- Replace with a real screenshot when ready -->
+![Dashboard Preview](public/social-preview.png)
 
 ## Live Demo
 Check out the live deployment (with Guest Mode enabled): [https://job-dashboard-6xrdvjlrcq-ts.a.run.app/](https://job-dashboard-6xrdvjlrcq-ts.a.run.app/)

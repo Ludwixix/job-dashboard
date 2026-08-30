@@ -25,10 +25,9 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
     setErrorMsg('');
     try {
       const passkeyUser = await loginWithBrowserPasskey();
-      const authUser = simulateGoogleWorkspaceAuth(passkeyUser);
-      setUser(authUser);
-      setSuccessMsg(`Authenticated via Browser Passkey as ${passkeyUser.name}!`);
-      if (onAuthChange) onAuthChange(authUser);
+      setUser(passkeyUser);
+      setSuccessMsg(`Authenticated via Browser Passkey as ${passkeyUser.name || 'Candidate'}!`);
+      if (onAuthChange) onAuthChange(passkeyUser);
     } catch (err) {
       setErrorMsg(err.message || 'Passkey authentication failed.');
     } finally {
@@ -40,7 +39,7 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
     try {
       const authUser = simulateGoogleWorkspaceAuth(activeProfile || { name: 'Google User', email: 'candidate@gmail.com' });
       setUser(authUser);
-      setSuccessMsg(`Instant Workspace Cloud connection activated for ${authUser.name}!`);
+      setSuccessMsg(`Instant Workspace Cloud connection activated for ${authUser.name}! (Demo)`);
       if (onAuthChange) onAuthChange(authUser);
     } catch (err) {
       setErrorMsg('Failed to initialize local workspace session.');
@@ -250,10 +249,10 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
                 type="button"
                 onClick={handleInstantConnect}
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                title="Connect instant cloud sync without Google Cloud project setup"
+                title="Connect simulated cloud sync without Google Cloud project setup"
               >
                 <Zap size={14} className="text-amber-300" />
-                <span>⚡ INSTANT SYNC</span>
+                <span>⚡ INSTANT SYNC (DEMO)</span>
               </button>
 
               {clientIdInput && (

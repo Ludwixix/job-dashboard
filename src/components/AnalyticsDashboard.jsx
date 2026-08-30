@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { 
   Target, TrendingUp, Users, Award, Calendar, Activity, ChevronRight, 
-  Search, Filter, ExternalLink, Building2, MapPin, Clock, AlignLeft, Sparkles, CheckCircle2
+  Search, Filter, ExternalLink, Building2, MapPin, Clock, AlignLeft, Sparkles, 
+  CheckCircle2, FileText, Eye, Zap
 } from 'lucide-react';
 import { format, subDays, parseISO, isValid, differenceInDays } from 'date-fns';
 
@@ -17,7 +18,7 @@ const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
   return 'Recently';
 };
 
-export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus }) => {
+export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus, onSelectJob, onOpenGenerator }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
@@ -264,7 +265,7 @@ export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus }) => {
               </span>
             </div>
             <div className="text-xs text-slate-400 font-sans mt-0.5">
-              Live records synced from your Gmail inbox, automated dispatchers, and manual applications.
+              Click any application to view the generated resume &amp; tailored cover letter used for your submission.
             </div>
           </div>
 
@@ -314,20 +315,26 @@ export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus }) => {
                 <th className="px-4 py-3 font-bold">Company &amp; Location</th>
                 <th className="px-4 py-3 font-bold">Position Title</th>
                 <th className="px-4 py-3 font-bold">Status Stage</th>
-                <th className="px-4 py-3 font-bold">Context &amp; Notes</th>
-                <th className="px-4 py-3 font-bold text-right">Job Link</th>
+                <th className="px-4 py-3 font-bold">Generated Assets</th>
+                <th className="px-4 py-3 font-bold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-sans">
               {filteredAppliedJobs.map((job) => {
                 const stage = getJobStage(job);
+                const hasDocs = Boolean(job.coverLetterText || job.cover_letter_text || job.resumeText || job.resume_text);
+
                 return (
-                  <tr key={job.id} className="hover:bg-slate-850/60 transition-colors">
+                  <tr 
+                    key={job.id} 
+                    onClick={() => onSelectJob && onSelectJob(job)}
+                    className="hover:bg-slate-800/60 transition-colors cursor-pointer group"
+                  >
                     <td className="px-4 py-3 font-mono text-[11px] text-slate-400">
                       {formatDateSafe(job.applied_at || job.date || job.posted)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-bold text-white flex items-center gap-1.5 text-xs">
+                      <div className="font-bold text-white flex items-center gap-1.5 text-xs group-hover:text-indigo-300 transition-colors">
                         <Building2 size={13} className="text-indigo-400 shrink-0" />
                         <span>{job.company}</span>
                       </div>
@@ -342,7 +349,7 @@ export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus }) => {
                         <div className="text-[10px] text-emerald-400 font-mono font-bold mt-0.5">{job.salary}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono">
+                    <td className="px-4 py-3 font-mono" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={job.status || 'Applied'}
                         onChange={(e) => onUpdateStatus && onUpdateStatus(job.id, e.target.value)}
@@ -354,26 +361,50 @@ export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus }) => {
                         <option value="Rejected">Rejected / Closed</option>
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-400 max-w-sm truncate">
-                      {job.notes ? (
-                        <span className="truncate block" title={job.notes}>{job.notes}</span>
+                    <td className="px-4 py-3">
+                      {hasDocs ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold">
+                          <CheckCircle2 size={11} className="text-emerald-400" />
+                          <span>CV &amp; RESUME READY</span>
+                        </span>
                       ) : (
-                        <span className="text-slate-600 italic">No notes recorded</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenGenerator) onOpenGenerator(job);
+                            else if (onSelectJob) onSelectJob(job);
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-950/60 text-indigo-300 hover:bg-indigo-900 border border-indigo-500/40 text-[10px] font-mono font-bold cursor-pointer transition-colors"
+                        >
+                          <Zap size={11} className="text-indigo-400" />
+                          <span>GENERATE DOCS</span>
+                        </button>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      {(job.link || job.url) && (
-                        <a
-                          href={job.link || job.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white inline-flex items-center gap-1 text-[11px] font-mono font-bold"
-                          title="Open Original Job Ad"
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onSelectJob && onSelectJob(job)}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Open Job Card & View Resume / Cover Letter"
                         >
-                          <span>PORTAL</span>
-                          <ExternalLink size={12} />
-                        </a>
-                      )}
+                          <Eye size={12} />
+                          <span>OPEN CARD</span>
+                        </button>
+                        {(job.link || job.url) && (
+                          <a
+                            href={job.link || job.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white inline-flex items-center gap-1 text-[10px] font-mono font-bold"
+                            title="Open Original Job Ad"
+                          >
+                            <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

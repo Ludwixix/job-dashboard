@@ -7,7 +7,7 @@ import {
   DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
-  ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
+  ChevronFirst, ChevronLast, ArrowDown, Wrench, 
   ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2
 } from 'lucide-react';
@@ -30,9 +30,10 @@ import { SCRAPER_BASE_URL } from '../services/jobQueryService';
 import { 
   getProfileAutoRoles, 
   getRoleArchetypeCounts, 
-  classifyJobRole, 
-  ROLE_ARCHETYPES 
+  classifyJobRole
 } from '../services/roleClusteringService';
+import { getCommuteDetails } from '../services/commuteService';
+import { Train, Car, Bike } from 'lucide-react';
 
 
 
@@ -1435,7 +1436,13 @@ export const JobSeeker = ({
                         </div>
 
                         <div>
-                          <h3 className="font-extrabold text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">
+                          <h3 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onSelectJob) onSelectJob(job);
+                            }}
+                            className="font-extrabold text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug cursor-pointer"
+                          >
                             {job.title}
                           </h3>
                           <p className="text-xs font-bold text-slate-500 mt-0.5 flex items-center gap-1">
@@ -1487,6 +1494,43 @@ export const JobSeeker = ({
                             {formatDaysAgo(job.date)}
                           </div>
                         </div>
+
+                        {/* Google Maps Commute Intelligence Pill */}
+                        {(() => {
+                          const commute = getCommuteDetails(baseLocation, job.location);
+                          if (commute.isRemote) {
+                            return (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-[10px] text-emerald-300 font-mono font-bold">
+                                <Sparkles size={11} className="text-emerald-400" />
+                                <span>100% REMOTE • 0 MIN COMMUTE</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="p-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono space-y-1">
+                              <div className="flex items-center justify-between text-slate-300 font-bold px-1">
+                                <span className="flex items-center gap-1 text-indigo-400">
+                                  <Navigation size={10} />
+                                  {commute.distanceKm}KM COMMUTE:
+                                </span>
+                                <span className={commute.car.tolls.hasTolls ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
+                                  {commute.car.tolls.hasTolls ? `Tolls: ${commute.car.tolls.estimatedCost}` : 'Toll-Free'}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-1 text-[9px] text-center">
+                                <span className="p-1 rounded bg-slate-900 border border-slate-800 text-indigo-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
+                                  <Train size={9} /> {commute.transit.durationMin}m Train
+                                </span>
+                                <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5" title={`Off-peak: ${commute.car.offPeakMin}m | Peak: ${commute.car.peakMin}m`}>
+                                  <Car size={9} /> {commute.car.peakMin}m Peak
+                                </span>
+                                <span className="p-1 rounded bg-slate-900 border border-slate-800 text-emerald-300 flex items-center justify-center gap-0.5" title={`Bike trail: ${commute.bike.bikePaths}`}>
+                                  <Bike size={9} /> {commute.bike.durationMin}m Bike
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Direct PDF Quick-Download Bar for Generated Docs */}

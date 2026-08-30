@@ -659,7 +659,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           <ApplicationPipeline 
             jobs={jobs} 
             loading={loading}
-            onUpdateStatus={(id, status) => updateJobStatus(id, status)}
+            onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
           />
         )}
 
@@ -670,7 +671,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         {activeSection === 'analytics' && (
           <AnalyticsDashboard 
             jobs={jobs} 
-            onUpdateStatus={(id, status) => updateJobStatus(id, status)}
+            onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+            onSelectJob={(j) => setSelectedJob(j)}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
           />
         )}
           </>

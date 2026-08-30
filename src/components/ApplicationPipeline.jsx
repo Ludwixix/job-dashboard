@@ -48,7 +48,7 @@ export const getJobStage = (job, starredSet = new Set()) => {
   return null;
 };
 
-export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, loading }) => {
+export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator, loading }) => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [viewMode, setViewMode] = useURLState('view', 'kanban'); // 'kanban' or 'table'
   const [searchQuery, setSearchQuery] = useURLState('q', '');
@@ -253,6 +253,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, loading }) => {
           job={selectedJob} 
           isOpen={!!selectedJob} 
           onClose={() => setSelectedJob(null)} 
+          onOpenGenerator={onOpenGenerator}
           onUpdateStatus={(jobId, newStatus) => {
             if (onUpdateStatus) onUpdateStatus(jobId, newStatus);
             setSelectedJob(prev => prev ? { ...prev, status: newStatus } : null);

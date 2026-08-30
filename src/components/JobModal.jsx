@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
-  ThumbsUp, ThumbsDown
+  ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
+import { getCommuteDetails } from '../services/commuteService';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply }) => {
   const jobId = job?.id || `${job?.company}_${job?.title}`;
@@ -21,8 +22,13 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
     return null;
   });
 
+  const baseLocation = localStorage.getItem('userBaseLocation') || 'BALACLAVA VIC 3183';
 
   const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
+  const [commuteTab, setCommuteTab] = useState('transit'); // 'transit', 'car', 'bike'
+  const commute = useMemo(() => {
+    return getCommuteDetails(baseLocation, job?.location);
+  }, [baseLocation, job?.location]);
   const [copiedSubject, setCopiedSubject] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isAutoApplying, setIsAutoApplying] = useState(false);
@@ -345,10 +351,144 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
                   </div>
                   <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
                     <div className="text-[10px] text-slate-400 font-bold uppercase">COMMUTE / MODE</div>
-                    <div className="font-extrabold text-cyan-400 text-sm mt-0.5">{job.remote ? 'REMOTE' : 'BALACLAVA Commute'}</div>
+                    <div className="font-extrabold text-cyan-400 text-sm mt-0.5">{job.remote ? 'REMOTE' : `${baseLocation.split(' ')[0]} Commute`}</div>
                   </div>
                 </div>
               </div>
+
+              {/* Google Maps Commute Intelligence Card */}
+              {commute && (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 border border-slate-800 space-y-3 font-mono text-white shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                        <Navigation size={15} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black flex items-center gap-2">
+                          GOOGLE MAPS COMMUTE ESTIMATOR
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700">
+                            {commute.isRemote ? 'REMOTE' : `${commute.distanceKm} KM FROM BASE`}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-sans">
+                          {baseLocation.split(' ')[0]} → {job.location || 'Melbourne'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {!commute.isRemote && (
+                      <a
+                        href={commute.googleMapsUrls[commuteTab === 'transit' ? 'transit' : commuteTab === 'car' ? 'driving' : 'bicycling']}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold underline inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Open Directions</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    )}
+                  </div>
+
+                  {!commute.isRemote ? (
+                    <div className="space-y-3 pt-1">
+                      {/* Commute Mode Selector */}
+                      <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setCommuteTab('transit')}
+                          className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            commuteTab === 'transit' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Train size={13} />
+                          <span>TRAIN ({commute.transit.durationMin}m)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCommuteTab('car')}
+                          className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            commuteTab === 'car' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Car size={13} />
+                          <span>CAR ({commute.car.peakMin}m)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCommuteTab('bike')}
+                          className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            commuteTab === 'bike' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Bike size={13} />
+                          <span>BIKE ({commute.bike.durationMin}m)</span>
+                        </button>
+                      </div>
+
+                      {/* Mode Details Display */}
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-2">
+                        {commuteTab === 'transit' && (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Estimated Public Transit Time:</span>
+                              <span className="font-black text-indigo-300 text-sm">{commute.transit.label}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-500">Transit Line / Route:</span>
+                              <span className="text-slate-300 font-semibold">{commute.transit.lines}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {commuteTab === 'car' && (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                                <div className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                                  <Clock size={10} /> PEAK TRAFFIC (8AM / 5PM)
+                                </div>
+                                <div className="text-sm font-black text-white mt-0.5">{commute.car.peakLabel}</div>
+                              </div>
+                              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                                <div className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                  <Clock size={10} /> OFF-PEAK HOURS
+                                </div>
+                                <div className="text-sm font-black text-white mt-0.5">{commute.car.offPeakLabel}</div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800">
+                              <span className="text-slate-400">Tolls &amp; Tollways:</span>
+                              <span className={`font-bold ${commute.car.tolls.hasTolls ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {commute.car.tolls.hasTolls ? `${commute.car.tolls.tollRoads} (${commute.car.tolls.estimatedCost})` : 'Toll-Free Route ($0.00)'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {commuteTab === 'bike' && (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Estimated Cycling Time:</span>
+                              <span className="font-black text-emerald-400 text-sm">{commute.bike.label}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-500">Dedicated Bike Trails:</span>
+                              <span className="text-slate-300 font-semibold">{commute.bike.bikePaths}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                      <CheckCircle2 size={16} className="shrink-0" />
+                      <span>100% Remote Opportunity — No daily commute required.</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* AI Audit Evaluation Box */}
               <div className="p-5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">

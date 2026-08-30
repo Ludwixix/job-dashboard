@@ -96,12 +96,6 @@ class JobRepository:
             conn.commit()
             logger.debug(f"Database schema initialized for {self.path}")
 
-    def count_jobs(self) -> int:
-        """Return total count of jobs currently in database."""
-        with get_db_connection(self.path) as conn:
-            row = conn.execute("SELECT COUNT(*) AS total FROM jobs").fetchone()
-            return int(row["total"]) if row else 0
-
 
     def is_query_cached(self, term: str, location: str = "", ttl_hours: float = 12.0) -> bool:
         """Check if a search query has been scraped recently to prevent redundant scraping."""
@@ -262,82 +256,90 @@ class JobRepository:
             return {"total": total, "by_status": counts, "events": event_count}
 
     def upsert_scraped_jobs(self, raw_jobs: list[dict[str, Any]]) -> int:
-        """Upsert a list of scraped jobs into the database with deduplication."""
+        """Upsert a list of scraped jobs into the database with high-performance batch executemany."""
+        if not raw_jobs:
+            return 0
         now = datetime.now(timezone.utc).isoformat()
-        inserted_or_updated = 0
         
+        batch_params = []
+        for job in raw_jobs:
+            company = str(job.get("company") or "").strip()
+            title = str(job.get("title") or "").strip()
+            url = str(job.get("url") or job.get("link") or job.get("portalLink") or "").strip()
+            
+            if not company and not title:
+                continue
+                
+            dedupe_id = job.get("id") or generate_dedupe_key(company, title, url)
+            location = str(job.get("location") or "Melbourne, VIC").strip()
+            source = str(job.get("source") or "Job Board").strip()
+            description = str(job.get("description") or job.get("notes") or "").strip()
+            posted = str(job.get("posted") or job.get("date") or "").strip()
+            remote = 1 if bool(job.get("remote", False)) or "remote" in location.lower() else 0
+            stream = str(job.get("stream") or job.get("industry") or "core-it").strip()
+            score = int(job.get("score") or 0)
+            
+            clean_job = dict(job)
+            clean_job["id"] = dedupe_id
+            clean_job["company"] = company
+            clean_job["title"] = title
+            clean_job["location"] = location
+            clean_job["source"] = source
+            clean_job["url"] = url
+            clean_job["portalLink"] = url
+            clean_job["date"] = posted
+            clean_job["posted"] = posted
+            clean_job["remote"] = bool(remote)
+            clean_job["stream"] = stream
+            clean_job["score"] = score
+            clean_job["description"] = description
+            
+            batch_params.append({
+                "id": dedupe_id,
+                "title": title or "Untitled Role",
+                "company": company or "Confidential",
+                "location": location,
+                "description": description,
+                "source": source,
+                "url": url,
+                "posted": posted,
+                "remote": remote,
+                "stream": stream,
+                "score": score,
+                "data_json": json.dumps(clean_job, ensure_ascii=False),
+                "created_at": now,
+                "updated_at": now
+            })
+            
+        if not batch_params:
+            return 0
+            
+        start_time = datetime.now()
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
             with conn:
-                for job in raw_jobs:
-                    company = str(job.get("company") or "").strip()
-                    title = str(job.get("title") or "").strip()
-                    url = str(job.get("url") or job.get("link") or job.get("portalLink") or "").strip()
-                    
-                    if not company and not title:
-                        continue
-                        
-                    dedupe_id = job.get("id") or generate_dedupe_key(company, title, url)
-                    location = str(job.get("location") or "Melbourne, VIC").strip()
-                    source = str(job.get("source") or "Job Board").strip()
-                    description = str(job.get("description") or job.get("notes") or "").strip()
-                    posted = str(job.get("posted") or job.get("date") or "").strip()
-                    remote = 1 if bool(job.get("remote", False)) or "remote" in location.lower() else 0
-                    stream = str(job.get("stream") or job.get("industry") or "core-it").strip()
-                    score = int(job.get("score") or 0)
-                    
-                    # Store clean standardized job dictionary in data_json
-                    clean_job = dict(job)
-                    clean_job["id"] = dedupe_id
-                    clean_job["company"] = company
-                    clean_job["title"] = title
-                    clean_job["location"] = location
-                    clean_job["source"] = source
-                    clean_job["url"] = url
-                    clean_job["portalLink"] = url
-                    clean_job["date"] = posted
-                    clean_job["posted"] = posted
-                    clean_job["remote"] = bool(remote)
-                    clean_job["stream"] = stream
-                    clean_job["score"] = score
-                    clean_job["description"] = description
-                    
-                    conn.execute("""
-                        INSERT INTO jobs (id, title, company, location, description, source, url, posted, remote, stream, score, data_json, status, created_at, updated_at)
-                        VALUES (:id, :title, :company, :location, :description, :source, :url, :posted, :remote, :stream, :score, :data_json, 'sourced', :created_at, :updated_at)
-                        ON CONFLICT(id) DO UPDATE SET
-                            title = excluded.title,
-                            company = excluded.company,
-                            location = excluded.location,
-                            description = excluded.description,
-                            source = excluded.source,
-                            url = excluded.url,
-                            posted = excluded.posted,
-                            remote = excluded.remote,
-                            stream = excluded.stream,
-                            score = CASE WHEN excluded.score > 0 THEN excluded.score ELSE jobs.score END,
-                            data_json = excluded.data_json,
-                            updated_at = excluded.updated_at
-                    """, {
-                        "id": dedupe_id,
-                        "title": title or "Untitled Role",
-                        "company": company or "Confidential",
-                        "location": location,
-                        "description": description,
-                        "source": source,
-                        "url": url,
-                        "posted": posted,
-                        "remote": remote,
-                        "stream": stream,
-                        "score": score,
-                        "data_json": json.dumps(clean_job, ensure_ascii=False),
-                        "created_at": now,
-                        "updated_at": now
-                    })
-                    inserted_or_updated += 1
-                    
-        logger.info(f"Upserted {inserted_or_updated} scraped jobs into database")
-        return inserted_or_updated
+                conn.executemany("""
+                    INSERT INTO jobs (id, title, company, location, description, source, url, posted, remote, stream, score, data_json, status, created_at, updated_at)
+                    VALUES (:id, :title, :company, :location, :description, :source, :url, :posted, :remote, :stream, :score, :data_json, 'sourced', :created_at, :updated_at)
+                    ON CONFLICT(id) DO UPDATE SET
+                        title = excluded.title,
+                        company = excluded.company,
+                        location = excluded.location,
+                        description = excluded.description,
+                        source = excluded.source,
+                        url = excluded.url,
+                        posted = excluded.posted,
+                        remote = excluded.remote,
+                        stream = excluded.stream,
+                        score = CASE WHEN excluded.score > 0 THEN excluded.score ELSE jobs.score END,
+                        data_json = excluded.data_json,
+                        updated_at = excluded.updated_at
+                """, batch_params)
+                
+        duration = (datetime.now() - start_time).total_seconds()
+        logger.info(f"Batch upserted {len(batch_params)} scraped jobs in {duration:.3f}s")
+        return len(batch_params)
+
 
     def query_jobs_paginated(
         self,
@@ -500,11 +502,11 @@ class JobRepository:
             "updated_at": now
         }
 
-
     def delete_user_application(self, user_id: str, job_id: str) -> bool:
         """Remove a user's tracking entry for a job."""
         with get_db_connection(self.path) as conn:
             with conn:
                 cur = conn.execute("DELETE FROM user_applications WHERE user_id = ? AND job_id = ?", (user_id, job_id))
                 return cur.rowcount > 0
+
 

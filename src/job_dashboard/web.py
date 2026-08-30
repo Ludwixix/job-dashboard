@@ -74,11 +74,8 @@ class DashboardApp:
         if self.jobs:
             if self.repository.count_jobs() == 0:
                 logger.info(f"Seeding database with {len(self.jobs)} scraped jobs...")
-                self.repository.upsert_scraped_jobs(self.jobs)
-            else:
-                self.repository.replace_jobs(self.jobs)
+                threading.Thread(target=self.repository.upsert_scraped_jobs, args=(self.jobs,), daemon=True).start()
         self.lock = threading.Lock()
-
 
     def save_search_queries(self):
         payload = [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
@@ -91,6 +88,7 @@ class DashboardApp:
         temporary.replace(self.search_queries_path)
 
     def _load_search_queries(self, defaults=None):
+
         if not self.search_queries_path.exists():
             return list(defaults or [])
         try:
@@ -349,32 +347,10 @@ class DashboardApp:
                     jobs = raw_data if isinstance(raw_data, list) else (raw_data.get("jobs", []) if isinstance(raw_data, dict) else [])
                     if jobs:
                         logger.info(f"Loaded {len(jobs)} jobs from {p}")
-                        return jobs
                 except Exception as e:
                     logger.error(f"Error loading jobs from {p}: {e}")
         return []
 
-
-
-    def save_jobs(self):
-        self.jobs_path.write_text(json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        self.repository.replace_jobs(self.jobs)
-
-    def materialize_jobs(self, jobs):
-        materialized = []
-        for raw in jobs:
-            job = normalize_job(raw)
-            analysis = self.dashboard.analyse(raw)
-            item = dict(raw)
-            item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "fit_category": analysis.fit_category, "dimensions": analysis.score.dimensions, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "description": clean_description(job.description)})
-            materialized.append(item)
-        return materialized
-
-    def analyses(self):
-        return [self.dashboard.analyse(job) for job in self.jobs]
-
-    def rejected_applications(self):
-        """Return Gmail rejection records for a separate archive view."""
         archived = []
         seen = set()
         for raw in self.jobs:
@@ -930,7 +906,6 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, result)
                 return
 
-
             if path == "/api/applications":
                 auth_header = self.headers.get("Authorization")
                 if not auth_header or not auth_header.startswith("Bearer "):
@@ -946,6 +921,7 @@ def make_handler(app: DashboardApp):
                     self.send_json(401, {"error": "Unauthorized: " + str(e)})
                 return
 
+
             if path == "/health":
                 import time
 
@@ -960,6 +936,7 @@ def make_handler(app: DashboardApp):
                     }
                 })
                 return
+
             
             # Prometheus metrics endpoint
             if path == "/metrics":

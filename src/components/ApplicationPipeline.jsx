@@ -28,13 +28,24 @@ const PIPELINE_STAGES = [
   { id: 'Rejected', title: 'Rejected / Closed', color: 'rose' }
 ];
 
-const getJobStage = (job) => {
+const getJobStage = (job, starredSet = new Set()) => {
   const s = (job.status || '').toLowerCase();
   if (s.includes('reject') || s.includes('unsuccessful') || s.includes('closed') || job.isRejected) return 'Rejected';
   if (s.includes('offer') || s.includes('accepted')) return 'Offer';
   if (s.includes('interview') || s.includes('screen') || s.includes('assessment')) return 'Interviewing';
   if (s.includes('applied') || s.includes('submitted') || s.includes('confirmation')) return 'Applied';
-  return 'Wishlist';
+  
+  // Wishlist ONLY includes jobs that are starred or explicitly marked wishlist
+  const isStarred = job.isStarred || 
+                    starredSet.has(String(job.id)) || 
+                    starredSet.has(`${job.company}_${job.title}`) ||
+                    s.includes('wishlist') || 
+                    s.includes('shortlist') || 
+                    s.includes('starred') || 
+                    s.includes('saved');
+                    
+  if (isStarred) return 'Wishlist';
+  return null;
 };
 
 export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, loading }) => {
@@ -46,15 +57,25 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, loading }) => {
   const [importData, setImportData] = useState(null);
   const fileInputRef = React.useRef(null);
 
+  const starredSet = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('starred_jobs');
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor)
   );
 
-  // Derived state
+  // Derived state: Only display active pipeline stages and starred wishlist items
   const activeJobs = useMemo(() => {
     return jobs.filter(j => {
-      const stage = getJobStage(j);
+      const stage = getJobStage(j, starredSet);
+      if (!stage) return false;
       if (statusFilter !== 'All' && stage !== statusFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -62,7 +83,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, loading }) => {
       }
       return true;
     });
-  }, [jobs, searchQuery, statusFilter]);
+  }, [jobs, searchQuery, statusFilter, starredSet]);
 
   const handleDragEnd = (event) => {
     const { active, over } = event;

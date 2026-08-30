@@ -10,6 +10,7 @@ import { loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPer
 import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES } from '../services/profileService';
 import { loginWithBrowserPasskey, isPasskeySupported, storeBrowserCredentials } from '../services/passkeyService';
 import { loginWithGoogle } from '../services/googleAuthService';
+import { GooglePromptModal } from './GooglePromptModal';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 
 const INDUSTRY_OPTIONS = [
@@ -238,35 +239,10 @@ export const OnboardingFlow = ({ onComplete }) => {
     }
   };
 
-  const [googleSyncStatus, setGoogleSyncStatus] = useState('');
+  const [showGooglePrompt, setShowGooglePrompt] = useState(false);
 
-  const handleGoogleLogin = async () => {
-    setAuthError('');
-    setAuthLoading(true);
-    setGoogleSyncStatus('Connecting with Google Identity...');
-    try {
-      const result = await loginWithGoogle({
-        autoScanGmail: true,
-        onStatusUpdate: (status) => setGoogleSyncStatus(status)
-      });
-      
-      setProfileData(prev => ({
-        ...prev,
-        name: result.user.name || prev.name,
-        email: result.user.email || prev.email
-      }));
-
-      if (onComplete) {
-        onComplete(result.session, result.profile);
-      } else {
-        setStep(2);
-      }
-    } catch (err) {
-      setAuthError(err.message || 'Google Sign-In failed.');
-    } finally {
-      setAuthLoading(false);
-      setGoogleSyncStatus('');
-    }
+  const handleGoogleLogin = () => {
+    setShowGooglePrompt(true);
   };
 
   const handlePasskeyLogin = async () => {
@@ -503,13 +479,6 @@ export const OnboardingFlow = ({ onComplete }) => {
                   <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
                     <AlertCircle size={15} className="text-rose-400 shrink-0" />
                     <span>{authError}</span>
-                  </div>
-                )}
-
-                {googleSyncStatus && (
-                  <div className="p-3 rounded-xl bg-indigo-950/80 border border-indigo-500/50 text-indigo-200 text-xs flex items-center gap-2 animate-pulse">
-                    <RefreshCw size={14} className="animate-spin text-indigo-400 shrink-0" />
-                    <span>{googleSyncStatus}</span>
                   </div>
                 )}
 
@@ -1127,6 +1096,15 @@ export const OnboardingFlow = ({ onComplete }) => {
 
         </div>
       </main>
+
+      {/* Google Sign-In & Gmail Sync Modal Prompt */}
+      <GooglePromptModal
+        isOpen={showGooglePrompt}
+        onClose={() => setShowGooglePrompt(false)}
+        onAuthenticated={(session, profile) => {
+          if (onComplete) onComplete(session, profile);
+        }}
+      />
 
       {/* Bottom Footer */}
       <footer className="text-center font-mono text-[11px] text-slate-500 py-4">

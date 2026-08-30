@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Target, TrendingUp, Users, Award, Calendar, Activity, ChevronRight } from 'lucide-react';
-import { format, subDays, parseISO, isAfter, startOfDay } from 'date-fns';
+import { format, subDays, parseISO, isValid, isAfter, startOfDay } from 'date-fns';
 
 export const AnalyticsDashboard = ({ jobs = [] }) => {
   const getJobStage = (job) => {
@@ -45,10 +45,18 @@ export const AnalyticsDashboard = ({ jobs = [] }) => {
     }
     
     tracked.forEach(j => {
-      if (j.date) {
-        const d = format(parseISO(j.date), 'MMM dd');
-        if (timelineMap[d] !== undefined) {
-          timelineMap[d]++;
+      const rawDate = j.applied_at || j.date || j.posted;
+      if (rawDate) {
+        try {
+          const parsed = typeof rawDate === 'string' ? parseISO(rawDate) : new Date(rawDate);
+          if (isValid(parsed)) {
+            const d = format(parsed, 'MMM dd');
+            if (timelineMap[d] !== undefined) {
+              timelineMap[d]++;
+            }
+          }
+        } catch {
+          // Ignore invalid dates safely
         }
       }
     });

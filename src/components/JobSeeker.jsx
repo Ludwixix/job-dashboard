@@ -27,6 +27,12 @@ import {
 } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
 import { SCRAPER_BASE_URL } from '../services/jobQueryService';
+import { 
+  getProfileAutoRoles, 
+  getRoleArchetypeCounts, 
+  classifyJobRole, 
+  ROLE_ARCHETYPES 
+} from '../services/roleClusteringService';
 
 
 
@@ -224,6 +230,52 @@ export const JobSeeker = ({
   const [userPrefs, setUserPrefs] = useState(() => getUserPreferences());
   const [prefToast, setPrefToast] = useState(null);
 
+  // Auto-Generated Roles based on Candidate Profile
+  const profileAutoRoles = useMemo(() => {
+    return getProfileAutoRoles(currentProfile);
+  }, [currentProfile]);
+
+  const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
+    return getProfileAutoRoles(currentProfile);
+  });
+
+  const [isRoleSelectorOpen, setIsRoleSelectorOpen] = useState(true);
+
+  // Update selected roles whenever active profile changes
+  useEffect(() => {
+    if (currentProfile) {
+      const autoRoles = getProfileAutoRoles(currentProfile);
+      setSelectedRoleIds(autoRoles);
+    }
+  }, [currentProfile?.id, currentProfile?.industry, JSON.stringify(currentProfile?.targetTitles || [])]);
+
+  // Unsubmitted jobs pool
+  const unsubmittedJobs = useMemo(() => {
+    return jobs.filter(job => {
+      if (job.isRejected) return false;
+      const s = (job.status || 'sourced').toLowerCase();
+      const isProgressed = s.includes('applied') || 
+                           s.includes('confirmation') || 
+                           s.includes('interview') || 
+                           s.includes('offer') || 
+                           s.includes('accepted') || 
+                           s.includes('under review') || 
+                           s.includes('action required') || 
+                           s.includes('verification') || 
+                           s.includes('unsuccessful') || 
+                           s.includes('closed') || 
+                           s.includes('rejected') || 
+                           s.includes('dismissed') || 
+                           s.includes('expired');
+      return !isProgressed;
+    });
+  }, [jobs]);
+
+  // Aggregate job counts per role archetype across all unsubmitted jobs
+  const roleArchetypeCounts = useMemo(() => {
+    return getRoleArchetypeCounts(unsubmittedJobs, currentProfile);
+  }, [unsubmittedJobs, currentProfile]);
+
   useEffect(() => {
     const handlePrefChange = (e) => {
       setUserPrefs(e.detail || getUserPreferences());
@@ -265,27 +317,6 @@ export const JobSeeker = ({
     }
     return () => clearInterval(timer);
   }, [scraping]);
-
-
-  // Unsubmitted jobs pool
-  const unsubmittedJobs = useMemo(() => {
-    return jobs.filter(job => {
-      if (job.isRejected) return false;
-      const s = job.status.toLowerCase();
-      return (s.includes('package prepared') || s.includes('to submit') || s.includes('draft') || s.includes('discovered')) &&
-             !s.includes('applied') &&
-             !s.includes('confirmation') &&
-             !s.includes('interview') &&
-             !s.includes('under review') &&
-             !s.includes('action required') &&
-             !s.includes('verification') &&
-             !s.includes('unsuccessful') &&
-             !s.includes('closed') &&
-             !s.includes('rejected') &&
-             !s.includes('dismissed') &&
-             !s.includes('expired');
-    });
-  }, [jobs]);
 
   const rejectedJobs = useMemo(() => {
     return jobs.filter(j => j.isRejected);
@@ -425,7 +456,16 @@ export const JobSeeker = ({
         matchesAge = ageDays <= 3;
       }
 
-      return matchesSearch && matchesSource && matchesStream && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
+      // Multi-Role Archetype Filter
+      let matchesRole = true;
+      if (selectedRoleIds.length > 0 && selectedRoleIds.length < roleArchetypeCounts.length) {
+        const jobRole = classifyJobRole(job);
+        matchesRole = selectedRoleIds.includes(jobRole.id);
+      } else if (selectedRoleIds.length === 0) {
+        matchesRole = false;
+      }
+
+      return matchesSearch && matchesSource && matchesStream && matchesRole && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
     });
 
     // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
@@ -454,7 +494,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile]);
+  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile, userPrefs]);
 
 
   // Paginated Sliced Jobs
@@ -807,6 +847,125 @@ export const JobSeeker = ({
               <span>{prefToast}</span>
             </div>
           )}
+
+          {/* Role Intelligence & Multi-Role Selector Bar */}
+          <div className="bg-[#1e1e2e] p-4 rounded-2xl border border-[#313244] shadow-md space-y-3 font-mono">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/40">
+                  <Bot size={16} />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-white flex items-center gap-2">
+                    ROLE INTELLIGENCE &amp; PROFILE TARGETING
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-500/40 font-bold">
+                      {selectedRoleIds.length} OF {roleArchetypeCounts.length} ROLES ACTIVE
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Auto-generated for {currentProfile?.name} • Select roles to customize which positions appear in the matrix
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoleIds(profileAutoRoles);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/40 text-[10px] font-black transition-all cursor-pointer flex items-center gap-1"
+                  title="Auto-select only the roles that match your active candidate profile"
+                >
+                  <Sparkles size={11} className="text-indigo-300" />
+                  <span>🎯 PROFILE MATCH ({profileAutoRoles.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoleIds(roleArchetypeCounts.map(r => r.id));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 transition-all cursor-pointer"
+                >
+                  SELECT ALL ({unsubmittedJobs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoleIds([]);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] font-bold border border-slate-700 transition-all cursor-pointer"
+                >
+                  CLEAR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRoleSelectorOpen(!isRoleSelectorOpen)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 transition-all cursor-pointer"
+                >
+                  {isRoleSelectorOpen ? 'COLLAPSE' : 'EXPAND'}
+                </button>
+              </div>
+            </div>
+
+            {/* Role Chips with Live Job Counts */}
+            {isRoleSelectorOpen && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 pt-2 border-t border-[#313244]/60 max-h-64 overflow-y-auto pr-1">
+                {roleArchetypeCounts.map(role => {
+                  const isSelected = selectedRoleIds.includes(role.id);
+                  const isProfileMatch = role.isRecommended;
+
+                  return (
+                    <div
+                      key={role.id}
+                      onClick={() => {
+                        setSelectedRoleIds(prev => 
+                          prev.includes(role.id) ? prev.filter(id => id !== role.id) : [...prev, role.id]
+                        );
+                        setCurrentPage(1);
+                      }}
+                      className={`p-2 rounded-xl border text-xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-purple-950/40 border-purple-500/60 text-purple-100 shadow-sm ring-1 ring-purple-500/30'
+                          : 'bg-[#181825] border-[#313244] text-slate-400 hover:border-slate-600 hover:text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-black shrink-0 ${
+                          isSelected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-500 border border-slate-700'
+                        }`}>
+                          {isSelected ? '✓' : ''}
+                        </div>
+                        <div className="truncate">
+                          <div className="font-bold text-[11px] truncate flex items-center gap-1">
+                            <span>{role.title}</span>
+                            {isProfileMatch && (
+                              <span className="text-[8px] px-1 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-500/40 font-bold shrink-0">
+                                ⭐ FIT
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[9px] text-slate-500">{role.category}</div>
+                        </div>
+                      </div>
+
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
+                        isSelected 
+                          ? 'bg-purple-600/30 text-purple-200 border border-purple-400/40' 
+                          : 'bg-slate-900 text-slate-500 border border-slate-800'
+                      }`}>
+                        {role.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* VS Code Theme Refinement Console */}
           <div className="bg-[#1e1e2e] p-5 rounded-2xl border border-[#313244] shadow-md space-y-4 font-mono">

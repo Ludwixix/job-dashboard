@@ -85,7 +85,10 @@ export const getAllProfiles = () => {
   try {
     const raw = localStorage.getItem(LS_CUSTOM_PROFILES);
     const customProfiles = raw ? JSON.parse(raw) : [];
-    return [...DEFAULT_PROFILES, ...customProfiles];
+    const profileMap = new Map();
+    DEFAULT_PROFILES.forEach(p => profileMap.set(p.id, p));
+    customProfiles.forEach(p => profileMap.set(p.id, p));
+    return Array.from(profileMap.values());
   } catch (e) {
     console.error('Error loading custom profiles:', e);
     return DEFAULT_PROFILES;

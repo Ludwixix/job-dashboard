@@ -194,6 +194,46 @@ export default defineConfig({
           });
         });
 
+        // Session Validation Endpoint
+        server.middlewares.use('/api/session', (req, res, next) => {
+          if (req.method !== 'GET') { return next(); }
+          const auth = req.headers['authorization'] || '';
+          const token = auth.replace('Bearer ', '').trim();
+          
+          if (!token) {
+            res.statusCode = 401;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: "Unauthorized" }));
+            return;
+          }
+
+          try {
+            const parts = token.split('.');
+            let payload = {};
+            if (parts.length >= 2) {
+              payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+            }
+            
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              success: true,
+              user: {
+                id: payload.sub || 'user_123',
+                email: payload.email || 'candidate@gmail.com',
+                name: payload.name || 'Candidate'
+              }
+            }));
+          } catch (e) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              success: true,
+              user: { id: 'user_123', email: 'candidate@gmail.com', name: 'Candidate' }
+            }));
+          }
+        });
+
         // Refresh & Scraper Trigger Endpoints
         server.middlewares.use('/api/refresh', (req, res) => {
           res.statusCode = 200;

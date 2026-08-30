@@ -17,13 +17,32 @@ export const KanbanBoard = ({
   onOpenGenerator, 
   onOpenInterviewPrep 
 }) => {
+  const starredSet = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem('starred_jobs');
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  }, []);
+
   const getJobStage = (job) => {
     const s = (job.status || '').toLowerCase();
     if (s.includes('non-responsive') || s.includes('closed') || s.includes('unsuccessful')) return 'Closed';
     if (s.includes('interview') || s.includes('screen') || s.includes('assessment')) return 'Interviewing';
     if (s.includes('offer') || s.includes('accepted')) return 'Offer';
     if (s.includes('applied') || s.includes('submitted')) return 'Applied';
-    return 'Discovered';
+    
+    // Only Starred jobs appear in Target Queue / Wishlist
+    const isStarred = job.isStarred || 
+                      starredSet.has(String(job.id)) || 
+                      starredSet.has(`${job.company}_${job.title}`) ||
+                      s.includes('wishlist') || 
+                      s.includes('shortlist') || 
+                      s.includes('starred') || 
+                      s.includes('saved');
+    if (isStarred) return 'Discovered';
+    return null;
   };
 
   const columns = STAGES.map(stage => ({

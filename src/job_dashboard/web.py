@@ -1163,6 +1163,55 @@ def make_handler(app: DashboardApp):
                     })
                     return
 
+                if path == "/api/google-login":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    email = (payload.get("email") or "").strip().lower()
+                    name = (payload.get("name") or "").strip() or (email.split("@")[0] if email else "Google User")
+                    google_id = payload.get("google_id") or payload.get("id") or str(uuid.uuid4())
+                    user_id = f"google_{google_id}"
+                    
+                    if not email:
+                        self.send_json(400, {"error": "Missing Google email address"})
+                        return
+                        
+                    now = datetime.datetime.utcnow().isoformat()
+                    try:
+                        with app.db.get_connection() as conn:
+                            cur = conn.cursor()
+                            cur.execute("SELECT id, name FROM users WHERE email = ?", (email,))
+                            existing = cur.fetchone()
+                            if existing:
+                                user_id = existing[0]
+                                cur.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+                            else:
+                                dummy_hash = bcrypt.hashpw(str(uuid.uuid4()).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                                cur.execute(
+                                    "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                                    (user_id, email, name, dummy_hash, now)
+                                )
+                            conn.commit()
+                    except Exception as e:
+                        logger.error(f"Error persisting Google user: {e}")
+                        
+                    token = jwt.encode({
+                        "sub": user_id,
+                        "email": email,
+                        "name": name,
+                        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=7)
+                    }, JWT_SECRET, algorithm="HS256")
+                    
+                    self.send_json(200, {
+                        "success": True,
+                        "token": token,
+                        "user": {
+                            "id": user_id,
+                            "email": email,
+                            "name": name
+                        }
+                    })
+                    return
+
                 if path == "/api/register":
                     content_len = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}

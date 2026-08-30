@@ -63,10 +63,11 @@ export const validateSession = async () => {
         const verifiedSession = {
           ...current,
           ...data.user,
-          authProvider: 'email'
+          authProvider: current.authProvider || 'email'
         };
         setSession(verifiedSession, token);
         return verifiedSession;
+
       }
     }
   } catch (err) {

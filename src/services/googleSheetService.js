@@ -158,7 +158,7 @@ const formatJobRow = (job, userProfile) => {
  * Appends a single job application to the user's personal Google Sheet
  */
 export const appendApplicationToSheet = async (accessToken, spreadsheetId, job, userProfile) => {
-  if (!accessToken || !spreadsheetId || !job) return;
+  if (!accessToken || !spreadsheetId || !job) return { success: false };
 
   const row = formatJobRow(job, userProfile);
 
@@ -180,9 +180,76 @@ export const appendApplicationToSheet = async (accessToken, spreadsheetId, job, 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.warn('Error appending application to personal Google Sheet:', err);
+      return { success: false, error: err };
     }
+    return { success: true, action: 'appended' };
   } catch (e) {
     console.error('Failed to append to Google Sheet:', e);
+    return { success: false, error: e.message };
+  }
+};
+
+/**
+ * Upserts a job application in the user's personal Google Sheet.
+ * Reads existing sheet rows, finds match by Company + Title, updates the row or appends a new one.
+ */
+export const upsertApplicationInSheet = async (accessToken, spreadsheetId, job, userProfile) => {
+  if (!accessToken || !spreadsheetId || !job) return { success: false };
+  if (accessToken.startsWith('simulated_')) return { success: false, simulated: true };
+
+  const row = formatJobRow(job, userProfile);
+  const targetCompany = String(job.company || '').trim().toLowerCase();
+  const targetTitle = String(job.title || '').trim().toLowerCase();
+
+  try {
+    // 1. Fetch current rows from the sheet
+    const getRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Applications!A:K`,
+      {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      }
+    );
+
+    if (getRes.ok) {
+      const data = await getRes.json();
+      const existingRows = data.values || [];
+      
+      // Row 1 (index 0) is headers. Search from row 2 (index 1)
+      let foundRowIndex = -1;
+      for (let i = 1; i < existingRows.length; i++) {
+        const r = existingRows[i];
+        const rowComp = String(r[2] || '').trim().toLowerCase();
+        const rowTitle = String(r[3] || '').trim().toLowerCase();
+        if (rowComp && targetCompany && (rowComp === targetCompany || rowComp.includes(targetCompany) || targetCompany.includes(rowComp))) {
+          if (rowTitle && targetTitle && (rowTitle === targetTitle || rowTitle.includes(targetTitle) || targetTitle.includes(rowTitle))) {
+            foundRowIndex = i + 1; // 1-based row number for Sheets API
+            break;
+          }
+        }
+      }
+
+      if (foundRowIndex > 1) {
+        // Update existing row
+        const updateRes = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Applications!A${foundRowIndex}:K${foundRowIndex}?valueInputOption=USER_ENTERED`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ values: [row] })
+          }
+        );
+        return { success: updateRes.ok, action: 'updated', row: foundRowIndex };
+      }
+    }
+
+    // If not found or get failed, append new row
+    return await appendApplicationToSheet(accessToken, spreadsheetId, job, userProfile);
+  } catch (err) {
+    console.warn('Google Sheet upsert failed, attempting direct append:', err);
+    return await appendApplicationToSheet(accessToken, spreadsheetId, job, userProfile);
   }
 };
 
@@ -191,6 +258,7 @@ export const appendApplicationToSheet = async (accessToken, spreadsheetId, job, 
  */
 export const syncAllApplicationsToSheet = async (accessToken, spreadsheetId, jobs, userProfile) => {
   if (!accessToken || !spreadsheetId || !jobs || jobs.length === 0) return { count: 0 };
+  if (accessToken.startsWith('simulated_')) return { count: 0, simulated: true };
 
   const rows = jobs.map(j => formatJobRow(j, userProfile));
 
@@ -215,3 +283,4 @@ export const syncAllApplicationsToSheet = async (accessToken, spreadsheetId, job
 
   return { count: rows.length };
 };
+

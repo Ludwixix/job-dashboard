@@ -15,12 +15,15 @@ const getApiBase = () => isLocalHost ? '' : (SCRAPER_BASE_URL || '');
 const LS_AUTH_USER = 'job_dashboard_google_auth_user';
 const LS_GOOGLE_CLIENT_ID = 'job_dashboard_google_client_id';
 
-// Default / fallback demo client ID or user-configured client ID
-const DEFAULT_CLIENT_ID = '1088456428789-demo-client-id.apps.googleusercontent.com';
+// Env-injected client ID (set via VITE_GOOGLE_CLIENT_ID in .env or Cloud Run env vars).
+// A Google OAuth Client ID is a PUBLIC identifier — safe to embed in browser JS.
+const ENV_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 export const getGoogleClientId = () => {
-  return localStorage.getItem(LS_GOOGLE_CLIENT_ID) || '';
+  // Priority: localStorage override → env var → empty (no fallback to demo ID)
+  return localStorage.getItem(LS_GOOGLE_CLIENT_ID) || ENV_CLIENT_ID || '';
 };
+
 
 export const setGoogleClientId = (clientId) => {
   if (clientId) {

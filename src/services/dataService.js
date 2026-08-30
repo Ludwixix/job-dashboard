@@ -1,5 +1,6 @@
 import { MULTI_INDUSTRY_JOBS } from './multiIndustryJobData';
 import { buildQueriesFromProfile, triggerProfileScrape, SCRAPER_BASE_URL } from './jobQueryService';
+import { upsertApplicationInSheet } from './googleSheetService';
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
@@ -183,7 +184,7 @@ export const fetchJobsFromApi = async ({
     });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.jobs)) {
+      if (Array.isArray(data.jobs) && data.jobs.length > 0) {
         return {
           jobs: data.jobs.map((item, idx) => parseMetadata(item, item.id || `api_${idx}`)),
           total: data.total || data.jobs.length,
@@ -197,7 +198,7 @@ export const fetchJobsFromApi = async ({
     console.warn("Backend /api/jobs fetch failed, falling back to local static payload:", err);
   }
 
-  // Fallback to demo jobs if API is unreachable
+  // Fallback to demo / static jobs if API is unreachable or returned 0 items
   return fetchDemoFallbackJobs();
 };
 
@@ -205,8 +206,16 @@ export const fetchJobsFromApi = async ({
  * Fetch private application tracking records for the authenticated user
  */
 export const fetchUserApplications = async () => {
+  let localApps = [];
+  try {
+    const rawLocal = localStorage.getItem('job_dashboard_local_applications');
+    if (rawLocal) {
+      localApps = Object.values(JSON.parse(rawLocal));
+    }
+  } catch {}
+
   const token = getAuthToken();
-  if (!token) return [];
+  if (!token) return localApps;
 
   const apiBase = getApiBase();
   try {
@@ -217,28 +226,52 @@ export const fetchUserApplications = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.applications)) {
-        return data.applications;
+        const combinedMap = new Map();
+        localApps.forEach(a => combinedMap.set(String(a.id || a.job_id), a));
+        data.applications.forEach(a => combinedMap.set(String(a.job_id || a.id), a));
+        return Array.from(combinedMap.values());
       }
     }
   } catch (err) {
     console.warn("Failed to fetch user applications from backend:", err);
   }
-  return [];
+  return localApps;
 };
 
 /**
  * Upsert private application tracking status and notes for the authenticated user
  */
 export const saveUserApplication = async (jobData) => {
+  const targetId = jobData.id || `${jobData.company}_${jobData.title}`;
+  
+  // 1. Persist locally in localStorage for instant offline / cache recovery
+  try {
+    const saved = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+    saved[targetId] = { ...(saved[targetId] || {}), ...jobData };
+    localStorage.setItem('job_dashboard_local_applications', JSON.stringify(saved));
+  } catch (e) {
+    console.warn("Local storage write failed:", e);
+  }
+
+  // 2. Auto-sync to personal Google Sheet if connected
+  try {
+    const authUserRaw = localStorage.getItem('job_dashboard_google_auth_user');
+    if (authUserRaw) {
+      const authUser = JSON.parse(authUserRaw);
+      if (authUser?.accessToken && !authUser.accessToken.startsWith('simulated_') && authUser?.spreadsheetId) {
+        upsertApplicationInSheet(authUser.accessToken, authUser.spreadsheetId, jobData);
+      }
+    }
+  } catch (e) {
+    console.warn("Auto Google Sheet sync non-blocking error:", e);
+  }
+
   const token = getAuthToken();
   if (!token) {
-    // If not logged in, persist locally in localStorage
-    const saved = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
-    saved[jobData.id || `${jobData.company}_${jobData.title}`] = jobData;
-    localStorage.setItem('job_dashboard_local_applications', JSON.stringify(saved));
     return { success: true, local: true };
   }
 
+  // 3. Persist to backend SQLite
   const apiBase = getApiBase();
   try {
     const res = await fetch(`${apiBase}/api/applications`, {
@@ -248,12 +281,20 @@ export const saveUserApplication = async (jobData) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        job_id: jobData.id || `${jobData.company}_${jobData.title}`,
+        job_id: targetId,
         status: jobData.status || 'sourced',
         notes: jobData.notes || '',
-        resume_text: jobData.resumeText || '',
-        cover_letter_text: jobData.coverLetterText || '',
-        applied_at: jobData.applied_at || jobData.date || null
+        resume_text: jobData.resumeText || jobData.resume_text || '',
+        cover_letter_text: jobData.coverLetterText || jobData.cover_letter_text || '',
+        applied_at: jobData.applied_at || jobData.date || null,
+        company: jobData.company || '',
+        title: jobData.title || '',
+        location: jobData.location || '',
+        source: jobData.source || '',
+        score: jobData.score || 0,
+        salary: jobData.salary || '',
+        portalLink: jobData.portalLink || jobData.link || jobData.url || '',
+        job_data: jobData
       })
     });
     return await res.json();
@@ -312,26 +353,64 @@ export const fetchJobsData = async () => {
 
   const userAppsMap = new Map();
   userApps.forEach(app => {
-    userAppsMap.set(String(app.job_id), app);
+    userAppsMap.set(String(app.job_id || app.id), app);
+    if (app.company && app.title) {
+      userAppsMap.set(`${app.company}_${app.title}`, app);
+    }
   });
 
   const mergedJobs = apiJobsResult.jobs.map(job => {
     const userApp = userAppsMap.get(String(job.id)) || userAppsMap.get(`${job.company}_${job.title}`);
     if (userApp) {
+      userAppsMap.delete(String(job.id));
+      userAppsMap.delete(String(userApp.job_id || userApp.id));
+      userAppsMap.delete(`${job.company}_${job.title}`);
       return {
         ...job,
         status: userApp.status || job.status,
         notes: userApp.notes || job.notes,
-        resumeText: userApp.resume_text || job.resumeText,
-        coverLetterText: userApp.cover_letter_text || job.coverLetterText,
-        applied_at: userApp.applied_at
+        resumeText: userApp.resume_text || userApp.resumeText || job.resumeText,
+        coverLetterText: userApp.cover_letter_text || userApp.coverLetterText || job.coverLetterText,
+        applied_at: userApp.applied_at || job.applied_at,
+        hasCustomDocs: Boolean(userApp.resume_text || userApp.cover_letter_text || job.hasCustomDocs)
       };
     }
     return job;
   });
 
-  return mergedJobs;
+  // Include any user application that was not in the scraped jobs catalog (e.g. Gmail imports, manual apps)
+  const remainingApps = [];
+  const seenIds = new Set(mergedJobs.map(j => String(j.id)));
+
+  userAppsMap.forEach((userApp, key) => {
+    const id = String(userApp.job_id || userApp.id || key);
+    if (seenIds.has(id)) return;
+    seenIds.add(id);
+
+    const comp = userApp.company || (id.includes('_') ? id.split('_')[0] : 'Direct Employer');
+    const tit = userApp.title || (id.includes('_') ? id.split('_')[1] : 'Applied Role');
+
+    remainingApps.push(parseMetadata({
+      id: id,
+      company: comp,
+      title: tit,
+      status: userApp.status || 'Applied',
+      notes: userApp.notes || '',
+      resumeText: userApp.resume_text || userApp.resumeText || '',
+      coverLetterText: userApp.cover_letter_text || userApp.coverLetterText || '',
+      applied_at: userApp.applied_at,
+      date: userApp.applied_at || userApp.date || new Date().toISOString().split('T')[0],
+      source: userApp.source || 'Gmail Inbox Sync',
+      location: userApp.location || 'Melbourne, VIC',
+      score: userApp.score || 90,
+      tags: ['Application', userApp.status || 'Applied'],
+      hasCustomDocs: Boolean(userApp.resume_text || userApp.cover_letter_text)
+    }, id));
+  });
+
+  return [...remainingApps, ...mergedJobs];
 };
+
 
 /**
  * Fetch jobs personalised to a user profile.

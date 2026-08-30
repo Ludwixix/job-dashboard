@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
-
-from .models import Job
 
 
 class ContentLibrary:
@@ -36,22 +33,22 @@ class ContentLibrary:
             try:
                 text = file.read_text(encoding="utf-8")
                 # Extract company names (assume they appear after "Company:" or in section headers)
-                companies = re.findall(r"(?:Company|Employer):\s*([^\n]+)", text, re.I)
+                companies = re.findall(r"(?:Company|Employer):\s*([^\n]+)", text, re.IGNORECASE)
                 self.facts["companies"].update(companies)
                 # Extract job titles
-                titles = re.findall(r"(?:Title|Role|Position):\s*([^\n]+)", text, re.I)
+                titles = re.findall(r"(?:Title|Role|Position):\s*([^\n]+)", text, re.IGNORECASE)
                 self.facts["titles"].update(titles)
                 # Extract dates in common formats
                 dates = re.findall(r"\b(?:19|20)\d{2}[-/]\d{2}\b", text)
                 self.facts["dates"].update(dates)
                 # Extract skills (assume comma-separated lists after "Skills:")
-                skills_match = re.search(r"(?:Technical )?Skills?:\s*([^\n]+(?:\n[^\n]*)*?)(?=\n\n|\n[A-Z]|$)", text, re.I)
+                skills_match = re.search(r"(?:Technical )?Skills?:\s*([^\n]+(?:\n[^\n]*)*?)(?=\n\n|\n[A-Z]|$)", text, re.IGNORECASE)
                 if skills_match:
                     skill_text = skills_match.group(1)
                     skills = re.findall(r"[A-Z][A-Za-z\s\-\.\/\+#\(\)]+", skill_text)
                     self.facts["skills"].update(s.strip() for s in skills if len(s) > 2)
                 # Extract quantified achievements (numbers + nouns)
-                metrics = re.findall(r"\b(\d+[%$KM]?)\s+(?:of\s+)?([a-z\s]+)(?:\s+(?:increased|decreased|improved|reduced))?", text, re.I)
+                metrics = re.findall(r"\b(\d+[%$KM]?)\s+(?:of\s+)?([a-z\s]+)(?:\s+(?:increased|decreased|improved|reduced))?", text, re.IGNORECASE)
                 self.facts["metrics"].update(f"{m[0]} {m[1]}" for m in metrics)
                 # Extract common achievement phrases
                 achievements = re.findall(r"[-•]\s+([^.\n]+)", text)
@@ -76,7 +73,7 @@ class ContentLibrary:
             if date not in self.facts["dates"]:
                 issues.append(f"date_not_verified: '{date}'")
         # Check for metrics/numbers
-        for metric_phrase in re.findall(r"\b\d+[%$KM]?\s+(?:of\s+)?(?:[a-z\s]+)", text, re.I):
+        for metric_phrase in re.findall(r"\b\d+[%$KM]?\s+(?:of\s+)?(?:[a-z\s]+)", text, re.IGNORECASE):
             if metric_phrase.strip() and not any(metric_phrase in m for m in self.facts["metrics"]):
                 issues.append(f"metric_not_verified: '{metric_phrase}'")
         return {"verified": len(issues) == 0, "issue_count": len(issues), "issues": issues}

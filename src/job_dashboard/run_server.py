@@ -8,7 +8,13 @@ from .config import settings
 from .llm import OpenRouterDocumentGenerator
 from .profile import load_profile
 from .scrape_config import DEFAULT_QUERIES
-from .sources import AdzunaApiSource, IndeedJobSpySource, LinkedInBrowserSource, RemoteOkApiSource, SeekApiSource
+from .sources import (
+    AdzunaApiSource,
+    IndeedJobSpySource,
+    LinkedInBrowserSource,
+    RemoteOkApiSource,
+    SeekApiSource,
+)
 from .web import DashboardApp, serve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

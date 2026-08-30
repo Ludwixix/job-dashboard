@@ -6,8 +6,8 @@ from job_dashboard.score import score_job
 from job_dashboard.sources import (
     AdzunaApiSource,
     RemoteOkApiSource,
-    SearchQuery,
     ScrapePipeline,
+    SearchQuery,
     deduplicate_jobs,
     is_recent,
     normalize_posted_date,

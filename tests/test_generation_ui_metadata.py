@@ -1,5 +1,5 @@
-from job_dashboard.web import DashboardApp
 from job_dashboard.sources import SearchQuery
+from job_dashboard.web import DashboardApp
 
 
 def test_generate_persists_downloadable_document_links(tmp_path):

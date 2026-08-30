@@ -8,54 +8,52 @@ Supports:
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import re
 import threading
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Standard Australian Screening Question Knowledge Base
 STANDARD_SCREENING_RULES = [
     # Work Rights
-    (re.compile(r"work.*rights|legally.*entitled|eligible.*work.*australia|visa.*status|citizen|permanent.*resident", re.I), "Australian Citizen"),
-    (re.compile(r"are you an australian citizen|right to work in australia", re.I), "Yes"),
+    (re.compile(r"work.*rights|legally.*entitled|eligible.*work.*australia|visa.*status|citizen|permanent.*resident", re.IGNORECASE), "Australian Citizen"),
+    (re.compile(r"are you an australian citizen|right to work in australia", re.IGNORECASE), "Yes"),
     # Security Clearance
-    (re.compile(r"clearance|security.*clearance|baseline|nv1|nv2|negative.*vetting", re.I), "Baseline / NV1 Ready"),
-    (re.compile(r"do you hold.*clearance|willing.*obtain.*clearance", re.I), "Yes"),
+    (re.compile(r"clearance|security.*clearance|baseline|nv1|nv2|negative.*vetting", re.IGNORECASE), "Baseline / NV1 Ready"),
+    (re.compile(r"do you hold.*clearance|willing.*obtain.*clearance", re.IGNORECASE), "Yes"),
     # Location & Commute
-    (re.compile(r"located.*melbourne|commute.*melbourne|live in.*australia|location", re.I), "Melbourne, VIC"),
-    (re.compile(r"willing to relocate|willing to travel|onsite.*attendance", re.I), "Yes"),
+    (re.compile(r"located.*melbourne|commute.*melbourne|live in.*australia|location", re.IGNORECASE), "Melbourne, VIC"),
+    (re.compile(r"willing to relocate|willing to travel|onsite.*attendance", re.IGNORECASE), "Yes"),
     # Notice Period
-    (re.compile(r"notice.*period|how soon.*start|availability|available.*start", re.I), "Immediate / <2 Weeks"),
+    (re.compile(r"notice.*period|how soon.*start|availability|available.*start", re.IGNORECASE), "Immediate / <2 Weeks"),
     # Driver's License & Working with Children
-    (re.compile(r"driver.*licence|driver.*license|valid.*licence", re.I), "Yes"),
-    (re.compile(r"working with children|wwcc|police.*check", re.I), "Yes"),
+    (re.compile(r"driver.*licence|driver.*license|valid.*licence", re.IGNORECASE), "Yes"),
+    (re.compile(r"working with children|wwcc|police.*check", re.IGNORECASE), "Yes"),
     # Vaccination / Compliance
-    (re.compile(r"covid|vaccinated|compliance", re.I), "Yes"),
+    (re.compile(r"covid|vaccinated|compliance", re.IGNORECASE), "Yes"),
     # Salary Expectations
-    (re.compile(r"salary.*expectation|expected.*rate|target.*remuneration", re.I), "$115,000 + Super"),
+    (re.compile(r"salary.*expectation|expected.*rate|target.*remuneration", re.IGNORECASE), "$115,000 + Super"),
 ]
 
 
 class AutoApplyTask:
-    def __init__(self, task_id: str, job: Dict[str, Any], profile: Dict[str, Any]):
+    def __init__(self, task_id: str, job: dict[str, Any], profile: dict[str, Any]):
         self.task_id = task_id
         self.job = job
         self.profile = profile
         self.status = "queued"  # queued | running | completed | failed | needs_human_review
         self.progress = 0  # 0 to 100%
         self.phase = "Initializing Application Engine"
-        self.logs: List[Dict[str, Any]] = []
-        self.screening_answers: Dict[str, str] = {}
-        self.error: Optional[str] = None
+        self.logs: list[dict[str, Any]] = []
+        self.screening_answers: dict[str, str] = {}
+        self.error: str | None = None
         self.started_at = time.time()
-        self.completed_at: Optional[float] = None
-        self.receipt: Optional[Dict[str, Any]] = None
+        self.completed_at: float | None = None
+        self.receipt: dict[str, Any] | None = None
 
     def add_log(self, message: str, level: str = "info") -> None:
         self.logs.append({
@@ -66,7 +64,7 @@ class AutoApplyTask:
         })
         logger.info(f"[{self.task_id}] {message}")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "status": self.status,
@@ -92,9 +90,9 @@ class AutoApplyManager:
     """Manages background auto-apply tasks and Playwright executions."""
 
     def __init__(self):
-        self.tasks: Dict[str, AutoApplyTask] = {}
+        self.tasks: dict[str, AutoApplyTask] = {}
 
-    def resolve_screening_answer(self, question_text: str, profile: Dict[str, Any]) -> str:
+    def resolve_screening_answer(self, question_text: str, profile: dict[str, Any]) -> str:
         """Resolve answer for arbitrary screening questions using candidate profile."""
         q = question_text.strip()
         
@@ -110,16 +108,16 @@ class AutoApplyManager:
                 return default_ans
 
         # Numeric experience questions (e.g. "How many years of Microsoft 365 experience do you have?")
-        if re.search(r"how many years|years of experience", q, re.I):
+        if re.search(r"how many years|years of experience", q, re.IGNORECASE):
             return "7"
         
         # Default affirmative answer for eligibility
-        if re.search(r"are you|do you|can you|will you", q, re.I):
+        if re.search(r"are you|do you|can you|will you", q, re.IGNORECASE):
             return "Yes"
 
         return "Applicable / Experienced"
 
-    def create_task(self, job: Dict[str, Any], profile: Dict[str, Any]) -> AutoApplyTask:
+    def create_task(self, job: dict[str, Any], profile: dict[str, Any]) -> AutoApplyTask:
         task_id = f"apply_{uuid.uuid4().hex[:10]}"
         task = AutoApplyTask(task_id, job, profile)
         self.tasks[task_id] = task
@@ -128,7 +126,7 @@ class AutoApplyManager:
         thread.start()
         return task
 
-    def get_task(self, task_id: str) -> Optional[AutoApplyTask]:
+    def get_task(self, task_id: str) -> AutoApplyTask | None:
         return self.tasks.get(task_id)
 
     def _run_auto_apply_worker(self, task: AutoApplyTask) -> None:
@@ -229,7 +227,7 @@ class AutoApplyManager:
             task.status = "failed"
             task.error = str(exc)
             task.phase = "Auto-Apply Failed"
-            task.add_log(f"❌ Error during auto-apply: {str(exc)}", level="error")
+            task.add_log(f"❌ Error during auto-apply: {exc!s}", level="error")
 
 
 auto_apply_manager = AutoApplyManager()

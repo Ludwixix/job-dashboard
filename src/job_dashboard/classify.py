@@ -9,11 +9,11 @@ _STREAM_PATTERNS = {
     "bridge": (r"barista|waiter|chef|cleaner|warehouse|retail|cashier|courier|driver|casual|part.?time|general.?hand",),
     "traineeship": (r"trainee|traineeship|apprentice|cabling|fibre|telecom|data.?cent(re|er)|hvac|electrician|technician|nbn|racking",),
 }
-_BRIDGE_EXCLUSIONS = re.compile(r"officer|manager|senior|lead|director|engineer|analyst|architect|consultant", re.I)
+_BRIDGE_EXCLUSIONS = re.compile(r"officer|manager|senior|lead|director|engineer|analyst|architect|consultant", re.IGNORECASE)
 
 
 def _matches(text: str, patterns: tuple[str, ...]) -> int:
-    return sum(bool(re.search(pattern, text, re.I)) for pattern in patterns)
+    return sum(bool(re.search(pattern, text, re.IGNORECASE)) for pattern in patterns)
 
 
 def classify_job(job: Job) -> str:
@@ -21,7 +21,7 @@ def classify_job(job: Job) -> str:
     text = job.text()
     scores = {stream: _matches(text, patterns) for stream, patterns in _STREAM_PATTERNS.items()}
     title = job.title
-    if scores["traineeship"] and re.search(r"trainee|apprentice|cabling|fibre|hvac|nbn", title, re.I):
+    if scores["traineeship"] and re.search(r"trainee|apprentice|cabling|fibre|hvac|nbn", title, re.IGNORECASE):
         return "traineeship"
     if scores["bridge"] and not _BRIDGE_EXCLUSIONS.search(title):
         return "bridge"

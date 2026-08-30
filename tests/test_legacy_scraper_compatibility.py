@@ -5,7 +5,6 @@ import pytest
 
 from job_dashboard.normalize import normalize_job
 
-
 LEGACY_SCRAPERS = Path("/home/s/.openclaw/workspace/job-dashboard-site/scrapers")
 LEGACY_OUTPUTS = tuple(sorted(LEGACY_SCRAPERS.glob("jobs_*.json")))
 

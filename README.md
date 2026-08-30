@@ -1,92 +1,85 @@
-# Job Dashboard Core
+# ACAA Job Dashboard
 
-A modular extraction of the existing job dashboard's reusable behavior. This project keeps the core functions independent from scraping, generated HTML, Netlify, and LLM providers.
+A comprehensive, modular, and AI-powered job application system. This project features a Python-based core backend, a React Single Page Application (SPA) frontend, intelligent Web Scraping, and automated Document Generation (Resume & Cover Letter) tailored to specific job requirements using LLMs.
 
-## Modules
+## Architecture
 
-- `models.py` defines the stable `Job` and `ApplicationRecord` data contracts.
-- `normalize.py` converts source records into a predictable job shape.
-- `classify.py` assigns jobs to `core-it`, `bridge`, or `traineeship`.
-- `score.py` calculates fit dimensions, matched skills, gaps, and confidence.
-- `applications.py` handles document splitting and application-index persistence.
-- `service.py` composes the pure functions into an application-facing service.
-- `sources.py` provides Indeed, Adzuna, RemoteOK, Seek, and LinkedIn adapters plus deduplication.
+The project consists of several components working in tandem:
 
-## Quick start
+- **job-dashboard-modular (Backend Core)**: 
+  - `models.py`: Stable data contracts (`Job`, `ApplicationRecord`).
+  - `score.py` & `classify.py`: Calculates fit dimensions, gaps, and categorizes jobs (e.g. `core-it`, `bridge`).
+  - `sources.py`: Provides scraping adapters (Seek, Indeed, LinkedIn, Adzuna) with robust fallbacks.
+  - `applications.py`: Manages SQLite state for Job Application tracking (ApplicationTracker).
+  - `web.py`: The HTTP server providing APIs for the frontend.
+
+- **job-dashboard-react (Frontend SPA)**:
+  - Built with Vite, React, and TailwindCSS.
+  - **Job Cards V2**: Highly optimized, scannable job cards displaying at-a-glance metadata, top matched skills, and "Star/Save" functionality.
+  - **Job Modal**: Expandable deep-dive view with beautifully formatted job descriptions, a robust FIT Audit, and 1-click Auto-Apply actions.
+  - **Auto-Apply Engine**: Leverages AI to pre-fill screening questions, dynamically generate tailored PDF Resumes/Cover Letters, and seamlessly dispatch the user to the application portal.
+
+## Quick Start (Local Development)
+
+### 1. Backend Server
+The backend handles scraping, SQLite persistence, and LLM orchestration.
 
 ```bash
-python -m pytest
-```
-
-Install provider adapters and run a collection:
-
-```bash
+cd /home/s/.openclaw/workspace/job-dashboard-modular
+# Install dependencies
 python -m pip install -e '.[scraping]'
 python -m playwright install chromium
-PYTHONPATH=src python -m job_dashboard.scrape --output jobs.json
-```
 
-Adzuna requires credentials supplied through the environment (or the local `.env`):
+# Run tests
+python -m pytest
 
-```bash
-export ADZUNA_APP_ID=your-app-id
-export ADZUNA_API_KEY=your-api-key
-```
-
-The source adapters are the tested integration of the usable scrapers from the
-legacy `job-dashboard-site/scrapers` folder. Indeed uses JobSpy, Adzuna uses its
-API, SEEK uses its public search API with an optional browser fallback, LinkedIn
-uses public search pages through Playwright, and RemoteOK adds remote listings.
-The legacy scripts are retained as reference material rather than copied into
-this application; fragile HTML, Google-search, Jora, CareerOne, and RSS
-variants are not part of the production pipeline.
-
-Run one provider while developing an adapter:
-
-```bash
-PYTHONPATH=src python -m job_dashboard.scrape --source seek --output jobs-seek.json
-```
-
-For Seek, the optional fallbacks can be enabled in order after the API:
-
-```bash
-PYTHONPATH=src python -m job_dashboard.scrape --source seek \
-    --seek-browser-fallback \
-    --seek-cache-fallback \
-    --seek-cache-path /path/to/jobs_seek.json \
-    --output jobs-seek.json
-```
-
-The app server enables the browser and cache fallbacks by default. Override
-`SEEK_BROWSER_FALLBACK`, `SEEK_CACHE_FALLBACK`, or `SEEK_CACHE_PATH` when a
-different policy or snapshot is required.
-
-Indeed uses JobSpy, SEEK uses its public search API when that endpoint permits the request, and LinkedIn uses public job search pages through Playwright. Provider dependencies are optional so the domain core remains usable offline. The SEEK adapter deliberately does not bypass CAPTCHA, bot protection, robots rules, authentication, or rate limits; denied requests are reported in the dashboard refresh errors. Configure `SEEK_ENABLED=0` to disable it, or set `SEEK_API_ENDPOINT` only to a provider-approved endpoint. `SEEK_MAX_PAGES`, `SEEK_MAX_RESULTS`, and `SEEK_PAUSE_SECONDS` provide conservative request bounds.
-
-Use the core without a server or database:
-
-```python
-from job_dashboard.service import JobDashboard
-
-profile = {"skills": ["azure", "powershell", "windows"]}
-dashboard = JobDashboard(profile)
-result = dashboard.analyse({
-    "title": "Cloud Engineer",
-    "company": "Example Co",
-    "location": "Melbourne",
-    "description": "Azure and PowerShell automation",
-})
-print(result.score.score, result.stream)
-```
-
-The original project remains the source for scrapers, document templates, and deployment. Migrate those adapters into this package only when their input/output contracts are tested.
-
-## Local dashboard
-
-Start the full local application with the existing profile and writing documents:
-
-```bash
+# Start the local API server
 PYTHONPATH=src python -m job_dashboard.run_server
 ```
 
-On-demand generation loads every Markdown file under `Source of truth/` and `Guidelines/`, then sends that context, the verified profile, and the selected listing to the configured OpenRouter model. Set `OPENROUTER_API_KEY` to override the local OpenClaw configuration, or set `LLM_MODEL` to choose another model. Without a key, the server uses the grounded local fallback generator.
+### 2. Frontend React SPA
+The frontend communicates with the backend API to render the dashboard.
+
+```bash
+cd /home/s/.openclaw/workspace/job-dashboard-react
+# Install dependencies
+npm install
+
+# Start Vite Dev Server
+npm run dev
+```
+
+## Features
+
+- **Multi-Source Scraping**: Scrapes SEEK, Indeed, LinkedIn, and Adzuna in real-time or via cache fallbacks.
+- **AI Document Generation**: Uses OpenRouter (or local fallbacks) to dynamically synthesize a customized Resume and Cover Letter strictly based on your "Source of Truth" profile context.
+- **Smart Scoring & FIT Audit**: Evaluates the job description against your profile to score compatibility and highlight missing/matching skills.
+- **Auto-Apply**: 1-click pipeline that generates documents, compiles a candidate payload, copies it to the clipboard, and opens the job portal.
+- **Starred Jobs**: Save jobs locally for future review.
+- **Kanban Board & Tracker**: Move jobs through lifecycle stages (Applied, Interviewing, Offer).
+
+## Deployment (Google Cloud Run)
+
+The application has been unified into a single Dockerized container deployed on Google Cloud Run. 
+The static React assets are built and served by the Python backend.
+
+1. Build the frontend and sync static assets:
+```bash
+cd job-dashboard-react
+npm run build
+rm -rf ../job-dashboard-modular/src/job_dashboard/static/*
+cp -r dist/* ../job-dashboard-modular/src/job_dashboard/static/
+```
+
+2. Deploy to Cloud Run:
+```bash
+cd job-dashboard-modular
+./deploy-cloudrun.sh
+```
+
+## Configuration
+
+Set the following environment variables (locally in `.env` or in GCP Secret Manager):
+- `OPENROUTER_API_KEY`: For AI document generation.
+- `ADZUNA_APP_ID` / `ADZUNA_API_KEY`: For Adzuna scraping.
+- `SEEK_API_ENDPOINT`: (Optional) Approved Seek API endpoint.

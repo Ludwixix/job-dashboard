@@ -10,7 +10,6 @@ from typing import Any
 from .db_pool import get_connection_pool, get_db_connection
 from .logging import get_logger
 
-
 logger = get_logger("job_dashboard.repository")
 
 STATUSES = ("sourced", "shortlisted", "applied", "interviewing", "offer", "rejected")
@@ -43,6 +42,13 @@ class JobRepository:
                 CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted);
                 CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);
                 CREATE INDEX IF NOT EXISTS idx_jobs_stream ON jobs(stream);
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    name TEXT,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS application_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
                     from_status TEXT, to_status TEXT NOT NULL, occurred_at TEXT NOT NULL,
@@ -168,13 +174,13 @@ class JobRepository:
         """Extract a comparable lower salary bound from provider text."""
         text = str(value or "")
         numbers = []
-        for match in re.finditer(r"(\d[\d,]*(?:\.\d+)?)\s*(k|m)?", text, re.I):
+        for match in re.finditer(r"(\d[\d,]*(?:\.\d+)?)\s*(k|m)?", text, re.IGNORECASE):
             number = float(match.group(1).replace(",", ""))
             multiplier = match.group(2)
             if multiplier:
                 number *= 1000 if multiplier.lower() == "k" else 1000000
             numbers.append(number)
-        super_match = re.search(r"\d+(?:\.\d+)?\s*%\s*(?:super|superannuation)", text, re.I)
+        super_match = re.search(r"\d+(?:\.\d+)?\s*%\s*(?:super|superannuation)", text, re.IGNORECASE)
         if super_match:
             numbers = [number for number in numbers if number != float(re.search(r"\d+(?:\.\d+)?", super_match.group()).group())]
         return min(numbers) if numbers else 0.0

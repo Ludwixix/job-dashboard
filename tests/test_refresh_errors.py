@@ -1,4 +1,4 @@
-from job_dashboard.sources import SearchQuery, ScrapePipeline
+from job_dashboard.sources import ScrapePipeline, SearchQuery
 
 
 class BrokenSource:

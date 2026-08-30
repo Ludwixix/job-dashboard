@@ -1,0 +1,182 @@
+version: '3.8'
+
+services:
+  # Main application
+  job-dashboard:
+    build:
+      context: .
+      target: production
+    container_name: job-dashboard-app
+    ports:
+      - "8787:8787"
+    environment:
+      - JOB_DASHBOARD_ENV=production
+      - JOB_DASHBOARD_DATA_DIR=/app/data
+      - JOB_DASHBOARD_LOG_LEVEL=INFO
+      - DATABASE_URL=sqlite:////app/data/jobs.sqlite3
+    volumes:
+      - job_data:/app/data
+      - job_logs:/app/logs
+      - job_cache:/app/cache
+    restart: unless-stopped
+    networks:
+      - job-network
+    depends_on:
+      - redis
+      # - postgres  # Uncomment for PostgreSQL
+
+  # Redis for caching and Celery
+  redis:
+    image: redis:7-alpine
+    container_name: job-dashboard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - job-network
+
+  # Celery worker for background tasks
+  celery-worker:
+    build:
+      context: .
+      target: production
+    container_name: job-dashboard-celery-worker
+    environment:
+      - JOB_DASHBOARD_ENV=production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - job_data:/app/data
+      - job_logs:/app/logs
+    command: celery -A job_dashboard.tasks worker --loglevel=info
+    restart: unless-stopped
+    networks:
+      - job-network
+    depends_on:
+      - redis
+      - job-dashboard
+
+  # Celery beat for scheduled tasks
+  celery-beat:
+    build:
+      context: .
+      target: production
+    container_name: job-dashboard-celery-beat
+    environment:
+      - JOB_DASHBOARD_ENV=production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - job_data:/app/data
+      - job_logs:/app/logs
+    command: celery -A job_dashboard.tasks beat --loglevel=info
+    restart: unless-stopped
+    networks:
+      - job-network
+    depends_on:
+      - redis
+      - job-dashboard
+
+  # Flower for Celery monitoring
+  flower:
+    build:
+      context: .
+      target: production
+    container_name: job-dashboard-flower
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    command: celery -A job_dashboard.tasks flower --port=5555
+    restart: unless-stopped
+    networks:
+      - job-network
+    depends_on:
+      - redis
+      - celery-worker
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: job-dashboard-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - job-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: job-dashboard-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+    networks:
+      - job-network
+    depends_on:
+      - prometheus
+
+  # PostgreSQL (optional - comment out if using SQLite)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: job-dashboard-postgres
+  #   environment:
+  #     POSTGRES_DB: job_dashboard
+  #     POSTGRES_USER: job_user
+  #     POSTGRES_PASSWORD: job_password
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - job-network
+
+  # Nginx for reverse proxy (optional)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: job-dashboard-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+  #     - ./nginx/ssl:/etc/nginx/ssl
+  #   depends_on:
+  #     - job-dashboard
+  #   restart: unless-stopped
+  #   networks:
+  #     - job-network
+
+networks:
+  job-network:
+    driver: bridge
+
+volumes:
+  job_data:
+  job_logs:
+  job_cache:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  # postgres_data:  # Uncomment for PostgreSQL

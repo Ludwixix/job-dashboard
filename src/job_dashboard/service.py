@@ -1,3 +1,6 @@
+"""
+Application service that composes independent job-domain functions.
+"""
 from collections.abc import Mapping
 from typing import Any
 

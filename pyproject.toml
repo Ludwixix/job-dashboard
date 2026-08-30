@@ -7,7 +7,7 @@ name = "job-dashboard-core"
 version = "0.1.0"
 description = "Modular job discovery, classification, scoring, and application tracking core"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["pydantic>=2.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.4"]

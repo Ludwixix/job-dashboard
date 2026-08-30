@@ -1,20 +1,20 @@
 from __future__ import annotations
 
+import base64
+import email
+import imaplib
 import json
 import re
-import imaplib
-import email
-import base64
 import secrets
 import time
-import urllib.request
 import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from email.header import decode_header
-from email.message import Message
-from collections.abc import Iterable, Mapping
+import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from email.header import decode_header
+from email.message import Message
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -68,8 +68,8 @@ class EmailClassifier:
 
         for category, patterns in self.PATTERNS.items():
             for pattern in patterns:
-                if re.search(pattern, search_text, re.I):
-                    confidence = 0.7 if len(re.findall(pattern, search_text, re.I)) == 1 else 0.9
+                if re.search(pattern, search_text, re.IGNORECASE):
+                    confidence = 0.7 if len(re.findall(pattern, search_text, re.IGNORECASE)) == 1 else 0.9
                     if confidence > best_confidence:
                         best_confidence = confidence
                         best_match = category

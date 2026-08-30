@@ -2,7 +2,12 @@ import json
 
 import pytest
 
-from job_dashboard.sources import SearchQuery, SeekApiSource, SeekUnavailableError, ensure_descriptions
+from job_dashboard.sources import (
+    SearchQuery,
+    SeekApiSource,
+    SeekUnavailableError,
+    ensure_descriptions,
+)
 
 
 class BlockedSeek(SeekApiSource):

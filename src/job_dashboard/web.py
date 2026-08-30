@@ -5,37 +5,44 @@ import io
 import json
 import mimetypes
 import os
+
+import time
+login_attempts = {}
+
+
 import re
 import threading
 import time
-import textwrap
 import urllib.error
 import urllib.request
-from xml.sax.saxutils import escape
+import bcrypt
+import jwt
+import uuid
+import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from xml.sax.saxutils import escape
 
-from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-from .documents import generate_documents
+from .ai_resume_analyzer import get_resume_analyzer
+from .auto_apply import auto_apply_manager
+from .career_recommender import get_career_recommender
 from .compare import COMPARE_MODELS, CompareRunner
+from .documents import generate_documents
 from .email_connector import GmailApiScanner, GmailScanner
-from .models import Job
 from .normalize import normalize_job
-from .service import JobDashboard
-from .sources import SearchQuery, ScrapePipeline, clean_description, is_recent, posted_age
+from .predictive_analytics import get_predictive_analytics
 from .repository import JobRepository
 from .scrape_config import DEFAULT_QUERIES
-from .predictive_analytics import get_predictive_analytics
-from .career_recommender import get_career_recommender
-from .ai_resume_analyzer import get_resume_analyzer
+from .service import JobDashboard
 from .smart_applications import get_smart_application_tracker
-from .auto_apply import auto_apply_manager
+from .sources import ScrapePipeline, SearchQuery, clean_description, is_recent, posted_age
 
 TRACKER_CSV_URL = "https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv&gid=0"
 
@@ -547,8 +554,8 @@ class DashboardApp:
 
     @staticmethod
     def _gmail_job_details(message):
-        subject = re.sub(r"^\s*(re|fw|fwd)\s*:\s*", "", message.subject, flags=re.I).strip()
-        match = re.search(r"(?:application|applying|applied|interest|submission).*?(?:for|to|:)[\s\-]*(.+?)\s+(?:at|with)\s+(.+)$", subject, re.I)
+        subject = re.sub(r"^\s*(re|fw|fwd)\s*:\s*", "", message.subject, flags=re.IGNORECASE).strip()
+        match = re.search(r"(?:application|applying|applied|interest|submission).*?(?:for|to|:)[\s\-]*(.+?)\s+(?:at|with)\s+(.+)$", subject, re.IGNORECASE)
         if match:
             title, company = match.groups()
         else:
@@ -557,7 +564,7 @@ class DashboardApp:
             domain = re.search(r"@([\w.-]+)", message.from_address)
             if domain:
                 company = domain.group(1).split(".")[0].replace("-", " ").title()
-        title = re.sub(r"\s+(?:application|received|confirmation|confirmed)$", "", title, flags=re.I).strip(" .:-")
+        title = re.sub(r"\s+(?:application|received|confirmation|confirmed)$", "", title, flags=re.IGNORECASE).strip(" .:-")
         return title[:160] or "Gmail application", company[:120]
 
     @staticmethod
@@ -859,6 +866,30 @@ def make_handler(app: DashboardApp):
             path = parsed.path
 
             # Health check endpoint
+            
+            if path == "/api/session":
+                auth_header = self.headers.get("Authorization")
+                if not auth_header or not auth_header.startswith("Bearer "):
+                    self.send_json(401, {"error": "Missing or invalid token"})
+                    return
+                
+                token = auth_header.split(" ")[1]
+                try:
+                    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+                    self.send_json(200, {
+                        "success": True,
+                        "user": {
+                            "id": payload.get("sub"),
+                            "email": payload.get("email"),
+                            "name": payload.get("name")
+                        }
+                    })
+                except jwt.ExpiredSignatureError:
+                    self.send_json(401, {"error": "Token expired"})
+                except jwt.InvalidTokenError:
+                    self.send_json(401, {"error": "Invalid token"})
+                return
+
             if path == "/health":
                 import time
 
@@ -1041,7 +1072,133 @@ def make_handler(app: DashboardApp):
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
                     self.send_json(200, app.select_compare_output(comparison_id, payload["model_id"]))
                     return
-                if path == "/api/refresh":
+                
+                if path == "/api/register":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    email = payload.get("email")
+                    password = payload.get("password")
+                    name = payload.get("name", "")
+                    
+                    
+                    client_ip = self.client_address[0]
+                    current_time = time.time()
+                    
+                    # Clean up old attempts
+                    for ip in list(login_attempts.keys()):
+                        if current_time - login_attempts[ip]['time'] > 60:
+                            del login_attempts[ip]
+                            
+                    if client_ip in login_attempts:
+                        if login_attempts[client_ip]['count'] >= 5:
+                            if current_time - login_attempts[client_ip]['time'] < 60:
+                                self.send_json(429, {"error": "Too many login attempts. Please try again later."})
+                                return
+                            else:
+                                login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                        else:
+                            login_attempts[client_ip]['count'] += 1
+                    else:
+                        login_attempts[client_ip] = {'count': 1, 'time': current_time}
+
+                    if not email or not password:
+                        self.send_json(400, {"error": "Missing email or password"})
+                        return
+                        
+                    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                    user_id = str(uuid.uuid4())
+                    now = datetime.datetime.utcnow().isoformat()
+                    
+                    try:
+                        with app.db.get_connection() as conn:
+                            cur = conn.cursor()
+                            cur.execute(
+                                "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                                (user_id, email, name, password_hash, now)
+                            )
+                            conn.commit()
+                    except sqlite3.IntegrityError:
+                        self.send_json(400, {"error": "Email already exists"})
+                        return
+                    
+                    # Create token
+                    payload_data = {
+                        "sub": user_id,
+                        "email": email,
+                        "name": name,
+                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                    }
+                    token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
+                    
+                    self.send_json(200, {
+                        "success": True,
+                        "token": token,
+                        "user": {"id": user_id, "email": email, "name": name}
+                    })
+                    return
+
+                elif path == "/api/login":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    email = payload.get("email")
+                    password = payload.get("password")
+                    
+                    
+                    client_ip = self.client_address[0]
+                    current_time = time.time()
+                    
+                    # Clean up old attempts
+                    for ip in list(login_attempts.keys()):
+                        if current_time - login_attempts[ip]['time'] > 60:
+                            del login_attempts[ip]
+                            
+                    if client_ip in login_attempts:
+                        if login_attempts[client_ip]['count'] >= 5:
+                            if current_time - login_attempts[client_ip]['time'] < 60:
+                                self.send_json(429, {"error": "Too many login attempts. Please try again later."})
+                                return
+                            else:
+                                login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                        else:
+                            login_attempts[client_ip]['count'] += 1
+                    else:
+                        login_attempts[client_ip] = {'count': 1, 'time': current_time}
+
+                    if not email or not password:
+                        self.send_json(400, {"error": "Missing email or password"})
+                        return
+                        
+                    with app.db.get_connection() as conn:
+                        cur = conn.cursor()
+                        cur.execute("SELECT id, name, password_hash FROM users WHERE email = ?", (email,))
+                        row = cur.fetchone()
+                        
+                    if not row:
+                        self.send_json(401, {"error": "Invalid credentials"})
+                        return
+                        
+                    user_id, name, password_hash = row
+                    
+                    if not bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
+                        self.send_json(401, {"error": "Invalid credentials"})
+                        return
+                        
+                    payload_data = {
+                        "sub": user_id,
+                        "email": email,
+                        "name": name,
+                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                    }
+                    token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
+                    
+                    self.send_json(200, {
+                        "success": True,
+                        "token": token,
+                        "user": {"id": user_id, "email": email, "name": name}
+                    })
+                    return
+
+                elif path == "/api/refresh":
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
                     queries = [SearchQuery(item["term"], item.get("location", "Melbourne, VIC"), item.get("stream", "core-it"), item.get("group", ""), float(item.get("weight", 1.0)), tuple(item.get("exclude_terms", [])), bool(item.get("enabled", True))) for item in payload.get("queries", [])]
                     force = bool(payload.get("force", False))
@@ -1209,7 +1366,133 @@ def make_handler(app: DashboardApp):
             path = parsed.path
             
             try:
-                if path == "/api/refresh":
+                
+                if path == "/api/register":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    email = payload.get("email")
+                    password = payload.get("password")
+                    name = payload.get("name", "")
+                    
+                    
+                    client_ip = self.client_address[0]
+                    current_time = time.time()
+                    
+                    # Clean up old attempts
+                    for ip in list(login_attempts.keys()):
+                        if current_time - login_attempts[ip]['time'] > 60:
+                            del login_attempts[ip]
+                            
+                    if client_ip in login_attempts:
+                        if login_attempts[client_ip]['count'] >= 5:
+                            if current_time - login_attempts[client_ip]['time'] < 60:
+                                self.send_json(429, {"error": "Too many login attempts. Please try again later."})
+                                return
+                            else:
+                                login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                        else:
+                            login_attempts[client_ip]['count'] += 1
+                    else:
+                        login_attempts[client_ip] = {'count': 1, 'time': current_time}
+
+                    if not email or not password:
+                        self.send_json(400, {"error": "Missing email or password"})
+                        return
+                        
+                    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                    user_id = str(uuid.uuid4())
+                    now = datetime.datetime.utcnow().isoformat()
+                    
+                    try:
+                        with app.db.get_connection() as conn:
+                            cur = conn.cursor()
+                            cur.execute(
+                                "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                                (user_id, email, name, password_hash, now)
+                            )
+                            conn.commit()
+                    except sqlite3.IntegrityError:
+                        self.send_json(400, {"error": "Email already exists"})
+                        return
+                    
+                    # Create token
+                    payload_data = {
+                        "sub": user_id,
+                        "email": email,
+                        "name": name,
+                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                    }
+                    token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
+                    
+                    self.send_json(200, {
+                        "success": True,
+                        "token": token,
+                        "user": {"id": user_id, "email": email, "name": name}
+                    })
+                    return
+
+                elif path == "/api/login":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    email = payload.get("email")
+                    password = payload.get("password")
+                    
+                    
+                    client_ip = self.client_address[0]
+                    current_time = time.time()
+                    
+                    # Clean up old attempts
+                    for ip in list(login_attempts.keys()):
+                        if current_time - login_attempts[ip]['time'] > 60:
+                            del login_attempts[ip]
+                            
+                    if client_ip in login_attempts:
+                        if login_attempts[client_ip]['count'] >= 5:
+                            if current_time - login_attempts[client_ip]['time'] < 60:
+                                self.send_json(429, {"error": "Too many login attempts. Please try again later."})
+                                return
+                            else:
+                                login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                        else:
+                            login_attempts[client_ip]['count'] += 1
+                    else:
+                        login_attempts[client_ip] = {'count': 1, 'time': current_time}
+
+                    if not email or not password:
+                        self.send_json(400, {"error": "Missing email or password"})
+                        return
+                        
+                    with app.db.get_connection() as conn:
+                        cur = conn.cursor()
+                        cur.execute("SELECT id, name, password_hash FROM users WHERE email = ?", (email,))
+                        row = cur.fetchone()
+                        
+                    if not row:
+                        self.send_json(401, {"error": "Invalid credentials"})
+                        return
+                        
+                    user_id, name, password_hash = row
+                    
+                    if not bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
+                        self.send_json(401, {"error": "Invalid credentials"})
+                        return
+                        
+                    payload_data = {
+                        "sub": user_id,
+                        "email": email,
+                        "name": name,
+                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                    }
+                    token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
+                    
+                    self.send_json(200, {
+                        "success": True,
+                        "token": token,
+                        "user": {"id": user_id, "email": email, "name": name}
+                    })
+                    return
+
+                elif path == "/api/refresh":
                     content_len = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     queries = [
@@ -1279,6 +1562,8 @@ def make_handler(app: DashboardApp):
 
     return Handler
 
+JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-key-fallback")
+JWT_EXPIRY_HOURS = 24
 
 def serve(app: DashboardApp, host: str = "127.0.0.1", port: int = 8787):
     server = ThreadingHTTPServer((host, port), make_handler(app))

@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
-from urllib.error import HTTPError, URLError
-from html import unescape
-import re
-from html.parser import HTMLParser
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
 
 
 @dataclass(frozen=True)
@@ -49,9 +49,9 @@ class _TextExtractor(HTMLParser):
 
 def clean_description(value: Any, limit: int = 12000) -> str:
     """Turn provider HTML into readable text while preserving paragraph breaks."""
-    html = re.sub(r"<\s*(?:br\s*/?|p|div|section|article|h[1-6]|ul|ol)\b[^>]*>", "\n\n", str(value or ""), flags=re.I)
-    html = re.sub(r"<\s*li\b[^>]*>", "\n- ", html, flags=re.I)
-    html = re.sub(r"<\s*/\s*(?:p|div|section|article|h[1-6]|ul|ol|li)\s*>", "\n", html, flags=re.I)
+    html = re.sub(r"<\s*(?:br\s*/?|p|div|section|article|h[1-6]|ul|ol)\b[^>]*>", "\n\n", str(value or ""), flags=re.IGNORECASE)
+    html = re.sub(r"<\s*li\b[^>]*>", "\n- ", html, flags=re.IGNORECASE)
+    html = re.sub(r"<\s*/\s*(?:p|div|section|article|h[1-6]|ul|ol|li)\s*>", "\n", html, flags=re.IGNORECASE)
     parser = _TextExtractor()
     parser.feed(html)
     lines = []
@@ -603,7 +603,7 @@ def _page_description(url: str, timeout: float = 4.0) -> str:
                 r'"description"\s*:\s*"((?:\\.|[^"])*)"',
         ]
         for pattern in patterns:
-            match = re.search(pattern, html, re.I)
+            match = re.search(pattern, html, re.IGNORECASE)
             if match:
                 value = unescape(match.group(1)).replace("\\n", " ").replace("\\\"", '"')
                 value = re.sub(r"\s+", " ", value).strip()

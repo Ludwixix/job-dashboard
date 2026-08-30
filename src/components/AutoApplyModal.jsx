@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Bot, CheckCircle2, AlertCircle, X, Sparkles, 
   ExternalLink, Download, Copy, ShieldCheck, ArrowRight, 
@@ -98,40 +99,27 @@ export const AutoApplyModal = ({ job, onClose, onJobStatusUpdate, onJobStatusUpd
             message: `⚠️ Direct LLM stream fallback: Generated grounded ATS package.`,
             level: 'info'
           }]);
+          setLogs(prev => [...prev, { time: new Date().toLocaleTimeString().split(' ')[0], message: '⚠ Document synthesis fell back to default profile text.', level: 'error' }]);
         }
-      } else {
-        setLogs(prev => [...prev, {
-          time: new Date().toLocaleTimeString().split(' ')[0],
-          message: `✓ [Step 1/4 Complete] Loaded pre-generated tailored ATS Resume & Cover Letter.`,
-          level: 'info'
-        }]);
       }
 
       if (!isMounted) return;
 
-      // Step 2: Screening Questionnaire Autofill
+      // Step 2: Extraction
+      setPhase('Extracting Portal Screening Patterns');
       setProgress(55);
-      setPhase('⚡ Pre-Filling Screening Questionnaire (Work Rights, Clearance, Notice)...');
-      await new Promise(r => setTimeout(r, 600));
+      setLogs(prev => [...prev, { time: new Date().toLocaleTimeString().split(' ')[0], message: '▶ Analyzing pre-employment and clearance requirements...', level: 'info' }]);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       if (!isMounted) return;
+      setLogs(prev => [...prev, { time: new Date().toLocaleTimeString().split(' ')[0], message: `✓ Resolved ${screeningQuestions.length} screening questions using profile context.`, level: 'success' }]);
 
-      setLogs(prev => [...prev, {
-        time: new Date().toLocaleTimeString().split(' ')[0],
-        message: `✓ [Step 2/4 Complete] Resolved ${screeningQuestions.length} pre-employment questions (Australian Citizen, Immediate Notice, Melbourne VIC).`,
-        level: 'info'
-      }]);
-
-      // Step 3: Package Assembly & PDF Generation
+      // Step 3: Payload compilation
+      setPhase('Compiling Clipboard Payload');
       setProgress(85);
-      setPhase('📄 Preparing PDF Assets & Clipboard Injection...');
-      await new Promise(r => setTimeout(r, 600));
-      if (!isMounted) return;
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-      setLogs(prev => [...prev, {
-        time: new Date().toLocaleTimeString().split(' ')[0],
-        message: `✓ [Step 3/4 Complete] PDF packages compiled and formatted for ${platformName}.`,
-        level: 'info'
-      }]);
+      if (!isMounted) return;
 
       // Step 4: Ready for 1-Click Launch
       setProgress(100);
@@ -160,30 +148,21 @@ export const AutoApplyModal = ({ job, onClose, onJobStatusUpdate, onJobStatusUpd
   const handleFastTrackLaunch = async () => {
     const targetJob = currentJob || job;
     
-    // Download PDFs
-    if (targetJob.resumeText) {
-      downloadResumePdf(targetJob.resumeText, targetJob, profile);
-    }
-    if (targetJob.coverLetterText) {
-      setTimeout(() => {
-        downloadCoverLetterPdf(targetJob.coverLetterText, targetJob, profile);
-      }, 350);
+    const result = await executeFastTrackApply(targetJob, profile, downloadResumePdf, downloadCoverLetterPdf);
+
+    if (result.popupBlocked && result.targetUrl) {
+      showToast(`Popup blocked! Please manually open: ${result.targetUrl}`);
     }
 
-    // Write full clipboard payload
-    handleCopyClipboard();
-
-    // Open portal in new tab
-    const link = targetJob.portalLink || targetJob.link;
-    if (link) {
-      const targetUrl = link.startsWith('http') ? link : `https://${link}`;
-      window.open(targetUrl, '_blank');
+    if (!result.clipboardSuccess) {
+      showToast('Failed to automatically copy candidate details to clipboard. Please click "Copy" manually if needed.');
     }
 
     const updatedJob = {
       ...targetJob,
       status: 'Applied / Confirmation Received',
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      appliedAt: new Date().toISOString()
     };
     setCurrentJob(updatedJob);
     if (notifyStatusUpdate) notifyStatusUpdate(updatedJob);
@@ -212,8 +191,15 @@ ${job.coverLetterText || job.coverLetter || ''}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-white font-sans">
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="bg-slate-900 border border-indigo-500/40 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-white font-sans"
+        >
         
         {/* Header */}
         <div className="p-6 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/60 border-b border-slate-800 flex items-center justify-between">
@@ -365,8 +351,24 @@ ${job.coverLetterText || job.coverLetter || ''}`;
             </button>
           </div>
         </div>
+        
+        {/* Toast Notification Layer */}
+        <AnimatePresence>
+          {toastMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, y: 50 }}
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-xl bg-rose-500 text-white font-bold text-sm shadow-xl flex items-center gap-2 z-[60]"
+            >
+              <AlertCircle size={16} />
+              {toastMsg}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      </div>
+      </motion.div>
     </div>
+    </AnimatePresence>
   );
 };

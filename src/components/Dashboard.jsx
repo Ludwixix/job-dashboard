@@ -6,7 +6,8 @@ import { JobModal } from './JobModal';
 import { GeneratorModal } from './GeneratorModal';
 import { InterviewPrepModal } from './InterviewPrepModal';
 import { MarketIntelligence } from './MarketIntelligence';
-import { KanbanBoard } from './KanbanBoard';
+import { ApplicationPipeline } from './ApplicationPipeline';
+import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { CommandPalette } from './CommandPalette';
 import { CopilotBar } from './CopilotBar';
 import { BatchApplyModal } from './BatchApplyModal';
@@ -15,6 +16,7 @@ import { ProfileModal } from './ProfileModal';
 import { AuthModal } from './AuthModal';
 import { GoogleIntegrationModal } from './GoogleIntegrationModal';
 import { AutoApplyModal } from './AutoApplyModal';
+import { DashboardGridSkeleton } from './SkeletonLoaders';
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile } from '../services/profileService';
@@ -26,7 +28,7 @@ import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeS
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target
 } from 'lucide-react';
 
 
@@ -341,15 +343,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     document.body.removeChild(link);
   };
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-slate-100 gap-4 font-mono">
-      <div className="relative flex items-center justify-center">
-        <div className="animate-ping absolute inline-flex h-12 w-12 rounded-full bg-indigo-500/20"></div>
-        <Cpu size={32} className="text-indigo-400 animate-pulse" />
-      </div>
-      <p className="text-xs font-bold tracking-widest uppercase text-slate-400">INITIALIZING V2.0 AUTONOMOUS CAREER ENGINE...</p>
-    </div>
-  );
+  // Loading is now handled within the main layout via SkeletonLoaders
 
   if (error) return (
     <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-950 text-rose-200 rounded-xl border border-rose-800 font-mono text-xs shadow-lg">
@@ -518,6 +512,11 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-400/30">
                   <Sparkles size={11} className="text-indigo-400" /> SUPER INTELLIGENCE
                 </span>
+                {(currentUser?.isDemoUser || currentUser?.authProvider === 'demo') && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-400/30">
+                    <Activity size={11} className="text-amber-400" /> DEMO MODE
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-400 font-medium">
                 AUTONOMOUS APPLICATION DISPATCHER & CAREER ACCELERATOR
@@ -569,15 +568,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             </button>
 
             <button
-              onClick={() => setActiveSection('tracker')}
+              onClick={() => setActiveSection('analytics')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'tracker' 
+                activeSection === 'analytics' 
                   ? 'bg-indigo-600 text-white shadow-md' 
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <Table size={14} /> 
-              TABLE
+              <Target size={14} /> 
+              ANALYTICS
             </button>
           </div>
         </div>
@@ -635,7 +634,11 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         />
 
         {/* Dynamic View Component */}
-        {activeSection === 'seeker' && (
+        {loading ? (
+          <DashboardGridSkeleton />
+        ) : (
+          <>
+            {activeSection === 'seeker' && (
           <JobSeeker 
             jobs={jobs} 
             activeProfile={activeProfile}
@@ -653,11 +656,10 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
 
         {activeSection === 'kanban' && (
-          <KanbanBoard 
+          <ApplicationPipeline 
             jobs={jobs} 
+            loading={loading}
             onUpdateStatus={(id, status) => updateJobStatus(id, status)}
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-            onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
           />
         )}
 
@@ -665,11 +667,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           <MarketIntelligence jobs={jobs} />
         )}
 
-        {activeSection === 'tracker' && (
-          <ApplicationTracker 
+        {activeSection === 'analytics' && (
+          <AnalyticsDashboard 
             jobs={jobs} 
-            onSelectJob={(job) => setSelectedJob(job)} 
           />
+        )}
+          </>
         )}
       </main>
 

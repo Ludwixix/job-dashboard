@@ -159,22 +159,29 @@ export const executeFastTrackApply = async (
 ) => {
   const profile = candidateProfile || getActiveProfile();
   
-  // 1. Generate tailored ATS application documents
-  const docResult = await generateApplicationDocs(job, null, null, profile);
+  // 1. Check for existing docs, otherwise generate them
+  let resumeText = job.resumeText;
+  let coverLetterText = job.coverLetterText;
+
+  if (!resumeText || !coverLetterText) {
+    const docResult = await generateApplicationDocs(job, null, null, profile);
+    resumeText = docResult.resume;
+    coverLetterText = docResult.coverLetter;
+  }
 
   // 2. Download tailored PDFs
-  if (downloadResumePdf && docResult.resume) {
+  if (downloadResumePdf && resumeText) {
     try {
-      downloadResumePdf(docResult.resume, job, profile);
+      downloadResumePdf(resumeText, job, profile);
     } catch (e) {
       console.warn('Resume PDF download warning:', e);
     }
   }
 
-  if (downloadCoverLetterPdf && docResult.coverLetter) {
+  if (downloadCoverLetterPdf && coverLetterText) {
     setTimeout(() => {
       try {
-        downloadCoverLetterPdf(docResult.coverLetter, job, profile);
+        downloadCoverLetterPdf(coverLetterText, job, profile);
       } catch (e) {
         console.warn('Cover letter PDF download warning:', e);
       }
@@ -199,20 +206,27 @@ Expected Salary: ${job.salary || profile.targetSalary || '$115,000 + Super'}
 ${screeningText}
 
 === BESPOKE TAILORED COVER LETTER ===
-${docResult.coverLetter}
+${coverLetterText}
 `;
 
+  let clipboardSuccess = false;
   try {
     await navigator.clipboard.writeText(clipboardPayload);
+    clipboardSuccess = true;
   } catch (err) {
-    console.warn('Clipboard write error:', err);
+    console.warn('Clipboard write error. User may need to grant permission:', err);
   }
 
   // 4. Open job application portal tab
   const link = job.portalLink || job.link;
+  let popupBlocked = false;
   if (link) {
     const targetUrl = link.startsWith('http') ? link : `https://${link}`;
-    window.open(targetUrl, '_blank');
+    const newWindow = window.open(targetUrl, '_blank');
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+      popupBlocked = true;
+      console.warn('Popup blocked. User needs to manually click the launch link.');
+    }
   }
 
   return {
@@ -222,8 +236,11 @@ ${docResult.coverLetter}
     jobTitle: job.title,
     company: job.company,
     appliedAt: new Date().toISOString(),
-    resumeText: docResult.resume,
-    coverLetterText: docResult.coverLetter,
-    screeningQuestions: screeningMap
+    resumeText: resumeText,
+    coverLetterText: coverLetterText,
+    screeningQuestions: screeningMap,
+    clipboardSuccess,
+    popupBlocked,
+    targetUrl: link ? (link.startsWith('http') ? link : `https://${link}`) : null
   };
 };

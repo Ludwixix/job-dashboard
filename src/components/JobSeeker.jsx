@@ -8,14 +8,15 @@ import {
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Cloud, ShieldCheck, Database, Wrench, 
-  ShoppingBag, Server, Flame, Building2, Trash2, Download, Zap,
-  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, GraduationCap, Briefcase, Star, FileText,
-  ThumbsUp, ThumbsDown
+  ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
+  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 import { AutoApplyModal } from './AutoApplyModal';
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
+import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { 
   calculateCandidateJobMatch, 
   calculateCandidateDistanceKm,
@@ -181,6 +182,19 @@ export const JobSeeker = ({
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [activeStreamTab, setActiveStreamTab] = useState('All');
+  const [starredJobIds, setStarredJobIds] = useState(() => {
+    const saved = localStorage.getItem('starred_jobs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('starred_jobs', JSON.stringify(starredJobIds));
+  }, [starredJobIds]);
+
+  const toggleStar = (jobId, e) => {
+    if (e) e.stopPropagation();
+    setStarredJobIds(prev => prev.includes(jobId) ? prev.filter(id => id !== jobId) : [...prev, jobId]);
+  };
   const [docsReadyFilter, setDocsReadyFilter] = useState(false);
   const [minSalaryFilter, setMinSalaryFilter] = useState('All');
   const [minScoreFilter, setMinScoreFilter] = useState('All');
@@ -285,10 +299,10 @@ export const JobSeeker = ({
   const streamCounts = useMemo(() => {
     const counts = { 
       All: unsubmittedJobs.length,
+      Starred: starredJobIds.length,
       TopFit: 0,
       QuickApply: 0,
       ReadyForSubmission: readyToSubmitCount,
-      'Healthcare & Medical': 0,
       'Finance & Accounting': 0,
       'Marketing & Sales': 0,
       'Construction & Trades': 0,
@@ -315,7 +329,7 @@ export const JobSeeker = ({
     });
 
     return counts;
-  }, [unsubmittedJobs, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
+  }, [unsubmittedJobs, starredJobIds, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
 
 
   const seekerJobs = useMemo(() => {
@@ -347,6 +361,8 @@ export const JobSeeker = ({
       let matchesStream = true;
       if (activeStreamTab === 'TopFit') {
         matchesStream = (job.score || 0) >= 85;
+      } else if (activeStreamTab === 'Starred') {
+        matchesStream = starredJobIds.includes(job.id);
       } else if (activeStreamTab === 'QuickApply') {
         matchesStream = isQuickApplyEligible(job);
       } else if (activeStreamTab === 'ReadyForSubmission') {
@@ -358,8 +374,6 @@ export const JobSeeker = ({
                         (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
       }
 
-
-      // Dedicated Docs Ready filter toggle
       let matchesDocsReady = true;
       if (docsReadyFilter) {
         matchesDocsReady = hasGeneratedApplicationDocs(job);
@@ -425,8 +439,6 @@ export const JobSeeker = ({
         if (tierA !== tierB) {
           return tierB - tierA; // Higher match tier first
         }
-        
-        // Within the same match tier, sort newest date first
         const dateA = a.date || a.posted || '';
         const dateB = b.date || b.posted || '';
         const dateComp = dateB.localeCompare(dateA);
@@ -442,7 +454,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile]);
+  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile]);
 
 
   // Paginated Sliced Jobs
@@ -456,6 +468,7 @@ export const JobSeeker = ({
   }, [seekerJobs, currentPage, pageSize, effectivePageSize]);
 
   const handlePageChange = (newPage) => {
+
     const pageNum = Math.max(1, Math.min(totalPages, newPage));
     setCurrentPage(pageNum);
     if (gridTopRef.current) {
@@ -569,7 +582,8 @@ export const JobSeeker = ({
 
   const STREAM_TAB_DEFINITIONS = [
     { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
-    { id: 'TopFit', name: '⭐ MY TOP MATCHES', icon: Star, color: 'amber', highlight: true },
+    { id: 'Starred', name: '⭐ SAVED', icon: Star, color: 'amber', highlight: true },
+    { id: 'TopFit', name: '🔥 TOP MATCHES', icon: Flame, color: 'rose', highlight: true },
     { id: 'QuickApply', name: '⚡ AUTO-APPLY (LINKEDIN & SEEK)', icon: Zap, color: 'indigo', highlight: true },
     { id: 'ReadyForSubmission', name: '📄 GENERATED (CV & COVER LETTER)', icon: FileText, color: 'emerald', highlight: true },
     { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
@@ -1088,21 +1102,33 @@ export const JobSeeker = ({
           ) : (
 
             <div className="space-y-6">
-              <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
-                {paginatedJobs.map(job => {
-                  const isTopFit = (job.score || 0) >= 90;
-                  const hasCustomDocs = hasGeneratedApplicationDocs(job);
-                  const isGeneratingThisJob = Boolean(
-                    asyncGeneratingIds?.has(job.id) || 
-                    asyncGeneratingIds?.has(String(job.id)) || 
-                    asyncGeneratingIds?.has(`${job.company}_${job.title}`)
-                  );
-                  const matchedSkills = job.audit?.matched_terms || job.tags || [];
+              {paginatedJobs.length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }} 
+                  animate={{ opacity: 1, scale: 1 }} 
+                  className="flex flex-col items-center justify-center py-24 text-slate-400 bg-white/50 rounded-3xl border-2 border-dashed border-slate-200"
+                >
+                  <Bot size={64} className="mb-4 text-slate-300" />
+                  <h3 className="text-xl font-bold text-slate-600 mb-2">No jobs found in this view</h3>
+                  <p className="text-sm max-w-md text-center">Try adjusting your filters, selecting a different tab, or running the scraper to find new opportunities.</p>
+                </motion.div>
+              ) : (
+                <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
+                  {paginatedJobs.map(job => {
+                    const isGeneratingThisJob = Boolean(
+                      asyncGeneratingIds?.has?.(job.id) || 
+                      asyncGeneratingIds?.has?.(String(job.id)) || 
+                      asyncGeneratingIds?.has?.(`${job.company}_${job.title}`)
+                    );
+                    const hasCustomDocs = hasGeneratedApplicationDocs(job);
+                    const isTopFit = (job.score || 0) >= 85;
 
-                  return (
-                    <div 
-                      key={job.id}
-                      onClick={() => onSelectJob(job)}
+                    return (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onClick={() => onSelectJob(job)}
                       className={`rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between space-y-4 group cursor-pointer relative overflow-hidden card-hover-lift ${
                         hasCustomDocs
                           ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 border-2 border-emerald-500 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-500/30'
@@ -1117,15 +1143,15 @@ export const JobSeeker = ({
                       <div className={`absolute top-0 left-0 right-0 h-1.5 ${
                         hasCustomDocs
                           ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500'
-                          : isGeneratingThisJob
-                          ? 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600 animate-pulse'
                           : isTopFit
-                          ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-600'
-                          : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-400'
+                          ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+                          : 'bg-gradient-to-r from-indigo-500 to-purple-500'
                       }`} />
 
-                      {/* Top Standout Badges */}
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Top Standout Badges & Actions */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+
                         {isGeneratingThisJob ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider shadow-sm animate-pulse">
                             <RefreshCw size={12} className="animate-spin text-slate-950" />
@@ -1156,8 +1182,15 @@ export const JobSeeker = ({
                             <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
                           </div>
                         )}
+                        </div>
+                        <button
+                          onClick={(e) => toggleStar(job.id || `${job.company}_${job.title}`, e)}
+                          className={`p-1.5 rounded-full transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'}`}
+                          title={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "Remove from Saved" : "Save Job"}
+                        >
+                          <Star size={18} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-500" : ""} />
+                        </button>
                       </div>
-
 
                       {/* Card Header & Scores */}
                       <div className="space-y-2.5">
@@ -1261,9 +1294,9 @@ export const JobSeeker = ({
                       </div>
 
                       {/* Matched Skill Tags on Card */}
-                      {matchedSkills.length > 0 && (
+                      {(job.matchedSkills || []).length > 0 && (
                         <div className="flex flex-wrap gap-1 font-mono pt-1">
-                          {matchedSkills.slice(0, 3).map((skill, sIdx) => (
+                          {(job.matchedSkills || []).slice(0, 3).map((skill, sIdx) => (
                             <span key={sIdx} className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-50/80 text-indigo-900 border border-indigo-200/80">
                               {skill}
                             </span>
@@ -1303,7 +1336,7 @@ export const JobSeeker = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadResumePdf(job.resumeText, job);
+                              downloadResumePdf(job.resumeText, job, currentProfile);
                             }}
                             className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
                             title="Download Tailored Resume PDF"
@@ -1313,16 +1346,15 @@ export const JobSeeker = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadCoverLetterPdf(job.coverLetterText, job);
+                              downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
                             }}
                             className="flex-1 py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
                             title="Download Tailored Cover Letter PDF"
                           >
-                            <Download size={11} /> COVER (PDF)
+                            <Download size={11} /> COVER LTR
                           </button>
                         </div>
                       )}
-
                       {/* Action Buttons */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
                         {/* Auto-Apply Launcher Button */}
@@ -1405,12 +1437,12 @@ export const JobSeeker = ({
                           </a>
                         )}
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
 
               </div>
-
+              )}
               {/* Interactive Pagination Navigation Bar */}
               {pageSize !== 'All' && totalPages > 1 && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
@@ -1434,11 +1466,9 @@ export const JobSeeker = ({
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
                       className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-800 cursor-pointer"
-                      title="Previous Page"
                     >
                       <ChevronLeft size={15} />
                     </button>
-
                     {/* Numeric Page Buttons */}
                     {Array.from({ length: totalPages }, (_, i) => i + 1)
                       .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)

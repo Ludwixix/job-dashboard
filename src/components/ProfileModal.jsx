@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, User, Sparkles, Upload, FileText, CheckCircle2, 
   MapPin, DollarSign, Briefcase, Mail, Phone, ShieldCheck, 
   Trash2, Plus, Tag, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { parseResumeWithAI, parseResumeTextClientSide, saveProfile, deleteProfile, DEFAULT_PROFILES } from '../services/profileService';
-import { getActiveApiKey, getActiveModel } from '../services/generationService';
+import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
 
 export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
-  const [activeTab, setActiveTab] = useState('upload'); // 'upload', 'edit'
+  const [activeTab, setActiveTab] = useState('upload'); // 'upload', 'edit', 'api'
   const [resumeText, setResumeText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
+  const [apiKey, setApiKey] = useState(() => getActiveApiKey());
+
 
   // Form State
   const [formData, setFormData] = useState(() => ({
@@ -138,6 +141,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
       return;
     }
 
+    setActiveApiKey(apiKey);
     const saved = saveProfile(formData);
     if (onProfileSaved) {
       onProfileSaved(saved);
@@ -159,8 +163,15 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 font-sans">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md font-sans">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        >
         {/* Header */}
         <div className="p-6 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -206,6 +217,16 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
             }`}
           >
             <FileText size={14} /> PROFILE DETAILS & SKILLS
+          </button>
+          <button
+            onClick={() => setActiveTab('api')}
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'api'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <ShieldCheck size={14} /> API SETTINGS
           </button>
         </div>
 
@@ -553,6 +574,38 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
               </div>
             </div>
           )}
+
+          {/* TAB 3: API SETTINGS */}
+          {activeTab === 'api' && (
+            <div className="space-y-6 font-mono text-xs max-w-xl mx-auto pt-4">
+              <div className="p-5 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 space-y-3">
+                <div className="text-indigo-300 font-extrabold flex items-center gap-2 text-sm">
+                  <ShieldCheck size={18} className="text-indigo-400" />
+                  OPENROUTER API INTEGRATION
+                </div>
+                <p className="text-slate-400 leading-relaxed text-[11px]">
+                  Your OpenRouter API key is used to power the intelligent candidate matching, resume parsing, and bespoke document generation. It is stored securely in your browser's local storage and remains with your session.
+                </p>
+                <div className="space-y-2 pt-2">
+                  <label className="text-[11px] font-bold text-slate-300">
+                    API KEY
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:border-indigo-500 focus:outline-none transition-colors"
+                    placeholder="sk-or-v1-..."
+                  />
+                  {apiKey && (
+                    <p className="text-emerald-400 text-[10px] flex items-center gap-1.5 mt-2">
+                      <CheckCircle2 size={12} /> Key is currently configured
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -583,7 +636,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
+    </AnimatePresence>
   );
 };

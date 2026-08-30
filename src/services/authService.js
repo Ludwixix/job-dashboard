@@ -5,12 +5,18 @@
  */
 
 import { DEFAULT_PROFILES, saveProfile, setActiveProfileId } from './profileService';
+import { SCRAPER_BASE_URL } from './jobQueryService';
 
 const LS_SESSION = 'job_dashboard_current_user_session';
-const LS_USERS = 'job_dashboard_registered_users';
+const LS_TOKEN = 'job_dashboard_auth_token';
+
+const getApiBase = () => {
+  const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  return isLocalHost ? '' : (SCRAPER_BASE_URL || '');
+};
 
 /**
- * Retrieves the currently active authenticated session
+ * Retrieves the currently active authenticated session (cached)
  */
 export const getCurrentSession = () => {
   try {
@@ -26,24 +32,50 @@ export const getCurrentSession = () => {
 /**
  * Persists the user session to localStorage
  */
-export const setSession = (userData) => {
+export const setSession = (userData, token = null) => {
   if (userData) {
     localStorage.setItem(LS_SESSION, JSON.stringify(userData));
+    if (token) localStorage.setItem(LS_TOKEN, token);
   } else {
     localStorage.removeItem(LS_SESSION);
+    localStorage.removeItem(LS_TOKEN);
   }
 };
 
 /**
- * Gets all locally registered user accounts
+ * Validates the session with the backend on load
  */
-const getRegisteredUsers = () => {
+export const validateSession = async () => {
+  const token = localStorage.getItem(LS_TOKEN);
+  if (!token) return null;
+
   try {
-    const raw = localStorage.getItem(LS_USERS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+    const apiBase = getApiBase();
+    const res = await fetch(`${apiBase}/api/session`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        // Keep onboarding state if it exists locally, but verify user details
+        const current = getCurrentSession() || {};
+        const verifiedSession = {
+          ...current,
+          ...data.user,
+          authProvider: 'email'
+        };
+        setSession(verifiedSession, token);
+        return verifiedSession;
+      }
+    }
+  } catch (err) {
+    console.error("Session validation failed:", err);
   }
+
+  // If we reach here, token is invalid or expired
+  setSession(null);
+  return null;
 };
 
 /**
@@ -52,39 +84,27 @@ const getRegisteredUsers = () => {
 export const loginWithEmail = async (email, password) => {
   const cleanEmail = (email || '').trim().toLowerCase();
   if (!cleanEmail) throw new Error('Please enter a valid email address.');
-  if (!password || password.length < 4) throw new Error('Please enter a password with at least 4 characters.');
+  if (!password) throw new Error('Please enter a password.');
 
-  const users = getRegisteredUsers();
-  const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
+  const apiBase = getApiBase();
+  const res = await fetch(`${apiBase}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: cleanEmail, password })
+  });
 
-  if (existing) {
-    if (existing.password && existing.password !== password) {
-      throw new Error('Incorrect password for this account.');
-    }
-    const sessionUser = { ...existing };
-    delete sessionUser.password;
-    setSession(sessionUser);
-    return sessionUser;
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Invalid credentials');
   }
 
-  // Create new account if first time logging in
-  const nameFromEmail = cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  const newUser = {
-    id: `user_${Date.now()}`,
-    email: cleanEmail,
-    name: nameFromEmail || 'Professional Candidate',
-    password: password,
+  const sessionUser = {
+    ...data.user,
     authProvider: 'email',
-    createdAt: new Date().toISOString(),
-    onboardingCompleted: false
+    onboardingCompleted: true // Assuming if they have an account, they onboarded. Or derive from profile sync.
   };
 
-  users.push(newUser);
-  localStorage.setItem(LS_USERS, JSON.stringify(users));
-
-  const sessionUser = { ...newUser };
-  delete sessionUser.password;
-  setSession(sessionUser);
+  setSession(sessionUser, data.token);
   return sessionUser;
 };
 
@@ -99,28 +119,25 @@ export const registerWithEmail = async (name, email, password) => {
   if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('Please enter a valid email address.');
   if (!password || password.length < 4) throw new Error('Password must be at least 4 characters.');
 
-  const users = getRegisteredUsers();
-  if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
-    // Log them in if account already exists
-    return loginWithEmail(cleanEmail, password);
+  const apiBase = getApiBase();
+  const res = await fetch(`${apiBase}/api/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: cleanName, email: cleanEmail, password })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Registration failed');
   }
 
-  const newUser = {
-    id: `user_${Date.now()}`,
-    name: cleanName,
-    email: cleanEmail,
-    password: password,
+  const sessionUser = {
+    ...data.user,
     authProvider: 'email',
-    createdAt: new Date().toISOString(),
     onboardingCompleted: false
   };
 
-  users.push(newUser);
-  localStorage.setItem(LS_USERS, JSON.stringify(users));
-
-  const sessionUser = { ...newUser };
-  delete sessionUser.password;
-  setSession(sessionUser);
+  setSession(sessionUser, data.token);
   return sessionUser;
 };
 
@@ -142,11 +159,9 @@ export const completeOnboarding = (profileData) => {
     email: profileData.email || current.email
   };
 
-  // Save profile to candidate profile storage
   saveProfile(finalProfile);
   setActiveProfileId(finalProfile.id);
 
-  // Update session
   const updatedSession = {
     ...current,
     name: finalProfile.name,
@@ -157,7 +172,7 @@ export const completeOnboarding = (profileData) => {
     lastActiveAt: new Date().toISOString()
   };
 
-  setSession(updatedSession);
+  setSession(updatedSession, localStorage.getItem(LS_TOKEN)); // preserve token
   return { session: updatedSession, profile: finalProfile };
 };
 
@@ -175,7 +190,7 @@ export const loginWithDemoPersona = (presetId) => {
     industry: preset.industry || 'Technology & IT',
     authProvider: 'demo',
     onboardingCompleted: true,
-    isDemoUser: true,
+    isDemoUser: true, // Marker for UI
     createdAt: new Date().toISOString()
   };
 
@@ -189,4 +204,5 @@ export const loginWithDemoPersona = (presetId) => {
  */
 export const logoutUser = () => {
   localStorage.removeItem(LS_SESSION);
+  localStorage.removeItem(LS_TOKEN);
 };

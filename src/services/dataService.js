@@ -5,8 +5,8 @@ import { buildQueriesFromProfile, triggerProfileScrape, SCRAPER_BASE_URL } from 
 
 
 const CSV_URL = '/api/sheet-csv';
-const FALLBACK_CSV_URL = 'https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv';
-const SUGGESTIONS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv&gid=123456789';
+const FALLBACK_CSV_URL = import.meta.env.VITE_PERSONAL_SHEET_URL || '';
+const SUGGESTIONS_CSV_URL = import.meta.env.VITE_PERSONAL_SHEET_SUGGESTIONS_URL || '';
 
 const CANDIDATE_SKILLS = [
   { term: 'system administrator', weight: 15 },
@@ -255,9 +255,9 @@ export const fetchJobsForProfile = async (profile) => {
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const fetchSheetData = async () => {
-  if (isLocalHost) {
+  if (isLocalHost && FALLBACK_CSV_URL) {
     return new Promise((resolve) => {
-      Papa.parse(CSV_URL, {
+      Papa.parse(FALLBACK_CSV_URL, {
         download: true,
         header: true,
         skipEmptyLines: true,
@@ -265,6 +265,8 @@ const fetchSheetData = async () => {
           const mainData = (results.data || [])
             .filter(row => row['Company'] || row['Job Title'])
             .map((row, index) => parseMetadata(row, index));
+
+          if (!SUGGESTIONS_CSV_URL) return resolve(mainData);
 
           Papa.parse(SUGGESTIONS_CSV_URL, {
             download: true,
@@ -283,49 +285,32 @@ const fetchSheetData = async () => {
           });
         },
         error: () => {
-          fetchFallbackData(resolve);
+          fetchDemoData(resolve);
         }
       });
     });
   }
 
-  // Production static host (GitHub Pages) -> fetch directly from Google Sheets CSV
+  // Production or no fallback URL -> fetch from demo_jobs.json
   return new Promise((resolve) => {
-    fetchFallbackData(resolve);
+    fetchDemoData(resolve);
   });
 };
 
-const fetchFallbackData = (resolve) => {
-  Papa.parse(FALLBACK_CSV_URL, {
-    download: true,
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      const mainData = (results.data || [])
-        .filter(row => row['Company'] || row['Job Title'])
-        .map((row, index) => parseMetadata(row, index));
-
-      Papa.parse(SUGGESTIONS_CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (sugResults) => {
-          const sugData = (sugResults.data || [])
-            .map((row, index) => parseSuggestionRow(row, index))
-            .filter(Boolean);
-          
-          resolve([...mainData, ...sugData]);
-        },
-        error: () => {
-          resolve(mainData);
-        }
-      });
-    },
-    error: () => {
-      resolve([]);
+const fetchDemoData = async (resolve) => {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL || '/'}demo_jobs.json`);
+    if (res.ok) {
+      const data = await res.json();
+      const parsed = data.map((row, index) => parseMetadata(row, index));
+      return resolve(parsed);
     }
-  });
+  } catch (e) {
+    console.warn("Failed to load demo jobs:", e);
+  }
+  return resolve([]);
 };
+
 
 const fetchStoredScrapedJobs = async () => {
   // Try local backend (dev) or Cloud Run backend (production)

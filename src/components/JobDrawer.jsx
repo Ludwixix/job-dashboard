@@ -1,0 +1,166 @@
+import React, { useState } from 'react';
+import { X, ExternalLink, Calendar, MapPin, DollarSign, Building2, UserCircle, Edit3, AlignLeft, Activity } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+
+export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes }) => {
+  const [notes, setNotes] = useState(job?.notes || '');
+  
+  if (!isOpen || !job) return null;
+
+  const handleSaveNotes = () => {
+    if (onSaveNotes) {
+      onSaveNotes(job.id, notes);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('reject') || s.includes('unsuccessful')) return 'bg-rose-950/60 text-rose-400 border-rose-800/50';
+    if (s.includes('offer')) return 'bg-emerald-950/60 text-emerald-400 border-emerald-800/50';
+    if (s.includes('interview')) return 'bg-amber-950/60 text-amber-400 border-amber-800/50';
+    if (s.includes('applied')) return 'bg-indigo-950/60 text-indigo-400 border-indigo-800/50';
+    return 'bg-slate-800 text-slate-300 border-slate-700';
+  };
+
+  // Mock stage history for now
+  const history = job.history || [
+    { stage: 'Wishlist', date: job.date || new Date().toISOString() }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex justify-end">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+      
+      {/* Drawer */}
+      <div className="relative w-full max-w-md h-full bg-slate-900 border-l border-slate-800 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col overflow-hidden">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-slate-800 bg-slate-900/50">
+          <div className="flex justify-between items-start mb-4">
+            <select
+              value={job.status || 'Discovered'}
+              onChange={(e) => onUpdateStatus(job.id, e.target.value)}
+              className={`text-[11px] font-mono font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer ${getStatusColor(job.status)}`}
+            >
+              <option value="Discovered">Wishlist</option>
+              <option value="Applied">Applied</option>
+              <option value="Interviewing">Interviewing</option>
+              <option value="Offer Received">Offer</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            
+            <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+          
+          <h2 className="text-xl font-bold text-white mb-2 leading-tight">{job.title}</h2>
+          
+          <div className="flex items-center gap-2 text-indigo-400 font-semibold mb-4">
+            <Building2 size={16} />
+            {job.company}
+          </div>
+
+          <div className="flex flex-wrap gap-y-2 gap-x-4 text-xs text-slate-400 font-mono">
+            <div className="flex items-center gap-1.5">
+              <MapPin size={14} className="text-slate-500" />
+              {job.location || 'Remote'}
+            </div>
+            {job.salary && (
+              <div className="flex items-center gap-1.5">
+                <DollarSign size={14} className="text-slate-500" />
+                {job.salary}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <Calendar size={14} className="text-slate-500" />
+              {job.date ? format(parseISO(job.date), 'MMM d, yyyy') : 'Unknown'}
+            </div>
+          </div>
+          
+          {job.link && (
+            <div className="mt-4 flex gap-2">
+              <a 
+                href={job.link} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-colors text-sm"
+              >
+                View Job Post <ExternalLink size={14} />
+              </a>
+              <button
+                onClick={() => import('../services/DataPortability').then(m => m.generateICS(job, job.date || new Date().toISOString()))}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold rounded-xl transition-colors text-sm flex items-center gap-2"
+                title="Add to Calendar"
+              >
+                <Calendar size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+          
+          {/* Notes Section */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider text-xs">
+              <AlignLeft size={14} className="text-indigo-400" />
+              Interview Notes
+            </div>
+            <div className="relative">
+              <textarea 
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={handleSaveNotes}
+                placeholder="Add prep notes, questions for the interviewer, or general thoughts..."
+                className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-4 text-sm min-h-[160px] focus:outline-none focus:border-indigo-500 resize-y custom-scrollbar"
+              />
+              <Edit3 size={12} className="absolute top-3 right-3 text-slate-600" />
+            </div>
+          </section>
+
+          {/* Contact Person */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider text-xs">
+              <UserCircle size={14} className="text-indigo-400" />
+              Contact Person
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center gap-4 text-sm text-slate-400">
+              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
+                <UserCircle size={20} />
+              </div>
+              <div>
+                <p className="text-white font-semibold">Not Specified</p>
+                <p className="text-xs">No contact details found</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Stage History */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider text-xs">
+              <Activity size={14} className="text-indigo-400" />
+              Stage History
+            </div>
+            
+            <div className="relative border-l border-slate-700 ml-3 space-y-6">
+              {history.map((h, i) => (
+                <div key={i} className="relative pl-6">
+                  <div className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-indigo-500 ring-4 ring-slate-900" />
+                  <p className="text-sm font-bold text-white mb-0.5">{h.stage}</p>
+                  <p className="text-[11px] font-mono text-slate-500">{format(parseISO(h.date), 'MMM d, yyyy - h:mm a')}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  );
+};

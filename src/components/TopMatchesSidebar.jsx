@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { 
   Flame, Award, Sparkles, ArrowRight, MapPin, ExternalLink, Dices, Navigation,
   ChevronDown, ChevronUp, Clock, Activity, DollarSign
@@ -417,7 +418,8 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
         {showMostRecent && (
           <div className="space-y-2.5 pt-3 mt-2 border-t border-slate-100 animate-in fade-in duration-200">
             {mostRecentJobs.map((job) => (
-              <div 
+              <motion.div 
+                whileHover={{ scale: 1.02, x: 2 }}
                 key={job.id} 
                 onClick={() => onSelectJob(job)}
                 className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200 transition-all cursor-pointer group"
@@ -444,7 +446,7 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
                     PACK <ArrowRight size={10} />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}

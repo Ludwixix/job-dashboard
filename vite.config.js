@@ -17,8 +17,8 @@ export default defineConfig({
       configureServer(server) {
         // Serve pre-stored background scraped jobs on launch
         server.middlewares.use('/api/scraped-jobs', (req, res) => {
-          const combinedJsonPath = path.resolve(__dirname, '../job-dashboard-site/scrapers/jobs_combined.json');
-          const seekJsonPath = path.resolve(__dirname, '../job-dashboard-site/scrapers/jobs_seek.json');
+          const combinedJsonPath = path.resolve(import.meta.dirname, './public/jobs_combined.json');
+          const seekJsonPath = path.resolve(import.meta.dirname, '../job-dashboard-site/scrapers/jobs_seek.json');
 
           let jobs = [];
           if (fs.existsSync(combinedJsonPath)) {
@@ -73,12 +73,12 @@ export default defineConfig({
             req.on('end', () => {
               try {
                 const jobPayload = JSON.parse(body || '{}');
-                const scriptPath = path.resolve(__dirname, '../job-dashboard-site/scrapers/auto_applier.py');
-                const tempPayloadPath = path.resolve(__dirname, '../job-dashboard-site/scrapers/temp_job_payload.json');
+                const scriptPath = path.resolve(import.meta.dirname, '../job-dashboard-site/scrapers/auto_applier.py');
+                const tempPayloadPath = path.resolve(import.meta.dirname, '../job-dashboard-site/scrapers/temp_job_payload.json');
                 
                 fs.writeFileSync(tempPayloadPath, JSON.stringify(jobPayload, null, 2));
 
-                exec(`python3 "${scriptPath}"`, { cwd: path.resolve(__dirname, '../job-dashboard-site') }, (error, stdout, stderr) => {
+                exec(`python3 "${scriptPath}"`, { cwd: path.resolve(import.meta.dirname, '../job-dashboard-site') }, (error, stdout, stderr) => {
                   if (error) {
                     console.error("Auto-apply execution error:", error, stderr);
                     res.statusCode = 500;
@@ -120,10 +120,10 @@ export default defineConfig({
         // Trigger manual run on demand
         server.middlewares.use('/api/run-scraper', (req, res, next) => {
           if (req.method === 'POST') {
-            const scriptPath = path.resolve(__dirname, '../job-dashboard-site/scrapers/scrape_seek_quick.py');
-            const combinedJsonPath = path.resolve(__dirname, '../job-dashboard-site/scrapers/jobs_combined.json');
+            const scriptPath = path.resolve(import.meta.dirname, '../job-dashboard-site/scrapers/scrape_seek_quick.py');
+            const combinedJsonPath = path.resolve(import.meta.dirname, './public/jobs_combined.json');
 
-            exec(`python3 "${scriptPath}"`, { cwd: path.resolve(__dirname, '../job-dashboard-site') }, (error, _stdout, _stderr) => {
+            exec(`python3 "${scriptPath}"`, { cwd: path.resolve(import.meta.dirname, '../job-dashboard-site') }, (error, _stdout, _stderr) => {
               if (error) {
                 console.error("Scraper execution error:", error);
                 res.statusCode = 500;
@@ -330,10 +330,27 @@ Return the resume first, then exactly ===COVER_LETTER=== on its own line, then o
   server: {
     proxy: {
       '/api/sheet-csv': {
-        target: 'https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/export?format=csv',
+        target: 'https://docs.google.com/spreadsheets/d/demo/export?format=csv',
         changeOrigin: true,
         secure: true,
         rewrite: () => '',
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/framer-motion')) {
+            return 'vendor-framer';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+        }
       }
     }
   }

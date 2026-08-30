@@ -125,10 +125,11 @@ export const simulateGoogleWorkspaceAuth = (profile) => {
     accessToken: `simulated_token_${Date.now()}`,
     expiresAt: Date.now() + (3600 * 1000 * 24 * 7), // 7 days
     scopes: ['openid', 'email', 'profile', 'gmail.readonly', 'spreadsheets', 'drive.file'],
-    spreadsheetId: `1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk`,
-    spreadsheetUrl: `https://docs.google.com/spreadsheets/d/1IciRjQBBQoykm0K6NljjDNEWDTzdjsSaEPef8-hw8Lk/edit`,
+    spreadsheetId: import.meta.env.VITE_PERSONAL_SHEET_ID || `demo_spreadsheet_id_123`,
+    spreadsheetUrl: import.meta.env.VITE_PERSONAL_SHEET_URL || `https://docs.google.com/spreadsheets/d/demo_spreadsheet_id_123/edit`,
     lastGmailScan: new Date().toISOString(),
-    isSimulated: true
+    isSimulated: true,
+    isDemoUser: true
   };
 
   setAuthenticatedUser(authUser);

@@ -9,7 +9,8 @@ import {
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Wrench, 
   ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
-  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2
+  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
+  Train, Car, Bike
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -33,9 +34,6 @@ import {
   classifyJobRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
-import { Train, Car, Bike } from 'lucide-react';
-
-
 
 
 const getAgeInDays = (dateStr) => {

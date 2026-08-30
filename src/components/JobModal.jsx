@@ -494,7 +494,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
               <div className="p-5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">
                 <div className="flex items-center gap-2 text-xs font-mono font-extrabold text-indigo-950 uppercase tracking-wider">
                   <ShieldCheck size={18} className="text-indigo-600" />
-                  AI AUDIT RATIONALE & RECOMMENDATION
+                  AI AUDIT RATIONALE &amp; RECOMMENDATION
                 </div>
                 <p className="text-xs text-indigo-900 font-sans font-medium leading-relaxed">
                   {audit.recommendation || audit.notes || `Target match score of ${job.score || 85}% based on IT Infrastructure profile alignment and Balaclava VIC commute compatibility.`}

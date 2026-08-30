@@ -35,14 +35,17 @@ from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .compare import COMPARE_MODELS, CompareRunner
 from .documents import generate_documents
-from .email_connector import GmailApiScanner, GmailScanner
+from .logging import get_logger
 from .normalize import normalize_job
 from .predictive_analytics import get_predictive_analytics
 from .repository import JobRepository
 from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .smart_applications import get_smart_application_tracker
+
+logger = get_logger("job_dashboard.web")
 TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
+
 
 
 
@@ -347,10 +350,12 @@ class DashboardApp:
                     jobs = raw_data if isinstance(raw_data, list) else (raw_data.get("jobs", []) if isinstance(raw_data, dict) else [])
                     if jobs:
                         logger.info(f"Loaded {len(jobs)} jobs from {p}")
+                        return jobs
                 except Exception as e:
                     logger.error(f"Error loading jobs from {p}: {e}")
         return []
 
+    def rejected_applications(self):
         archived = []
         seen = set()
         for raw in self.jobs:
@@ -365,6 +370,7 @@ class DashboardApp:
             seen.add(email_id)
             archived.append({"id": job.id, "title": job.title, "company": job.company or "Company not identified", "received_at": latest.get("received_at", ""), "confidence": latest.get("confidence", 0), "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "description": job.description})
         return archived
+
 
     def application_archive(self):
         archive = []

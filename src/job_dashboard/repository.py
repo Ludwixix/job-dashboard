@@ -96,8 +96,14 @@ class JobRepository:
             conn.commit()
             logger.debug(f"Database schema initialized for {self.path}")
 
+    def count_jobs(self) -> int:
+        """Return total count of jobs currently in database."""
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT COUNT(*) AS total FROM jobs").fetchone()
+            return int(row[0]) if row else 0
 
     def is_query_cached(self, term: str, location: str = "", ttl_hours: float = 12.0) -> bool:
+
         """Check if a search query has been scraped recently to prevent redundant scraping."""
         if not term:
             return True

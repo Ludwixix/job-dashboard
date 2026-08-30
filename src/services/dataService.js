@@ -1,6 +1,5 @@
 import { MULTI_INDUSTRY_JOBS } from './multiIndustryJobData';
 import { buildQueriesFromProfile, triggerProfileScrape, SCRAPER_BASE_URL } from './jobQueryService';
-import { upsertApplicationInSheet } from './googleSheetService';
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
@@ -208,9 +207,10 @@ export const fetchJobsFromApi = async ({
 export const fetchUserApplications = async () => {
   let localApps = [];
   try {
-    const rawLocal = localStorage.getItem('job_dashboard_local_applications');
-    if (rawLocal) {
-      localApps = Object.values(JSON.parse(rawLocal));
+    const raw = localStorage.getItem('job_dashboard_local_applications');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      localApps = Object.values(parsed);
     }
   } catch {}
 
@@ -247,34 +247,21 @@ export const saveUserApplication = async (jobData) => {
   // 1. Persist locally in localStorage for instant offline / cache recovery
   try {
     const saved = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
-    saved[targetId] = { ...(saved[targetId] || {}), ...jobData };
+    saved[targetId] = {
+      ...jobData,
+      id: targetId,
+      updated_at: new Date().toISOString()
+    };
     localStorage.setItem('job_dashboard_local_applications', JSON.stringify(saved));
-  } catch (e) {
-    console.warn("Local storage write failed:", e);
-  }
+  } catch {}
 
-  // 2. Auto-sync to personal Google Sheet if connected
-  try {
-    const authUserRaw = localStorage.getItem('job_dashboard_google_auth_user');
-    if (authUserRaw) {
-      const authUser = JSON.parse(authUserRaw);
-      if (authUser?.accessToken && !authUser.accessToken.startsWith('simulated_') && authUser?.spreadsheetId) {
-        upsertApplicationInSheet(authUser.accessToken, authUser.spreadsheetId, jobData);
-      }
-    }
-  } catch (e) {
-    console.warn("Auto Google Sheet sync non-blocking error:", e);
-  }
-
+  // 2. Persist to backend SQLite if authenticated
   const token = getAuthToken();
-  if (!token) {
-    return { success: true, local: true };
-  }
+  if (!token) return;
 
-  // 3. Persist to backend SQLite
   const apiBase = getApiBase();
   try {
-    const res = await fetch(`${apiBase}/api/applications`, {
+    await fetch(`${apiBase}/api/applications`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,26 +278,23 @@ export const saveUserApplication = async (jobData) => {
         title: jobData.title || '',
         location: jobData.location || '',
         source: jobData.source || '',
-        score: jobData.score || 0,
         salary: jobData.salary || '',
         portalLink: jobData.portalLink || jobData.link || jobData.url || '',
         job_data: jobData
       })
     });
-    return await res.json();
-  } catch (err) {
-    console.error("Failed to save user application tracking record:", err);
-    return { success: false, error: err.message };
+  } catch (e) {
+    console.warn('Failed to persist user application to SQLite:', e);
   }
 };
 
 const fetchDemoFallbackJobs = async () => {
   const fallbackPaths = [
-    `${import.meta.env.BASE_URL || '/'}jobs_combined.json`,
-    './jobs_combined.json',
+    `${import.meta.env.BASE_URL || '/'}data/scraped_jobs.json`,
     `${import.meta.env.BASE_URL || '/'}demo_jobs.json`,
     './demo_jobs.json'
   ];
+
 
   for (const path of fallbackPaths) {
     try {
@@ -369,8 +353,6 @@ export const fetchJobsData = async () => {
         ...job,
         status: userApp.status || job.status,
         notes: userApp.notes || job.notes,
-        resumeText: userApp.resume_text || userApp.resumeText || job.resumeText,
-        coverLetterText: userApp.cover_letter_text || userApp.coverLetterText || job.coverLetterText,
         applied_at: userApp.applied_at || job.applied_at,
         hasCustomDocs: Boolean(userApp.resume_text || userApp.cover_letter_text || job.hasCustomDocs)
       };
@@ -378,7 +360,6 @@ export const fetchJobsData = async () => {
     return job;
   });
 
-  // Include any user application that was not in the scraped jobs catalog (e.g. Gmail imports, manual apps)
   const remainingApps = [];
   const seenIds = new Set(mergedJobs.map(j => String(j.id)));
 
@@ -386,57 +367,51 @@ export const fetchJobsData = async () => {
     const id = String(userApp.job_id || userApp.id || key);
     if (seenIds.has(id)) return;
     seenIds.add(id);
-
-    const comp = userApp.company || (id.includes('_') ? id.split('_')[0] : 'Direct Employer');
-    const tit = userApp.title || (id.includes('_') ? id.split('_')[1] : 'Applied Role');
-
+    const comp = userApp.company || 'Applied Employer';
+    const tit = userApp.title || 'Applied Role';
     remainingApps.push(parseMetadata({
       id: id,
       company: comp,
       title: tit,
-      status: userApp.status || 'Applied',
+      status: userApp.status || 'Applied / In Review',
       notes: userApp.notes || '',
-      resumeText: userApp.resume_text || userApp.resumeText || '',
-      coverLetterText: userApp.cover_letter_text || userApp.coverLetterText || '',
-      applied_at: userApp.applied_at,
-      date: userApp.applied_at || userApp.date || new Date().toISOString().split('T')[0],
-      source: userApp.source || 'Gmail Inbox Sync',
+      applied_at: userApp.applied_at || new Date().toISOString(),
       location: userApp.location || 'Melbourne, VIC',
-      score: userApp.score || 90,
-      tags: ['Application', userApp.status || 'Applied'],
-      hasCustomDocs: Boolean(userApp.resume_text || userApp.cover_letter_text)
+      source: 'User Application',
+      score: 90,
+      tags: ['Tracked Application', userApp.status || 'Applied / In Review']
     }, id));
   });
 
   return [...remainingApps, ...mergedJobs];
 };
 
+/**
+ * Triggers scraper run on backend for given search queries
+ */
+export const triggerLiveScrape = async (queries = []) => {
+  const apiBase = getApiBase();
+  try {
+    const res = await fetch(`${apiBase}/api/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queries })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { liveScraped: true, queriesUsed: queries, cacheStats: data };
+    }
+  } catch (err) {
+    console.warn('Scraper API trigger error:', err);
+  }
+  return { liveScraped: false, queriesUsed: queries, cacheStats: null };
+};
 
 /**
- * Fetch jobs personalised to a user profile.
- * When the Python backend is available:
- * triggers an intelligent query refresh via POST /api/refresh using profile-derived search queries.
+ * Fetches jobs for active profile using custom queries
  */
-export const fetchJobsForProfile = async (profile) => {
-  const queriesUsed = buildQueriesFromProfile(profile);
-
-  if (isLocalHost || SCRAPER_BASE_URL) {
-    try {
-      const result = await triggerProfileScrape(profile);
-      if (result.success && Array.isArray(result.jobs) && result.jobs.length > 0) {
-        const parsed = result.jobs.map((item, idx) => parseMetadata(item, item.id || `ps_${idx}`));
-        return { 
-          jobs: parsed, 
-          queriesUsed, 
-          liveScraped: true, 
-          errors: result.errors,
-          cacheStats: result.cacheStats 
-        };
-      }
-    } catch {}
-  }
-
-  // Database API fallback
-  const all = await fetchJobsData();
-  return { jobs: all, queriesUsed, liveScraped: false, cacheStats: null };
+export const fetchJobsForProfile = async (targetProfile) => {
+  const queries = targetProfile?.searchQueries || targetProfile?.keywords || ['IT Support', 'Systems Administrator'];
+  return triggerLiveScrape(queries);
 };
+

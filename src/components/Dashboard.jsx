@@ -23,8 +23,6 @@ import { getActiveProfile, saveProfile } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
 import { logoutUser } from '../services/authService';
 import { fetchJobsForProfile } from '../services/dataService';
-import { upsertApplicationInSheet } from '../services/googleSheetService';
-
 import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { 
@@ -96,9 +94,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           upsertApplicationInSheet(authUser.accessToken, authUser.spreadsheetId, { ...job, ...appPayload }, activeProfile);
         }
 
-
         const notif = {
-          id: Date.now(),
           title: job.title,
           company: job.company,
           time: 'Just now'
@@ -832,9 +828,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               upsertApplicationInSheet(authUser.accessToken, authUser.spreadsheetId, j, activeProfile);
             }
           });
-          setActiveSection('tracker');
         }}
-
       />
 
       {/* Fixed Bottom Status Bar */}

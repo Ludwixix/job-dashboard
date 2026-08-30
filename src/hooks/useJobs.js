@@ -121,12 +121,10 @@ export const useJobs = () => {
 
   /** Persist a status change + optional extra fields for a job. Survives page refresh. */
   const updateJobStatus = useCallback((targetJobIdentifier, newStatus, extraData = {}) => {
-    let matchedJob = rawJobs.find(j =>
+    const matchedJob = rawJobs.find(j => 
       (j.id && String(j.id) === String(targetJobIdentifier)) ||
-      `${j.company}_${j.title}` === targetJobIdentifier ||
-      j.title === targetJobIdentifier
+      `${j.company}_${j.title}` === targetJobIdentifier
     );
-
     const key = matchedJob ? jobKey(matchedJob) : String(targetJobIdentifier);
 
     setOverrides(prev => {
@@ -141,39 +139,15 @@ export const useJobs = () => {
           id: String(targetJobIdentifier),
           company: extraData.company || (String(targetJobIdentifier).includes('_') ? String(targetJobIdentifier).split('_')[0] : 'Direct Employer'),
           title: extraData.title || (String(targetJobIdentifier).includes('_') ? String(targetJobIdentifier).split('_')[1] : 'Applied Role'),
-          status: newStatus,
           date: extraData.date || new Date().toISOString().split('T')[0],
           applied_at: extraData.applied_at || (newStatus.toLowerCase().includes('applied') ? new Date().toISOString().split('T')[0] : null),
-          location: extraData.location || 'Melbourne, VIC',
-          source: extraData.source || 'Direct Application',
-          score: extraData.score || 90,
-          tags: ['Application', newStatus],
+          status: newStatus,
           ...extraData
         };
-
-    if (!matchedJob) {
-      setRawJobs(prev => [jobObj, ...prev]);
-    }
 
     saveUserApplication(jobObj);
   }, [rawJobs]);
 
-
-  /** Persist a notes/description edit for a job. */
-  const updateJobNotes = useCallback((targetJobIdentifier, notes) => {
-    setOverrides(prev => {
-      const next  = { ...prev };
-      const match = rawJobs.find(j =>
-        (j.id && String(j.id) === String(targetJobIdentifier)) ||
-        `${j.company}_${j.title}` === targetJobIdentifier
-      );
-      const key  = match ? jobKey(match) : String(targetJobIdentifier);
-      next[key]  = { ...(prev[key] || {}), notes };
-      const jobObj = match ? { ...match, ...next[key] } : { id: targetJobIdentifier, notes };
-      saveUserApplication(jobObj);
-      return next;
-    });
-  }, [rawJobs]);
 
   const rejectJob = useCallback((targetJobIdentifier) => {
     setRejectedIds(prev => {

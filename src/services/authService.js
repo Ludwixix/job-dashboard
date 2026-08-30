@@ -67,12 +67,12 @@ export const validateSession = async () => {
         };
         setSession(verifiedSession, token);
         return verifiedSession;
-
       }
     }
   } catch (err) {
     console.error("Session validation failed:", err);
   }
+
 
   // If we reach here, token is invalid or expired
   setSession(null);

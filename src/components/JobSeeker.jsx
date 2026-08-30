@@ -1377,7 +1377,7 @@ export const JobSeeker = ({
                                     ? 'bg-emerald-500 text-slate-950 shadow-xs ring-1 ring-emerald-400 font-black'
                                     : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50'
                                 }`}
-                                title="Show More Like This: Algorithm prioritizes roles with similar titles and company"
+                                title="Show More Like This"
                               >
                                 <ThumbsUp size={11} className={isJobPromoted(job) ? "fill-slate-950" : ""} />
                                 <span className="hidden sm:inline text-[9px]">MORE</span>
@@ -1393,7 +1393,7 @@ export const JobSeeker = ({
                                     ? 'bg-rose-500 text-white shadow-xs ring-1 ring-rose-400 font-black'
                                     : 'text-slate-600 hover:text-rose-700 hover:bg-rose-50'
                                 }`}
-                                title="Show Less Like This: Algorithm demotes roles with similar titles and company"
+                                title="Show Less Like This"
                               >
                                 <ThumbsDown size={11} className={isJobDemoted(job) ? "fill-white" : ""} />
                                 <span className="hidden sm:inline text-[9px]">LESS</span>
@@ -1433,27 +1433,56 @@ export const JobSeeker = ({
 
                         </div>
 
-                        <div>
-                          <h3 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onSelectJob) onSelectJob(job);
-                            }}
-                            className="font-extrabold text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug cursor-pointer"
-                          >
-                            {job.title}
-                          </h3>
-                          <p className="text-xs font-bold text-slate-500 mt-0.5 flex items-center gap-1">
-                            <Building2 size={12} className="text-slate-400 shrink-0" />
-                            <span>{job.company}</span>
-                          </p>
+                        {/* Title, Company & Top Direct Job Link */}
+                        <div className="flex items-start justify-between gap-3 pt-1">
+                          <div className="flex-1 min-w-0">
+                            <h3 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSelectJob) onSelectJob(job);
+                              }}
+                              className="font-black text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug cursor-pointer"
+                            >
+                              {job.title}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-600 mt-1 flex items-center gap-1.5">
+                              <Building2 size={13} className="text-indigo-500 shrink-0" />
+                              <span className="font-extrabold text-slate-800">{job.company}</span>
+                            </p>
+                          </div>
+
+                          {/* Direct External Job Link Button in Top Header */}
+                          {(job.portalLink || job.url || job.link) && (
+                            <a
+                              href={(job.portalLink || job.url || job.link).startsWith('http') ? (job.portalLink || job.url || job.link) : `https://${job.portalLink || job.url || job.link}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-mono font-black text-xs shadow-md shadow-blue-500/25 hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105"
+                              title={`Open official job ad on ${job.source || 'Portal'}`}
+                            >
+                              <span>OPEN JOB</span>
+                              <ExternalLink size={12} className="text-white" />
+                            </a>
+                          )}
                         </div>
 
-                        {/* Description Snippet */}
+                        {/* Expanded & Scrollable Job Description */}
                         {(job.description || job.notes || job.why) && (
-                          <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 font-mono border-l-2 border-indigo-200 pl-2 mt-1">
-                            {(job.description || job.notes || job.why || '').replace(/<[^>]*>/g, '').slice(0, 140)}
-                          </p>
+                          <div 
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-slate-50/90 hover:bg-slate-50 border border-slate-200/90 rounded-xl p-3 max-h-48 overflow-y-auto mt-2 select-text custom-scrollbar space-y-1 text-slate-700 shadow-inner group/desc"
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-wider pb-1 border-b border-slate-200/60 mb-1 sticky top-0 bg-slate-50/95 py-0.5 z-10 backdrop-blur-xs">
+                              <span className="flex items-center gap-1">
+                                <FileText size={11} className="text-indigo-500" /> FULL JOB DESCRIPTION
+                              </span>
+                              <span className="text-slate-400 text-[9px]">Scroll to read</span>
+                            </div>
+                            <p className="text-xs font-sans leading-relaxed whitespace-pre-line text-slate-700">
+                              {(job.description || job.notes || job.why || '').replace(/<[^>]*>/g, '').trim()}
+                            </p>
+                          </div>
                         )}
                       </div>
 
@@ -1621,24 +1650,15 @@ export const JobSeeker = ({
 
                         <button
                           onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
-                          className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1 cursor-pointer"
+                          className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1 cursor-pointer"
+                          title="View Full Details"
                         >
                           <Eye size={12} className="text-slate-600" />
+                          <span>DETAILS</span>
                         </button>
-
-                        {job.portalLink && (
-                          <a
-                            href={job.portalLink.startsWith('http') ? job.portalLink : `http://${job.portalLink}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <ExternalLink size={12} />
-                          </a>
-                        )}
                       </div>
                     </motion.div>
+
                   );
                 })}
 

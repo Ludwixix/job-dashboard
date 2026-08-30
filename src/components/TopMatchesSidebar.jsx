@@ -29,34 +29,49 @@ const getProximityTier = (locationStr = '') => {
 
 const IT_KEYWORDS = ['engineer', 'developer', 'sysadmin', 'systems admin', 'network', 'cloud', 'azure', 'devops', 'software', 'database', 'it support', 'help desk', 'cyber', 'intune', 'm365'];
 
-const getAgeInDays = (dateStr) => {
-  if (!dateStr) return 0;
-  try {
-    const d = parseISO(dateStr);
-    if (!isValid(d)) return 0;
-    const diff = differenceInDays(new Date(), d);
-    return diff >= 0 ? diff : 0;
-  } catch {
-    return 0;
+const parseJobDate = (dateStr) => {
+  if (!dateStr) return null;
+  if (typeof dateStr !== 'string') return null;
+  const str = dateStr.trim();
+  if (str.toLowerCase().includes('today') || str.toLowerCase().includes('just now') || str.toLowerCase().includes('hour')) {
+    return new Date();
   }
+  const dayMatch = str.match(/(\d+)\s*d(?:ay)?/i);
+  if (dayMatch) {
+    const d = new Date();
+    d.setDate(d.getDate() - parseInt(dayMatch[1], 10));
+    return d;
+  }
+  try {
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed;
+  } catch {}
+  try {
+    const d = parseISO(str);
+    if (isValid(d)) return d;
+  } catch {}
+  return null;
+};
+
+const getAgeInDays = (dateStr) => {
+  const d = parseJobDate(dateStr);
+  if (!d) return 2;
+  const diff = differenceInDays(new Date(), d);
+  return diff >= 0 ? diff : 0;
 };
 
 const formatDaysAgo = (dateStr) => {
-  if (!dateStr) return 'Recently';
-  try {
-    const d = parseISO(dateStr);
-    if (!isValid(d)) return 'Recently';
-    const days = differenceInDays(new Date(), d);
-    if (days <= 0) return 'Today';
-    if (days === 1) return '1 day ago';
-    return `${days} days ago`;
-  } catch {
-    return 'Recently';
-  }
+  const d = parseJobDate(dateStr);
+  if (!d) return 'Recently';
+  const days = differenceInDays(new Date(), d);
+  if (days <= 0) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  return 'Recently';
 };
 
 
-export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
+export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
   const [showTopMatches, setShowTopMatches] = useState(true); // Open by default
   const [showLiveInsights, setShowLiveInsights] = useState(true);
   const [showLocalJob, setShowLocalJob] = useState(false);
@@ -64,18 +79,19 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
   const [showMostRecent, setShowMostRecent] = useState(false);
   const [showMostLikely, setShowMostLikely] = useState(false);
 
-  // Unsubmitted jobs pool
+  // Available Active Jobs Pool (Excluding only already applied / closed / rejected records)
   const unsubmittedJobs = useMemo(() => {
+    if (!jobs || jobs.length === 0) return [];
     return jobs.filter(job => {
-      const s = job.status.toLowerCase();
-      return (s.includes('package prepared') || s.includes('to submit') || s.includes('draft') || s.includes('discovered')) &&
-             !s.includes('applied') &&
+      const s = (job.status || 'sourced').toLowerCase();
+      return !s.includes('applied') &&
              !s.includes('confirmation') &&
              !s.includes('interview') &&
              !s.includes('under review') &&
              !s.includes('action required') &&
              !s.includes('verification') &&
              !s.includes('unsuccessful') &&
+             !s.includes('rejected') &&
              !s.includes('closed') &&
              !s.includes('expired');
     });
@@ -86,7 +102,7 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
     return [...unsubmittedJobs]
       .map(job => {
         const score = Number(job.score) || 75;
-        const age = getAgeInDays(job.date);
+        const age = getAgeInDays(job.date || job.posted);
         // Composite priority: 65% match score + 35% date recency
         const recencyScore = Math.max(0, 100 - (age * 7));
         const compositeRank = (score * 0.65) + (recencyScore * 0.35);
@@ -110,17 +126,21 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
 
     // Fresh < 7 days
     const fresh7Days = unsubmittedJobs.filter(j => {
-      if (!j.date) return false;
-      try {
-        const d = parseISO(j.date);
-        return isValid(d) && differenceInDays(new Date(), d) <= 7;
-      } catch { return false; }
+      const d = parseJobDate(j.date || j.posted);
+      return d ? differenceInDays(new Date(), d) <= 7 : true;
     }).length;
 
     // High compensation roles ($100k+)
-    const highSalaryCount = unsubmittedJobs.filter(j => 
-      j.salary && (j.salary.includes('100') || j.salary.includes('110') || j.salary.includes('120') || j.salary.includes('130'))
-    ).length;
+    const highSalaryCount = unsubmittedJobs.filter(j => {
+      const sal = `${j.salary || ''} ${j.compensation || ''} ${j.description || ''}`.toLowerCase();
+      return (
+        sal.includes('$100') || sal.includes('$110') || sal.includes('$120') || 
+        sal.includes('$130') || sal.includes('$140') || sal.includes('$150') ||
+        sal.includes('100k') || sal.includes('110k') || sal.includes('120k') ||
+        sal.includes('130k') || sal.includes('140k') || sal.includes('150k') ||
+        sal.includes('100,000') || sal.includes('110,000') || sal.includes('120,000')
+      );
+    }).length;
 
     return {
       nearBalaclava,
@@ -135,11 +155,9 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
   // Top 3 Most Recent Jobs
   const mostRecentJobs = useMemo(() => {
     return [...unsubmittedJobs]
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      .sort((a, b) => (b.date || b.posted || '').localeCompare(a.date || a.posted || ''))
       .slice(0, 3);
   }, [unsubmittedJobs]);
-
-
 
   // Highlighted Local Job (Sorted by Proximity Tier to Balaclava, VIC 3183)
   const highlightedLocalJob = useMemo(() => {
@@ -158,7 +176,7 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
       const streamStr = (j.stream || '').toLowerCase();
       const titleStr = (j.title || '').toLowerCase();
       
-      const isCoreIT = streamStr.includes('core it');
+      const isCoreIT = streamStr.includes('core-it') || streamStr.includes('core it') || streamStr.includes('cloud') || streamStr.includes('cyber');
       const hasItKeyword = IT_KEYWORDS.some(kw => titleStr.includes(kw));
 
       return !isCoreIT && !hasItKeyword;
@@ -170,10 +188,11 @@ export const TopMatchesSidebar = ({ jobs, onSelectJob, onOpenGenerator, baseLoca
   // Most Likely to Get (High skill match + Core IT stream)
   const mostLikely = useMemo(() => {
     return [...unsubmittedJobs]
-      .filter(j => (j.stream || '').toLowerCase().includes('core it') || (j.score || 0) >= 85)
+      .filter(j => (j.stream || '').toLowerCase().includes('core') || (j.score || 0) >= 80)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, 2);
   }, [unsubmittedJobs]);
+
 
   const proximityTier = highlightedLocalJob ? getProximityTier(highlightedLocalJob.location) : 3;
 

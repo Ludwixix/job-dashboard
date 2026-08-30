@@ -152,17 +152,23 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
     setGmailScanResults([]);
 
     try {
-      const results = await scanGmailForApplications(currentUser.accessToken, 25);
+      const results = await scanGmailForApplications(currentUser.accessToken, 35, jobs || []);
       setGmailScanResults(results);
       if (results.length === 0) {
         setGmailSuccess('No new job application emails found in the recent inbox scan.');
       } else {
-        setGmailSuccess(`Found ${results.length} application emails & confirmations!`);
+        const linkedCount = results.filter(r => r.isLinkedToScrapedAd).length;
+        if (linkedCount > 0) {
+          setGmailSuccess(`Found ${results.length} application emails (Matched & Linked ${linkedCount} directly to scraped job ads)!`);
+        } else {
+          setGmailSuccess(`Found and structured ${results.length} job application confirmations!`);
+        }
       }
     } catch (err) {
       console.error('Gmail scan error:', err);
       setGmailError(err.message || 'Failed to scan Gmail inbox.');
-    } finally {
+    }
+ finally {
       setIsScanningGmail(false);
     }
   };

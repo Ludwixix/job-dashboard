@@ -25,15 +25,23 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
 
   if (!isOpen) return null;
 
+
   // 1. Create Personal Google Sheet Tracker
   const handleCreateSheet = async () => {
     let currentUser = user;
+
+    // Guard: Simulated tokens cannot call real Google APIs
+    if (currentUser?.isSimulated || currentUser?.accessToken?.startsWith('simulated_')) {
+      setSheetError('A real Google account sign-in is required to create a Google Sheet. Please configure a Google OAuth Client ID in settings, or sign in with a real Google account.');
+      return;
+    }
+
     if (!currentUser?.accessToken || currentUser.isTokenExpired) {
       try {
         currentUser = await requestGoogleAuthToken();
         setUser(currentUser);
       } catch (err) {
-        setSheetError('Google Sign-In is required to create a spreadsheet.');
+        setSheetError('Google Sign-In is required to create a spreadsheet. Please sign in with Google first.');
         return;
       }
     }
@@ -77,6 +85,13 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
   // 2. Sync all existing dashboard applications to the sheet
   const handleSyncToSheet = async () => {
     let currentUser = user;
+
+    // Guard: Simulated tokens cannot call real Google APIs
+    if (currentUser?.isSimulated || currentUser?.accessToken?.startsWith('simulated_')) {
+      setSheetError('A real Google account sign-in is required to sync to Google Sheets. Please sign in with a real Google account.');
+      return;
+    }
+
     if (!currentUser?.accessToken || currentUser.isTokenExpired) {
       try {
         currentUser = await requestGoogleAuthToken();
@@ -114,6 +129,13 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
   // 3. Scan Gmail Inbox
   const handleScanGmail = async () => {
     let currentUser = user;
+
+    // Guard: Simulated tokens cannot call real Google APIs
+    if (currentUser?.isSimulated || currentUser?.accessToken?.startsWith('simulated_')) {
+      setGmailError('A real Google account sign-in with Gmail permissions is required to scan your inbox. Please configure a Google OAuth Client ID in settings.');
+      return;
+    }
+
     if (!currentUser?.accessToken || currentUser.isTokenExpired) {
       try {
         currentUser = await requestGoogleAuthToken();
@@ -144,6 +166,7 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
       setIsScanningGmail(false);
     }
   };
+
 
   const handleImportScanned = () => {
     if (gmailScanResults.length > 0 && onImportGmailJobs) {

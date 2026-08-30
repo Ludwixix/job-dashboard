@@ -236,13 +236,24 @@ export default defineConfig({
 
         // Refresh & Scraper Trigger Endpoints
         server.middlewares.use('/api/refresh', (req, res) => {
+          const combinedJsonPath = path.resolve(import.meta.dirname, './public/jobs_combined.json');
+          let jobs = [];
+          if (fs.existsSync(combinedJsonPath)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(combinedJsonPath, 'utf8'));
+              jobs = Array.isArray(raw) ? raw : (raw.jobs || []);
+            } catch (e) {
+              console.error('Error reading jobs_combined.json for /api/refresh:', e);
+            }
+          }
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
-            status: "success",
-            queries_scraped: 8,
-            queries_cached: 14,
-            message: "Local discovery sync completed"
+            success: true,
+            jobs,
+            errors: [],
+            cache_stats: { total: jobs.length, cached: 0, scraped: jobs.length },
+            message: `Local discovery sync: ${jobs.length} jobs loaded`
           }));
         });
 

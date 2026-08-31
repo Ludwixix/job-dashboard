@@ -13,6 +13,7 @@ import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApp
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 import { getCommuteDetails } from '../services/commuteService';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
+import { cleanDescriptionText } from '../services/dataService';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep }) => {
   const jobId = job?.id || `${job?.company}_${job?.title}`;
@@ -41,16 +42,16 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   if (!job) return null;
 
   const formatDaysAgo = (dateStr) => {
-    if (!dateStr) return 'Recently';
+    if (!dateStr) return 'Active Opportunity';
     try {
-      const d = parseISO(dateStr);
-      if (!isValid(d)) return 'Recently';
-      const days = differenceInDays(new Date(), d);
-      if (days <= 0) return 'Today';
-      if (days === 1) return '1 day ago';
-      return `${days} days ago`;
+      const parsed = parseISO(dateStr);
+      if (!isValid(parsed)) return 'Active Opportunity';
+      const days = differenceInDays(new Date(), parsed);
+      if (days === 0) return 'Posted Today';
+      if (days === 1) return 'Posted Yesterday';
+      return `${days}d ago`;
     } catch {
-      return 'Recently';
+      return 'Active Opportunity';
     }
   };
 
@@ -69,8 +70,10 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   // Formatter for raw description / notes
   const renderFormattedDescription = (text) => {
     if (!text) return null;
+    const cleanText = cleanDescriptionText(text);
+    if (!cleanText) return null;
 
-    const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
+    const paragraphs = cleanText.split(/\n\s*\n/).filter(Boolean);
 
     return (
       <div className="space-y-4">

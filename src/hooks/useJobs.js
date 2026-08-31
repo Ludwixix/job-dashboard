@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchJobsData, saveUserApplication } from '../services/dataService';
+import { fetchJobsData, saveUserApplication, normalizeJobKey } from '../services/dataService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,10 +70,13 @@ export const useJobs = () => {
 
     return rawJobs.map(j => {
       const key   = jobKey(j);
-      const patch = overrides[key] || {};
+      const altKey = `${j.company}_${j.title}`;
+      const normKey = normalizeJobKey(j.company, j.title);
+
+      const patch = overrides[key] || overrides[altKey] || (normKey !== '__' ? overrides[normKey] : null) || {};
       const merged = { ...j, ...patch };
 
-      let status = merged.status || 'Package Prepared / To Submit';
+      let status = merged.status || 'sourced';
       const statusLower = status.toLowerCase();
 
       // Non-responsive employer auto-closing rule:
@@ -101,7 +104,8 @@ export const useJobs = () => {
 
       const isRejected =
         rejectedIds.includes(String(j.id)) ||
-        rejectedIds.includes(`${j.company}_${j.title}`) ||
+        rejectedIds.includes(altKey) ||
+        (normKey !== '__' && rejectedIds.includes(normKey)) ||
         statusLower.includes('rejected') ||
         statusLower.includes('dismissed');
 
@@ -121,24 +125,40 @@ export const useJobs = () => {
 
   /** Persist a status change + optional extra fields for a job. Survives page refresh. */
   const updateJobStatus = useCallback((targetJobIdentifier, newStatus, extraData = {}) => {
-    const matchedJob = rawJobs.find(j =>
-      (j.id && String(j.id) === String(targetJobIdentifier)) ||
-      `${j.company}_${j.title}` === targetJobIdentifier
+    const targetStr = typeof targetJobIdentifier === 'object' && targetJobIdentifier !== null
+      ? (targetJobIdentifier.id || `${targetJobIdentifier.company}_${targetJobIdentifier.title}`)
+      : String(targetJobIdentifier || '');
+
+    const targetObj = typeof targetJobIdentifier === 'object' && targetJobIdentifier !== null
+      ? targetJobIdentifier
+      : null;
+
+    const matchedJob = targetObj || rawJobs.find(j =>
+      (j.id && String(j.id) === targetStr) ||
+      `${j.company}_${j.title}` === targetStr ||
+      (j.company && j.title && normalizeJobKey(j.company, j.title) === normalizeJobKey(extraData.company, extraData.title))
     );
-    const key = matchedJob ? jobKey(matchedJob) : String(targetJobIdentifier);
+
+    const key = matchedJob ? jobKey(matchedJob) : targetStr;
+    const altKey = matchedJob ? `${matchedJob.company}_${matchedJob.title}` : targetStr;
+    const normKey = matchedJob ? normalizeJobKey(matchedJob.company, matchedJob.title) : normalizeJobKey(extraData.company, extraData.title);
+
+    const patch = { ...(newStatus ? { status: newStatus } : {}), ...extraData };
 
     setOverrides(prev => {
       const next = { ...prev };
-      next[key] = { ...(prev[key] || {}), ...(newStatus ? { status: newStatus } : {}), ...extraData };
+      next[key] = { ...(prev[key] || {}), ...patch };
+      if (altKey) next[altKey] = { ...(prev[altKey] || {}), ...patch };
+      if (normKey && normKey !== '__') next[normKey] = { ...(prev[normKey] || {}), ...patch };
       return next;
     });
 
     const jobObj = matchedJob
-      ? { ...matchedJob, ...(newStatus ? { status: newStatus } : {}), ...extraData }
+      ? { ...matchedJob, ...patch }
       : {
-          id: String(targetJobIdentifier),
-          company: extraData.company || (String(targetJobIdentifier).includes('_') ? String(targetJobIdentifier).split('_')[0] : 'Direct Employer'),
-          title: extraData.title || (String(targetJobIdentifier).includes('_') ? String(targetJobIdentifier).split('_')[1] : 'Direct Position'),
+          id: targetStr,
+          company: extraData.company || (targetStr.includes('_') ? targetStr.split('_')[0] : 'Direct Employer'),
+          title: extraData.title || (targetStr.includes('_') ? targetStr.split('_')[1] : 'Direct Position'),
           date: extraData.date || new Date().toISOString().split('T')[0],
           applied_at: extraData.applied_at || (newStatus && newStatus.toLowerCase().includes('applied') ? new Date().toISOString().split('T')[0] : null),
           status: newStatus || extraData.status || 'Applied / In Review',
@@ -155,39 +175,36 @@ export const useJobs = () => {
 
   /** Reject / dismiss a job */
   const rejectJob = useCallback((targetJobIdentifier) => {
-    setRejectedIds(prev => {
-      const strId = String(targetJobIdentifier);
-      return prev.includes(strId) ? prev : [...prev, strId];
-    });
+    const strId = String(targetJobIdentifier);
+    setRejectedIds(prev => prev.includes(strId) ? prev : [...prev, strId]);
     updateJobStatus(targetJobIdentifier, 'Rejected / Dismissed');
   }, [updateJobStatus]);
 
   const unrejectJob = useCallback((targetJobIdentifier) => {
-    setRejectedIds(prev => prev.filter(id => id !== String(targetJobIdentifier)));
+    const strId = String(targetJobIdentifier);
+    setRejectedIds(prev => prev.filter(id => id !== strId));
     setOverrides(prev => {
       const next  = { ...prev };
       const match = rawJobs.find(j =>
-        (j.id && String(j.id) === String(targetJobIdentifier)) ||
-        `${j.company}_${j.title}` === targetJobIdentifier
+        (j.id && String(j.id) === strId) ||
+        `${j.company}_${j.title}` === strId
       );
-      const key = match ? jobKey(match) : String(targetJobIdentifier);
-      if (next[key]) {
-        const { status: _s, ...rest } = next[key];
-        if (Object.keys(rest).length === 0) {
-          delete next[key];
-        } else {
-          next[key] = rest;
-        }
-      }
+      const key = match ? jobKey(match) : strId;
+      const altKey = match ? `${match.company}_${match.title}` : strId;
+      const normKey = match ? normalizeJobKey(match.company, match.title) : '';
+
+      delete next[key];
+      delete next[altKey];
+      if (normKey) delete next[normKey];
+
       return next;
     });
   }, [rawJobs]);
 
-
-
   /** Batch closes all applied jobs that have had no updates for >= 14 days */
   const closeNonResponsiveJobs = useCallback(() => {
     setOverrides(prev => {
+      const next = { ...prev };
       enrichedJobs.forEach(job => {
         if (job.isNonResponsive) {
           const key = jobKey(job);
@@ -202,8 +219,8 @@ export const useJobs = () => {
   const filteredJobs = useMemo(() => {
     return enrichedJobs.filter(job => {
       const matchesSearch =
-        job.company.toLowerCase().includes(search.toLowerCase()) ||
-        job.title.toLowerCase().includes(search.toLowerCase());
+        (job.company || '').toLowerCase().includes(search.toLowerCase()) ||
+        (job.title || '').toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'All' || job.status === statusFilter;
       const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
       return matchesSearch && matchesStatus && matchesSource;
@@ -242,3 +259,4 @@ export const useJobs = () => {
     sources,
   };
 };
+

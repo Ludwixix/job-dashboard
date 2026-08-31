@@ -18,12 +18,11 @@ const CLOUD_RUN_API = isLocalHost ? '' : (SCRAPER_BASE_URL || '');
  * Checks if a job is eligible for LinkedIn Easy Apply or SEEK Quick Apply
  */
 export const isQuickApplyEligible = (job) => {
-
   if (!job) return false;
-  const src = (job.source || '').toLowerCase();
-  const link = (job.link || job.portalLink || '').toLowerCase();
-  const title = (job.title || '').toLowerCase();
-  const notes = (job.notes || job.description || '').toLowerCase();
+  const src = String(job.source || '').toLowerCase();
+  const link = String(job.link || job.portalLink || job.url || '').toLowerCase();
+  const title = String(job.title || '').toLowerCase();
+  const notes = String(job.notes || job.description || '').toLowerCase();
 
   // LinkedIn Easy Apply
   if (src.includes('linkedin') || link.includes('linkedin.com/jobs')) return true;
@@ -43,8 +42,8 @@ export const isQuickApplyEligible = (job) => {
  */
 export const getQuickApplyPlatform = (job) => {
   if (!job) return 'Unified Fast-Track Gateway';
-  const src = (job.source || '').toLowerCase();
-  const link = (job.link || job.portalLink || '').toLowerCase();
+  const src = String(job.source || '').toLowerCase();
+  const link = String(job.link || job.portalLink || job.url || '').toLowerCase();
 
   if (src.includes('linkedin') || link.includes('linkedin.com')) {
     return 'LinkedIn Easy Apply';

@@ -15,6 +15,59 @@ const getAuthToken = () => {
   }
 };
 
+/**
+ * Normalizes company and title into a robust deduplication key
+ */
+export const normalizeJobKey = (company = '', title = '') => {
+  const c = String(company || '').toLowerCase().replace(/\b(pty|ltd|limited|inc|corporation|corp|australia|group|services|technologies|solutions|holdings)\b/g, '').replace(/[^a-z0-9]/g, '');
+  const t = String(title || '').toLowerCase().replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, '').replace(/\b(immediate start|urgent|urgent:?|contract|permanent|full time|part time|temp|hybrid|remote)\b/g, '').replace(/[^a-z0-9]/g, '');
+  return `${c}__${t}`;
+};
+
+/**
+ * Cleans and un-mangles job descriptions from HTML, email alerts, or encoded strings
+ */
+export const cleanDescriptionText = (raw = '') => {
+  if (!raw || typeof raw !== 'string') return '';
+  
+  // 1. Remove style, script, head, comment tags completely
+  let text = raw.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, '')
+                .replace(/<!--[\s\S]*?-->/g, '');
+
+  // 2. Remove email headers, MIME boundaries and footers
+  text = text.replace(/^[\s\S]*?Content-Type:\s*text\/html[\s\S]*?\n\n/gi, '')
+             .replace(/^[\s\S]*?boundary=[\s\S]*?\n\n/gi, '')
+             .replace(/(?:unsubscribe|view this job on seek|manage alerts|email preference|terms of service)[\s\S]*?$/gi, '');
+
+  // 3. Format breaks and lists
+  text = text.replace(/<\s*(?:br\s*\/?|p|div|section|article|h[1-6]|ul|ol|tr)\b[^>]*>/gi, '\n\n')
+             .replace(/<\s*li\b[^>]*>/gi, '\n• ')
+             .replace(/<\s*\/\s*(?:p|div|section|article|h[1-6]|ul|ol|li|tr|table)\s*>/gi, '\n')
+             .replace(/<[^>]+>/g, '');
+
+  // 4. Decode HTML entities thoroughly
+  text = text.replace(/&nbsp;/gi, ' ')
+             .replace(/&amp;/gi, '&')
+             .replace(/&quot;/gi, '"')
+             .replace(/&#39;/gi, "'")
+             .replace(/&lt;/gi, '<')
+             .replace(/&gt;/gi, '>')
+             .replace(/\\n/g, '\n')
+             .replace(/\\"/g, '"');
+
+  // 5. Clean excess whitespace and lines
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const cleanLines = [];
+  for (const line of lines) {
+    if (/^[-=_*~]{4,}$/.test(line)) continue;
+    cleanLines.push(line);
+  }
+
+  return cleanLines.join('\n\n').trim();
+};
+
 const CANDIDATE_SKILLS = [
   { term: 'system administrator', weight: 15 },
   { term: 'it support', weight: 15 },
@@ -46,7 +99,7 @@ export const calculateCandidateMatchScore = (row) => {
     if (!isNaN(val) && val > 0) return Math.round(val);
   }
 
-  // Calculate dynamic keyword match score against Candidate IT Profile
+  // Calculate dynamic keyword match score against Candidate Profile
   const text = `${row['Job Title'] || row['title'] || ''} ${row['Company'] || row['company'] || ''} ${row['Notes & Next Steps'] || row['notes'] || row['description'] || ''}`.toLowerCase();
   
   let matchScore = 65;
@@ -61,7 +114,6 @@ export const calculateCandidateMatchScore = (row) => {
 
 /**
  * Validates whether a URL points to an actual external job listing
- * and NOT to candidate Google Docs, Google Drive, or user profile pages.
  */
 export const isJobAdUrl = (url) => {
   if (!url || typeof url !== 'string') return false;
@@ -73,7 +125,7 @@ export const isJobAdUrl = (url) => {
 };
 
 /**
- * Resolves a direct job ad URL, extracting from candidate row, notes, or generating a direct SEEK / employer search link.
+ * Resolves a direct job ad URL
  */
 export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '') => {
   if (isJobAdUrl(rawLink)) {
@@ -102,13 +154,14 @@ export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '
 };
 
 export const parseMetadata = (row, index) => {
-  const notesStr = row['Notes & Next Steps'] || row['notes'] || row['description'] || row['why'] || '';
-  const company = row['Company'] || row['company'] || 'Unknown Company';
-  const title = row['Job Title'] || row['title'] || 'Unknown Title';
+  const rawNotes = row['Notes & Next Steps'] || row['notes'] || row['description'] || row['why'] || '';
+  const notesStr = cleanDescriptionText(rawNotes);
+  const company = String(row['Company'] || row['company'] || 'Unknown Company').trim();
+  const title = String(row['Job Title'] || row['title'] || 'Unknown Title').trim();
   
   let salary = row['salary'] || null;
   if (!salary || salary === '') {
-    const salaryMatch = notesStr.match(/(?:Salary|Rate):\s*([^|.]+)/i) || notesStr.match(/(\$\d+[\d,.]*(?:–|-|\s*to\s*)\$\d+[\d,.]*(?:\/hr|\s*\+\s*Super|\s*casual)?)/i);
+    const salaryMatch = rawNotes.match(/(?:Salary|Rate):\s*([^|.]+)/i) || rawNotes.match(/(\$\d+[\d,.]*(?:–|-|\s*to\s*)\$\d+[\d,.]*(?:\/hr|\s*\+\s*Super|\s*casual)?)/i);
     if (salaryMatch) {
       salary = salaryMatch[1].trim();
     }
@@ -120,11 +173,11 @@ export const parseMetadata = (row, index) => {
 
   // Direct Job Ad portal link resolution
   const rawPortal = row['Email / Portal Link'] || row['portalLink'] || row['url'] || row['application_route'] || row['link'] || '';
-  const portalLink = resolveJobAdLink(rawPortal, notesStr, company, title);
+  const portalLink = resolveJobAdLink(rawPortal, rawNotes, company, title);
 
   // Parse rich audit & score
   const matchScore = calculateCandidateMatchScore(row);
-  const location = row['location'] || row['Location'] || 'Melbourne, VIC';
+  const location = String(row['location'] || row['Location'] || 'Melbourne, VIC').trim();
   const stream = row['stream'] || row['industry'] || 'Core IT & Systems';
   const tags = Array.isArray(row['tags']) ? row['tags'] : [];
   const audit = row['audit'] || null;
@@ -143,11 +196,13 @@ export const parseMetadata = (row, index) => {
     emailSubject: row['Email Subject'] || row['emailSubject'] || '',
     portalLink,
     notes: notesStr,
+    description: notesStr,
     salary,
     coverLetterLink,
     cvLink,
     resumeText: row['resumeText'] || row['resume_text'] || '',
     coverLetterText: row['coverLetterText'] || row['cover_letter_text'] || '',
+    psychologyInsights: row['psychologyInsights'] || row['psychology_insights'] || null,
     score: matchScore,
     location,
     stream,
@@ -197,7 +252,6 @@ export const fetchJobsFromApi = async ({
     console.warn("Backend /api/jobs fetch failed, falling back to local static payload:", err);
   }
 
-  // Fallback to demo / static jobs if API is unreachable or returned 0 items
   return fetchDemoFallbackJobs();
 };
 
@@ -280,6 +334,7 @@ export const saveUserApplication = async (jobData) => {
         source: jobData.source || '',
         salary: jobData.salary || '',
         portalLink: jobData.portalLink || jobData.link || jobData.url || '',
+        psychology_insights: jobData.psychologyInsights || null,
         job_data: jobData
       })
     });
@@ -295,20 +350,18 @@ const fetchDemoFallbackJobs = async () => {
     './demo_jobs.json'
   ];
 
-
   for (const path of fallbackPaths) {
     try {
       const res = await fetch(path);
       if (res.ok) {
-        const data = await res.json();
-        const rawList = Array.isArray(data) ? data : (data.jobs || []);
-        if (rawList.length > 0) {
-          const parsed = rawList.map((row, index) => parseMetadata(row, row.id || `db_${index}`));
+        const raw = await res.json();
+        const arrayData = Array.isArray(raw) ? raw : (raw.jobs || []);
+        if (arrayData.length > 0) {
           return {
-            jobs: parsed,
-            total: parsed.length,
+            jobs: arrayData.map((row, index) => parseMetadata(row, index)),
+            total: arrayData.length,
             page: 1,
-            pageSize: parsed.length,
+            pageSize: arrayData.length,
             totalPages: 1
           };
         }
@@ -327,7 +380,7 @@ const fetchDemoFallbackJobs = async () => {
 
 /**
  * Main fetch function for populating the active dashboard state.
- * Queries /api/jobs (or cached jobs) and merges user-scoped applications.
+ * Queries /api/jobs (or cached jobs), deduplicates them cleanly, and merges user-scoped applications.
  */
 export const fetchJobsData = async () => {
   const [apiJobsResult, userApps] = await Promise.all([
@@ -335,83 +388,86 @@ export const fetchJobsData = async () => {
     fetchUserApplications()
   ]);
 
+  // Index user applications by exact ID, direct company_title, and normalized company_title
   const userAppsMap = new Map();
   userApps.forEach(app => {
-    userAppsMap.set(String(app.job_id || app.id), app);
+    const rawId = String(app.job_id || app.id || '');
+    if (rawId) userAppsMap.set(rawId, app);
     if (app.company && app.title) {
       userAppsMap.set(`${app.company}_${app.title}`, app);
+      userAppsMap.set(normalizeJobKey(app.company, app.title), app);
     }
   });
 
-  const mergedJobs = apiJobsResult.jobs.map(job => {
-    const userApp = userAppsMap.get(String(job.id)) || userAppsMap.get(`${job.company}_${job.title}`);
+  // Client-side deduplication & application reconciliation
+  const seenUrls = new Set();
+  const seenNormKeys = new Set();
+  const deduplicatedJobs = [];
+
+  for (const rawJob of (apiJobsResult.jobs || [])) {
+    const job = { ...rawJob };
+    const rawUrl = String(job.portalLink || job.link || job.url || '').split('?')[0].split('#')[0].trim();
+    const normKey = normalizeJobKey(job.company, job.title);
+
+    // Skip true duplicates
+    if (rawUrl && seenUrls.has(rawUrl)) continue;
+    if (normKey && normKey !== '__' && seenNormKeys.has(normKey)) continue;
+
+    if (rawUrl) seenUrls.add(rawUrl);
+    if (normKey && normKey !== '__') seenNormKeys.add(normKey);
+
+    // Check if user has an active application or customization for this job
+    const userApp = userAppsMap.get(String(job.id)) || 
+                    userAppsMap.get(`${job.company}_${job.title}`) || 
+                    userAppsMap.get(normKey);
+
     if (userApp) {
-      userAppsMap.delete(String(job.id));
-      userAppsMap.delete(String(userApp.job_id || userApp.id));
-      userAppsMap.delete(`${job.company}_${job.title}`);
-      return {
-        ...job,
-        status: userApp.status || job.status,
-        notes: userApp.notes || job.notes,
-        applied_at: userApp.applied_at || job.applied_at,
-        hasCustomDocs: Boolean(userApp.resume_text || userApp.cover_letter_text || job.hasCustomDocs)
-      };
+      job.status = userApp.status || job.status;
+      job.notes = userApp.notes || job.notes;
+      job.applied_at = userApp.applied_at || job.applied_at;
+      job.hasCustomDocs = Boolean(userApp.resume_text || userApp.cover_letter_text || userApp.hasCustomDocs || job.hasCustomDocs);
+      job.resumeText = userApp.resume_text || userApp.resumeText || job.resumeText;
+      job.coverLetterText = userApp.cover_letter_text || userApp.coverLetterText || job.coverLetterText;
+      job.psychologyInsights = userApp.psychology_insights || userApp.psychologyInsights || job.psychologyInsights;
     }
-    return job;
-  });
 
+    deduplicatedJobs.push(job);
+  }
+
+  // Ensure any tracked user applications not present in the public feed are appended
+  const seenIds = new Set(deduplicatedJobs.map(j => String(j.id)));
   const remainingApps = [];
-  const seenIds = new Set(mergedJobs.map(j => String(j.id)));
 
-  userAppsMap.forEach((userApp, key) => {
-    const id = String(userApp.job_id || userApp.id || key);
-    if (seenIds.has(id)) return;
+  userApps.forEach(userApp => {
+    const id = String(userApp.job_id || userApp.id || `${userApp.company}_${userApp.title}`);
+    const normKey = normalizeJobKey(userApp.company, userApp.title);
+    if (seenIds.has(id) || seenNormKeys.has(normKey)) return;
+    
     seenIds.add(id);
-    const comp = userApp.company || 'Applied Employer';
-    const tit = userApp.title || 'Applied Role';
+    if (normKey && normKey !== '__') seenNormKeys.add(normKey);
+
     remainingApps.push(parseMetadata({
       id: id,
-      company: comp,
-      title: tit,
+      company: userApp.company || 'Applied Employer',
+      title: userApp.title || 'Applied Role',
       status: userApp.status || 'Applied / In Review',
       notes: userApp.notes || '',
       applied_at: userApp.applied_at || new Date().toISOString(),
       location: userApp.location || 'Melbourne, VIC',
       source: 'User Application',
-      score: 90,
-      tags: ['Tracked Application', userApp.status || 'Applied / In Review']
-    }, id));
+      resumeText: userApp.resume_text || userApp.resumeText || '',
+      coverLetterText: userApp.cover_letter_text || userApp.coverLetterText || '',
+      psychologyInsights: userApp.psychology_insights || userApp.psychologyInsights || null
+    }));
   });
 
-  return [...remainingApps, ...mergedJobs];
+  return [...deduplicatedJobs, ...remainingApps];
 };
+
 
 /**
- * Triggers scraper run on backend for given search queries
+ * Backward compatibility alias for profile-targeted job fetching
  */
-export const triggerLiveScrape = async (queries = []) => {
-  const apiBase = getApiBase();
-  try {
-    const res = await fetch(`${apiBase}/api/scrape`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ queries })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return { liveScraped: true, queriesUsed: queries, cacheStats: data };
-    }
-  } catch (err) {
-    console.warn('Scraper API trigger error:', err);
-  }
-  return { liveScraped: false, queriesUsed: queries, cacheStats: null };
+export const fetchJobsForProfile = async (profile) => {
+  return fetchJobsData();
 };
-
-/**
- * Fetches jobs for active profile using custom queries
- */
-export const fetchJobsForProfile = async (targetProfile) => {
-  const queries = targetProfile?.searchQueries || targetProfile?.keywords || ['IT Support', 'Systems Administrator'];
-  return triggerLiveScrape(queries);
-};
-

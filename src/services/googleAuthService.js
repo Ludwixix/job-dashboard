@@ -137,7 +137,7 @@ export const simulateGoogleWorkspaceAuth = (profile) => {
     accessToken: `simulated_token_${Date.now()}`,
     expiresAt: Date.now() + (3600 * 1000 * 24 * 7), // 7 days
     scopes: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly'],
-    lastGmailScan: new Date().toISOString(),
+    lastGmailScan: null,
     isSimulated: true,
     isDemoUser: true
   };
@@ -198,8 +198,15 @@ export const requestGoogleAuthToken = async ({
             accessToken: accessToken,
             expiresAt: expiresAt,
             scopes: tokenResponse.scope ? tokenResponse.scope.split(' ') : scopes,
-            lastGmailScan: new Date().toISOString()
+            lastGmailScan: null
           };
+          
+          const existing = getAuthenticatedUser();
+          if (existing && existing.email === authUser.email && existing.lastGmailScan) {
+             authUser.lastGmailScan = existing.lastGmailScan;
+             authUser.spreadsheetId = existing.spreadsheetId;
+             authUser.spreadsheetUrl = existing.spreadsheetUrl;
+          }
 
           setAuthenticatedUser(authUser);
           resolve(authUser);
@@ -280,19 +287,38 @@ export const loginWithGoogle = async ({
 
   setSession(sessionUser);
 
+  // Check if they already have a spreadsheet
+  onStatusUpdate('Checking for existing Job Tracker spreadsheet...');
+  try {
+    const existingSheet = await findExistingJobTrackerSheet(authUser.accessToken);
+    if (existingSheet) {
+      authUser.spreadsheetId = existingSheet.spreadsheetId;
+      authUser.spreadsheetUrl = existingSheet.spreadsheetUrl;
+      setAuthenticatedUser(authUser);
+    }
+  } catch(e) {}
+
   // Automatically scan Gmail for job records
   let applications = [];
   let scanCount = 0;
-  if (autoScanGmail) {
+  
+  const alreadyScanned = authUser.lastGmailScan && Date.now() - new Date(authUser.lastGmailScan).getTime() < (1000 * 60 * 60 * 24); // within 24 hours
+  
+  if (autoScanGmail && !alreadyScanned) {
     onStatusUpdate('Scanning Gmail inbox for application confirmations & interview invites...');
     try {
       const syncResult = await scanAndSyncGmailApplications(authUser.accessToken, getActiveProfile() || DEFAULT_PROFILES[0]);
       applications = syncResult.applications || [];
       scanCount = syncResult.count || 0;
       onStatusUpdate(`Synced ${scanCount} application records from Gmail!`);
+      
+      authUser.lastGmailScan = new Date().toISOString();
+      setAuthenticatedUser(authUser);
     } catch (e) {
       console.warn('Gmail sync non-blocking error:', e);
     }
+  } else if (alreadyScanned) {
+    onStatusUpdate('Gmail applications were recently synced. Skipping scan.');
   }
 
   // Synthesize and auto-build an intelligent candidate profile

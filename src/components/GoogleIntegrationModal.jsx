@@ -68,7 +68,11 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
         const syncRes = await syncAllApplicationsToSheet(
           currentUser.accessToken, 
           result.spreadsheetId, 
-          jobs.filter(j => !j.status.toLowerCase().includes('package prepared') && !j.status.toLowerCase().includes('to submit')), 
+          jobs.filter(j => {
+            const s = (j.status || '').toLowerCase();
+            const src = (j.source || '').toLowerCase();
+            return s.includes('applied') || s.includes('interview') || s.includes('reject') || s.includes('offer') || src.includes('user application') || src.includes('gmail');
+          }), 
           activeProfile || currentUser
         );
         setSheetMessage(`Custom Sheet created and synced with ${syncRes.count} application records!`);
@@ -112,10 +116,13 @@ export const GoogleIntegrationModal = ({ isOpen, onClose, jobs, activeProfile, o
     setSheetMessage('');
 
     try {
-      const submittedJobs = jobs.filter(j => 
-        !j.status.toLowerCase().includes('package prepared') && 
-        !j.status.toLowerCase().includes('to submit')
-      );
+      const submittedJobs = jobs.filter(j => {
+        const s = (j.status || '').toLowerCase();
+        const src = (j.source || '').toLowerCase();
+        const isApplied = s.includes('applied') || s.includes('interview') || s.includes('reject') || s.includes('offer');
+        const isUserApp = src.includes('user application') || src.includes('gmail');
+        return isApplied || isUserApp;
+      });
       const res = await syncAllApplicationsToSheet(currentUser.accessToken, currentUser.spreadsheetId, submittedJobs, activeProfile || currentUser);
       setSheetMessage(`Successfully synced ${res.count} application records to your personal Google Sheet!`);
     } catch (err) {

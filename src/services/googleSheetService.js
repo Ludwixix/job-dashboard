@@ -227,3 +227,35 @@ export const syncAllApplicationsToSheet = async (accessToken, spreadsheetId, job
   return { count: rows.length };
 };
 
+
+
+/**
+ * Searches Google Drive for an existing Job Tracker spreadsheet.
+ */
+export const findExistingJobTrackerSheet = async (accessToken) => {
+  if (!accessToken || accessToken.startsWith('simulated_')) return null;
+
+  try {
+    const res = await fetch(
+      "https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet' and name contains 'Job Applications Tracker' and trashed = false&orderBy=createdTime desc&pageSize=1",
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.files && data.files.length > 0) {
+        return {
+          spreadsheetId: data.files[0].id,
+          spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${data.files[0].id}/edit`,
+          title: data.files[0].name
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Could not search Google Drive for existing tracker:", err);
+  }
+  return null;
+};

@@ -204,9 +204,13 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs =
                 <ol className="list-decimal pl-4 space-y-1 text-slate-400">
                   <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-indigo-400 underline">Google Cloud Console &gt; Credentials</a>.</li>
                   <li>Click <strong>Create Credentials &gt; OAuth Client ID</strong> (Web Application).</li>
-                  <li>Add to <strong>Authorized JavaScript origins</strong>:
-                    <div className="mt-1 font-mono text-[10px] bg-slate-900 p-1.5 rounded text-emerald-400 select-all">
-                      https://job-dashboard-45495870656.australia-southeast1.run.app
+                  <li>Add both of these to <strong>Authorized JavaScript origins</strong>:
+                    <div className="mt-1 font-mono text-[10px] bg-slate-900 p-1.5 rounded text-emerald-400 select-all space-y-1">
+                      <div>https://job-dashboard-6xrdvjlrcq-ts.a.run.app</div>
+                      <div>https://job-dashboard-45495870656.australia-southeast1.run.app</div>
+                      {typeof window !== 'undefined' && window.location.origin.includes('localhost') && (
+                        <div>http://localhost:5173</div>
+                      )}
                     </div>
                   </li>
                   <li>Paste the generated Client ID above.</li>

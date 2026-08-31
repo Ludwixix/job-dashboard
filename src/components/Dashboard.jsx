@@ -5,6 +5,7 @@ import { JobSeeker } from './JobSeeker';
 import { JobModal } from './JobModal';
 import { GeneratorModal } from './GeneratorModal';
 import { InterviewPrepModal } from './InterviewPrepModal';
+import { MockInterviewModal } from './MockInterviewModal';
 import { MarketIntelligence } from './MarketIntelligence';
 import { ApplicationPipeline } from './ApplicationPipeline';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
@@ -42,6 +43,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedForGenerator, setSelectedForGenerator] = useState(null);
   const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
+  const [selectedForMockInterview, setSelectedForMockInterview] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
@@ -168,6 +170,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     totalDiscovered: 0
   });
 
+  
   const triggerDiscoveryScrape = useCallback((targetProfile) => {
     if (!targetProfile) return;
     const industry = targetProfile.industry || 'Technology & IT';
@@ -176,8 +179,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
     setScrapeProgress({
       isActive: true,
-      percent: 15,
-      stage: `Connecting to SEEK, LinkedIn & Indeed gateways for ${primaryQuery}...`,
+      percent: 5,
+      stage: `Connecting to gateways for ${primaryQuery}...`,
       elapsedSec: 0,
       totalDiscovered: 0
     });
@@ -185,38 +188,27 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     setProfileScrapeMsg(`🔄 Ingestion Active: Scanning ${industry} opportunities...`);
 
     const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Math.round((Date.now() - startTime) / 1000);
-      setScrapeProgress(prev => {
-        if (!prev.isActive) return prev;
-        let nextPercent = Math.min(94, prev.percent + Math.floor(Math.random() * 8) + 3);
-        let nextStage = prev.stage;
-        if (nextPercent > 70) {
-          nextStage = `Computing ATS fit, commute radius & deduplicating positions in SQLite...`;
-        } else if (nextPercent > 40) {
-          nextStage = `Scanning live market listings for "${primaryQuery}" in Melbourne...`;
-        }
-        return {
-          ...prev,
-          percent: nextPercent,
-          stage: nextStage,
-          elapsedSec: elapsed
-        };
-      });
-    }, 800);
+    const timer = setInterval(() => {
+      setScrapeProgress(prev => ({ ...prev, elapsedSec: Math.round((Date.now() - startTime) / 1000) }));
+    }, 1000);
 
-    fetchJobsForProfile(targetProfile)
-      .then(({ liveScraped, queriesUsed, cacheStats }) => {
-        clearInterval(interval);
+    const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const apiBase = isLocalHost ? '' : (import.meta.env.VITE_SCRAPER_BASE_URL || '');
+    
+    const eventSource = new EventSource(`${apiBase}/api/scrape/stream`);
+    
+    eventSource.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        eventSource.close();
+        clearInterval(timer);
         applyIndustryTheme(industry);
         refetch();
-        const found = cacheStats?.queries_scraped || (queriesUsed?.length ? queriesUsed.length * 3 : 15);
         setScrapeProgress({
           isActive: false,
           percent: 100,
-          stage: `Discovery Complete! +${found} positions verified`,
+          stage: `Discovery Complete!`,
           elapsedSec: Math.round((Date.now() - startTime) / 1000),
-          totalDiscovered: found
+          totalDiscovered: 15
         });
         setProfileScrapeStatus('done');
         setProfileScrapeMsg(`✅ Discovery Complete: Updated matrix with fresh ${industry} opportunities`);
@@ -224,21 +216,33 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           setScrapeProgress(prev => ({ ...prev, percent: 0, stage: '' }));
           setProfileScrapeStatus(null);
         }, 6000);
-      })
-      .catch((err) => {
-        console.warn('Scraper fetch error:', err);
-        clearInterval(interval);
-        refetch();
-        setScrapeProgress({
-          isActive: false,
-          percent: 100,
-          stage: `Ready`,
-          elapsedSec: Math.round((Date.now() - startTime) / 1000),
-          totalDiscovered: 0
-        });
-        setProfileScrapeStatus(null);
-      });
+      } else {
+        try {
+          const data = JSON.parse(event.data);
+          setScrapeProgress(prev => ({
+            ...prev,
+            percent: data.percent,
+            stage: data.stage
+          }));
+        } catch (e) {}
+      }
+    };
+    
+    eventSource.onerror = (err) => {
+      console.warn('EventSource error:', err);
+      eventSource.close();
+      clearInterval(timer);
+      refetch();
+      setScrapeProgress(prev => ({
+        ...prev,
+        isActive: false,
+        percent: 100,
+        stage: `Ready`,
+      }));
+      setProfileScrapeStatus(null);
+    };
   }, [refetch]);
+
 
   // Trigger discovery when activeProfile changes or on initial load
   useEffect(() => {
@@ -662,7 +666,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
             {activeSection === 'kanban' && (
               <SafeErrorBoundary sectionName="Application Pipeline Kanban">
-                <ApplicationPipeline 
+                <ApplicationPipeline
+                  onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                  onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)} 
                   jobs={jobs} 
                   loading={loading}
                   onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
@@ -712,7 +718,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       {/* Job Details Modal */}
       {liveSelectedJob && (
         <SafeErrorBoundary sectionName="Job Detail Modal" onClose={() => setSelectedJob(null)}>
-          <JobModal 
+          <JobModal
+            onOpenMockInterview={(j) => { setSelectedJob(null); setSelectedForMockInterview(j); }}
+            onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
             job={liveSelectedJob} 
             onClose={() => setSelectedJob(null)} 
             onOpenGenerator={(j) => setSelectedForGenerator(j)}
@@ -770,6 +778,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       )}
 
       {/* Interview Prep Super Intelligence Modal */}
+      
+      {/* Mock Interview Modal */}
+      {liveSelectedForMockInterview && (
+        <SafeErrorBoundary sectionName="Mock Interview" onClose={() => setSelectedForMockInterview(null)}>
+          <MockInterviewModal 
+            job={liveSelectedForMockInterview} 
+            onClose={() => setSelectedForMockInterview(null)} 
+          />
+        </SafeErrorBoundary>
+      )}
+
       {liveSelectedForInterviewPrep && (
         <SafeErrorBoundary sectionName="Interview Preparation" onClose={() => setSelectedForInterviewPrep(null)}>
           <InterviewPrepModal 

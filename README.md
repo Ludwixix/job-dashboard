@@ -1,18 +1,29 @@
-# Job Search Dashboard
+# ACAA Career Agent V2.0 (React Frontend)
 
-An AI-powered job application tracking system that organizes your applications into a sleek Kanban board, surfaces market intelligence, and uses generative AI to tailor resumes and cover letters in one click.
+An AI-powered, highly resilient, commercial-ready job application tracking system. This system organizes applications into a sleek Kanban board, surfaces deep market intelligence (FIT Audits), and uses generative AI to tailor resumes and cover letters with 1-click Auto-Apply functionality.
 
 ![Dashboard Preview](public/social-preview.png)
 
-## Live Demo
-Check out the live deployment (with Guest Mode enabled): [https://job-dashboard-6xrdvjlrcq-ts.a.run.app/](https://job-dashboard-6xrdvjlrcq-ts.a.run.app/)
+## 🚀 Live Demo
+Check out the live production deployment: [https://job-dashboard-6xrdvjlrcq-ts.a.run.app/](https://job-dashboard-6xrdvjlrcq-ts.a.run.app/)
 
-## Try it out (Demo Mode)
-You don't need a real account to test the waters. When you visit the site, click **Guest / Demo Login** on the login screen, select an industry persona, and you'll instantly have a populated dashboard with realistic mocked data to explore the features.
+## ✨ Key Features (V2.0 Commercial Release)
 
-## Local Setup
+- **Smart Profile Auto-Synthesis**: Seamless Google OAuth integration that instantly builds candidate profiles, extracting skills and industry targets dynamically upon login.
+- **Auto-Apply Engine**: 1-click pipeline that synthesizes tailored PDF Resumes/Cover Letters based on a live-edited "Source of Truth" profile, pre-fills screening data, and robustly dispatches candidates to the correct application portal (SEEK, LinkedIn, Indeed, Adzuna).
+- **Application Studio (Live PDF Sync)**: Real-time, debounced auto-saving in the Generator Modal ensures all custom doc edits are immediately synced to the backend and immediately reflected in generated PDFs.
+- **Enterprise Resilience**: Comprehensive `SafeErrorBoundary` architecture ensures that isolated component crashes (e.g., Job Modal rendering) fallback gracefully without dropping the user's active session or job feed. Includes `safeStorage` to prevent QuotaExceeded crashes.
+- **Live System Health HUD**: Real-time monitoring of Backend APIs, SQLite persistence, Active Profile Sync, and Indexed Feed counts directly in the Auth modal.
+- **Production SEO & Branding**: Full OpenGraph tags, Twitter Cards, and product branding ready for commercial growth.
 
-This project uses a companion Python backend scraper (`job-dashboard-modular`) for live job fetching and ML scoring. By default in development, it expects that backend to be running locally.
+## 🛠️ Architecture
+- **Framework**: React 19, Vite, Tailwind CSS, Lucide Icons
+- **State & UI**: Custom DnD Kit (Kanban), Recharts for data visualization, React Error Boundaries for granular crash recovery.
+- **Backend Sync**: Integrates strictly with the Python `job-dashboard-modular` backend for SQLite WAL persistence and OpenRouter LLM synthesis.
+
+## 💻 Local Setup
+
+This project requires the companion Python backend scraper (`job-dashboard-modular`) for live job fetching, database persistence, and ML scoring.
 
 1. **Install dependencies:**
    ```bash
@@ -22,9 +33,7 @@ This project uses a companion Python backend scraper (`job-dashboard-modular`) f
 2. **Environment Variables:**
    Create a `.env` file in this directory with any local overrides:
    ```env
-   # Set this if you want to use a real Google Sheet as a data source locally instead of the demo payload
-   VITE_PERSONAL_SHEET_URL="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv"
-   VITE_PERSONAL_SHEET_ID="YOUR_SHEET_ID"
+   VITE_API_BASE_URL="http://localhost:8000"
    ```
 
 3. **Start the Frontend:**
@@ -32,12 +41,9 @@ This project uses a companion Python backend scraper (`job-dashboard-modular`) f
    npm run dev
    ```
 
-4. **Start the Backend (Optional but recommended):**
-   Navigate to the `job-dashboard-modular` directory and start the FastAPI server:
+4. **Start the Backend:**
+   Navigate to the `job-dashboard-modular` directory and start the local API:
    ```bash
-   python3 -m uvicorn src.job_dashboard.run_server:app --reload --port 8000
+   cd ../job-dashboard-modular
+   PYTHONPATH=src python3 -m job_dashboard.run_server
    ```
-
-## Architecture
-- **Frontend:** React 19, Vite, Tailwind CSS, Lucide Icons, DnD Kit (Kanban), Recharts.
-- **Backend Auth & Data:** FastAPI Python backend for session management, OAuth simulation, and Web Scraping.

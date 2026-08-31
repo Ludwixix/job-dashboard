@@ -13,7 +13,7 @@ import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApp
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 import { getCommuteDetails } from '../services/commuteService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep }) => {
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
   const [prefStatus, setPrefStatus] = useState(() => {

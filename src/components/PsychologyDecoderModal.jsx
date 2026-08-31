@@ -4,6 +4,7 @@ import {
   Loader2, CheckCircle2, RefreshCw, Clock, Zap, ShieldCheck
 } from 'lucide-react';
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
+import { getActiveProfile } from '../services/profileService';
 
 export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
   const [loading, setLoading] = useState(() => !job?.psychologyInsights);
@@ -35,6 +36,25 @@ export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
 
     try {
       const activeModel = getActiveModel() || 'z-ai/glm-5.3-flash';
+      const candidateProfile = getActiveProfile() || {};
+
+      // Compile comprehensive multi-source description and job dossier
+      const descriptionSections = [
+        job.description,
+        job.notes && job.notes !== job.description ? `Detailed Notes / Brief:\n${job.notes}` : '',
+        job.snippet && job.snippet !== job.description ? `Posting Snippet:\n${job.snippet}` : '',
+        job.why ? `Strategic Context:\n${job.why}` : '',
+        Array.isArray(job.requirements) && job.requirements.length > 0 ? `Requirements List:\n${job.requirements.join('\n')}` : '',
+        Array.isArray(job.matchedSkills) && job.matchedSkills.length > 0 ? `Detected Key Skills: ${job.matchedSkills.join(', ')}` : '',
+        Array.isArray(job.tags) && job.tags.length > 0 ? `Industry Taxonomy & Tags: ${job.tags.join(', ')}` : '',
+        job.salary ? `Advertised Salary / Package: ${job.salary}` : '',
+        job.location ? `Location / Workplace: ${job.location} (${job.remote ? '100% Remote' : 'On-Site / Hybrid'})` : '',
+        job.source ? `Job Source: ${job.source}` : '',
+        job.emailSubject ? `Original Alert / Email Subject: ${job.emailSubject}` : ''
+      ].filter(Boolean);
+
+      const fullJobText = descriptionSections.join('\n\n') || `${job.title} at ${job.company}`;
+
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -49,19 +69,44 @@ export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
           messages: [
             {
               role: 'system',
-              content: `You are an expert corporate psychologist, executive talent strategist, and behavioral analyst.
-Your mission is to read between the lines of the job posting to decode the hiring manager's unstated psychological pressures, organizational subtext, and covert expectations.
+              content: `You are an elite executive talent psychologist, organizational diagnostician, and behavioral interview strategist.
+Your mission is to perform a deep psychoanalytic breakdown of this full job advertisement to uncover the hiring manager's unstated operational pressures, organizational vulnerabilities, covert expectations, and what candidate posture will dominate the interview.
+
+Candidate Context (for customizing the leverage edge):
+- Candidate Archetype: ${candidateProfile.archetype || candidateProfile.headline || 'Senior Technical Leader'}
+- Superpowers: ${(candidateProfile.superpowers || []).join('; ') || 'Autonomous problem solver, enterprise systems reliability'}
+- Seniority: ${candidateProfile.seniority || 'Senior'}
+
 Output a strictly valid JSON object matching this schema:
 {
-  "hiddenPriorities": "A 2-sentence summary of what they ACTUALLY care about vs boilerplate requirements.",
-  "managerProfile": "A 2-sentence psychological profile of the hiring manager (their fears, urgent pain points, and management style).",
-  "edgeStrategy": ["Tactical candidate leverage point 1", "Tactical candidate leverage point 2", "Tactical candidate leverage point 3"],
-  "cultureClues": ["Specific phrasing nuance or red/green flag 1", "Specific phrasing nuance or red/green flag 2"]
+  "hiddenPriorities": "A 2-3 sentence deep diagnosis of what the hiring team ACTUALLY fears, desires, or needs behind the boilerplate requirements.",
+  "managerProfile": "A 2-3 sentence psychological profile of the hiring manager (their operational stressors, management personality archetype, and what keeps them up at night).",
+  "edgeStrategy": [
+    "High-impact psychological positioning tactic 1 aligning candidate strengths to manager pain",
+    "High-impact psychological positioning tactic 2",
+    "High-impact psychological positioning tactic 3"
+  ],
+  "cultureClues": [
+    "Covert cultural signal or unwritten team dynamic detected in the phrasing",
+    "Underlying organizational reality (e.g. legacy refactoring debt, firefighting mode, high-growth chaos)"
+  ]
 }`
             },
             {
               role: 'user',
-              content: `Decode the covert psychology and hidden priorities for "${job.title}" at "${job.company}".\n\nJob Description:\n${job.description || job.snippet || 'No description available'}`
+              content: `Analyze the complete job ad details, covert psychology, and hidden priorities for "${job.title}" at "${job.company}":
+
+=== FULL JOB AD DOSSIER & SPECIFICATION ===
+Role Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || 'Australia'}
+Work Arrangement: ${job.remote ? '100% Remote' : 'Hybrid / On-site'}
+Salary / Package: ${job.salary || 'Market Rate'}
+Source: ${job.source || 'Direct Portal / Job Board'}
+${job.emailSubject ? `Email Subject: ${job.emailSubject}\n` : ''}
+
+=== JOB DESCRIPTION & REQUIREMENTS ===
+${fullJobText}`
             }
           ],
           temperature: 0.2

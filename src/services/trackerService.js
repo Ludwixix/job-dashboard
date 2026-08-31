@@ -1,5 +1,6 @@
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { cleanDescriptionText } from './dataService';
+import { getBackendApiBase } from './apiConfig';
 
 /**
  * Validates whether a job record is valid and belongs in the Application Tracker.
@@ -197,4 +198,124 @@ Balaclava VIC 3183`;
     mailtoUrl,
     contactEmail
   };
+};
+
+/**
+ * Persists an applied job to backend SQLite database.
+ */
+export const saveUserApplicationToBackend = async (job, userId = 'sam_ludwig') => {
+  if (!job || typeof job !== 'object') return null;
+  const apiBase = getBackendApiBase();
+  const jobId = job.id || `${job.company}_${job.title}`;
+
+  try {
+    const res = await fetch(`${apiBase}/api/applications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': userId
+      },
+      body: JSON.stringify({
+        job_id: jobId,
+        company: job.company || '',
+        title: job.title || '',
+        status: job.status || 'Applied',
+        notes: job.notes || '',
+        resume_text: job.resume_text || '',
+        cover_letter_text: job.cover_letter_text || '',
+        applied_at: job.appliedDate || job.applied_at || new Date().toISOString(),
+        job_data: job
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.application;
+    }
+  } catch (e) {
+    console.warn('Backend application save non-blocking error:', e);
+  }
+  return null;
+};
+
+/**
+ * Synchronizes batch application array to backend database.
+ */
+export const syncApplicationsToBackend = async (appsList, userId = 'sam_ludwig') => {
+  if (!Array.isArray(appsList) || appsList.length === 0) return null;
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/applications/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': userId
+      },
+      body: JSON.stringify({
+        applications: appsList.map(j => ({
+          job_id: j.id || `${j.company}_${j.title}`,
+          company: j.company || '',
+          title: j.title || '',
+          status: j.status || 'Applied',
+          notes: j.notes || '',
+          applied_at: j.appliedDate || j.applied_at || new Date().toISOString(),
+          job_data: j
+        }))
+      })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn('Backend batch applications sync error:', e);
+  }
+  return null;
+};
+
+/**
+ * Fetches all saved applications for user from backend database.
+ */
+export const fetchUserApplicationsFromBackend = async (userId = 'sam_ludwig') => {
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/applications?user_id=${encodeURIComponent(userId)}`, {
+      headers: { 'X-User-Id': userId }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.applications || [];
+    }
+  } catch (e) {
+    console.warn('Backend fetch applications error:', e);
+  }
+  return [];
+};
+
+/**
+ * Scans targeted Gmail inbox for recruiter/ATS updates for applied jobs.
+ */
+export const scanGmailForApplicationUpdates = async ({ username, appPassword, jobId = null, days = 14, userId = 'sam_ludwig' }) => {
+  const apiBase = getBackendApiBase();
+
+  const res = await fetch(`${apiBase}/api/applications/scan-updates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': userId
+    },
+    body: JSON.stringify({
+      username,
+      app_password: appPassword,
+      job_id: jobId,
+      days: days
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Gmail scan failed with HTTP ${res.status}`);
+  }
+
+  return await res.json();
 };

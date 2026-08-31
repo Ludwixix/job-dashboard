@@ -2,6 +2,7 @@
  * psychologyService.js
  * Persistent caching and de-duplication engine for Employer Psychology Decoder
  */
+import { getBackendApiBase } from './apiConfig';
 
 const STORAGE_KEY_PSYCHOLOGY = 'job_dashboard_psychology_cache';
 
@@ -74,9 +75,64 @@ export const setCachedPsychology = (job, insights) => {
         }
       }));
     }
+
+    // Persist to backend database asynchronously
+    savePsychologyToBackend(job, insights).catch(() => {});
   } catch (e) {
     console.warn('Error saving to psychology cache:', e);
   }
+};
+
+/**
+ * Persists employer psychology to backend SQLite database.
+ */
+export const savePsychologyToBackend = async (job, insights) => {
+  if (!job || !insights) return null;
+  const apiBase = getBackendApiBase();
+  const jobId = getJobPsychologyKey(job);
+
+  try {
+    const res = await fetch(`${apiBase}/api/psychology`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        job_id: jobId,
+        company: job.company || '',
+        title: job.title || '',
+        insights: insights
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.psychology;
+    }
+  } catch (e) {
+    console.warn('Backend psychology sync non-blocking error:', e);
+  }
+  return null;
+};
+
+/**
+ * Fetches employer psychology from backend SQLite database.
+ */
+export const fetchPsychologyFromBackend = async (job) => {
+  if (!job) return null;
+  const apiBase = getBackendApiBase();
+  const jobId = getJobPsychologyKey(job);
+
+  try {
+    const res = await fetch(`${apiBase}/api/psychology?job_id=${encodeURIComponent(jobId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.psychology && data.psychology.insights) {
+        setCachedPsychology(job, data.psychology.insights);
+        return data.psychology.insights;
+      }
+    }
+  } catch (e) {
+    console.warn('Backend psychology fetch non-blocking error:', e);
+  }
+  return getCachedPsychology(job);
 };
 
 /**

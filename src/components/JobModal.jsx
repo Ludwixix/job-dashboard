@@ -14,6 +14,7 @@ import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../se
 import { getCommuteDetails } from '../services/commuteService';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 import { cleanDescriptionText } from '../services/dataService';
+import { saveUserApplicationToBackend } from '../services/trackerService';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep }) => {
   const jobId = job?.id || `${job?.company}_${job?.title}`;
@@ -1077,6 +1078,7 @@ Sam Ludwig
                         if (onJobStatusUpdate) {
                           onJobStatusUpdate(updatedJob);
                         }
+                        saveUserApplicationToBackend(updatedJob).catch(() => {});
 
                         // 1. Download Resume PDF to computer
                         if (data.pipeline_result?.resume_text) {

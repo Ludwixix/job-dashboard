@@ -4,6 +4,7 @@
  * Market Intelligence, and Autonomous Agent Heuristics.
  */
 import { getActiveProfile } from './profileService';
+import { getBackendApiBase } from './apiConfig';
 
 const MASTER_RESUME_HIGHLIGHTS = `
 SAM LUDWIG — Senior IT Infrastructure & M365 Engineer
@@ -416,6 +417,14 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
 
   log(`Document synthesis complete (${resume.length + coverLetter.length} chars). Running Quality Gate…`, 'success');
 
+  const jobId = job.id || `${job.company}_${job.title}`;
+  if (resume) {
+    saveDocumentToBackend(jobId, 'resume', resume, model, { title: job.title, company: job.company }).catch(() => {});
+  }
+  if (coverLetter) {
+    saveDocumentToBackend(jobId, 'cover_letter', coverLetter, model, { title: job.title, company: job.company }).catch(() => {});
+  }
+
   return {
     success: true,
     resume,
@@ -423,6 +432,61 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
     model: `${model} (Live OpenRouter API)`,
     elapsedMs: Date.now() - startTime
   };
+};
+
+/**
+ * Persists tailored application documents to backend SQLite database.
+ */
+export const saveDocumentToBackend = async (jobId, docType, contentText, modelName = '', metadata = {}, userId = 'sam_ludwig') => {
+  if (!jobId || !contentText) return null;
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/documents`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': userId
+      },
+      body: JSON.stringify({
+        job_id: jobId,
+        doc_type: docType,
+        content_text: contentText,
+        model_name: modelName,
+        metadata: metadata
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.document;
+    }
+  } catch (e) {
+    console.warn('Backend document save non-blocking error:', e);
+  }
+  return null;
+};
+
+/**
+ * Fetches cached tailored document for a job from backend SQLite database.
+ */
+export const fetchDocumentFromBackend = async (jobId, docType = 'resume', userId = 'sam_ludwig') => {
+  if (!jobId) return null;
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/documents?job_id=${encodeURIComponent(jobId)}&doc_type=${encodeURIComponent(docType)}`, {
+      headers: { 'X-User-Id': userId }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.document) {
+        return data.document;
+      }
+    }
+  } catch (e) {
+    console.warn('Backend document fetch error:', e);
+  }
+  return null;
 };
 
 /**

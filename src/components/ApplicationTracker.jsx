@@ -1,14 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TableView } from './TableView';
 import { KanbanView } from './KanbanView';
 import { MetricsPanel } from './MetricsPanel';
 import { 
   LayoutList, Kanban, Search, BarChart2,
   CheckCircle2, AlertCircle, Clock, ChevronDown, ChevronUp, RotateCcw,
-  Send, Calendar, ArrowUpRight
+  Send, Calendar, ArrowUpRight, Mail, RefreshCw, Sparkles, Check, Lock
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
-import { isValidTrackerJob } from '../services/trackerService';
+import { 
+  isValidTrackerJob, 
+  scanGmailForApplicationUpdates, 
+  fetchUserApplicationsFromBackend, 
+  syncApplicationsToBackend 
+} from '../services/trackerService';
 
 const formatDaysAgo = (dateStr) => {
   if (!dateStr) return 'Recently';
@@ -51,6 +56,62 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [appliedDateFilter, setAppliedDateFilter] = useState('all'); // 'all' (DEFAULT: most recent first), 'today', '7days', '30days'
+  
+  // Gmail targeted status tracking state
+  const [isScanningGmail, setIsScanningGmail] = useState(false);
+  const [showGmailModal, setShowGmailModal] = useState(false);
+  const [gmailUsername, setGmailUsername] = useState(() => localStorage.getItem('gmail_scanner_username') || 'sam.ludwig@gmail.com');
+  const [gmailAppPassword, setGmailAppPassword] = useState(() => localStorage.getItem('gmail_scanner_app_password') || '');
+  const [scanResult, setScanResult] = useState(null);
+  const [isSyncingBackend, setIsSyncingBackend] = useState(false);
+
+  // Hydrate from and sync to backend on mount
+  useEffect(() => {
+    const syncWithBackend = async () => {
+      setIsSyncingBackend(true);
+      try {
+        const validLocal = (jobs || []).filter(isValidTrackerJob);
+        if (validLocal.length > 0) {
+          await syncApplicationsToBackend(validLocal);
+        }
+        await fetchUserApplicationsFromBackend();
+      } catch (e) {
+        console.warn('Initial backend sync non-blocking warning:', e);
+      } finally {
+        setIsSyncingBackend(false);
+      }
+    };
+    syncWithBackend();
+  }, []);
+
+  const handleExecuteGmailScan = async () => {
+    if (!gmailUsername || !gmailAppPassword) {
+      alert('Please enter your Gmail address and 16-character Google App Password.');
+      return;
+    }
+    setIsScanningGmail(true);
+    setScanResult(null);
+
+    try {
+      localStorage.setItem('gmail_scanner_username', gmailUsername);
+      localStorage.setItem('gmail_scanner_app_password', gmailAppPassword);
+
+      const res = await scanGmailForApplicationUpdates({
+        username: gmailUsername,
+        appPassword: gmailAppPassword,
+        days: 14
+      });
+
+      setScanResult(res);
+      if (res && res.updates_count > 0 && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jobs-updated'));
+      }
+    } catch (err) {
+      alert(`Gmail status scan failed: ${err.message}`);
+    } finally {
+      setIsScanningGmail(false);
+    }
+  };
 
   // Recently Applied Submissions list (Sorted newest first)
   const recentlyAppliedJobs = useMemo(() => {
@@ -352,8 +413,16 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
 
         {/* RIGHT COLUMN: MAIN TRACKER CONTENT */}
         <div className="flex-1 space-y-6 w-full">
-          {/* Detailed Metrics Panel Toggle */}
-          <div className="flex justify-end font-mono">
+          {/* Detailed Metrics Panel Toggle & Gmail Targeted Scanner Trigger */}
+          <div className="flex flex-wrap items-center justify-between gap-3 font-mono">
+            <button
+              onClick={() => setShowGmailModal(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-black shadow-md hover:shadow-purple-500/25 transition-all cursor-pointer"
+            >
+              {isScanningGmail ? <RefreshCw size={14} className="animate-spin text-white" /> : <Sparkles size={14} className="text-white" />}
+              {isScanningGmail ? "SCANNING GMAIL INBOX..." : "⚡ SCAN GMAIL FOR APPLICATION UPDATES"}
+            </button>
+
             <button
               onClick={() => setShowMetricsPanel(!showMetricsPanel)}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#181825] border border-[#313244] text-xs font-bold text-slate-200 hover:text-purple-300 hover:border-purple-400/50 transition-colors cursor-pointer"
@@ -363,6 +432,108 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
               {showMetricsPanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           </div>
+
+          {/* Scan Results Notification Banner */}
+          {scanResult && (
+            <div className="p-4 rounded-xl bg-purple-950/70 border border-purple-400/50 font-mono text-xs text-purple-100 shadow-md space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-white flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-400" />
+                  GMAIL TARGETED SCAN COMPLETE
+                </span>
+                <button onClick={() => setScanResult(null)} className="text-slate-400 hover:text-white text-[11px] underline cursor-pointer">
+                  Dismiss
+                </button>
+              </div>
+              <div className="text-slate-300">
+                Scanned <span className="font-bold text-white">{scanResult.scanned_count}</span> active applications. Found <span className="font-bold text-emerald-300">{scanResult.updates_count}</span> status transitions in your inbox.
+              </div>
+              {scanResult.updates && scanResult.updates.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {scanResult.updates.map((u, i) => (
+                    <div key={i} className="p-2 rounded bg-[#181825] border border-purple-500/30 flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-white truncate max-w-xs">{u.email_subject || 'Recruiter Communication'}</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-extrabold">{u.new_status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Gmail Credentials Configuration Modal */}
+          {showGmailModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs font-mono animate-in fade-in">
+              <div className="bg-[#181825] border border-[#313244] rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-[#313244] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                      <Mail size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-white">TARGETED GMAIL APPLICATION SCANNER</h3>
+                      <p className="text-[10px] text-slate-400">Zero-spam intelligence scanner matching company & ATS threads</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowGmailModal(false)}
+                    className="text-slate-400 hover:text-white p-1 rounded cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">GMAIL ADDRESS</label>
+                    <input
+                      type="email"
+                      value={gmailUsername}
+                      onChange={(e) => setGmailUsername(e.target.value)}
+                      placeholder="your.email@gmail.com"
+                      className="w-full px-3 py-2 rounded bg-[#1e1e2e] border border-[#313244] text-white focus:outline-none focus:border-purple-400 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                      GOOGLE APP PASSWORD (16-CHARACTERS)
+                    </label>
+                    <input
+                      type="password"
+                      value={gmailAppPassword}
+                      onChange={(e) => setGmailAppPassword(e.target.value)}
+                      placeholder="abcd efgh ijkl mnop"
+                      className="w-full px-3 py-2 rounded bg-[#1e1e2e] border border-[#313244] text-white focus:outline-none focus:border-purple-400 text-xs"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Generated at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-purple-400 underline">myaccount.google.com/apppasswords</a>. Credentials are never written to source repositories.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#313244]">
+                  <button
+                    onClick={() => setShowGmailModal(false)}
+                    className="px-4 py-2 rounded bg-[#1e1e2e] hover:bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowGmailModal(false);
+                      handleExecuteGmailScan();
+                    }}
+                    disabled={isScanningGmail}
+                    className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-black shadow-md cursor-pointer flex items-center gap-2"
+                  >
+                    {isScanningGmail ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                    START TARGETED SCAN
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Advanced Metrics Panel */}
           {showMetricsPanel && (

@@ -5,6 +5,8 @@
  * persisting personalization across all dashboard facets and events.
  */
 
+import { getBackendApiBase } from './apiConfig';
+
 export const STORAGE_KEY_PROFILES = 'job_dashboard_profiles';
 export const STORAGE_KEY_ACTIVE_PROFILE_ID = 'job_dashboard_active_profile_id';
 export const STORAGE_KEY_CANDIDATE_PROFILE = 'candidate_profile';
@@ -146,11 +148,63 @@ export const saveProfile = (updatedProfile) => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('profile-updated', { detail: profile }));
     }
+
+    // Persist to backend database asynchronously
+    saveProfileToBackend(profile).catch(() => {});
   } catch (e) {
     console.error('Error saving profile:', e);
   }
 
   return profile;
+};
+
+/**
+ * Persists user profile to backend SQLite database.
+ */
+export const saveProfileToBackend = async (profile) => {
+  if (!profile || typeof profile !== 'object') return null;
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': profile.id || 'sam_ludwig'
+      },
+      body: JSON.stringify(profile)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.profile;
+    }
+  } catch (e) {
+    console.warn('Backend profile sync non-blocking error:', e);
+  }
+  return null;
+};
+
+/**
+ * Fetches user profile from backend SQLite database with local storage fallback.
+ */
+export const fetchProfileFromBackend = async (userId = 'sam_ludwig') => {
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/profile?user_id=${encodeURIComponent(userId)}`, {
+      headers: { 'X-User-Id': userId }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.profile && Object.keys(data.profile).length > 0) {
+        saveProfile(data.profile);
+        return data.profile;
+      }
+    }
+  } catch (e) {
+    console.warn('Backend profile fetch error, using local cached profile:', e);
+  }
+  return getActiveProfile();
 };
 
 export const setActiveProfile = (profileId) => {

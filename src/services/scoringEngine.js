@@ -4,6 +4,8 @@
  * Computes live match score, matched keywords, and commute distance for ANY candidate profile.
  */
 
+import { getBackendApiBase } from './apiConfig';
+
 const MELBOURNE_SUBURB_COORDINATES = {
   'melbourne': { lat: -37.8136, lon: 144.9631 },
   'cbd': { lat: -37.8136, lon: 144.9631 },
@@ -119,9 +121,61 @@ export const saveUserPreferences = (prefs) => {
   try {
     localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(prefs));
     window.dispatchEvent(new CustomEvent('job-preferences-changed', { detail: prefs }));
+
+    // Persist to backend database asynchronously
+    savePreferencesToBackend(prefs).catch(() => {});
   } catch (err) {
     console.warn('Could not save recommendation preferences:', err);
   }
+};
+
+/**
+ * Persists recommendation preferences to backend SQLite database.
+ */
+export const savePreferencesToBackend = async (prefs, userId = 'sam_ludwig') => {
+  if (!prefs || typeof prefs !== 'object') return null;
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/preferences`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': userId
+      },
+      body: JSON.stringify(prefs)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.preferences;
+    }
+  } catch (e) {
+    console.warn('Backend preferences sync non-blocking error:', e);
+  }
+  return null;
+};
+
+/**
+ * Fetches recommendation preferences from backend SQLite database.
+ */
+export const fetchPreferencesFromBackend = async (userId = 'sam_ludwig') => {
+  const apiBase = getBackendApiBase();
+
+  try {
+    const res = await fetch(`${apiBase}/api/preferences?user_id=${encodeURIComponent(userId)}`, {
+      headers: { 'X-User-Id': userId }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.preferences && Object.keys(data.preferences).length > 0) {
+        saveUserPreferences(data.preferences);
+        return data.preferences;
+      }
+    }
+  } catch (e) {
+    console.warn('Backend preferences fetch error, using local prefs:', e);
+  }
+  return getUserPreferences();
 };
 
 export const extractJobKeyTerms = (job) => {

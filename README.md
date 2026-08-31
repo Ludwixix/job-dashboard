@@ -1,25 +1,32 @@
-# ACAA Job Dashboard
+# ACAA Career Agent V2.0 (Modular Core)
 
-A comprehensive, modular, and AI-powered job application system. This project features a Python-based core backend, a React Single Page Application (SPA) frontend, intelligent Web Scraping, and automated Document Generation (Resume & Cover Letter) tailored to specific job requirements using LLMs.
+A comprehensive, commercial-ready, and AI-powered job application system. This project features a Python-based core backend, a React Single Page Application (SPA) frontend, intelligent Web Scraping, and automated Document Generation (Resume & Cover Letter) orchestrated by LLMs.
 
-## Architecture
+## 🏗️ Architecture
 
-The project consists of several components working in tandem:
+The project is structured into robust, decoupled modules:
 
 - **job-dashboard-modular (Backend Core)**: 
   - `models.py`: Stable data contracts (`Job`, `ApplicationRecord`).
-  - `score.py` & `classify.py`: Calculates fit dimensions, gaps, and categorizes jobs (e.g. `core-it`, `bridge`).
-  - `sources.py`: Provides scraping adapters (Seek, Indeed, LinkedIn, Adzuna) with robust fallbacks.
-  - `applications.py`: Manages SQLite state for Job Application tracking (ApplicationTracker).
-  - `web.py`: The HTTP server providing APIs for the frontend.
+  - `score.py` & `classify.py`: Calculates fit dimensions, skill gaps, and categorizes jobs intelligently (e.g. `core-it`, `bridge`).
+  - `sources.py`: Provides multi-source scraping adapters (Seek, Indeed, LinkedIn, Adzuna) with intelligent rate-limiting and fallbacks.
+  - `applications.py`: Manages high-performance SQLite WAL state for Job Application tracking (`ApplicationTracker`).
+  - `web.py` / `run_server.py`: HTTP API layer integrating Auth, LLM document generation, and persistence.
 
 - **job-dashboard-react (Frontend SPA)**:
-  - Built with Vite, React, and TailwindCSS.
-  - **Job Cards V2**: Highly optimized, scannable job cards displaying at-a-glance metadata, top matched skills, and "Star/Save" functionality.
-  - **Job Modal**: Expandable deep-dive view with beautifully formatted job descriptions, a robust FIT Audit, and 1-click Auto-Apply actions.
-  - **Auto-Apply Engine**: Leverages AI to pre-fill screening questions, dynamically generate tailored PDF Resumes/Cover Letters, and seamlessly dispatch the user to the application portal.
+  - **Job Cards V2**: Scannable, highly-optimized job cards.
+  - **Application Studio**: Expandable deep-dive view with beautifully formatted job descriptions, a robust FIT Audit, and real-time synchronized PDF editors.
+  - **Enterprise Resilience**: Safe Error Boundaries prevent full-app crashes, backed by safe local storage wrappers.
+  - **Smart Profile**: Auto-synthesizes user profiles via Google OAuth.
 
-## Quick Start (Local Development)
+## ✨ V2.0 Commercial Enhancements
+
+- **SQLite WAL Persistence**: Fully transitioned from Google Sheets to a robust SQLite Write-Ahead Logging database for immediate, reliable state management across user sessions.
+- **Live PDF Document Sync**: Backend API endpoints orchestrate real-time updates from frontend debounced editors straight into dynamically generated PDFs.
+- **Smart Portal Resolution**: Auto-Apply routing resolves complex scraping links to guarantee accurate application portal handoffs.
+- **Cloud Run Native**: Unified Dockerfile configuration serving both the Python backend and pre-compiled static Vite frontend assets in a single Google Cloud Run deployment.
+
+## 🚀 Quick Start (Local Development)
 
 ### 1. Backend Server
 The backend handles scraping, SQLite persistence, and LLM orchestration.
@@ -27,14 +34,14 @@ The backend handles scraping, SQLite persistence, and LLM orchestration.
 ```bash
 cd /home/s/.openclaw/workspace/job-dashboard-modular
 # Install dependencies
-python -m pip install -e '.[scraping]'
-python -m playwright install chromium
+python3 -m pip install -e '.[scraping]'
+python3 -m playwright install chromium
 
 # Run tests
-python -m pytest
+python3 -m pytest
 
 # Start the local API server
-PYTHONPATH=src python -m job_dashboard.run_server
+PYTHONPATH=src python3 -m job_dashboard.run_server
 ```
 
 ### 2. Frontend React SPA
@@ -49,19 +56,9 @@ npm install
 npm run dev
 ```
 
-## Features
-
-- **Multi-Source Scraping**: Scrapes SEEK, Indeed, LinkedIn, and Adzuna in real-time or via cache fallbacks.
-- **AI Document Generation**: Uses OpenRouter (or local fallbacks) to dynamically synthesize a customized Resume and Cover Letter strictly based on your "Source of Truth" profile context.
-- **Smart Scoring & FIT Audit**: Evaluates the job description against your profile to score compatibility and highlight missing/matching skills.
-- **Auto-Apply**: 1-click pipeline that generates documents, compiles a candidate payload, copies it to the clipboard, and opens the job portal.
-- **Starred Jobs**: Save jobs locally for future review.
-- **Kanban Board & Tracker**: Move jobs through lifecycle stages (Applied, Interviewing, Offer).
-
-## Deployment (Google Cloud Run)
+## ☁️ Deployment (Google Cloud Run)
 
 The application has been unified into a single Dockerized container deployed on Google Cloud Run. 
-The static React assets are built and served by the Python backend.
 
 1. Build the frontend and sync static assets:
 ```bash
@@ -74,12 +71,12 @@ cp -r dist/* ../job-dashboard-modular/src/job_dashboard/static/
 2. Deploy to Cloud Run:
 ```bash
 cd job-dashboard-modular
-./deploy-cloudrun.sh
+gcloud run deploy job-dashboard --source . --region australia-southeast1 --project acaa-agent --quiet
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Set the following environment variables (locally in `.env` or in GCP Secret Manager):
-- `OPENROUTER_API_KEY`: For AI document generation.
+- `OPENROUTER_API_KEY`: For AI document generation via OpenRouter.
 - `ADZUNA_APP_ID` / `ADZUNA_API_KEY`: For Adzuna scraping.
 - `SEEK_API_ENDPOINT`: (Optional) Approved Seek API endpoint.

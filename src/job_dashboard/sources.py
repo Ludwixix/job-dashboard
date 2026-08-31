@@ -636,10 +636,13 @@ class ScrapePipeline:
         self.pause_seconds = pause_seconds
         self.source_health: dict[str, dict[str, Any]] = {}
 
-    def run(self, queries: Iterable[SearchQuery]) -> list[dict[str, Any]]:
+    def run(self, queries: Iterable[SearchQuery], on_progress=None) -> list[dict[str, Any]]:
         collected: list[Mapping[str, Any]] = []
         self.errors: list[str] = []
-        for source in self.sources:
+        total_sources = len(self.sources)
+        for idx, source in enumerate(self.sources):
+            if on_progress:
+                on_progress(f'Scraping {source.name}...', int((idx / total_sources) * 100))
             health = self.source_health.setdefault(source.name, {"jobs": 0, "queries": 0, "success": False, "last_error": ""})
             for query in queries:
                 if not query.enabled:

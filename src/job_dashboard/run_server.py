@@ -81,6 +81,23 @@ def main():
                 print("Gmail scanned in the background (last 7 days).", flush=True)
             except Exception as error:
                 print(f"Gmail scan failed: {error}", flush=True)
+
+        try:
+            # Simple 24h throttling (storing last run in data dir)
+            digest_flag = args.data_dir / "last_digest.txt"
+            should_send = True
+            if digest_flag.exists():
+                last_time = float(digest_flag.read_text())
+                if time.time() - last_time < 86400:
+                    should_send = False
+            
+            if should_send:
+                app.send_daily_digest()
+                digest_flag.write_text(str(time.time()))
+                print("Daily email digest generated.", flush=True)
+        except Exception as error:
+            print(f"Digest failed: {error}", flush=True)
+
         try:
             app.sync_tracker()
             print("Application tracker synced in the background.", flush=True)

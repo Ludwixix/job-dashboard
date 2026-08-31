@@ -33,6 +33,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 from .ai_resume_analyzer import get_resume_analyzer
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
+from .interview_simulator import get_interview_simulator
 from .compare import COMPARE_MODELS, CompareRunner
 from .documents import generate_documents
 from .logging import get_logger
@@ -1427,6 +1428,13 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, result)
                     return
                 
+                
+                if path.startswith("/api/ai/interview/") and path.endswith("/feedback"):
+                    session_id = path.removeprefix("/api/ai/interview/").removesuffix("/feedback")
+                    result = get_interview_simulator().get_feedback(session_id)
+                    self.send_json(200, result)
+                    return
+
                 if path == "/api/ai/interview/reset":
                     result = app.reset_interview_simulator()
                     self.send_json(200, result)
@@ -1644,6 +1652,38 @@ def make_handler(app: DashboardApp):
                         "token": token,
                         "user": {"id": user_id, "email": email, "name": name}
                     })
+                    return
+
+                
+                elif path == "/api/scrape/stream":
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/event-stream')
+                    self.send_header('Cache-Control', 'no-cache')
+                    self.send_header('Connection', 'keep-alive')
+                    self.end_headers()
+                    
+                    def on_progress(stage, pct):
+                        try:
+                            msg = '{"stage": "' + stage + '", "percent": ' + str(pct) + '}'
+                            self.wfile.write(f"data: {msg}\n\n".encode('utf-8'))
+                            self.wfile.flush()
+                        except:
+                            pass
+                            
+                    queries = app.search_queries
+                    pipeline = ScrapePipeline(app.sources, days=14)
+                    on_progress("Starting pipeline...", 0)
+                    fresh = pipeline.run(queries, on_progress=on_progress)
+                    fresh = deduplicate_jobs(fresh)
+                    fresh = ensure_descriptions(fresh)
+                    on_progress("Saving to SQLite WAL database...", 90)
+                    app.repository.save_jobs(fresh)
+                    on_progress("Done", 100)
+                    try:
+                        self.wfile.write(b"data: [DONE]\n\n")
+                        self.wfile.flush()
+                    except:
+                        pass
                     return
 
                 elif path in ("/api/refresh", "/api/scrape"):

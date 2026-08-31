@@ -1052,6 +1052,43 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, result)
                 return
             
+            if path == "/api/scrape/stream":
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.send_header('Connection', 'keep-alive')
+                self._send_cors_headers()
+                self.end_headers()
+                
+                def on_progress(stage, pct):
+                    try:
+                        msg = json.dumps({"stage": stage, "percent": pct})
+                        self.wfile.write(f"data: {msg}\n\n".encode('utf-8'))
+                        self.wfile.flush()
+                    except Exception:
+                        pass
+                        
+                queries = app.search_queries
+                pipeline = ScrapePipeline(app.sources, days=14)
+                on_progress("Connecting to job gateways...", 10)
+                try:
+                    fresh = pipeline.run(queries, on_progress=on_progress)
+                    fresh = deduplicate_jobs(fresh)
+                    fresh = ensure_descriptions(fresh)
+                    on_progress("Saving & indexing positions...", 90)
+                    app.repository.save_jobs(fresh)
+                    on_progress("Discovery Complete", 100)
+                except Exception as scrape_err:
+                    logger.warning(f"Live scrape stream warning: {scrape_err}")
+                    on_progress("Discovery complete (cached fallback)", 100)
+                
+                try:
+                    self.wfile.write(b"data: [DONE]\n\n")
+                    self.wfile.flush()
+                except Exception:
+                    pass
+                return
+
             if path.startswith("/api/auto-apply/") and path.endswith("/status"):
                 task_id = path.removeprefix("/api/auto-apply/").removesuffix("/status")
                 task = auto_apply_manager.get_task(task_id)

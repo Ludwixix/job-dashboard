@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
 import { getActiveProfile } from '../services/profileService';
+import { saveUserApplication } from '../services/dataService';
 
 export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
   const [loading, setLoading] = useState(() => !job?.psychologyInsights);
@@ -131,9 +132,19 @@ ${fullJobText}`
 
       setInsights(payload);
       
-      // Persist asynchronously against the job record
-      if (onSaveInsights && job?.id) {
-        onSaveInsights(job.id, payload);
+      const targetId = job?.id || `${job?.company}_${job?.title}`;
+
+      // Persist directly to localStorage & SQLite application tracking storage
+      saveUserApplication({
+        ...job,
+        id: targetId,
+        psychologyInsights: payload,
+        psychology_insights: payload
+      });
+
+      // Persist asynchronously against the job record in parent state
+      if (onSaveInsights) {
+        onSaveInsights(targetId, payload);
       }
     } catch (err) {
       console.error('Psychology decoding error:', err);

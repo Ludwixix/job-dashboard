@@ -1791,7 +1791,7 @@ export const JobSeeker = ({
             onClose={() => setPsychologyJob(null)}
             onSaveInsights={(id, insights) => {
               if (onJobStatusUpdate) {
-                onJobStatusUpdate({ ...psychologyJob, psychologyInsights: insights });
+                onJobStatusUpdate(id, psychologyJob.status || 'Discovered', { psychologyInsights: insights });
               }
             }}
           />

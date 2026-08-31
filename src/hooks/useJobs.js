@@ -125,6 +125,16 @@ export const useJobs = () => {
 
   /** Persist a status change + optional extra fields for a job. Survives page refresh. */
   const updateJobStatus = useCallback((targetJobIdentifier, newStatus, extraData = {}) => {
+    let resolvedStatus = typeof newStatus === 'string' ? newStatus : undefined;
+    let resolvedExtra = typeof newStatus === 'object' && newStatus !== null ? { ...newStatus, ...extraData } : { ...extraData };
+
+    if (typeof targetJobIdentifier === 'object' && targetJobIdentifier !== null) {
+      resolvedExtra = { ...targetJobIdentifier, ...resolvedExtra };
+      if (!resolvedStatus && targetJobIdentifier.status) {
+        resolvedStatus = targetJobIdentifier.status;
+      }
+    }
+
     const targetStr = typeof targetJobIdentifier === 'object' && targetJobIdentifier !== null
       ? (targetJobIdentifier.id || `${targetJobIdentifier.company}_${targetJobIdentifier.title}`)
       : String(targetJobIdentifier || '');
@@ -136,14 +146,14 @@ export const useJobs = () => {
     const matchedJob = targetObj || rawJobs.find(j =>
       (j.id && String(j.id) === targetStr) ||
       `${j.company}_${j.title}` === targetStr ||
-      (j.company && j.title && normalizeJobKey(j.company, j.title) === normalizeJobKey(extraData.company, extraData.title))
+      (j.company && j.title && normalizeJobKey(j.company, j.title) === normalizeJobKey(resolvedExtra.company, resolvedExtra.title))
     );
 
     const key = matchedJob ? jobKey(matchedJob) : targetStr;
     const altKey = matchedJob ? `${matchedJob.company}_${matchedJob.title}` : targetStr;
-    const normKey = matchedJob ? normalizeJobKey(matchedJob.company, matchedJob.title) : normalizeJobKey(extraData.company, extraData.title);
+    const normKey = matchedJob ? normalizeJobKey(matchedJob.company, matchedJob.title) : normalizeJobKey(resolvedExtra.company, resolvedExtra.title);
 
-    const patch = { ...(newStatus ? { status: newStatus } : {}), ...extraData };
+    const patch = { ...(resolvedStatus ? { status: resolvedStatus } : {}), ...resolvedExtra };
 
     setOverrides(prev => {
       const next = { ...prev };
@@ -157,12 +167,12 @@ export const useJobs = () => {
       ? { ...matchedJob, ...patch }
       : {
           id: targetStr,
-          company: extraData.company || (targetStr.includes('_') ? targetStr.split('_')[0] : 'Direct Employer'),
-          title: extraData.title || (targetStr.includes('_') ? targetStr.split('_')[1] : 'Direct Position'),
-          date: extraData.date || new Date().toISOString().split('T')[0],
-          applied_at: extraData.applied_at || (newStatus && newStatus.toLowerCase().includes('applied') ? new Date().toISOString().split('T')[0] : null),
-          status: newStatus || extraData.status || 'Applied / In Review',
-          ...extraData
+          company: resolvedExtra.company || (targetStr.includes('_') ? targetStr.split('_')[0] : 'Direct Employer'),
+          title: resolvedExtra.title || (targetStr.includes('_') ? targetStr.split('_')[1] : 'Direct Position'),
+          date: resolvedExtra.date || new Date().toISOString().split('T')[0],
+          applied_at: resolvedExtra.applied_at || (resolvedStatus && resolvedStatus.toLowerCase().includes('applied') ? new Date().toISOString().split('T')[0] : null),
+          status: resolvedStatus || resolvedExtra.status || 'Applied / In Review',
+          ...resolvedExtra
         };
 
     saveUserApplication(jobObj);

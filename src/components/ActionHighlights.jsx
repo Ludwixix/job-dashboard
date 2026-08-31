@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles } from 'lucide-react';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 
-export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onSelectJob }) => {
+export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onSelectJob, onJobStatusUpdate }) => {
   const [psychJob, setPsychJob] = React.useState(null);
   // Filter jobs that need action: Interviewing, Offer, or Package Prepared
   const actionJobs = jobs.filter(j => {
@@ -150,7 +150,17 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
         })}
       </div>
     </div>
-    {psychJob && <PsychologyDecoderModal job={psychJob} onClose={() => setPsychJob(null)} />}
+    {psychJob && (
+      <PsychologyDecoderModal 
+        job={psychJob} 
+        onClose={() => setPsychJob(null)} 
+        onSaveInsights={(id, insights) => {
+          if (onJobStatusUpdate) {
+            onJobStatusUpdate(id, psychJob.status || 'Discovered', { psychologyInsights: insights });
+          }
+        }}
+      />
+    )}
     </>
   );
 };

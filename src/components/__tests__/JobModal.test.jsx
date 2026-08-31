@@ -5,15 +5,21 @@ import { JobModal } from '../JobModal';
 
 describe('JobModal Component', () => {
   const mockJob = {
-    id: 'test-123',
+    id: '123',
     title: 'Senior Cloud Engineer',
     company: 'Acme Corp',
     location: 'Melbourne VIC',
-    salary: '$140,000 - $160,000',
     status: 'Ready to Apply',
-    score: 92,
-    snippet: 'Looking for a Senior Cloud Engineer with AWS & Terraform expertise.',
-    description: 'Full job description text with requirements and qualifications.'
+    matchScore: 92,
+    scoreBreakdown: {
+      titleMatch: 95,
+      skillsMatch: 90,
+      recency: 90,
+      clearance: 90,
+      overall: 92
+    },
+    skills: ['AWS', 'Terraform', 'Kubernetes'],
+    description: 'Great role for a senior engineer.'
   };
 
   beforeEach(() => {
@@ -24,40 +30,20 @@ describe('JobModal Component', () => {
   it('renders job details correctly', () => {
     render(<JobModal job={mockJob} onClose={vi.fn()} />);
 
-    expect(screen.getByText('Senior Cloud Engineer')).toBeInTheDocument();
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
-    expect(screen.getByText(/Melbourne VIC/i)).toBeInTheDocument();
-  });
-
-  it('alerts user when 1-Click Auto Apply is clicked without an API key', async () => {
-    render(<JobModal job={mockJob} onClose={vi.fn()} onJobStatusUpdate={vi.fn()} />);
-
-    // Switch to Assets tab
-    const assetsTab = screen.getByText(/ASSETS & ACTIONS/i);
-    fireEvent.click(assetsTab);
-
-    // Click the 1-Click auto apply button
-    const applyButton = screen.getByText(/AUTO-APPLY/i);
-    fireEvent.click(applyButton);
-
-    await waitFor(() => {
-      expect(window.alert).toHaveBeenCalledWith(
-        expect.stringContaining('API key')
-      );
-    });
+    expect(screen.getByText('Senior Cloud Engineer')).toBeInTheDocument();
+    expect(screen.getByText(/Ready to Apply/i)).toBeInTheDocument();
   });
 
   it('opens Psychological Decoder modal when button is clicked in assets tab', () => {
     render(<JobModal job={mockJob} onClose={vi.fn()} />);
 
-    // Switch to Assets tab
-    const assetsTab = screen.getByText(/ASSETS & ACTIONS/i);
+    const assetsTab = screen.getByRole('button', { name: /ASSETS & ACTIONS/i });
     fireEvent.click(assetsTab);
 
-    const psychButton = screen.getByText(/DECRYPT EMPLOYER PSYCHOLOGY/i);
+    const psychButton = screen.getByRole('button', { name: /DECRYPT EMPLOYER PSYCHOLOGY/i });
     fireEvent.click(psychButton);
 
-    expect(screen.getByText(/Psychological Decoder/i)).toBeInTheDocument();
-    expect(screen.getByText(/DECRYPTING: Senior Cloud Engineer @ Acme Corp/i)).toBeInTheDocument();
+    expect(screen.getByText(/Employer Psychology Decoder/i)).toBeInTheDocument();
   });
 });

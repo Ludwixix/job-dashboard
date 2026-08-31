@@ -710,6 +710,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
                   onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
                   onSelectJob={(j) => setSelectedJob(j)}
+                  onJobStatusUpdate={(id, status, extra) => updateJobStatus(id, status, extra)}
                 />
               </SafeErrorBoundary>
             )}

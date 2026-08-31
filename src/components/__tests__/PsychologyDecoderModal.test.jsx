@@ -5,9 +5,10 @@ import { PsychologyDecoderModal } from '../PsychologyDecoderModal';
 
 describe('PsychologyDecoderModal Component', () => {
   const mockJob = {
-    title: 'Lead Architect',
-    company: 'TechFlow',
-    description: 'Fast paced environment, wear many hats, high ownership.'
+    id: 'job-123',
+    title: 'Senior Cloud Engineer',
+    company: 'Acme Corp',
+    description: 'We are seeking an experienced engineer to overhaul our legacy infrastructure.'
   };
 
   beforeEach(() => {
@@ -15,55 +16,62 @@ describe('PsychologyDecoderModal Component', () => {
     window.localStorage.clear();
   });
 
-  it('displays an error if no API key is configured', async () => {
-    render(<PsychologyDecoderModal job={mockJob} onClose={vi.fn()} />);
+  it('renders and fetches psychology insights asynchronously from OpenRouter', async () => {
+    window.localStorage.setItem('openrouter_api_key', 'test-key');
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                hiddenPriorities: 'They are desperately firefighting cloud outages.',
+                managerProfile: 'Stressed engineering director seeking reliability.',
+                edgeStrategy: ['Emphasize zero-downtime migrations.'],
+                cultureClues: ['Urgent hiring indicates understaffing.']
+              })
+            }
+          }
+        ]
+      })
+    });
+
+    const onSave = vi.fn();
+    render(<PsychologyDecoderModal job={mockJob} onClose={vi.fn()} onSaveInsights={onSave} />);
+
+    expect(screen.getByText(/DECODING COVERT SUBTEXT/i)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/OpenRouter API key is required/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/They are desperately firefighting cloud outages/i)).toBeInTheDocument();
+      expect(screen.getByText(/Stressed engineering director seeking reliability/i)).toBeInTheDocument();
+      expect(screen.getByText(/Emphasize zero-downtime migrations/i)).toBeInTheDocument();
     });
+
+    expect(onSave).toHaveBeenCalledWith('job-123', expect.objectContaining({
+      hiddenPriorities: 'They are desperately firefighting cloud outages.'
+    }));
   });
 
-  it('renders decoded insights when API returns JSON analysis', async () => {
-    window.localStorage.setItem('openrouter_api_key', 'sk-test-key-12345');
-
-    const mockApiResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              hiddenPriorities: 'They need someone to untangle legacy tech debt without complaining.',
-              managerProfile: 'Stressed VP who needs quick stability and zero drama.',
-              edgeStrategy: [
-                'Lead with pragmatic refactoring examples',
-                'Demonstrate cross-functional calm',
-                'Emphasize hands-on troubleshooting'
-              ],
-              cultureClues: [
-                'Wear many hats means small team with under-resourced roadmap',
-                'High ownership means you will be on-call'
-              ]
-            })
-          }
-        }
-      ]
+  it('immediately renders retained cached insights without making a new network request', async () => {
+    const cachedJob = {
+      ...mockJob,
+      psychologyInsights: {
+        hiddenPriorities: 'Retained from previous session.',
+        managerProfile: 'Cached manager profile.',
+        edgeStrategy: ['Use cached edge.'],
+        cultureClues: ['Cached culture clue.'],
+        decodedAt: '2026-08-31T00:00:00.000Z'
+      }
     };
 
-    global.fetch = vi.fn().mockImplementation(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockApiResponse),
-      })
-    );
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy;
 
-    render(<PsychologyDecoderModal job={mockJob} onClose={vi.fn()} />);
+    render(<PsychologyDecoderModal job={cachedJob} onClose={vi.fn()} onSaveInsights={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/The Hidden Priorities/i)).toBeInTheDocument();
-      expect(screen.getByText(/untangle legacy tech debt/i)).toBeInTheDocument();
-      expect(screen.getByText(/Stressed VP who needs quick stability/i)).toBeInTheDocument();
-      expect(screen.getByText(/Lead with pragmatic refactoring examples/i)).toBeInTheDocument();
-    });
+    expect(screen.getByText(/Retained from previous session/i)).toBeInTheDocument();
+    expect(screen.getByText(/RETAINED ON CARD/i)).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

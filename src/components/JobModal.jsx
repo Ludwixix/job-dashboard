@@ -919,10 +919,14 @@ ${data.pipeline_result?.cover_text || ''}`;
               <div className="space-y-2 pt-2 border-t border-slate-200">
                 <button
                   onClick={() => setShowPsychology(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 font-extrabold text-xs transition-colors cursor-pointer"
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-extrabold text-xs transition-all cursor-pointer shadow-sm ${
+                    job.psychologyInsights 
+                      ? 'bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300' 
+                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200'
+                  }`}
                 >
-                  <Sparkles size={16} className="text-purple-600" />
-                  DECRYPT EMPLOYER PSYCHOLOGY
+                  <Sparkles size={16} className={job.psychologyInsights ? 'text-teal-600' : 'text-indigo-600'} />
+                  {job.psychologyInsights ? 'VIEW DECODED PSYCHOLOGY (RETAINED)' : 'DECRYPT EMPLOYER PSYCHOLOGY'}
                 </button>
               </div>
 
@@ -1012,7 +1016,15 @@ ${data.pipeline_result?.cover_text || ''}`;
 
       </div>
       {showPsychology && (
-        <PsychologyDecoderModal job={job} onClose={() => setShowPsychology(false)} />
+        <PsychologyDecoderModal 
+          job={job} 
+          onClose={() => setShowPsychology(false)}
+          onSaveInsights={(id, insights) => {
+            if (onJobStatusUpdate) {
+              onJobStatusUpdate(id, job.status || 'Discovered', { psychologyInsights: insights });
+            }
+          }}
+        />
       )}
     </div>
   );

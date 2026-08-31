@@ -17,6 +17,7 @@ import { motion } from 'framer-motion';
 import { AutoApplyModal } from './AutoApplyModal';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
+import { getCachedPsychology } from '../services/psychologyService';
 
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
@@ -1573,30 +1574,36 @@ export const JobSeeker = ({
                           </button>
                         </div>
                       )}
-                      {/* Psychology Insights Status & Decoder Trigger */}
-                      <div className="pt-2 border-t border-slate-100 font-mono">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPsychologyJob(job);
-                          }}
-                          className={`w-full py-1.5 px-2.5 rounded-xl text-[10px] font-bold flex items-center justify-between transition-all cursor-pointer border ${
-                            job.psychologyInsights
-                              ? 'bg-teal-950/70 hover:bg-teal-900/90 text-teal-300 border-teal-500/40 shadow-2xs'
-                              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-teal-300 border-slate-700/60 hover:border-teal-500/40'
-                          }`}
-                          title={job.psychologyInsights ? "View decoded employer psychology & hidden priorities" : "Decode employer psychology, covert pain points & candidate edge"}
-                        >
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Sparkles size={12} className={job.psychologyInsights ? "text-teal-400 shrink-0" : "text-slate-400 shrink-0"} />
-                            <span className="truncate">{job.psychologyInsights ? "PSYCHOLOGY DECODED" : "DECODE PSYCHOLOGY"}</span>
-                          </div>
-                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-black shrink-0 ${
-                            job.psychologyInsights ? "bg-teal-500/20 text-teal-300 border border-teal-500/30" : "bg-slate-800 text-slate-400"
-                          }`}>
-                            {job.psychologyInsights ? "RETAINED" : "UNFAIR EDGE"}
-                          </span>
-                        </button>
+                      {/* Psychology & Behavioral Subtext Decoder Pill Button */}
+                      <div className="pt-2 border-t border-slate-100">
+                        {(() => {
+                          const cached = getCachedPsychology(job);
+                          const hasPsychology = !!cached;
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPsychologyJob({ ...job, psychologyInsights: cached });
+                              }}
+                              className={`w-full py-1.5 px-2.5 rounded-xl text-[10px] font-bold flex items-center justify-between transition-all cursor-pointer border ${
+                                hasPsychology
+                                  ? 'bg-teal-950/70 hover:bg-teal-900/90 text-teal-300 border-teal-500/40 shadow-2xs'
+                                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-teal-300 border-slate-700/60 hover:border-teal-500/40'
+                              }`}
+                              title={hasPsychology ? "View decoded employer psychology & hidden priorities" : "Decode employer psychology, covert pain points & candidate edge"}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <Sparkles size={12} className={hasPsychology ? "text-teal-400 shrink-0" : "text-slate-400 shrink-0"} />
+                                <span className="truncate">{hasPsychology ? "PSYCHOLOGY DECODED" : "DECODE PSYCHOLOGY"}</span>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-black shrink-0 ${
+                                hasPsychology ? "bg-teal-500/20 text-teal-300 border border-teal-500/30" : "bg-slate-800 text-slate-400"
+                              }`}>
+                                {hasPsychology ? "RETAINED" : "UNFAIR EDGE"}
+                              </span>
+                            </button>
+                          );
+                        })()}
                       </div>
 
                       {/* Action Buttons */}

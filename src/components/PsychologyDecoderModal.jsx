@@ -6,17 +6,38 @@ import {
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
 import { getActiveProfile } from '../services/profileService';
 import { saveUserApplication } from '../services/dataService';
+import { 
+  getCachedPsychology, setCachedPsychology, 
+  getPendingPsychologyPromise, setPendingPsychologyPromise 
+} from '../services/psychologyService';
 
 export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
-  const [loading, setLoading] = useState(() => !job?.psychologyInsights);
+  const cached = getCachedPsychology(job);
+  const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState('');
-  const [insights, setInsights] = useState(() => job?.psychologyInsights || null);
+  const [insights, setInsights] = useState(() => cached || null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const decodePsychology = async (forceFresh = false) => {
-    if (!forceFresh && job?.psychologyInsights) {
-      setInsights(job.psychologyInsights);
+    const existing = getCachedPsychology(job);
+    if (!forceFresh && existing) {
+      setInsights(existing);
       setLoading(false);
+      return;
+    }
+
+    // Reuse in-flight promise if currently running
+    const inFlight = getPendingPsychologyPromise(job);
+    if (inFlight && !forceFresh) {
+      setLoading(true);
+      try {
+        const result = await inFlight;
+        setInsights(result);
+      } catch (err) {
+        setError(err.message || 'Failed to decode employer psychology.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -35,7 +56,7 @@ export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
     }
     setError('');
 
-    try {
+    const fetchPromise = (async () => {
       const activeModel = getActiveModel() || 'z-ai/glm-5.3-flash';
       const candidateProfile = getActiveProfile() || {};
 
@@ -74,9 +95,9 @@ export const PsychologyDecoderModal = ({ job, onClose, onSaveInsights }) => {
 Your mission is to perform a deep psychoanalytic breakdown of this full job advertisement to uncover the hiring manager's unstated operational pressures, organizational vulnerabilities, covert expectations, and what candidate posture will dominate the interview.
 
 Candidate Context (for customizing the leverage edge):
-- Candidate Archetype: ${candidateProfile.archetype || candidateProfile.headline || 'Senior Technical Leader'}
-- Superpowers: ${(candidateProfile.superpowers || []).join('; ') || 'Autonomous problem solver, enterprise systems reliability'}
-- Seniority: ${candidateProfile.seniority || 'Senior'}
+- Candidate Archetype: ${candidateProfile.marketArchetype || candidateProfile.headline || 'Senior Technical Specialist'}
+- Superpowers: ${(candidateProfile.keyStrengths || []).join('; ') || 'Autonomous systems reliability, enterprise cloud architecture'}
+- Seniority: ${candidateProfile.seniorityLevel || 'Senior'}
 
 Output a strictly valid JSON object matching this schema:
 {
@@ -134,7 +155,10 @@ ${fullJobText}`
       
       const targetId = job?.id || `${job?.company}_${job?.title}`;
 
-      // Persist directly to localStorage & SQLite application tracking storage
+      // 1. Save to dedicated local psychology cache
+      setCachedPsychology(job, payload);
+
+      // 2. Persist directly to localStorage & SQLite application tracking storage
       saveUserApplication({
         ...job,
         id: targetId,
@@ -142,10 +166,18 @@ ${fullJobText}`
         psychology_insights: payload
       });
 
-      // Persist asynchronously against the job record in parent state
+      // 3. Persist asynchronously against the job record in parent state
       if (onSaveInsights) {
         onSaveInsights(targetId, payload);
       }
+
+      return payload;
+    })();
+
+    setPendingPsychologyPromise(job, fetchPromise);
+
+    try {
+      await fetchPromise;
     } catch (err) {
       console.error('Psychology decoding error:', err);
       setError(err.message || 'Failed to decode employer psychology.');
@@ -156,8 +188,12 @@ ${fullJobText}`
   };
 
   useEffect(() => {
-    if (!job?.psychologyInsights) {
+    const existing = getCachedPsychology(job);
+    if (!existing) {
       decodePsychology(false);
+    } else {
+      setInsights(existing);
+      setLoading(false);
     }
   }, [job?.id]);
 

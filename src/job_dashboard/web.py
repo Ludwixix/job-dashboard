@@ -42,6 +42,8 @@ from .repository import JobRepository
 from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .smart_applications import get_smart_application_tracker
+from .sources import SearchQuery, ScrapePipeline
+
 
 logger = get_logger("job_dashboard.web")
 TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")

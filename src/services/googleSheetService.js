@@ -190,9 +190,17 @@ export const appendApplicationToSheet = async (accessToken, spreadsheetId, job, 
 
 
 /**
- * Upserts a job application in the user's personal Google Sheet.
+ * Upserts / appends a job application in the user's personal Google Sheet in real time.
+ */
+export const upsertApplicationInSheet = async (accessToken, spreadsheetId, job, userProfile) => {
+  return appendApplicationToSheet(accessToken, spreadsheetId, job, userProfile);
+};
+
+/**
+ * Bulk syncs all application records to the user's personal Google Sheet.
  */
 export const syncAllApplicationsToSheet = async (accessToken, spreadsheetId, jobs, userProfile) => {
+
   if (!accessToken || !spreadsheetId || !jobs || jobs.length === 0) return { count: 0 };
   if (accessToken.startsWith('simulated_')) return { count: 0, simulated: true };
   const rows = jobs.map(j => formatJobRow(j, userProfile));

@@ -1398,8 +1398,8 @@ export const JobSeeker = ({
                                 <ThumbsDown size={11} className={isJobDemoted(job) ? "fill-white" : ""} />
                                 <span className="hidden sm:inline text-[9px]">LESS</span>
                               </button>
-
                             </div>
+
 
                             {job.isRejected ? (
                               <button
@@ -1452,65 +1452,47 @@ export const JobSeeker = ({
                             </p>
                           </div>
 
-                          {/* Direct External Job Link Button in Top Header */}
-                          {(job.portalLink || job.url || job.link) && (
+                          {(job.portalLink || job.link || job.url) && (
                             <a
-                              href={(job.portalLink || job.url || job.link).startsWith('http') ? (job.portalLink || job.url || job.link) : `https://${job.portalLink || job.url || job.link}`}
+                              href={job.portalLink || job.link || job.url}
                               target="_blank"
-                              rel="noopener noreferrer"
+                              rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="shrink-0 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-mono font-black text-xs shadow-md shadow-blue-500/25 hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105"
-                              title={`Open official job ad on ${job.source || 'Portal'}`}
+                              className="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs"
+                              title="Open original job posting"
                             >
                               <span>OPEN JOB</span>
-                              <ExternalLink size={12} className="text-white" />
+                              <ExternalLink size={13} />
                             </a>
                           )}
                         </div>
 
-                        {/* Expanded & Scrollable Job Description */}
-                        {(job.description || job.notes || job.why) && (
-                          <div 
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-slate-50/90 hover:bg-slate-50 border border-slate-200/90 rounded-xl p-3 max-h-48 overflow-y-auto mt-2 select-text custom-scrollbar space-y-1 text-slate-700 shadow-inner group/desc"
-                          >
-                            <div className="flex items-center justify-between text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-wider pb-1 border-b border-slate-200/60 mb-1 sticky top-0 bg-slate-50/95 py-0.5 z-10 backdrop-blur-xs">
-                              <span className="flex items-center gap-1">
-                                <FileText size={11} className="text-indigo-500" /> FULL JOB DESCRIPTION
-                              </span>
-                              <span className="text-slate-400 text-[9px]">Scroll to read</span>
+                        {/* Salary and Stream Information */}
+                        <div className="flex items-center gap-2 pt-1">
+                          {job.salary ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <DollarSign size={13} className="text-emerald-600" />
+                              {job.salary}
                             </div>
-                            <p className="text-xs font-sans leading-relaxed whitespace-pre-line text-slate-700">
-                              {(job.description || job.notes || job.why || '').replace(/<[^>]*>/g, '').trim()}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Matched Skill Tags on Card */}
-                      {(job.matchedSkills || []).length > 0 && (
-                        <div className="flex flex-wrap gap-1 font-mono pt-1">
-                          {(job.matchedSkills || []).slice(0, 3).map((skill, sIdx) => (
-                            <span key={sIdx} className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-50/80 text-indigo-900 border border-indigo-200/80">
-                              {skill}
-                            </span>
-                          ))}
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+                              <DollarSign size={13} className="text-slate-400" />
+                              Market Salary
+                            </div>
+                          )}
                         </div>
-                      )}
 
-                      {/* Visual Chips (Location, Salary, Relative Posted Date) */}
-                      <div className="space-y-2 font-mono pt-1">
-                        {job.salary ? (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-extrabold bg-emerald-50 text-emerald-900 border border-emerald-300">
-                            <DollarSign size={13} className="text-emerald-700" />
-                            {job.salary}
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200">
-                            <DollarSign size={13} className="text-slate-400" />
-                            Market Salary
+                        {/* Matched Skill Tags on Card */}
+                        {(job.matchedSkills || []).length > 0 && (
+                          <div className="flex flex-wrap gap-1 font-mono pt-1">
+                            {job.matchedSkills.slice(0, 4).map((skill, idx) => (
+                              <span key={idx} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                ✓ {skill}
+                              </span>
+                            ))}
                           </div>
                         )}
+
 
                         <div className="flex items-center justify-between text-xs font-bold text-slate-600 pt-1 border-t border-slate-100">
                           <div className="flex items-center gap-1.5 truncate pr-2">
@@ -1560,7 +1542,6 @@ export const JobSeeker = ({
                           );
                         })()}
                       </div>
-
 
                       {/* Direct PDF Quick-Download Bar for Generated Docs */}
                       {hasCustomDocs && (
@@ -1692,8 +1673,8 @@ export const JobSeeker = ({
                     {/* Numeric Page Buttons */}
                     {Array.from({ length: totalPages }, (_, i) => i + 1)
                       .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-
                       .map((pageNum, idx, arr) => {
+
                         const prevPage = arr[idx - 1];
                         const showEllipsis = prevPage && pageNum - prevPage > 1;
 

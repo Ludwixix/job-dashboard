@@ -21,7 +21,9 @@ import { DashboardGridSkeleton } from './SkeletonLoaders';
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
+import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
+
 import { fetchJobsForProfile } from '../services/dataService';
 import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
@@ -105,9 +107,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         }, 6000);
       }
     } catch (err) {
-
       console.error('Async application error:', err);
     } finally {
+
       setAsyncGeneratingIds(prev => {
         const next = new Set(prev);
         if (job.id) {
@@ -834,7 +836,6 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
       {/* Fixed Bottom Status Bar */}
       <footer className="fixed bottom-0 left-0 right-0 h-7 bg-slate-900 border-t border-slate-800 text-slate-400 font-mono text-[11px] font-bold px-4 flex items-center justify-between z-50 select-none shadow-md">
-
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1 text-emerald-400">
             <span>⚡ V2.0 AUTONOMOUS</span>
@@ -843,6 +844,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <span>Active Feed: {jobs.length} jobs</span>
           </div>
         </div>
+
 
         <div className="flex items-center gap-3">
           <span className="text-slate-500">React 19 / Vite 6</span>

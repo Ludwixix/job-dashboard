@@ -184,10 +184,10 @@ export const useJobs = () => {
   }, [rawJobs]);
 
 
+
   /** Batch closes all applied jobs that have had no updates for >= 14 days */
   const closeNonResponsiveJobs = useCallback(() => {
     setOverrides(prev => {
-      const next = { ...prev };
       enrichedJobs.forEach(job => {
         if (job.isNonResponsive) {
           const key = jobKey(job);

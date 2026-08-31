@@ -225,7 +225,6 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
 
         {showLiveInsights && (
           <div className="space-y-2.5 pt-3 mt-2 border-t border-slate-800 animate-in fade-in duration-200">
-
             <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Navigation size={13} className="text-emerald-400 shrink-0" />
@@ -235,6 +234,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
               </div>
               <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">&lt;10KM</span>
             </div>
+
 
             {/* Telemetry Item 2: Top Fit Employer */}
             {liveInsights.topEmployer && (

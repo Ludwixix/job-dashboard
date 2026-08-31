@@ -153,9 +153,13 @@ export const BatchApplyModal = ({ jobs, isOpen, onClose, onComplete }) => {
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {completedResults.map((item, idx) => (
-                <div key={idx} className="p-3 rounded-xl bg-[#1e1e2e] border border-emerald-500/40 text-xs font-mono">
+                <div key={idx} className={`p-3 rounded-xl bg-[#1e1e2e] border ${item.success ? 'border-emerald-500/40' : 'border-rose-500/40'} text-xs font-mono`}>
                   <div className="font-black text-white">{item.job.title} — {item.job.company}</div>
-                  <div className="text-[11px] text-emerald-300 font-bold">Status: Applied / Confirmation Received ✅</div>
+                  {item.success ? (
+                    <div className="text-[11px] text-emerald-300 font-bold">Status: Applied / Confirmation Received ✅</div>
+                  ) : (
+                    <div className="text-[11px] text-rose-400 font-bold whitespace-pre-wrap">Action requires an API key or failed: {item.error}</div>
+                  )}
                 </div>
               ))}
             </div>

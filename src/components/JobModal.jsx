@@ -862,6 +862,9 @@ ${data.pipeline_result?.cover_text || ''}`;
                         setIsAutoApplying(false);
                         setAutoApplyReceipt(receipt);
                         if (onJobStatusUpdate) onJobStatusUpdate({ ...job, status: 'Applied' });
+                      }).catch(err => {
+                        setIsAutoApplying(false);
+                        alert(`Action requires an API key or failed: ${err.message}`);
                       });
                     }
                   }}

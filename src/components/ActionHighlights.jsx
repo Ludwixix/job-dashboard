@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2 } from 'lucide-react';
 
 export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onSelectJob }) => {
+  const [psychJob, setPsychJob] = React.useState(null);
   // Filter jobs that need action: Interviewing, Offer, or Package Prepared
   const actionJobs = jobs.filter(j => {
     const s = (j.status || '').toLowerCase();
@@ -28,6 +29,7 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
   );
 
   return (
+    <>
     <div className="w-full flex flex-col h-full space-y-4 font-sans pb-10">
       <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-950/60 via-orange-950/40 to-slate-900 border border-amber-500/40 space-y-2">
         <div className="text-amber-300 font-black flex items-center gap-2 text-sm uppercase">
@@ -114,6 +116,13 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
                 {isInterview ? (
                   <>
                     <button
+                      onClick={() => setPsychJob(job)}
+                      className="py-2 px-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-purple-500/30"
+                      title="Decrypt Psychology"
+                    >
+                      <Sparkles size={14} />
+                    </button>
+                    <button
                       onClick={() => onOpenInterviewPrep(job)}
                       className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
@@ -140,5 +149,7 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
         })}
       </div>
     </div>
+    {psychJob && <PsychologyDecoderModal job={psychJob} onClose={() => setPsychJob(null)} />}
+    </>
   );
 };

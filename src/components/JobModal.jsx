@@ -12,6 +12,7 @@ import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 import { getCommuteDetails } from '../services/commuteService';
+import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep }) => {
   const jobId = job?.id || `${job?.company}_${job?.title}`;
@@ -34,6 +35,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   const [isAutoApplying, setIsAutoApplying] = useState(false);
   const [pipelineStage, setPipelineStage] = useState(1);
   const [autoApplyReceipt, setAutoApplyReceipt] = useState(null);
+  const [showPsychology, setShowPsychology] = useState(false);
   const [activeReceiptTab, setActiveReceiptTab] = useState('fields'); // 'fields', 'resume', 'cover'
 
   if (!job) return null;
@@ -913,6 +915,17 @@ ${data.pipeline_result?.cover_text || ''}`;
                 )}
               </div>
 
+              {/* Psychological Edge */}
+              <div className="space-y-2 pt-2 border-t border-slate-200">
+                <button
+                  onClick={() => setShowPsychology(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 font-extrabold text-xs transition-colors cursor-pointer"
+                >
+                  <Sparkles size={16} className="text-purple-600" />
+                  DECRYPT EMPLOYER PSYCHOLOGY
+                </button>
+              </div>
+
               {/* Tailored Asset Generation Suite Options */}
               <div className="space-y-3 pt-2 border-t border-slate-200">
                 <div className="text-[10px] font-mono font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
@@ -998,6 +1011,9 @@ ${data.pipeline_result?.cover_text || ''}`;
         </div>
 
       </div>
+      {showPsychology && (
+        <PsychologyDecoderModal job={job} onClose={() => setShowPsychology(false)} />
+      )}
     </div>
   );
 };

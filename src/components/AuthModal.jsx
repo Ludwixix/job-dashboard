@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, LogIn, LogOut, CheckCircle2, ShieldCheck, Mail, 
   Table, Sparkles, Key, AlertCircle, RefreshCw, ExternalLink, Zap
@@ -10,13 +10,30 @@ import {
 } from '../services/googleAuthService';
 import { loginWithBrowserPasskey } from '../services/passkeyService';
 
-export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
+export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs = [] }) => {
   const [user, setUser] = useState(() => getAuthenticatedUser());
   const [clientIdInput, setClientIdInput] = useState(() => getGoogleClientId());
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [apiHealth, setApiHealth] = useState('checking...');
+  const [dbHealth, setDbHealth] = useState('checking...');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/health')
+        .then(res => res.json())
+        .then(data => {
+          setApiHealth('Healthy');
+          setDbHealth(data.database || 'SQLite WAL (Pooled)');
+        })
+        .catch(err => {
+          setApiHealth('Unreachable');
+          setDbHealth('Offline');
+        });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -213,31 +230,40 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile }) => {
             <div className="grid grid-cols-2 gap-2 text-[10px]">
               <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 space-y-0.5">
                 <div className="text-slate-400 font-bold uppercase">Backend API</div>
-                <div className="text-emerald-400 font-black flex items-center gap-1">
-                  <CheckCircle2 size={11} /> Healthy (Cloud Run)
+                <div className={`font-black flex items-center gap-1 ${apiHealth === 'Healthy' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {apiHealth === 'Healthy' ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />} {apiHealth}
                 </div>
               </div>
 
               <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 space-y-0.5">
                 <div className="text-slate-400 font-bold uppercase">Database Engine</div>
-                <div className="text-emerald-400 font-black flex items-center gap-1">
-                  <CheckCircle2 size={11} /> SQLite WAL (Pooled)
+                <div className={`font-black flex items-center gap-1 ${apiHealth === 'Healthy' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {apiHealth === 'Healthy' ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />} {dbHealth}
                 </div>
               </div>
 
               <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 space-y-0.5">
                 <div className="text-slate-400 font-bold uppercase">Active Profile Sync</div>
                 <div className="text-indigo-300 font-black truncate">
-                  {activeProfile?.name || user?.name || 'Sam Ludwig'}
+                  {activeProfile?.name || user?.name || 'Not Synced'}
                 </div>
               </div>
 
               <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 space-y-0.5">
                 <div className="text-slate-400 font-bold uppercase">Indexed Feed</div>
                 <div className="text-slate-200 font-black">
-                  4,787 Live Positions
+                  {jobs.length.toLocaleString()} Live Positions
                 </div>
               </div>
+              
+              {user?.spreadsheetId && (
+                <div className="col-span-2 p-2 rounded-xl bg-emerald-950/30 border border-emerald-900 space-y-0.5">
+                  <div className="text-emerald-500 font-bold uppercase">Google Drive Sync</div>
+                  <div className="text-emerald-400 font-black flex items-center gap-1">
+                    <CheckCircle2 size={11} /> Tracker Sheet Connected & Active
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

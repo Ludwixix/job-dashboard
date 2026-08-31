@@ -875,6 +875,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
           activeProfile={activeProfile}
+          jobs={jobs}
           onAuthChange={(user) => {
             setAuthUser(user);
             if (user) {

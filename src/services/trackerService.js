@@ -11,10 +11,31 @@ export const isValidTrackerJob = (job) => {
   const title = String(job.title || '').trim();
 
   // Filter out corrupted or placeholder values
-  if (!company || company.toLowerCase() === 'unknown' || company.toLowerCase() === 'undefined' || company.toLowerCase() === 'null') {
+  const compLower = company.toLowerCase();
+  const titLower = title.toLowerCase();
+
+  if (
+    !company ||
+    compLower === 'unknown' ||
+    compLower === 'undefined' ||
+    compLower === 'null' ||
+    compLower === 'gmail' ||
+    compLower === 'direct employer'
+  ) {
     return false;
   }
-  if (!title || title.toLowerCase() === 'unknown' || title.toLowerCase() === 'undefined' || title.toLowerCase() === 'null') {
+
+  if (
+    !title ||
+    titLower === 'unknown' ||
+    titLower === 'undefined' ||
+    titLower === 'null' ||
+    titLower.startsWith('exploring a new opportunity') ||
+    titLower.includes('application was sent to') ||
+    titLower.includes('application submitted') ||
+    titLower.includes('application received') ||
+    titLower.includes('invitation to connect')
+  ) {
     return false;
   }
 

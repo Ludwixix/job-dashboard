@@ -153,6 +153,117 @@ export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '
   return 'https://www.seek.com.au';
 };
 
+/**
+ * Extracts structured sections (responsibilities, requirements, benefits, employment type, work arrangement) from raw description
+ */
+export const extractStructuredJobSections = (text = '') => {
+  if (!text || typeof text !== 'string') {
+    return {
+      responsibilities: [],
+      requirements: [],
+      benefits: [],
+      employmentType: 'Full-time',
+      workArrangement: 'Hybrid'
+    };
+  }
+
+  const clean = text;
+  
+  // 1. Employment Type
+  let employmentType = 'Full-time';
+  if (/part[\s-]?time/i.test(clean)) employmentType = 'Part-time';
+  else if (/contract(?:or)?|temp(?:orary)?|fixed[\s-]?term/i.test(clean)) employmentType = 'Contract / Temp';
+  else if (/casual/i.test(clean)) employmentType = 'Casual';
+  else if (/permanent/i.test(clean)) employmentType = 'Permanent';
+
+  // 2. Work Arrangement
+  let workArrangement = 'Hybrid';
+  if (/\b(?:remote|work from home|wfh|100% remote|anywhere in australia)\b/i.test(clean)) workArrangement = 'Remote';
+  else if (/\b(?:on[\s-]?site|in[\s-]?office|client site|depot)\b/i.test(clean)) workArrangement = 'On-site';
+  else if (/\b(?:hybrid|flexible work)\b/i.test(clean)) workArrangement = 'Hybrid';
+
+  // 3. Extract bullets by sections
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  const responsibilities = [];
+  const requirements = [];
+  const benefits = [];
+
+  let currentSection = null; // 'resp' | 'req' | 'ben'
+
+  for (const line of lines) {
+    const lLower = line.toLowerCase();
+
+    // Section headers detection
+    if (/^(?:key\s+)?(?:responsibilities|duties|what you('ll| will) do|role overview|the opportunity|about the role|in this role)[:\s]*$/i.test(line) ||
+        /(?:key responsibilities|what you'll do|duties and responsibilities):/i.test(line)) {
+      currentSection = 'resp';
+      continue;
+    } else if (/^(?:requirements|about you|qualifications|skills\s*(?:&|and)\s*experience|what you('ll| will) bring|key selection criteria)[:\s]*$/i.test(line) ||
+               /(?:skills and experience|what you'll bring|requirements):/i.test(line)) {
+      currentSection = 'req';
+      continue;
+    } else if (/^(?:benefits|what we offer|perks|why join us|our culture|employee benefits)[:\s]*$/i.test(line) ||
+               /(?:what we offer|benefits and perks|why you'll love working here):/i.test(line)) {
+      currentSection = 'ben';
+      continue;
+    }
+
+    // Capture bullet points
+    if (/^[-•*▪▫►→✔✓]/.test(line) || /^\d+\.\s+/.test(line)) {
+      const bulletText = line.replace(/^[-•*▪▫►→✔✓\d.]+\s*/, '').trim();
+      if (bulletText.length > 5) {
+        if (currentSection === 'resp' && responsibilities.length < 6) {
+          responsibilities.push(bulletText);
+        } else if (currentSection === 'req' && requirements.length < 6) {
+          requirements.push(bulletText);
+        } else if (currentSection === 'ben' && benefits.length < 6) {
+          benefits.push(bulletText);
+        }
+      }
+    }
+  }
+
+  return {
+    responsibilities,
+    requirements,
+    benefits,
+    employmentType,
+    workArrangement
+  };
+};
+
+/**
+ * Evaluates whether a scraped job ad has all required data for complete presentation
+ */
+export const evaluateJobCompleteness = (job) => {
+  const missing = [];
+
+  const company = String(job.company || '').trim().toLowerCase();
+  if (!company || company === 'unknown' || company === 'undefined' || company === 'null' || company === 'gmail' || company === 'direct employer') {
+    missing.push('Company Name');
+  }
+
+  const title = String(job.title || '').trim().toLowerCase();
+  if (!title || title === 'unknown' || title === 'undefined' || title.length < 3 || title.startsWith('exploring a new opportunity') || title.includes('application was sent to')) {
+    missing.push('Job Title');
+  }
+
+  const desc = String(job.description || job.notes || '').trim();
+  if (!desc || desc.length < 60) {
+    missing.push('Job Description');
+  }
+
+  const url = String(job.portalLink || job.link || job.url || '').trim();
+  if (!url || !url.startsWith('http')) {
+    missing.push('Application Link');
+  }
+
+  return {
+    isComplete: missing.length === 0,
+    missingFields: missing
+  };
+};
+
 export const parseMetadata = (row, index) => {
   const rawNotes = row['Notes & Next Steps'] || row['notes'] || row['description'] || row['why'] || '';
   const notesStr = cleanDescriptionText(rawNotes);
@@ -186,7 +297,10 @@ export const parseMetadata = (row, index) => {
 
   const rowId = row['id'] || (index !== undefined ? String(index) : `${company}_${title}`);
 
-  return {
+  // Extract structured sections
+  const structured = extractStructuredJobSections(notesStr);
+
+  const jobObject = {
     id: String(rowId),
     date: row['Date'] || row['date'] || row['posted'] || new Date().toISOString().split('T')[0],
     company,
@@ -197,7 +311,12 @@ export const parseMetadata = (row, index) => {
     portalLink,
     notes: notesStr,
     description: notesStr,
-    salary,
+    salary: salary || row['salary'] || 'Market Competitive Salary',
+    employmentType: row['employmentType'] || structured.employmentType,
+    workArrangement: row['workArrangement'] || structured.workArrangement,
+    keyResponsibilities: row['keyResponsibilities'] || structured.responsibilities,
+    requirements: row['requirements'] || structured.requirements,
+    benefits: row['benefits'] || structured.benefits,
     coverLetterLink,
     cvLink,
     resumeText: row['resumeText'] || row['resume_text'] || '',
@@ -210,6 +329,13 @@ export const parseMetadata = (row, index) => {
     audit,
     remote
   };
+
+  // Evaluate data completeness
+  const completeness = evaluateJobCompleteness(jobObject);
+  jobObject.isComplete = completeness.isComplete;
+  jobObject.missingFields = completeness.missingFields;
+
+  return jobObject;
 };
 
 /**
@@ -263,7 +389,36 @@ export const getLocalUserApplications = () => {
     const raw = localStorage.getItem('job_dashboard_local_applications');
     if (raw) {
       const parsed = JSON.parse(raw);
-      return Object.values(parsed);
+      let changed = false;
+      const valid = {};
+
+      Object.entries(parsed).forEach(([k, app]) => {
+        const comp = String(app.company || '').trim().toLowerCase();
+        const tit = String(app.title || '').trim().toLowerCase();
+
+        // Discard corrupted email conversation or fake company records
+        const isCorrupt = !comp || !tit ||
+          comp === 'gmail' ||
+          comp === 'direct employer' ||
+          comp === 'unknown' ||
+          tit.startsWith('exploring a new opportunity') ||
+          tit.includes('application was sent to') ||
+          tit.includes('application submitted') ||
+          tit.includes('application received') ||
+          tit.includes('invitation to connect');
+
+        if (!isCorrupt) {
+          valid[k] = app;
+        } else {
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        localStorage.setItem('job_dashboard_local_applications', JSON.stringify(valid));
+      }
+
+      return Object.values(valid);
     }
   } catch {}
   return [];
@@ -289,7 +444,13 @@ export const fetchUserApplications = async () => {
       if (data.success && Array.isArray(data.applications)) {
         const combinedMap = new Map();
         localApps.forEach(a => combinedMap.set(String(a.id || a.job_id), a));
-        data.applications.forEach(a => combinedMap.set(String(a.job_id || a.id), a));
+        data.applications.forEach(a => {
+          const comp = String(a.company || '').trim().toLowerCase();
+          const tit = String(a.title || '').trim().toLowerCase();
+          if (comp && tit && comp !== 'gmail' && !tit.startsWith('exploring a new opportunity')) {
+            combinedMap.set(String(a.job_id || a.id), a);
+          }
+        });
         return Array.from(combinedMap.values());
       }
     }
@@ -303,6 +464,14 @@ export const fetchUserApplications = async () => {
  * Upsert private application tracking status and notes for the authenticated user
  */
 export const saveUserApplication = async (jobData) => {
+  const comp = String(jobData.company || '').trim().toLowerCase();
+  const tit = String(jobData.title || '').trim().toLowerCase();
+  
+  // Never save corrupted email conversation cards
+  if (!comp || !tit || comp === 'gmail' || tit.startsWith('exploring a new opportunity')) {
+    return;
+  }
+
   const targetId = jobData.id || `${jobData.company}_${jobData.title}`;
   
   // 1. Persist locally in localStorage for instant offline / cache recovery
@@ -329,24 +498,20 @@ export const saveUserApplication = async (jobData) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        job_id: targetId,
-        status: jobData.status || 'sourced',
+        job_id: String(targetId),
+        company: jobData.company,
+        title: jobData.title,
+        status: jobData.status || 'Applied / In Review',
         notes: jobData.notes || '',
-        resume_text: jobData.resumeText || jobData.resume_text || '',
-        cover_letter_text: jobData.coverLetterText || jobData.cover_letter_text || '',
-        applied_at: jobData.applied_at || jobData.date || null,
-        company: jobData.company || '',
-        title: jobData.title || '',
-        location: jobData.location || '',
-        source: jobData.source || '',
-        salary: jobData.salary || '',
-        portalLink: jobData.portalLink || jobData.link || jobData.url || '',
-        psychology_insights: jobData.psychologyInsights || null,
-        job_data: jobData
-      })
+        applied_at: jobData.applied_at || jobData.date || new Date().toISOString(),
+        resume_text: jobData.resumeText || jobData.resume_text || null,
+        cover_letter_text: jobData.coverLetterText || jobData.cover_letter_text || null,
+        psychology_insights: jobData.psychologyInsights || jobData.psychology_insights || null
+      }),
+      signal: AbortSignal.timeout(5000)
     });
-  } catch (e) {
-    console.warn('Failed to persist user application to SQLite:', e);
+  } catch (err) {
+    console.warn("Failed to persist application to backend:", err);
   }
 };
 
@@ -441,34 +606,8 @@ export const fetchJobsData = async () => {
     deduplicatedJobs.push(job);
   }
 
-  // Ensure any tracked user applications not present in the public feed are appended
-  const seenIds = new Set(deduplicatedJobs.map(j => String(j.id)));
-  const remainingApps = [];
-
-  userApps.forEach(userApp => {
-    const id = String(userApp.job_id || userApp.id || `${userApp.company}_${userApp.title}`);
-    const normKey = normalizeJobKey(userApp.company, userApp.title);
-    if (seenIds.has(id) || seenNormKeys.has(normKey)) return;
-    
-    seenIds.add(id);
-    if (normKey && normKey !== '__') seenNormKeys.add(normKey);
-
-    remainingApps.push(parseMetadata({
-      id: id,
-      company: userApp.company || 'Applied Employer',
-      title: userApp.title || 'Applied Role',
-      status: userApp.status || 'Applied / In Review',
-      notes: userApp.notes || '',
-      applied_at: userApp.applied_at || new Date().toISOString(),
-      location: userApp.location || 'Melbourne, VIC',
-      source: 'User Application',
-      resumeText: userApp.resume_text || userApp.resumeText || '',
-      coverLetterText: userApp.cover_letter_text || userApp.coverLetterText || '',
-      psychologyInsights: userApp.psychology_insights || userApp.psychologyInsights || null
-    }));
-  });
-
-  return [...deduplicatedJobs, ...remainingApps];
+  // Return strictly genuine scraped job ads
+  return deduplicatedJobs;
 };
 
 

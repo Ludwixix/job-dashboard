@@ -7,7 +7,7 @@ import {
   DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
   SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
-  ChevronFirst, ChevronLast, ArrowDown, Wrench, 
+  ChevronFirst, ChevronLast, ArrowDown, Wrench, Briefcase,
   ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
   Train, Car, Bike
@@ -254,10 +254,26 @@ export const JobSeeker = ({
     }
   }, [currentProfile?.id, currentProfile?.industry, JSON.stringify(currentProfile?.targetTitles || [])]);
 
-  // Unsubmitted jobs pool
+  // Unsubmitted jobs pool (strictly genuine scraped ads, discarding email pseudo-jobs)
   const unsubmittedJobs = useMemo(() => {
-    return jobs.filter(job => {
+    return (jobs || []).filter(job => {
       if (job.isRejected) return false;
+
+      // Filter out email conversation pseudo-jobs or corrupted company entries
+      const comp = (job.company || '').toLowerCase();
+      const tit = (job.title || '').toLowerCase();
+      if (
+        comp === 'gmail' ||
+        comp === 'direct employer' ||
+        tit.startsWith('exploring a new opportunity') ||
+        tit.includes('application was sent to') ||
+        tit.includes('application submitted') ||
+        tit.includes('application received') ||
+        tit.includes('invitation to connect')
+      ) {
+        return false;
+      }
+
       const s = (job.status || 'sourced').toLowerCase();
       const isProgressed = s.includes('applied') || 
                            s.includes('confirmation') || 
@@ -276,10 +292,19 @@ export const JobSeeker = ({
     });
   }, [jobs]);
 
-  // Aggregate job counts per role archetype across all unsubmitted jobs
+  // Complete Jobs vs Incomplete (Missing Data) Jobs
+  const completeJobs = useMemo(() => {
+    return unsubmittedJobs.filter(j => j.isComplete !== false);
+  }, [unsubmittedJobs]);
+
+  const missingDataJobs = useMemo(() => {
+    return unsubmittedJobs.filter(j => j.isComplete === false);
+  }, [unsubmittedJobs]);
+
+  // Aggregate job counts per role archetype across complete unsubmitted jobs
   const roleArchetypeCounts = useMemo(() => {
-    return getRoleArchetypeCounts(unsubmittedJobs, currentProfile);
-  }, [unsubmittedJobs, currentProfile]);
+    return getRoleArchetypeCounts(completeJobs, currentProfile);
+  }, [completeJobs, currentProfile]);
 
   useEffect(() => {
     const handlePrefChange = (e) => {
@@ -324,21 +349,22 @@ export const JobSeeker = ({
   }, [scraping]);
 
   const rejectedJobs = useMemo(() => {
-    return jobs.filter(j => j.isRejected);
+    return (jobs || []).filter(j => j.isRejected);
   }, [jobs]);
 
   const readyToSubmitCount = useMemo(() => {
-    return unsubmittedJobs.filter(hasGeneratedApplicationDocs).length;
-  }, [unsubmittedJobs]);
+    return completeJobs.filter(hasGeneratedApplicationDocs).length;
+  }, [completeJobs]);
 
   // Stream counts for expanded quick tabs
   const streamCounts = useMemo(() => {
     const counts = { 
-      All: unsubmittedJobs.length,
-      Starred: starredJobIds.length,
+      All: completeJobs.length,
+      Starred: completeJobs.filter(j => starredJobIds.includes(j.id || `${j.company}_${j.title}`)).length,
       TopFit: 0,
       QuickApply: 0,
       ReadyForSubmission: readyToSubmitCount,
+      'Healthcare & Medical': 0,
       'Finance & Accounting': 0,
       'Marketing & Sales': 0,
       'Construction & Trades': 0,
@@ -349,10 +375,11 @@ export const JobSeeker = ({
       'Gov & Public Sector': 0,
       'Field Tech & Labour': 0,
       'General & Professional': 0,
+      MissingData: missingDataJobs.length,
       'Rejected Jobs': rejectedJobs.length,
     };
 
-    unsubmittedJobs.forEach(j => {
+    completeJobs.forEach(j => {
       const match = calculateCandidateJobMatch(j, currentProfile, userPrefs);
       if (match.score >= 85) {
         counts.TopFit = (counts.TopFit || 0) + 1;
@@ -365,11 +392,15 @@ export const JobSeeker = ({
     });
 
     return counts;
-  }, [unsubmittedJobs, starredJobIds, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
+  }, [completeJobs, missingDataJobs, starredJobIds, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
 
 
   const seekerJobs = useMemo(() => {
-    const sourcePool = activeStreamTab === 'Rejected Jobs' ? rejectedJobs : unsubmittedJobs;
+    const sourcePool = activeStreamTab === 'Rejected Jobs' 
+      ? rejectedJobs 
+      : activeStreamTab === 'MissingData' 
+      ? missingDataJobs 
+      : completeJobs;
 
     // Enriched with active candidate dynamic ATS match & commute distance & preference weights
     const enrichedPool = sourcePool.map(job => {
@@ -383,7 +414,6 @@ export const JobSeeker = ({
         feedbackBonus: match.feedbackBonus
       };
     });
-
 
     const filtered = enrichedPool.filter(job => {
       const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
@@ -403,7 +433,9 @@ export const JobSeeker = ({
         matchesStream = isQuickApplyEligible(job);
       } else if (activeStreamTab === 'ReadyForSubmission') {
         matchesStream = hasGeneratedApplicationDocs(job);
-      } else if (activeStreamTab !== 'All' && activeStreamTab !== 'Rejected Jobs') {
+      } else if (activeStreamTab === 'MissingData' || activeStreamTab === 'Rejected Jobs' || activeStreamTab === 'All') {
+        matchesStream = true;
+      } else {
         const subStream = getJobSubStream(job);
         matchesStream = subStream === activeStreamTab || 
                         (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
@@ -499,7 +531,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile, userPrefs]);
+  }, [completeJobs, missingDataJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile, userPrefs]);
 
 
   // Paginated Sliced Jobs
@@ -641,6 +673,7 @@ export const JobSeeker = ({
     { id: 'Gov & Public Sector', name: 'GOV & PUBLIC SECTOR', icon: Building2, color: 'slate' },
     { id: 'Field Tech & Labour', name: 'FIELD TECH & LABOUR', icon: Wrench, color: 'teal' },
     { id: 'Education & Training', name: 'EDUCATION & TRAINING', icon: GraduationCap, color: 'indigo' },
+    { id: 'MissingData', name: '⚠️ MISSING DATA', icon: AlertCircle, color: 'amber', highlight: true },
     { id: 'Rejected Jobs', name: 'REJECTED JOBS', icon: Trash2, color: 'rose' },
   ];
 
@@ -1473,20 +1506,64 @@ export const JobSeeker = ({
                           )}
                         </div>
 
-                        {/* Salary and Stream Information */}
-                        <div className="flex items-center gap-2 pt-1">
-                          {job.salary ? (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {/* Salary, Employment Type & Work Arrangement Information */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {job.salary && (
+                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-300">
                               <DollarSign size={13} className="text-emerald-600" />
-                              {job.salary}
+                              <span>{job.salary}</span>
                             </div>
-                          ) : (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200">
-                              <DollarSign size={13} className="text-slate-400" />
-                              Market Salary
+                          )}
+                          {job.employmentType && (
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                              <Briefcase size={10} className="text-indigo-600" />
+                              <span>{job.employmentType}</span>
+                            </div>
+                          )}
+                          {job.workArrangement && (
+                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                              job.workArrangement === 'Remote' 
+                                ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                : job.workArrangement === 'Hybrid'
+                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                : 'bg-slate-50 text-slate-700 border-slate-200'
+                            }`}>
+                              <Building2 size={10} />
+                              <span>{job.workArrangement}</span>
                             </div>
                           )}
                         </div>
+
+                        {/* Key Responsibilities & Highlights Preview */}
+                        {job.keyResponsibilities && job.keyResponsibilities.length > 0 && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-700 space-y-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Key Deliverables:</span>
+                            <ul className="space-y-0.5">
+                              {job.keyResponsibilities.slice(0, 2).map((r, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-700 line-clamp-1">
+                                  <span className="text-indigo-600 font-black">•</span>
+                                  <span className="truncate">{r}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Incomplete Job Ad Warning Box (For Missing Data Stream) */}
+                        {job.isComplete === false && (
+                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-[11px] text-rose-900 space-y-1 font-mono">
+                            <div className="font-bold flex items-center gap-1 text-rose-700 text-[10px] uppercase">
+                              <AlertCircle size={12} /> Incomplete Job Ad Metadata:
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {job.missingFields?.map((f, i) => (
+                                <span key={i} className="px-1.5 py-0.5 rounded bg-rose-200 text-rose-900 text-[9px] font-bold">
+                                  Missing {f}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Matched Skill Tags on Card */}
                         {(job.matchedSkills || []).length > 0 && (

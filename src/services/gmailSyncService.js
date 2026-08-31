@@ -75,23 +75,63 @@ export const extractSeekJobId = (text = '') => {
 };
 
 /**
- * Parses actual job title & employer name from email subject, snippet, and body
+ * Parses actual job title & employer name from email subject, snippet, and body.
+ * Ignores conversational InMails, recruiter outreach, and newsletters.
  */
 export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyText = '', snippet = '') => {
   const fullText = cleanText(`${subject} \n ${snippet} \n ${bodyText}`);
+  const subLower = (subject || '').toLowerCase();
+
+  // Reject generic conversational messages, recruiter InMails, and newsletter digests
+  if (
+    subLower.includes('exploring a new opportunity') ||
+    subLower.includes('invitation to connect') ||
+    subLower.includes('message from') ||
+    subLower.includes('weekly digest') ||
+    subLower.includes('daily job alert') ||
+    subLower.includes('jobs you might be interested in') ||
+    subLower.includes('top job picks')
+  ) {
+    return { title: '', company: '', isIgnoredMessage: true };
+  }
+
   let company = '';
   let title = '';
 
-  // 1. SEEK Specific Patterns:
-  // e.g. "application for IT Support Engineer (ICT Managed Services) advertised by Tecala ICT Pty Limited"
-  const seekAdvPattern = /application for (?:the )?([A-Za-z0-9\s/()\-]+?)\s*(?:advertised by|with)\s*([A-Za-z0-9\s/()\-&.,]+?)(?:\s+is|\s+was|\.|\n|\r|%%|<|http|Thank|Keep)/i;
-  const seekAdvMatch = fullText.match(seekAdvPattern);
-  if (seekAdvMatch) {
-    title = seekAdvMatch[1].trim();
-    company = seekAdvMatch[2].trim();
+  // 1. LinkedIn Application Sent Pattern:
+  // e.g. "Sam, your application was sent to Bitwarden"
+  const liSentMatch = subject.match(/(?:your application was sent to|application sent to|applied to)\s+([A-Za-z0-9\s/()\-&.,]+)/i);
+  if (liSentMatch) {
+    company = liSentMatch[1].replace(/[.!?]+$/, '').trim();
+    // Extract title from body: "You applied for Systems Administrator at Bitwarden"
+    const liBodyMatch = fullText.match(/(?:You applied for|applied for the role of|application for)\s+(?:the )?([A-Za-z0-9\s/()\-]+?)\s+(?:at|with)\s+/i);
+    if (liBodyMatch) {
+      title = liBodyMatch[1].trim();
+    }
   }
 
-  // e.g. "You applied for Systems Administrator at Canva on 24 Aug"
+  // 2. Careers Portal Dash Pattern:
+  // e.g. "Thales Careers - Systems Administrator (R0335815)"
+  if (!company || !title) {
+    const portalDashMatch = subject.match(/^([A-Za-z0-9\s&.,]+?)\s+Careers\s*[-|–:]\s*([^\n\r]+)/i);
+    if (portalDashMatch) {
+      company = portalDashMatch[1].trim();
+      title = portalDashMatch[2].trim();
+    }
+  }
+
+  // 3. SEEK Specific Patterns:
+  // e.g. "application for IT Support Engineer (ICT Managed Services) advertised by Tecala ICT Pty Limited"
+  if (!company || !title) {
+    const seekAdvPattern = /application for (?:the )?([A-Za-z0-9\s/()\-]+?)\s*(?:advertised by|with)\s*([A-Za-z0-9\s/()\-&.,]+?)(?:\s+is|\s+was|\.|\n|\r|%%|<|http|Thank|Keep)/i;
+    const seekAdvMatch = fullText.match(seekAdvPattern);
+    if (seekAdvMatch) {
+      title = seekAdvMatch[1].trim();
+      company = seekAdvMatch[2].trim();
+    }
+  }
+
+  // 4. "You applied for X at Y" Pattern:
   if (!company || !title || company.length > 50 || title.length > 60) {
     const appliedPattern = /(?:You applied for|Thank you for applying (?:to|for)|Your application for)\s+(?:the )?([A-Za-z0-9\s/()\-]+?)\s+(?:at|with|to)\s+([A-Za-z0-9\s/()\-&.,]+?)(?:\s+on|\s+has|\s+is|\s+was|\.|\n|\r|%%|<|http|!)/i;
     const appliedMatch = fullText.match(appliedPattern);
@@ -101,7 +141,7 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
     }
   }
 
-  // e.g. "Thank you for your interest in the IT Support Engineer job at Tecala ICT"
+  // 5. "interest in the X job at Y" Pattern:
   if (!company || !title) {
     const interestPattern = /interest in the\s+([A-Za-z0-9\s/()\-]+?)\s+job at\s+([A-Za-z0-9\s/()\-&.,]+?)(?:\.|\n|\r|!|<)/i;
     const interestMatch = fullText.match(interestPattern);
@@ -111,7 +151,7 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
     }
   }
 
-  // e.g. Subject: "Application submitted: Senior DevOps Engineer - Melbourne Recital Centre"
+  // 6. Subject: "Application submitted: Senior DevOps Engineer - Melbourne Recital Centre"
   if (!company || !title) {
     const subDashPattern = /(?:Application submitted|Application received|Application|Applied):\s*([^-\n|]+?)\s*[-|–]\s*([^\n\r]+)/i;
     const subDashMatch = subject.match(subDashPattern);
@@ -121,30 +161,30 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
     }
   }
 
-  // 2. Clean fallback Company from Sender Header if needed
-  if (!company || ['SEEK', 'SEEK Applications', 'Seek', 'Broadbean', 'noreply', 'Direct Employer'].includes(company)) {
+  // Clean fallback Company from Sender Header if needed
+  if (!company || ['SEEK', 'SEEK Applications', 'Seek', 'Broadbean', 'noreply', 'Direct Employer', 'Gmail', 'Linkedin', 'LinkedIn'].includes(company)) {
     const nameMatch = fromHeader.match(/^"?([^"<]+)"?\s*<.*>/);
     if (nameMatch && nameMatch[1]) {
       const rawName = nameMatch[1]
-        .replace(/(careers|talent|recruitment|team|jobs|hiring|notifications|no-reply|noreply|hr|alerts|applications)/gi, '')
+        .replace(/(careers|talent|recruitment|team|jobs|hiring|notifications|no-reply|noreply|hr|alerts|applications|linkedin)/gi, '')
         .trim();
-      if (rawName.length > 2 && !rawName.toLowerCase().includes('seek')) {
+      if (rawName.length > 2 && !rawName.toLowerCase().includes('seek') && !rawName.toLowerCase().includes('gmail')) {
         company = rawName;
       }
     }
     
-    if (!company || ['SEEK', 'SEEK Applications', 'Seek'].includes(company)) {
+    if (!company || ['SEEK', 'SEEK Applications', 'Seek', 'Gmail', 'Linkedin'].includes(company)) {
       const domainMatch = fromHeader.match(/@([a-zA-Z0-9.-]+)\./);
       if (domainMatch && domainMatch[1]) {
         const domainPart = domainMatch[1].toLowerCase();
-        if (!['gmail', 'yahoo', 'hotmail', 'outlook', 'seek', 'workday', 'greenhouse', 'lever', 'smartrecruiters', 'jobvite', 'bamboohr', 'ashbyhq', 'broadbean'].includes(domainPart)) {
+        if (!['gmail', 'yahoo', 'hotmail', 'outlook', 'seek', 'linkedin', 'workday', 'greenhouse', 'lever', 'smartrecruiters', 'jobvite', 'bamboohr', 'ashbyhq', 'broadbean'].includes(domainPart)) {
           company = domainPart.charAt(0).toUpperCase() + domainPart.slice(1);
         }
       }
     }
   }
 
-  // 3. Clean fallback Title from Subject if needed
+  // Clean fallback Title from Subject if needed
   if (!title || title.toLowerCase().includes('your application was') || title.toLowerCase().includes('application submitted') || title.length < 3) {
     let cleanSub = subject
       .replace(/^(re:|fwd:|thank you for applying:?|application for:?|your application to:?|application submitted:?|application received:?)\s*/gi, '')
@@ -160,11 +200,16 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
   title = (title || 'Applied Position')
     .replace(/^["'\s]+|["'\s]+$/g, '')
     .replace(/\s+/g, ' ');
-  company = (company || 'Direct Employer')
+  company = (company || '')
     .replace(/^["'\s]+|["'\s]+$/g, '')
     .replace(/\s+/g, ' ');
 
-  return { title, company };
+  // If company is still generic or missing, do not treat as valid job
+  if (!company || company.toLowerCase() === 'gmail' || company.toLowerCase() === 'linkedin') {
+    return { title: '', company: '', isIgnoredMessage: true };
+  }
+
+  return { title, company, isIgnoredMessage: false };
 };
 
 /**
@@ -299,6 +344,9 @@ export const scanGmailForApplications = async (accessToken, maxResults = 30, cat
 
       // 2. Extract clean company and title
       const extracted = extractJobDetailsFromEmail(from, subject, bodyText, snippet);
+      if (extracted.isIgnoredMessage || !extracted.company || !extracted.title) {
+        continue;
+      }
       extracted.seekJobId = seekJobId;
 
       // 3. Classify application status
@@ -326,7 +374,7 @@ export const scanGmailForApplications = async (accessToken, maxResults = 30, cat
           emailId: m.id
         });
       } else {
-        // Rich standalone parsed job
+        // Standalone user-tracked application record (for Application Tracker only)
         detailedResults.push({
           id: `gmail_${m.id}`,
           title: extracted.title,
@@ -335,13 +383,13 @@ export const scanGmailForApplications = async (accessToken, maxResults = 30, cat
           date: date,
           applied_at: date,
           location: 'Melbourne, VIC',
-          source: seekJobId ? 'SEEK (via Gmail)' : 'Gmail Inbox Sync',
+          source: seekJobId ? 'SEEK (via Gmail)' : 'Email Application Tracker',
           portalLink: seekJobId ? `https://au.seek.com/job/${seekJobId}` : '',
           url: seekJobId ? `https://au.seek.com/job/${seekJobId}` : '',
           score: 88,
           isLinkedToScrapedAd: false,
           tags: ['Gmail Verified', status],
-          notes: `Extracted from email: "${subject}"\n${snippet}`,
+          notes: `Extracted from email confirmation: "${subject}"\n${snippet}`,
           emailSubject: subject,
           emailSender: from,
           emailSnippet: snippet,

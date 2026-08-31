@@ -875,48 +875,100 @@ Sam Ludwig
           {activeTab === 'description' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               {/* Info Chips Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                  <Clock size={16} className="text-indigo-600 shrink-0" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
+                  <Clock size={15} className="text-indigo-600 shrink-0" />
                   <div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">AGE / POSTED</div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">POSTED</div>
                     <div className="font-extrabold text-slate-900">{formatDaysAgo(job.date)}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                  <MapPin size={16} className="text-indigo-600 shrink-0" />
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
+                  <MapPin size={15} className="text-indigo-600 shrink-0" />
                   <div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">LOCATION</div>
-                    <div className="font-extrabold text-slate-900 truncate max-w-[160px]">{job.location}</div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">LOCATION</div>
+                    <div className="font-extrabold text-slate-900 truncate">{job.location || 'Melbourne, VIC'}</div>
                   </div>
                 </div>
 
-                {job.salary ? (
-                  <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300">
-                    <DollarSign size={16} className="text-emerald-600 shrink-0" />
-                    <div>
-                      <div className="text-[10px] text-emerald-800 font-bold uppercase">COMPENSATION</div>
-                      <div className="font-extrabold">{job.salary}</div>
-                    </div>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300">
+                  <DollarSign size={15} className="text-emerald-600 shrink-0" />
+                  <div>
+                    <div className="text-[9px] text-emerald-800 font-bold uppercase">REMUNERATION</div>
+                    <div className="font-extrabold">{job.salary || 'Market Rate'}</div>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                    <DollarSign size={16} className="text-slate-400 shrink-0" />
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-bold uppercase">COMPENSATION</div>
-                      <div className="font-bold text-slate-600">Market Rate</div>
-                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
+                  <Briefcase size={15} className="text-indigo-600 shrink-0" />
+                  <div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">WORK MODE</div>
+                    <div className="font-extrabold text-slate-900">{job.workArrangement || (job.remote ? 'Remote' : 'Hybrid')} • {job.employmentType || 'Full-time'}</div>
                   </div>
-                )}
+                </div>
               </div>
+
+              {/* Structured Key Responsibilities */}
+              {job.keyResponsibilities && job.keyResponsibilities.length > 0 && (
+                <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200 space-y-2 font-mono">
+                  <div className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-indigo-600" />
+                    KEY RESPONSIBILITIES &amp; DELIVERABLES ({job.keyResponsibilities.length})
+                  </div>
+                  <ul className="space-y-1.5 pt-1">
+                    {job.keyResponsibilities.map((resp, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-800 font-sans">
+                        <span className="text-indigo-600 font-black shrink-0">•</span>
+                        <span>{resp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Structured Requirements & Qualifications */}
+              {job.requirements && job.requirements.length > 0 && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 font-mono">
+                  <div className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Award size={14} className="text-indigo-600" />
+                    REQUIRED QUALIFICATIONS &amp; EXPERIENCE ({job.requirements.length})
+                  </div>
+                  <ul className="space-y-1.5 pt-1">
+                    {job.requirements.map((req, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-800 font-sans">
+                        <span className="text-emerald-600 font-black shrink-0">✓</span>
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Structured Benefits & Perks */}
+              {job.benefits && job.benefits.length > 0 && (
+                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2 font-mono">
+                  <div className="text-xs font-black text-emerald-950 uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles size={14} className="text-emerald-600" />
+                    BENEFITS &amp; CULTURE ({job.benefits.length})
+                  </div>
+                  <ul className="space-y-1.5 pt-1">
+                    {job.benefits.map((ben, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-emerald-900 font-sans">
+                        <span className="text-emerald-600 font-black shrink-0">★</span>
+                        <span>{ben}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Expandable Formatted Job Description */}
               {job.notes ? (
                 <div className="space-y-3 font-mono">
                   <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                     <div className="flex items-center gap-2">
-                      <FileText size={14} className="text-slate-400" /> JOB OVERVIEW & DETAILS
+                      <FileText size={14} className="text-slate-400" /> FULL JOB ADVERTISEMENT TEXT
                     </div>
                     {isLongText && (
                       <button

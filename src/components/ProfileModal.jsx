@@ -1,54 +1,124 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, User, Sparkles, Upload, FileText, CheckCircle2, 
   MapPin, DollarSign, Briefcase, Mail, Phone, ShieldCheck, 
   Trash2, Plus, Tag, RefreshCw, AlertCircle, Award, Target,
-  Compass, Zap, Brain, ChevronRight, Layers, FileCode
+  Compass, Zap, Brain, MessageSquare, ChevronRight, Layers, FileCode
 } from 'lucide-react';
-import { parseResumeWithAI, parseResumeTextClientSide, saveProfile, deleteProfile, DEFAULT_PROFILES } from '../services/profileService';
+import { 
+  parseResumeWithAI, 
+  parseResumeTextClientSide, 
+  saveProfile, 
+  getActiveProfile,
+  deleteProfile, 
+  DEFAULT_PROFILES 
+} from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
 import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
 
-export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
-  const [activeTab, setActiveTab] = useState(() => {
-    return (profile?.name && profile?.name !== 'Candidate' && (profile?.targetTitles?.length || profile?.coreSkills?.length)) ? 'edit' : 'upload';
-  });
+const INDUSTRY_OPTIONS = [
+  'Technology & IT',
+  'Healthcare & Nursing',
+  'Finance & Accounting',
+  'Construction & Engineering',
+  'Sales, Marketing & Comms',
+  'Trades & Services',
+  'Education & Training',
+  'Executive & Management',
+  'Hospitality & Tourism',
+  'Legal & Compliance',
+  'Mining, Energy & Resources',
+  'Government & Defence'
+];
+
+const SENIORITY_OPTIONS = [
+  'Entry / Graduate',
+  'Mid-Level',
+  'Senior',
+  'Senior / Lead',
+  'Principal / Architect',
+  'Manager / Lead',
+  'Executive / Director'
+];
+
+export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initialTab = 'upload' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [resumeText, setResumeText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [apiKey, setApiKey] = useState(() => getActiveApiKey());
 
   // Form State
-  const [formData, setFormData] = useState(() => ({
-    id: profile?.id || 'sam_ludwig',
-    name: profile?.name || '',
-    title: profile?.title || '',
-    industry: profile?.industry || 'Technology & IT',
-    seniorityLevel: profile?.seniorityLevel || 'Senior',
-    yearsOfExperience: profile?.yearsOfExperience || 8,
-    marketArchetype: profile?.marketArchetype || 'Enterprise Specialist',
-    email: profile?.email || '',
-    phone: profile?.phone || '',
-    location: profile?.location || 'Melbourne, VIC',
-    suburb: profile?.suburb || 'Melbourne',
-    workRights: profile?.workRights || 'Australian Citizen (Unrestricted)',
-    clearance: profile?.clearance || 'Australian Citizen (Baseline / NV1 Eligible)',
-    targetSalary: profile?.targetSalary || '$135,000 - $160,000 + Super',
-    keyStrengths: profile?.keyStrengths ? [...profile.keyStrengths] : [],
-    managementStyle: profile?.managementStyle || 'Collaborative / Outcome-Driven',
-    targetTitles: profile?.targetTitles ? [...profile.targetTitles] : ['Systems Engineer'],
-    coreSkills: profile?.coreSkills ? [...profile.coreSkills] : ['Microsoft 365', 'Azure', 'PowerShell'],
-    certifications: profile?.certifications ? [...profile.certifications] : [],
-    interviewTalkingPoints: profile?.interviewTalkingPoints ? [...profile.interviewTalkingPoints] : [],
-    workHistorySummary: profile?.workHistorySummary || '',
-    fullWorkExperienceText: profile?.fullWorkExperienceText || ''
-  }));
+  const [formData, setFormData] = useState(() => {
+    const current = getActiveProfile() || profile || {};
+    return {
+      id: current.id || 'sam_ludwig',
+      name: current.name || '',
+      title: current.title || '',
+      industry: current.industry || 'Technology & IT',
+      seniorityLevel: current.seniorityLevel || 'Senior',
+      yearsOfExperience: current.yearsOfExperience || 8,
+      marketArchetype: current.marketArchetype || current.market_archetype || 'Enterprise Systems & Cloud Specialist',
+      email: current.email || '',
+      phone: current.phone || '',
+      location: current.location || 'Melbourne, VIC',
+      suburb: current.suburb || 'Melbourne',
+      workRights: current.workRights || current.work_rights || 'Australian Citizen (Unrestricted)',
+      clearance: current.clearance || 'Australian Citizen (Baseline / NV1 Eligible)',
+      targetSalary: current.targetSalary || current.target_salary || '$135,000 - $160,000 + Super',
+      keyStrengths: current.keyStrengths?.length ? [...current.keyStrengths] : (current.key_strengths?.length ? [...current.key_strengths] : []),
+      managementStyle: current.managementStyle || 'Collaborative / Outcome-Driven',
+      targetTitles: current.targetTitles?.length ? [...current.targetTitles] : (current.target_titles?.length ? [...current.target_titles] : ['Systems Engineer']),
+      coreSkills: current.coreSkills?.length ? [...current.coreSkills] : (current.core_skills?.length ? [...current.core_skills] : ['Microsoft 365', 'Azure', 'PowerShell']),
+      certifications: current.certifications?.length ? [...current.certifications] : [],
+      interviewTalkingPoints: current.interviewTalkingPoints?.length ? [...current.interviewTalkingPoints] : [],
+      workHistorySummary: current.workHistorySummary || '',
+      fullWorkExperienceText: current.fullWorkExperienceText || ''
+    };
+  });
 
   const [newTitleInput, setNewTitleInput] = useState('');
   const [newSkillInput, setNewSkillInput] = useState('');
   const [newCertInput, setNewCertInput] = useState('');
   const [newStrengthInput, setNewStrengthInput] = useState('');
+  const [newTalkingPointInput, setNewTalkingPointInput] = useState('');
+
+  // Synchronize active profile data whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const active = getActiveProfile() || profile;
+      if (active) {
+        setFormData({
+          id: active.id || 'sam_ludwig',
+          name: active.name || '',
+          title: active.title || '',
+          industry: active.industry || 'Technology & IT',
+          seniorityLevel: active.seniorityLevel || 'Senior',
+          yearsOfExperience: active.yearsOfExperience || 8,
+          marketArchetype: active.marketArchetype || active.market_archetype || 'Enterprise Systems & Cloud Specialist',
+          email: active.email || '',
+          phone: active.phone || '',
+          location: active.location || 'Melbourne, VIC',
+          suburb: active.suburb || 'Melbourne',
+          workRights: active.workRights || active.work_rights || 'Australian Citizen (Unrestricted)',
+          clearance: active.clearance || 'Australian Citizen (Baseline / NV1 Eligible)',
+          targetSalary: active.targetSalary || active.target_salary || '$135,000 - $160,000 + Super',
+          keyStrengths: active.keyStrengths?.length ? [...active.keyStrengths] : (active.key_strengths?.length ? [...active.key_strengths] : []),
+          managementStyle: active.managementStyle || 'Collaborative / Outcome-Driven',
+          targetTitles: active.targetTitles?.length ? [...active.targetTitles] : (active.target_titles?.length ? [...active.target_titles] : ['Systems Engineer']),
+          coreSkills: active.coreSkills?.length ? [...active.coreSkills] : (active.core_skills?.length ? [...active.core_skills] : ['Microsoft 365', 'Azure', 'PowerShell']),
+          certifications: active.certifications?.length ? [...active.certifications] : [],
+          interviewTalkingPoints: active.interviewTalkingPoints?.length ? [...active.interviewTalkingPoints] : [],
+          workHistorySummary: active.workHistorySummary || '',
+          fullWorkExperienceText: active.fullWorkExperienceText || ''
+        });
+      }
+      setSaveSuccess(false);
+      setParseError('');
+    }
+  }, [isOpen, profile]);
 
   if (!isOpen) return null;
 
@@ -210,6 +280,23 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
     }));
   };
 
+  const handleAddTalkingPoint = () => {
+    if (newTalkingPointInput.trim() && !formData.interviewTalkingPoints.includes(newTalkingPointInput.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        interviewTalkingPoints: [...prev.interviewTalkingPoints, newTalkingPointInput.trim()]
+      }));
+      setNewTalkingPointInput('');
+    }
+  };
+
+  const handleRemoveTalkingPoint = (tp) => {
+    setFormData(prev => ({
+      ...prev,
+      interviewTalkingPoints: prev.interviewTalkingPoints.filter(item => item !== tp)
+    }));
+  };
+
   const handleSave = () => {
     if (!formData.name.trim()) {
       alert('Please enter a candidate name.');
@@ -218,14 +305,17 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
 
     setActiveApiKey(apiKey);
     const saved = saveProfile(formData);
+    setSaveSuccess(true);
     if (onProfileSaved) {
       onProfileSaved(saved);
     }
-    onClose();
+    setTimeout(() => {
+      onClose();
+    }, 450);
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete profile "${formData.name}"?`)) {
+    if (window.confirm(`Are you sure you want to reset profile for "${formData.name}"?`)) {
       deleteProfile(formData.id);
       if (onProfileSaved) {
         onProfileSaved(DEFAULT_PROFILES);
@@ -511,6 +601,36 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <Compass size={12} /> PRIMARY INDUSTRY DOMAIN
+                  </label>
+                  <select
+                    value={formData.industry}
+                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs cursor-pointer"
+                  >
+                    {INDUSTRY_OPTIONS.map(ind => (
+                      <option key={ind} value={ind}>{ind}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <Award size={12} /> SENIORITY LEVEL
+                  </label>
+                  <select
+                    value={formData.seniorityLevel}
+                    onChange={(e) => setFormData({ ...formData, seniorityLevel: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs cursor-pointer"
+                  >
+                    {SENIORITY_OPTIONS.map(lvl => (
+                      <option key={lvl} value={lvl}>{lvl}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                     <ShieldCheck size={12} /> CITIZENSHIP & WORK RIGHTS
                   </label>
                   <input
@@ -598,7 +718,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                 </div>
               </div>
 
-              {/* Certifications Tag Editor */}
+              {/* Verified Certifications Tag Editor */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
                   <Award size={13} /> VERIFIED CERTIFICATIONS & ACCREDITATIONS
@@ -625,6 +745,77 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                   />
                   <button
                     onClick={handleAddCert}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition-colors"
+                  >
+                    <Plus size={14} /> Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Competitive Superpowers Tag Editor */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                  <Zap size={13} className="text-amber-400" /> COMPETITIVE SUPERPOWERS & STRENGTHS
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]">
+                  {formData.keyStrengths?.map((str, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold">
+                      {str}
+                      <button onClick={() => handleRemoveStrength(str)} className="text-slate-400 hover:text-white cursor-pointer ml-1">×</button>
+                    </span>
+                  ))}
+                  {(!formData.keyStrengths || formData.keyStrengths.length === 0) && (
+                    <span className="text-slate-500 text-[11px] italic py-1">No superpowers listed yet</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newStrengthInput}
+                    onChange={(e) => setNewStrengthInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddStrength())}
+                    placeholder="Add superpower (e.g. Complex Zero-Downtime Cloud Migrations)..."
+                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-indigo-500 focus:outline-none text-xs"
+                  />
+                  <button
+                    onClick={handleAddStrength}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition-colors"
+                  >
+                    <Plus size={14} /> Add
+                  </button>
+                </div>
+              </div>
+
+              {/* STAR Interview Talking Points Editor */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                  <MessageSquare size={13} className="text-emerald-400" /> STAR INTERVIEW TALKING POINTS & METRICS
+                </label>
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]">
+                  {formData.interviewTalkingPoints?.map((tp, idx) => (
+                    <div key={idx} className="flex items-start justify-between gap-2 p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-200">
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 font-black">•</span>
+                        <span>{tp}</span>
+                      </div>
+                      <button onClick={() => handleRemoveTalkingPoint(tp)} className="text-slate-500 hover:text-rose-400 cursor-pointer shrink-0">×</button>
+                    </div>
+                  ))}
+                  {(!formData.interviewTalkingPoints || formData.interviewTalkingPoints.length === 0) && (
+                    <span className="text-slate-500 text-[11px] italic py-1 block">No talking points added yet</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTalkingPointInput}
+                    onChange={(e) => setNewTalkingPointInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTalkingPoint())}
+                    placeholder="Add STAR talking point (e.g. Reduced Azure infrastructure costs by $120k/yr via RI automated provisioning)..."
+                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-emerald-500 focus:outline-none text-xs"
+                  />
+                  <button
+                    onClick={handleAddTalkingPoint}
                     className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition-colors"
                   >
                     <Plus size={14} /> Add
@@ -689,7 +880,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                 onClick={handleDelete}
                 className="text-rose-400 hover:text-rose-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
               >
-                <Trash2 size={14} /> Delete Custom Profile
+                <Trash2 size={14} /> Reset Profile
               </button>
             )}
           </div>

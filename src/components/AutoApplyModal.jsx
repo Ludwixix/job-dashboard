@@ -15,19 +15,17 @@ import { generateApplicationDocs, hasGeneratedApplicationDocs } from '../service
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 
 export const AutoApplyModal = ({ job, onClose, onJobStatusUpdate, onJobStatusUpdated }) => {
-  if (!job) return null;
-
   const notifyStatusUpdate = onJobStatusUpdate || onJobStatusUpdated;
   const profile = getActiveProfile();
-  const platformName = getQuickApplyPlatform(job);
-  const screeningQuestions = resolveScreeningQuestions(job, profile);
+  const platformName = job ? getQuickApplyPlatform(job) : '';
+  const screeningQuestions = job ? resolveScreeningQuestions(job, profile) : [];
 
   const [mode, setMode] = useState('bot'); // 'bot' | 'answers' | 'receipt'
   const [taskStatus, setTaskStatus] = useState('running'); // 'running' | 'completed' | 'failed'
   const [progress, setProgress] = useState(10);
   const [phase, setPhase] = useState('Initializing Application Engine');
-  const [logs, setLogs] = useState([
-    { time: '00:01', message: `Target identified: ${job.title} at ${job.company}`, level: 'info' },
+  const [logs, setLogs] = useState(() => [
+    { time: '00:01', message: `Target identified: ${job?.title || 'Unknown'} at ${job?.company || 'Unknown'}`, level: 'info' },
     { time: '00:02', message: `Detected application protocol: ${platformName}`, level: 'info' },
   ]);
   const [copied, setCopied] = useState(false);

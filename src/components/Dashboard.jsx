@@ -7,6 +7,7 @@ import { GeneratorModal } from './GeneratorModal';
 import { InterviewPrepModal } from './InterviewPrepModal';
 import { MockInterviewModal } from './MockInterviewModal';
 import { MarketIntelligence } from './MarketIntelligence';
+import { ActionHighlights } from './ActionHighlights';
 import { ApplicationPipeline } from './ApplicationPipeline';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { CommandPalette } from './CommandPalette';
@@ -660,6 +661,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   asyncGeneratingIds={asyncGeneratingIds}
                   onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
                   onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
+                />
+              </SafeErrorBoundary>
+            )}
+
+            {activeSection === 'highlights' && (
+              <SafeErrorBoundary sectionName="Action Highlights">
+                <ActionHighlights 
+                  jobs={jobs}
+                  onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                  onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+                  onSelectJob={(j) => setSelectedJob(j)}
                 />
               </SafeErrorBoundary>
             )}

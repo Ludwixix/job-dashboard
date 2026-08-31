@@ -9,6 +9,7 @@ import { getActiveProfile, saveProfile, DEFAULT_PROFILES } from './profileServic
 import { scanAndSyncGmailApplications } from './gmailSyncService';
 import { synthesizeUserProfile } from './smartProfileBuilder';
 import { SCRAPER_BASE_URL } from './jobQueryService';
+import { getLocalUserApplications } from './dataService';
 
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -298,27 +299,41 @@ export const loginWithGoogle = async ({
     }
   } catch(e) {}
 
-  // Automatically scan Gmail for job records
+  // Automatically scan Gmail for job records (Hourly throttle & existing tracker check)
   let applications = [];
   let scanCount = 0;
   
-  const alreadyScanned = authUser.lastGmailScan && Date.now() - new Date(authUser.lastGmailScan).getTime() < (1000 * 60 * 60 * 24); // within 24 hours
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  const lastScanTimestamp = localStorage.getItem('job_dashboard_last_email_scan_timestamp') || authUser.lastGmailScan;
+  const lastScanTime = lastScanTimestamp ? new Date(lastScanTimestamp).getTime() : 0;
+  const isHourlyScanDue = !lastScanTime || (Date.now() - lastScanTime) >= ONE_HOUR_MS;
   
-  if (autoScanGmail && !alreadyScanned) {
-    onStatusUpdate('Scanning Gmail inbox for application confirmations & interview invites...');
+  // Check if tracker already has existing applications
+  const existingApps = getLocalUserApplications();
+  const hasExistingTracker = Array.isArray(existingApps) && existingApps.length > 0;
+
+  if (hasExistingTracker && !isHourlyScanDue) {
+    const minsAgo = Math.max(1, Math.round((Date.now() - lastScanTime) / 60000));
+    onStatusUpdate(`Existing application tracker active (Last synced ${minsAgo}m ago). Skipping email re-scan.`);
+    applications = existingApps;
+  } else if (autoScanGmail) {
+    onStatusUpdate('Scanning Gmail inbox for application confirmations & interview invites (Hourly sync)...');
     try {
       const syncResult = await scanAndSyncGmailApplications(authUser.accessToken, getActiveProfile() || DEFAULT_PROFILES[0]);
       applications = syncResult.applications || [];
       scanCount = syncResult.count || 0;
       onStatusUpdate(`Synced ${scanCount} application records from Gmail!`);
       
-      authUser.lastGmailScan = new Date().toISOString();
+      const nowIso = new Date().toISOString();
+      authUser.lastGmailScan = nowIso;
+      localStorage.setItem('job_dashboard_last_email_scan_timestamp', nowIso);
       setAuthenticatedUser(authUser);
     } catch (e) {
       console.warn('Gmail sync non-blocking error:', e);
     }
-  } else if (alreadyScanned) {
+  } else {
     onStatusUpdate('Gmail applications were recently synced. Skipping scan.');
+    applications = existingApps;
   }
 
   // Synthesize and auto-build an intelligent candidate profile

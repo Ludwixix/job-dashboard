@@ -8,6 +8,7 @@ import {
   Send, Calendar, ArrowUpRight
 } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
+import { isValidTrackerJob } from '../services/trackerService';
 
 const formatDaysAgo = (dateStr) => {
   if (!dateStr) return 'Recently';
@@ -43,7 +44,7 @@ const getJobTimestamp = (job) => {
   return 0;
 };
 
-export const ApplicationTracker = ({ jobs, onSelectJob }) => {
+export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
   const [viewMode, setViewMode] = useState('table');
   const [showMetricsPanel, setShowMetricsPanel] = useState(true);
   const [search, setSearch] = useState('');
@@ -53,26 +54,16 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
 
   // Recently Applied Submissions list (Sorted newest first)
   const recentlyAppliedJobs = useMemo(() => {
-    return jobs
-      .filter(job => {
-        const s = (job.status || '').toLowerCase();
-        return !s.includes('package prepared') && 
-               !s.includes('to submit') && 
-               !s.includes('discovered') &&
-               !s.includes('draft');
-      })
+    return (jobs || [])
+      .filter(isValidTrackerJob)
       .sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a))
       .slice(0, 15);
   }, [jobs]);
 
   // Applied Today Count
   const appliedTodayCount = useMemo(() => {
-    return jobs.filter(j => {
-      const s = (j.status || '').toLowerCase();
-      const isTrackerJob = !s.includes('package prepared') && 
-                           !s.includes('to submit') && 
-                           !s.includes('discovered') && 
-                           !s.includes('draft');
+    return (jobs || []).filter(j => {
+      const isTrackerJob = isValidTrackerJob(j);
       const isToday = formatDaysAgo(j.date) === 'Today' || (j.date && j.date.startsWith(new Date().toISOString().split('T')[0]));
       return isTrackerJob && isToday;
     }).length;
@@ -81,26 +72,25 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
 
   // Interactive status category & date filtering (Default newest applications first)
   const trackerJobs = useMemo(() => {
-    return jobs
+    return (jobs || [])
       .filter(job => {
-        const s = (job.status || '').toLowerCase();
-        const isTrackerJob = !s.includes('package prepared') && 
-                             !s.includes('to submit') && 
-                             !s.includes('discovered') && 
-                             !s.includes('draft');
+        if (!isValidTrackerJob(job)) return false;
 
-        const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
-                              job.title.toLowerCase().includes(search.toLowerCase());
+        const s = (job.status || '').toLowerCase();
+        const matchesSearch = (job.company || '').toLowerCase().includes(search.toLowerCase()) || 
+                              (job.title || '').toLowerCase().includes(search.toLowerCase());
         
         let matchesStatus = true;
         if (statusFilter !== 'All') {
           const f = statusFilter.toLowerCase();
           if (f.includes('interview')) {
             matchesStatus = s.includes('interview');
+          } else if (f.includes('offer')) {
+            matchesStatus = s.includes('offer');
           } else if (f.includes('action required') || f.includes('verification')) {
             matchesStatus = s.includes('action required') || s.includes('verification');
-          } else if (f.includes('closed') || f.includes('expired') || f.includes('unsuccessful')) {
-            matchesStatus = s.includes('closed') || s.includes('expired') || s.includes('unsuccessful');
+          } else if (f.includes('closed') || f.includes('expired') || f.includes('unsuccessful') || f.includes('non-responsive')) {
+            matchesStatus = s.includes('closed') || s.includes('expired') || s.includes('unsuccessful') || s.includes('non-responsive');
           } else {
             matchesStatus = job.status === statusFilter;
           }
@@ -108,7 +98,7 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
 
         const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
 
-        // Date Applied Filter (Default: Today)
+        // Date Applied Filter (Default: All or Today)
         let matchesDate = true;
         if (appliedDateFilter === 'today') {
           matchesDate = formatDaysAgo(job.date) === 'Today' || (job.date && job.date.startsWith(new Date().toISOString().split('T')[0]));
@@ -128,35 +118,40 @@ export const ApplicationTracker = ({ jobs, onSelectJob }) => {
           }
         }
 
-        return isTrackerJob && matchesSearch && matchesStatus && matchesSource && matchesDate;
+        return matchesSearch && matchesStatus && matchesSource && matchesDate;
       })
       .sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
   }, [jobs, search, statusFilter, sourceFilter, appliedDateFilter]);
 
-
   const trackerStats = useMemo(() => {
-    const totalSubmitted = jobs.filter(j => {
+    const valid = (jobs || []).filter(isValidTrackerJob);
+    const totalSubmitted = valid.length;
+    const interviews = valid.filter(j => (j.status || '').toLowerCase().includes('interview')).length;
+    const offers = valid.filter(j => (j.status || '').toLowerCase().includes('offer')).length;
+    
+    const actionRequired = valid.filter(j => 
+      (j.status || '').toLowerCase().includes('action required') || 
+      (j.status || '').toLowerCase().includes('verification')
+    ).length;
+
+    const underReview = valid.filter(j => {
       const s = (j.status || '').toLowerCase();
-      return !s.includes('package prepared') && 
-             !s.includes('to submit') && 
-             !s.includes('discovered') && 
-             !s.includes('draft');
+      return s.includes('applied') || s.includes('review') || s.includes('confirmation');
     }).length;
 
-    const interviews = jobs.filter(j => j.status.toLowerCase().includes('interview')).length;
-    
-    const actionRequired = jobs.filter(j => 
-      j.status.toLowerCase().includes('action required') || 
-      j.status.toLowerCase().includes('verification')
-    ).length;
+    const unsuccessful = valid.filter(j => {
+      const s = (j.status || '').toLowerCase();
+      return s.includes('unsuccessful') || s.includes('closed') || s.includes('expired') || s.includes('non-responsive');
+    }).length;
 
-    const unsuccessful = jobs.filter(j => 
-      j.status.toLowerCase().includes('unsuccessful') || 
-      j.status.toLowerCase().includes('closed') ||
-      j.status.toLowerCase().includes('expired')
-    ).length;
-
-    return { totalSubmitted, interviews, actionRequired, unsuccessful };
+    return {
+      totalSubmitted,
+      interviews,
+      offers,
+      actionRequired,
+      underReview,
+      unsuccessful
+    };
   }, [jobs]);
 
   const trackerStatuses = useMemo(() => {

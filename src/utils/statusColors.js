@@ -1,6 +1,24 @@
 export const getStatusConfig = (status = '') => {
-  const s = status.toLowerCase();
+  const s = (status || '').toLowerCase();
 
+  if (s.includes('hired') || s.includes('accepted')) {
+    return {
+      bg: 'bg-teal-50',
+      text: 'text-teal-900',
+      border: 'border-teal-300',
+      dot: 'bg-teal-600',
+      code: 'HIRD'
+    };
+  }
+  if (s.includes('offer')) {
+    return {
+      bg: 'bg-amber-50',
+      text: 'text-amber-900',
+      border: 'border-amber-400',
+      dot: 'bg-amber-500',
+      code: 'OFFR'
+    };
+  }
   if (s.includes('interview')) {
     return {
       bg: 'bg-emerald-50',
@@ -28,7 +46,7 @@ export const getStatusConfig = (status = '') => {
       code: 'PREP'
     };
   }
-  if (s.includes('applied') || s.includes('viewed') || s.includes('confirmation')) {
+  if (s.includes('applied') || s.includes('viewed') || s.includes('confirmation') || s.includes('submitted')) {
     return {
       bg: 'bg-blue-50',
       text: 'text-blue-900',
@@ -37,7 +55,7 @@ export const getStatusConfig = (status = '') => {
       code: 'APPL'
     };
   }
-  if (s.includes('under review')) {
+  if (s.includes('under review') || s.includes('in review')) {
     return {
       bg: 'bg-purple-50',
       text: 'text-purple-900',
@@ -46,7 +64,16 @@ export const getStatusConfig = (status = '') => {
       code: 'REVW'
     };
   }
-  if (s.includes('unsuccessful') || s.includes('rejected')) {
+  if (s.includes('non-responsive') || s.includes('closed (non-responsive)')) {
+    return {
+      bg: 'bg-slate-100',
+      text: 'text-slate-700',
+      border: 'border-slate-300',
+      dot: 'bg-slate-500',
+      code: 'NRSP'
+    };
+  }
+  if (s.includes('unsuccessful') || s.includes('rejected') || s.includes('dismissed')) {
     return {
       bg: 'bg-rose-50',
       text: 'text-rose-900',

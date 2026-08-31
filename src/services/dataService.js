@@ -256,17 +256,24 @@ export const fetchJobsFromApi = async ({
 };
 
 /**
- * Fetch private application tracking records for the authenticated user
+ * Synchronous local retrieval of user applications cache
  */
-export const fetchUserApplications = async () => {
-  let localApps = [];
+export const getLocalUserApplications = () => {
   try {
     const raw = localStorage.getItem('job_dashboard_local_applications');
     if (raw) {
       const parsed = JSON.parse(raw);
-      localApps = Object.values(parsed);
+      return Object.values(parsed);
     }
   } catch {}
+  return [];
+};
+
+/**
+ * Fetch application statuses submitted/tracked by the user
+ */
+export const fetchUserApplications = async () => {
+  let localApps = getLocalUserApplications();
 
   const token = getAuthToken();
   if (!token) return localApps;

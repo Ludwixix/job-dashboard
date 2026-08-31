@@ -33,7 +33,16 @@ export const AutoApplyModal = ({ job, onClose, onJobStatusUpdate, onJobStatusUpd
   const [copied, setCopied] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [currentJob, setCurrentJob] = useState(job);
+  const [toastMsg, setToastMsg] = useState('');
   const logEndRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => {
+      setToastMsg('');
+    }, 4500);
+  };
+
 
   // Auto-scroll logs
   useEffect(() => {

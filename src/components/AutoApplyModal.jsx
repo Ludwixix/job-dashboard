@@ -157,9 +157,10 @@ export const AutoApplyModal = ({ job, onClose, onJobStatusUpdate, onJobStatusUpd
   const handleFastTrackLaunch = async () => {
     const targetJob = currentJob || job;
     
-    const result = await executeFastTrackApply(targetJob, profile, downloadResumePdf, downloadCoverLetterPdf);
+    try {
+      const result = await executeFastTrackApply(targetJob, profile, downloadResumePdf, downloadCoverLetterPdf);
 
-    if (result.popupBlocked && result.targetUrl) {
+      if (result.popupBlocked && result.targetUrl) {
       showToast(`Popup blocked! Please manually open: ${result.targetUrl}`);
     }
 
@@ -175,6 +176,9 @@ export const AutoApplyModal = ({ job, onClose, onJobStatusUpdate, onJobStatusUpd
     };
     setCurrentJob(updatedJob);
     if (notifyStatusUpdate) notifyStatusUpdate(updatedJob);
+    } catch (err) {
+      showToast(`Action requires an API key or failed: ${err.message}`);
+    }
   };
 
 

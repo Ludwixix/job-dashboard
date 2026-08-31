@@ -14,6 +14,11 @@ export const InterviewPrepModal = ({ job, onClose }) => {
         setGuide(res);
         setLoading(false);
       }
+    }).catch(err => {
+      if (isMounted) {
+        setLoading(false);
+        alert(`Failed to generate guide: ${err.message}`);
+      }
     });
     return () => { isMounted = false; };
   }, [job]);

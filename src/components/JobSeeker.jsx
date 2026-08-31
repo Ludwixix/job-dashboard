@@ -182,7 +182,8 @@ export const JobSeeker = ({
   onUnrejectJob,
   onDispatchAsyncApplication,
   asyncGeneratingIds = new Set(),
-  onJobStatusUpdate
+  onJobStatusUpdate,
+  onSaveCustomDocs
 }) => {
 
   const currentProfile = activeProfile || getActiveProfile();
@@ -1738,6 +1739,8 @@ export const JobSeeker = ({
         <GeneratorModal 
           job={selectedForGenerator} 
           onClose={() => setSelectedForGenerator(null)} 
+          onSaveCustomDocs={onSaveCustomDocs}
+          onUpdateStatus={onJobStatusUpdate}
         />
       )}
 

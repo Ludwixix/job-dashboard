@@ -113,6 +113,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       }
     } catch (err) {
       console.error('Async application error:', err);
+      alert(`Synthesis failed: ${err.message}`);
     } finally {
 
       setAsyncGeneratingIds(prev => {
@@ -661,6 +662,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   asyncGeneratingIds={asyncGeneratingIds}
                   onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
                   onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
+                  onSaveCustomDocs={(jobId, docData) => {
+                    updateJobStatus(jobId, 'Package Prepared / To Submit', {
+                      hasCustomDocs: true,
+                      resumeText: docData.resumeText,
+                      coverLetterText: docData.coverLetterText,
+                      docsModel: docData.model,
+                      docsGeneratedAt: docData.generatedAt || new Date().toISOString()
+                    });
+                  }}
                 />
               </SafeErrorBoundary>
             )}

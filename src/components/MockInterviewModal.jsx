@@ -30,6 +30,7 @@ export const MockInterviewModal = ({ job, onClose }) => {
         }
       } catch (err) {
         console.error("Failed to start mock interview", err);
+        setMessages([{ role: 'interviewer', text: 'Connection to AI Interview service failed. Please ensure the backend is running.' }]);
       } finally {
         setLoading(false);
       }
@@ -77,6 +78,7 @@ export const MockInterviewModal = ({ job, onClose }) => {
       }
     } catch (err) {
       console.error(err);
+      setMessages(prev => [...prev, { role: 'interviewer', text: 'Error: Could not reach the AI agent. Please check your connection or backend server.' }]);
       setSubmitting(false);
     }
   };

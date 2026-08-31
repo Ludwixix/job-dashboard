@@ -626,7 +626,8 @@ def deduplicate_jobs(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
         
         comp_norm = _normalize_company_name(job.get("company", ""))
         title_norm = _normalize_job_title(job.get("title", ""))
-        key = (comp_norm, title_norm)
+        loc_norm = re.sub(r"[^a-z0-9]", "", str(job.get("location", "")).lower().strip())
+        key = (comp_norm, title_norm, loc_norm)
         
         duplicate_key = comp_norm != "" and title_norm != "" and key in seen_keys
         duplicate_url = bool(url and url in seen_urls)

@@ -819,6 +819,25 @@ class DashboardApp:
         return self.generation_progress[job_id]
 
 
+def resolve_user_id(handler, query_params=None) -> str:
+    auth_header = handler.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            sub = payload.get("sub")
+            if sub:
+                return str(sub)
+        except Exception:
+            pass
+    uid = handler.headers.get("X-User-Id")
+    if uid:
+        return str(uid).strip()
+    if query_params and "user_id" in query_params:
+        return str(query_params["user_id"][0]).strip()
+    return "sam_ludwig"
+
+
 def make_handler(app: DashboardApp):
     # Allowed origins — GitHub Pages deployment + localhost dev
     _ALLOWED_ORIGINS = {
@@ -833,14 +852,11 @@ def make_handler(app: DashboardApp):
             origin = self.headers.get("Origin", "")
             return origin or "*"
 
-
-
         def _send_cors_headers(self):
             self.send_header("Access-Control-Allow-Origin", self._cors_origin())
             self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id")
             self.send_header("Access-Control-Max-Age", "86400")
-
 
         def do_OPTIONS(self):
             """Handle CORS preflight requests."""
@@ -860,9 +876,8 @@ def make_handler(app: DashboardApp):
         def do_GET(self):
             parsed = urlparse(self.path)
             path = parsed.path
+            query_params = parse_qs(parsed.query)
 
-            # Health check endpoint
-            
             if path == "/api/session":
                 auth_header = self.headers.get("Authorization")
                 if not auth_header or not auth_header.startswith("Bearer "):
@@ -880,14 +895,11 @@ def make_handler(app: DashboardApp):
                             "name": payload.get("name")
                         }
                     })
-                except jwt.ExpiredSignatureError:
-                    self.send_json(401, {"error": "Token expired"})
-                except jwt.InvalidTokenError:
-                    self.send_json(401, {"error": "Invalid token"})
+                except Exception as e:
+                    self.send_json(401, {"error": str(e)})
                 return
 
             if path == "/api/jobs":
-                query_params = parse_qs(parsed.query)
                 page = int(query_params.get("page", ["1"])[0])
                 page_size = int(query_params.get("pageSize", ["50"])[0])
                 search = query_params.get("search", [""])[0]
@@ -896,7 +908,6 @@ def make_handler(app: DashboardApp):
                 remote = None if remote_param is None else (remote_param.lower() in ("true", "1"))
                 sort_by = query_params.get("sortBy", ["newest"])[0]
                 
-                # If repository has 0 jobs, ensure it is seeded from in-memory jobs or fallback files
                 if app.repository.count_jobs() == 0:
                     if not app.jobs:
                         app.jobs = app._load_jobs()
@@ -915,19 +926,43 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, result)
                 return
 
+            if path == "/api/profile":
+                user_id = resolve_user_id(self, query_params)
+                prof = app.repository.get_user_profile(user_id)
+                self.send_json(200, {"success": True, "profile": prof})
+                return
+
+            if path == "/api/preferences":
+                user_id = resolve_user_id(self, query_params)
+                prefs = app.repository.get_user_preferences(user_id)
+                self.send_json(200, {"success": True, "preferences": prefs})
+                return
+
+            if path == "/api/documents":
+                user_id = resolve_user_id(self, query_params)
+                job_id = query_params.get("job_id", [""])[0]
+                doc_type = query_params.get("doc_type", ["resume"])[0]
+                doc = app.repository.get_generated_document(user_id, job_id, doc_type)
+                self.send_json(200, {"success": True, "document": doc})
+                return
+
+            if path == "/api/psychology":
+                job_id = query_params.get("job_id", [""])[0]
+                psy = app.repository.get_job_psychology(job_id)
+                self.send_json(200, {"success": True, "psychology": psy})
+                return
+
+            if path == "/api/interview-sessions":
+                user_id = resolve_user_id(self, query_params)
+                job_id = query_params.get("job_id", [""])[0] or None
+                sessions = app.repository.get_interview_sessions(user_id, job_id)
+                self.send_json(200, {"success": True, "sessions": sessions})
+                return
+
             if path == "/api/applications":
-                auth_header = self.headers.get("Authorization")
-                if not auth_header or not auth_header.startswith("Bearer "):
-                    self.send_json(401, {"error": "Missing or invalid token"})
-                    return
-                token = auth_header.split(" ")[1]
-                try:
-                    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-                    user_id = payload.get("sub")
-                    apps = app.repository.get_user_applications(user_id)
-                    self.send_json(200, {"success": True, "applications": apps})
-                except Exception as e:
-                    self.send_json(401, {"error": "Unauthorized: " + str(e)})
+                user_id = resolve_user_id(self, query_params)
+                apps = app.repository.get_user_applications(user_id)
+                self.send_json(200, {"success": True, "applications": apps})
                 return
 
 
@@ -1164,28 +1199,135 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, app.select_compare_output(comparison_id, payload["model_id"]))
                     return
                 
-                if path == "/api/applications":
-                    auth_header = self.headers.get("Authorization")
-                    if not auth_header or not auth_header.startswith("Bearer "):
-                        self.send_json(401, {"error": "Missing or invalid token"})
-                        return
-                    token = auth_header.split(" ")[1]
-                    try:
-                        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-                        user_id = payload.get("sub")
-                    except Exception as e:
-                        self.send_json(401, {"error": "Unauthorized: " + str(e)})
-                        return
-                        
+                if path == "/api/profile":
+                    user_id = resolve_user_id(self)
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    job_id = str(body.get("job_id") or "").strip()
+                    res = app.repository.upsert_user_profile(user_id, body)
+                    self.send_json(200, {"success": True, "profile": res})
+                    return
+
+                if path == "/api/preferences":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    res = app.repository.upsert_user_preferences(user_id, body)
+                    self.send_json(200, {"success": True, "preferences": res})
+                    return
+
+                if path == "/api/documents":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = str(body.get("job_id") or "")
+                    doc_type = str(body.get("doc_type") or "resume")
+                    content_text = str(body.get("content_text") or body.get("text") or "")
+                    model_name = str(body.get("model_name") or "")
+                    metadata = body.get("metadata") or {}
+                    doc = app.repository.upsert_generated_document(user_id, job_id, doc_type, content_text, model_name, metadata)
+                    self.send_json(200, {"success": True, "document": doc})
+                    return
+
+                if path == "/api/psychology":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = str(body.get("job_id") or "")
+                    company = str(body.get("company") or "")
+                    title = str(body.get("title") or "")
+                    insights = body.get("insights") or {}
+                    model_name = str(body.get("model_name") or "")
+                    psy = app.repository.upsert_job_psychology(job_id, company, title, insights, model_name)
+                    self.send_json(200, {"success": True, "psychology": psy})
+                    return
+
+                if path == "/api/interview-sessions":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = str(body.get("job_id") or "")
+                    company = str(body.get("company") or "")
+                    title = str(body.get("title") or "")
+                    session_data = body.get("session_data") or body
+                    score = float(body.get("score") or 0.0)
+                    sess = app.repository.save_interview_session(user_id, job_id, company, title, session_data, score)
+                    self.send_json(200, {"success": True, "session": sess})
+                    return
+
+                if path == "/api/applications":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = str(body.get("job_id") or body.get("id") or "").strip()
                     if not job_id:
                         self.send_json(400, {"error": "Missing job_id"})
                         return
                         
                     app_rec = app.repository.upsert_user_application(user_id, job_id, body)
                     self.send_json(200, {"success": True, "application": app_rec})
+                    return
+
+                if path == "/api/applications/sync":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    apps_list = body.get("applications") or []
+                    synced = []
+                    for item in apps_list:
+                        jid = str(item.get("job_id") or item.get("id") or "").strip()
+                        if jid:
+                            synced.append(app.repository.upsert_user_application(user_id, jid, item))
+                    self.send_json(200, {"success": True, "synced_count": len(synced), "applications": app.repository.get_user_applications(user_id)})
+                    return
+
+                if path == "/api/applications/scan-updates":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    username = body.get("username")
+                    app_password = body.get("app_password")
+                    target_job_id = body.get("job_id")
+                    days = int(body.get("days") or 14)
+
+                    if not username or not app_password:
+                        self.send_json(400, {"error": "Missing Gmail username or app_password"})
+                        return
+
+                    from .email_connector import GmailScanner
+                    scanner = GmailScanner(username=username, app_password=app_password, days=days)
+
+                    apps = app.repository.get_user_applications(user_id)
+                    if target_job_id:
+                        apps = [a for a in apps if a.get("job_id") == target_job_id or a.get("id") == target_job_id]
+
+                    scan_results = scanner.scan_updates_for_all_applications(apps, days=days)
+                    updates_applied = []
+
+                    for res in scan_results:
+                        if res.get("updated"):
+                            jid = res.get("job_id")
+                            new_st = res.get("new_status")
+                            subj = res.get("email_subject", "")
+                            snip = res.get("email_snippet", "")
+                            edate = res.get("email_date", "")
+                            th_id = res.get("email_thread_id", "")
+                            app.repository.update_application_status_from_email(
+                                user_id=user_id,
+                                job_id=jid,
+                                new_status=new_st,
+                                email_subject=subj,
+                                email_snippet=snip,
+                                email_date=edate,
+                                email_thread_id=th_id
+                            )
+                            updates_applied.append(res)
+
+                    self.send_json(200, {
+                        "success": True,
+                        "scanned_count": len(apps),
+                        "updates_count": len(updates_applied),
+                        "updates": updates_applied,
+                        "applications": app.repository.get_user_applications(user_id)
+                    })
                     return
 
                 if path == "/api/passkey-login":

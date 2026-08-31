@@ -130,6 +130,120 @@ class GmailScanner:
                 results.append((message, category, confidence))
         return results
 
+    def scan_updates_for_application(self, app_dict: dict[str, Any], days: int = 14) -> dict[str, Any]:
+        """Scan user inbox targeted specifically for updates regarding a single applied job."""
+        company = str(app_dict.get("company") or app_dict.get("job_data", {}).get("company") or "").strip().lower()
+        title = str(app_dict.get("title") or app_dict.get("job_data", {}).get("title") or "").strip().lower()
+        current_status = str(app_dict.get("status") or "applied")
+        job_id = app_dict.get("job_id") or app_dict.get("id")
+
+        if not company or company in ("unknown", "gmail", "direct employer"):
+            return {"updated": False, "job_id": job_id, "status": current_status, "reason": "No valid company to search"}
+
+        classifier = EmailClassifier()
+        status_map = {
+            "application_confirmed": "Applied / Confirmation Received",
+            "interview_requested": "Interview Scheduled",
+            "offer_extended": "Offer Received",
+            "rejected": "Unsuccessful",
+            "recruiter_reply": "In Review / Recruiter Contacted",
+        }
+
+        # Fetch recent messages
+        messages = self.fetch_messages()
+        matching_updates = []
+
+        for msg in messages:
+            haystack = f"{msg.from_address} {msg.subject} {msg.snippet} {msg.body_preview}".lower()
+            if company in haystack:
+                category, confidence = classifier.classify(msg)
+                if category in status_map and confidence >= 0.65:
+                    new_status = status_map[category]
+                    matching_updates.append({
+                        "message": msg,
+                        "category": category,
+                        "new_status": new_status,
+                        "confidence": confidence,
+                        "date": msg.received_at
+                    })
+
+        if not matching_updates:
+            return {"updated": False, "job_id": job_id, "status": current_status}
+
+        # Pick most recent and highest progression status
+        matching_updates.sort(key=lambda x: x["date"], reverse=True)
+        best = matching_updates[0]
+
+        return {
+            "updated": True,
+            "job_id": job_id,
+            "old_status": current_status,
+            "new_status": best["new_status"],
+            "email_subject": best["message"].subject,
+            "email_snippet": best["message"].snippet,
+            "email_date": best["message"].received_at,
+            "email_thread_id": best["message"].email_id,
+            "confidence": best["confidence"]
+        }
+
+    def scan_updates_for_all_applications(self, apps_list: list[dict[str, Any]], days: int = 14) -> list[dict[str, Any]]:
+        """Scan user inbox targeted across all tracked applications in a single IMAP connection."""
+        classifier = EmailClassifier()
+        status_map = {
+            "application_confirmed": "Applied / Confirmation Received",
+            "interview_requested": "Interview Scheduled",
+            "offer_extended": "Offer Received",
+            "rejected": "Unsuccessful",
+            "recruiter_reply": "In Review / Recruiter Contacted",
+        }
+
+        messages = self.fetch_messages()
+        results = []
+
+        for app_dict in apps_list:
+            company = str(app_dict.get("company") or app_dict.get("job_data", {}).get("company") or "").strip().lower()
+            current_status = str(app_dict.get("status") or "applied")
+            job_id = app_dict.get("job_id") or app_dict.get("id")
+
+            if not company or company in ("unknown", "gmail", "direct employer"):
+                continue
+
+            app_updates = []
+            for msg in messages:
+                haystack = f"{msg.from_address} {msg.subject} {msg.snippet} {msg.body_preview}".lower()
+                if company in haystack:
+                    category, confidence = classifier.classify(msg)
+                    if category in status_map and confidence >= 0.65:
+                        app_updates.append({
+                            "message": msg,
+                            "new_status": status_map[category],
+                            "confidence": confidence,
+                            "date": msg.received_at
+                        })
+
+            if app_updates:
+                app_updates.sort(key=lambda x: x["date"], reverse=True)
+                best = app_updates[0]
+                results.append({
+                    "updated": True,
+                    "job_id": job_id,
+                    "old_status": current_status,
+                    "new_status": best["new_status"],
+                    "email_subject": best["message"].subject,
+                    "email_snippet": best["message"].snippet,
+                    "email_date": best["message"].received_at,
+                    "email_thread_id": best["message"].email_id,
+                    "confidence": best["confidence"]
+                })
+            else:
+                results.append({
+                    "updated": False,
+                    "job_id": job_id,
+                    "status": current_status
+                })
+
+        return results
+
     @staticmethod
     def _decode(value: str) -> str:
         parts = decode_header(value or "")

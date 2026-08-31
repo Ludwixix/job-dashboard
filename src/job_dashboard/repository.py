@@ -79,6 +79,46 @@ class JobRepository:
                     from_status TEXT, to_status TEXT NOT NULL, occurred_at TEXT NOT NULL,
                     FOREIGN KEY(job_id) REFERENCES jobs(id)
                 );
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    user_id TEXT PRIMARY KEY,
+                    profile_data_json TEXT NOT NULL DEFAULT '{}',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    user_id TEXT PRIMARY KEY,
+                    prefs_json TEXT NOT NULL DEFAULT '{}',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS generated_documents (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    job_id TEXT NOT NULL,
+                    doc_type TEXT NOT NULL,
+                    content_text TEXT NOT NULL,
+                    model_name TEXT DEFAULT '',
+                    metadata_json TEXT DEFAULT '{}',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_gen_docs_user_job ON generated_documents(user_id, job_id);
+                CREATE TABLE IF NOT EXISTS job_psychology (
+                    job_id TEXT PRIMARY KEY,
+                    company TEXT DEFAULT '',
+                    title TEXT DEFAULT '',
+                    insights_json TEXT NOT NULL DEFAULT '{}',
+                    model_name TEXT DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS interview_sessions (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    job_id TEXT NOT NULL,
+                    company TEXT DEFAULT '',
+                    title TEXT DEFAULT '',
+                    session_data_json TEXT NOT NULL DEFAULT '{}',
+                    score REAL DEFAULT 0.0,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_interview_user_job ON interview_sessions(user_id, job_id);
                 CREATE TABLE IF NOT EXISTS query_scrape_cache (
                     query_key TEXT PRIMARY KEY,
                     term TEXT NOT NULL,
@@ -89,10 +129,19 @@ class JobRepository:
                 );
                 CREATE INDEX IF NOT EXISTS idx_query_cache_term ON query_scrape_cache(term);
             """)
-            try:
-                conn.execute("ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'")
-            except Exception:
-                pass
+            for col_sql in [
+                "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
+                "ALTER TABLE user_applications ADD COLUMN company_domain TEXT DEFAULT ''",
+                "ALTER TABLE user_applications ADD COLUMN application_ref_id TEXT DEFAULT ''",
+                "ALTER TABLE user_applications ADD COLUMN email_thread_id TEXT DEFAULT ''",
+                "ALTER TABLE user_applications ADD COLUMN last_scanned_at TEXT DEFAULT ''",
+                "ALTER TABLE user_applications ADD COLUMN last_email_subject TEXT DEFAULT ''",
+                "ALTER TABLE user_applications ADD COLUMN last_email_date TEXT DEFAULT ''",
+            ]:
+                try:
+                    conn.execute(col_sql)
+                except Exception:
+                    pass
             conn.commit()
             logger.debug(f"Database schema initialized for {self.path}")
 
@@ -514,5 +563,292 @@ class JobRepository:
             with conn:
                 cur = conn.execute("DELETE FROM user_applications WHERE user_id = ? AND job_id = ?", (user_id, job_id))
                 return cur.rowcount > 0
+
+    # ==========================================
+    # USER PROFILES & RESUME INTELLIGENCE VAULT
+    # ==========================================
+    def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        """Fetch custom candidate profile from backend database."""
+        if not user_id:
+            return {}
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT profile_data_json FROM user_profiles WHERE user_id = ?", (user_id,)).fetchone()
+            if row and row[0]:
+                try:
+                    return json.loads(row[0])
+                except Exception:
+                    pass
+        return {}
+
+    def upsert_user_profile(self, user_id: str, profile_data: dict[str, Any]) -> dict[str, Any]:
+        """Persist candidate profile permanently to backend database."""
+        now = datetime.now(timezone.utc).isoformat()
+        payload_json = json.dumps(profile_data, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT INTO user_profiles (user_id, profile_data_json, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        profile_data_json = excluded.profile_data_json,
+                        updated_at = excluded.updated_at
+                """, (user_id, payload_json, now))
+        return profile_data
+
+    # ==========================================
+    # USER PREFERENCES & ALGORITHMIC WEIGHTS
+    # ==========================================
+    def get_user_preferences(self, user_id: str) -> dict[str, Any]:
+        """Fetch candidate recommendation preferences & boosted/demoted weights."""
+        if not user_id:
+            return {}
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT prefs_json FROM user_preferences WHERE user_id = ?", (user_id,)).fetchone()
+            if row and row[0]:
+                try:
+                    return json.loads(row[0])
+                except Exception:
+                    pass
+        return {
+            "promotedJobIds": [],
+            "demotedJobIds": [],
+            "boostedCompanies": [],
+            "demotedCompanies": [],
+            "boostedTerms": [],
+            "demotedTerms": [],
+            "preferredStreams": []
+        }
+
+    def upsert_user_preferences(self, user_id: str, prefs_data: dict[str, Any]) -> dict[str, Any]:
+        """Persist recommendation feedback weights and preferences."""
+        now = datetime.now(timezone.utc).isoformat()
+        payload_json = json.dumps(prefs_data, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT INTO user_preferences (user_id, prefs_json, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        prefs_json = excluded.prefs_json,
+                        updated_at = excluded.updated_at
+                """, (user_id, payload_json, now))
+        return prefs_data
+
+    # ==========================================
+    # GENERATED TAILORED DOCUMENTS (RESUME / COVER)
+    # ==========================================
+    def get_generated_document(self, user_id: str, job_id: str, doc_type: str = "resume") -> dict[str, Any] | None:
+        """Fetch cached tailored application document for a job."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT id, user_id, job_id, doc_type, content_text, model_name, metadata_json, updated_at
+                FROM generated_documents
+                WHERE user_id = ? AND job_id = ? AND doc_type = ?
+            """, (user_id, job_id, doc_type)).fetchone()
+            if row:
+                d = dict(row)
+                try:
+                    d["metadata"] = json.loads(d.get("metadata_json") or "{}")
+                except Exception:
+                    d["metadata"] = {}
+                return d
+        return None
+
+    def upsert_generated_document(
+        self,
+        user_id: str,
+        job_id: str,
+        doc_type: str,
+        content_text: str,
+        model_name: str = "",
+        metadata: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Cache tailored resume or cover letter permanently."""
+        now = datetime.now(timezone.utc).isoformat()
+        doc_id = f"doc_{user_id[:8]}_{job_id}_{doc_type}"
+        meta_json = json.dumps(metadata or {}, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT INTO generated_documents (id, user_id, job_id, doc_type, content_text, model_name, metadata_json, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        content_text = excluded.content_text,
+                        model_name = excluded.model_name,
+                        metadata_json = excluded.metadata_json,
+                        updated_at = excluded.updated_at
+                """, (doc_id, user_id, job_id, doc_type, content_text, model_name, meta_json, now))
+        return {
+            "id": doc_id,
+            "user_id": user_id,
+            "job_id": job_id,
+            "doc_type": doc_type,
+            "content_text": content_text,
+            "model_name": model_name,
+            "metadata": metadata or {},
+            "updated_at": now
+        }
+
+    # ==========================================
+    # EMPLOYER PSYCHOLOGY DECODER CACHE
+    # ==========================================
+    def get_job_psychology(self, job_id: str) -> dict[str, Any] | None:
+        """Fetch cached employer psychology & hidden priorities."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT job_id, company, title, insights_json, model_name, updated_at
+                FROM job_psychology
+                WHERE job_id = ?
+            """, (job_id,)).fetchone()
+            if row:
+                d = dict(row)
+                try:
+                    d["insights"] = json.loads(d.get("insights_json") or "{}")
+                except Exception:
+                    d["insights"] = {}
+                return d
+        return None
+
+    def upsert_job_psychology(
+        self,
+        job_id: str,
+        company: str,
+        title: str,
+        insights: dict[str, Any],
+        model_name: str = ""
+    ) -> dict[str, Any]:
+        """Cache decoded employer psychology permanently in SQLite."""
+        now = datetime.now(timezone.utc).isoformat()
+        insights_json = json.dumps(insights, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT INTO job_psychology (job_id, company, title, insights_json, model_name, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(job_id) DO UPDATE SET
+                        company = excluded.company,
+                        title = excluded.title,
+                        insights_json = excluded.insights_json,
+                        model_name = excluded.model_name,
+                        updated_at = excluded.updated_at
+                """, (job_id, company, title, insights_json, model_name, now))
+        return {
+            "job_id": job_id,
+            "company": company,
+            "title": title,
+            "insights": insights,
+            "model_name": model_name,
+            "updated_at": now
+        }
+
+    # ==========================================
+    # INTERVIEW SIMULATOR SESSIONS
+    # ==========================================
+    def get_interview_sessions(self, user_id: str, job_id: str | None = None) -> list[dict[str, Any]]:
+        """Fetch mock interview session history and AI ratings."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            if job_id:
+                rows = conn.execute("""
+                    SELECT id, user_id, job_id, company, title, session_data_json, score, updated_at
+                    FROM interview_sessions
+                    WHERE user_id = ? AND job_id = ?
+                    ORDER BY updated_at DESC
+                """, (user_id, job_id)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT id, user_id, job_id, company, title, session_data_json, score, updated_at
+                    FROM interview_sessions
+                    WHERE user_id = ?
+                    ORDER BY updated_at DESC
+                """, (user_id,)).fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["session_data"] = json.loads(d.get("session_data_json") or "{}")
+            except Exception:
+                d["session_data"] = {}
+            results.append(d)
+        return results
+
+    def save_interview_session(
+        self,
+        user_id: str,
+        job_id: str,
+        company: str,
+        title: str,
+        session_data: dict[str, Any],
+        score: float = 0.0
+    ) -> dict[str, Any]:
+        """Save a completed mock interview Q&A session with AI scores."""
+        now = datetime.now(timezone.utc).isoformat()
+        session_id = f"mock_{user_id[:8]}_{job_id}_{int(datetime.now().timestamp())}"
+        session_json = json.dumps(session_data, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT INTO interview_sessions (id, user_id, job_id, company, title, session_data_json, score, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (session_id, user_id, job_id, company, title, session_json, score, now))
+        return {
+            "id": session_id,
+            "user_id": user_id,
+            "job_id": job_id,
+            "company": company,
+            "title": title,
+            "session_data": session_data,
+            "score": score,
+            "updated_at": now
+        }
+
+    # ==========================================
+    # TARGETED GMAIL APPLICATION STATUS UPDATES
+    # ==========================================
+    def update_application_status_from_email(
+        self,
+        user_id: str,
+        job_id: str,
+        new_status: str,
+        email_subject: str = "",
+        email_snippet: str = "",
+        email_date: str = "",
+        email_thread_id: str = ""
+    ) -> dict[str, Any]:
+        """Update status and log event timeline when targeted Gmail scanner detects recruiter response."""
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db_connection(self.path) as conn:
+            with conn:
+                # Update user_applications record
+                conn.execute("""
+                    UPDATE user_applications
+                    SET status = ?,
+                        last_scanned_at = ?,
+                        last_email_subject = ?,
+                        last_email_date = ?,
+                        email_thread_id = CASE WHEN ? != '' THEN ? ELSE email_thread_id END,
+                        updated_at = ?
+                    WHERE user_id = ? AND job_id = ?
+                """, (
+                    new_status, now, email_subject, email_date,
+                    email_thread_id, email_thread_id, now, user_id, job_id
+                ))
+                
+                # Append to application_events timeline
+                conn.execute("""
+                    INSERT INTO application_events (job_id, from_status, to_status, occurred_at)
+                    VALUES (?, 'gmail_sync', ?, ?)
+                """, (job_id, new_status, email_date or now))
+
+        return {
+            "user_id": user_id,
+            "job_id": job_id,
+            "status": new_status,
+            "email_subject": email_subject,
+            "email_date": email_date,
+            "updated_at": now
+        }
 
 

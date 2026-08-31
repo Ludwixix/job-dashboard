@@ -4,13 +4,16 @@ import {
   X, User, Sparkles, Upload, FileText, CheckCircle2, 
   MapPin, DollarSign, Briefcase, Mail, Phone, ShieldCheck, 
   Trash2, Plus, Tag, RefreshCw, AlertCircle, Award, Target,
-  Compass, Zap, Brain, ChevronRight, Layers
+  Compass, Zap, Brain, ChevronRight, Layers, FileCode
 } from 'lucide-react';
 import { parseResumeWithAI, parseResumeTextClientSide, saveProfile, deleteProfile, DEFAULT_PROFILES } from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
+import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
 
 export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
-  const [activeTab, setActiveTab] = useState('upload'); // 'upload', 'edit', 'api'
+  const [activeTab, setActiveTab] = useState(() => {
+    return (profile?.name && profile?.name !== 'Candidate' && (profile?.targetTitles?.length || profile?.coreSkills?.length)) ? 'edit' : 'upload';
+  });
   const [resumeText, setResumeText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
@@ -18,7 +21,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
 
   // Form State
   const [formData, setFormData] = useState(() => ({
-    id: profile?.id || '',
+    id: profile?.id || 'sam_ludwig',
     name: profile?.name || '',
     title: profile?.title || '',
     industry: profile?.industry || 'Technology & IT',
@@ -49,25 +52,44 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
 
   if (!isOpen) return null;
 
-  // Handle Resume File Upload
-  const handleFileUpload = (e) => {
+  // Handle Resume File Upload (PDF, Word, Text, Markdown)
+  const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result || '';
+    setIsParsing(true);
+    setParseError('');
+    try {
+      const text = await extractTextFromFile(file);
+      if (!text || !text.trim()) {
+        throw new Error('Could not extract readable text from the uploaded document.');
+      }
       setResumeText(text);
-      handleParseResume(text);
-    };
-    reader.readAsText(file);
+      await handleParseResume(text);
+    } catch (err) {
+      console.error('Document extraction error:', err);
+      setParseError(`Error parsing ${file.name}: ${err.message}`);
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   // Handle AI / Client-Side Resume Parsing
   const handleParseResume = async (textToParse = resumeText) => {
-    if (!textToParse.trim()) {
-      setParseError('Please paste your resume text or upload a resume file first.');
+    let cleanText = (textToParse || '').trim();
+    if (!cleanText) {
+      setParseError('Please paste your resume text or upload a resume file (PDF, Word, Text, Markdown).');
       return;
+    }
+
+    // Auto-detect & recover raw PDF stream binary text if pasted directly
+    if (cleanText.startsWith('%PDF')) {
+      try {
+        cleanText = await extractTextFromPastedPdfString(cleanText);
+        setResumeText(cleanText);
+      } catch (e) {
+        console.warn('PDF stream extraction fallback:', e);
+      }
     }
 
     setIsParsing(true);
@@ -76,39 +98,43 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
     try {
       const currentApiKey = getActiveApiKey();
       const currentModel = getActiveModel();
-      const parsed = await parseResumeWithAI(textToParse, currentApiKey, currentModel);
+      const parsed = await parseResumeWithAI(cleanText, currentApiKey, currentModel);
 
       if (parsed) {
-        setFormData(prev => ({
-          ...prev,
-          name: parsed.name || prev.name,
-          title: parsed.title || prev.title,
-          industry: parsed.industry || prev.industry,
-          seniorityLevel: parsed.seniorityLevel || prev.seniorityLevel,
-          yearsOfExperience: parsed.yearsOfExperience || prev.yearsOfExperience,
-          marketArchetype: parsed.marketArchetype || prev.marketArchetype,
-          email: parsed.email || prev.email,
-          phone: parsed.phone || prev.phone,
-          location: parsed.location || prev.location,
-          suburb: parsed.suburb || prev.suburb,
-          workRights: parsed.workRights || prev.workRights,
-          clearance: parsed.clearance || prev.clearance,
-          targetSalary: parsed.targetSalary || prev.targetSalary,
-          keyStrengths: parsed.keyStrengths?.length ? parsed.keyStrengths : prev.keyStrengths,
-          managementStyle: parsed.managementStyle || prev.managementStyle,
-          targetTitles: parsed.targetTitles?.length ? parsed.targetTitles : prev.targetTitles,
-          coreSkills: parsed.coreSkills?.length ? parsed.coreSkills : prev.coreSkills,
-          certifications: parsed.certifications?.length ? parsed.certifications : prev.certifications,
-          interviewTalkingPoints: parsed.interviewTalkingPoints?.length ? parsed.interviewTalkingPoints : prev.interviewTalkingPoints,
-          workHistorySummary: parsed.workHistorySummary || prev.workHistorySummary,
-          fullWorkExperienceText: parsed.fullWorkExperienceText || textToParse
-        }));
+        const newProfile = {
+          ...formData,
+          name: parsed.name || formData.name,
+          title: parsed.title || formData.title,
+          industry: parsed.industry || formData.industry,
+          seniorityLevel: parsed.seniorityLevel || formData.seniorityLevel,
+          yearsOfExperience: parsed.yearsOfExperience || formData.yearsOfExperience,
+          marketArchetype: parsed.marketArchetype || formData.marketArchetype,
+          email: parsed.email || formData.email,
+          phone: parsed.phone || formData.phone,
+          location: parsed.location || formData.location,
+          suburb: parsed.suburb || formData.suburb,
+          workRights: parsed.workRights || formData.workRights,
+          clearance: parsed.clearance || formData.clearance,
+          targetSalary: parsed.targetSalary || formData.targetSalary,
+          keyStrengths: parsed.keyStrengths?.length ? parsed.keyStrengths : formData.keyStrengths,
+          managementStyle: parsed.managementStyle || formData.managementStyle,
+          targetTitles: parsed.targetTitles?.length ? parsed.targetTitles : formData.targetTitles,
+          coreSkills: parsed.coreSkills?.length ? parsed.coreSkills : formData.coreSkills,
+          certifications: parsed.certifications?.length ? parsed.certifications : formData.certifications,
+          interviewTalkingPoints: parsed.interviewTalkingPoints?.length ? parsed.interviewTalkingPoints : formData.interviewTalkingPoints,
+          workHistorySummary: parsed.workHistorySummary || formData.workHistorySummary,
+          fullWorkExperienceText: parsed.fullWorkExperienceText || cleanText
+        };
+        setFormData(newProfile);
+        saveProfile(newProfile);
         setActiveTab('edit');
       }
     } catch (e) {
-      console.warn('Parsing error:', e);
-      const clientParsed = parseResumeTextClientSide(textToParse);
-      setFormData(prev => ({ ...prev, ...clientParsed }));
+      console.warn('Parsing fallback:', e);
+      const clientParsed = parseResumeTextClientSide(cleanText);
+      const newProfile = { ...formData, ...clientParsed, fullWorkExperienceText: cleanText };
+      setFormData(newProfile);
+      saveProfile(newProfile);
       setActiveTab('edit');
     } finally {
       setIsParsing(false);
@@ -299,7 +325,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                 <input
                   type="file"
                   id="resume-file-input"
-                  accept=".txt,.md,.json"
+                  accept=".pdf,.docx,.doc,.txt,.md,.json,.rtf"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -307,8 +333,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                   <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center border border-teal-500/20">
                     <Upload size={22} />
                   </div>
-                  <span className="text-xs font-bold text-slate-200 font-mono">Upload Text/Markdown Resume File</span>
-                  <span className="text-[10px] text-slate-400">Or paste raw text directly below</span>
+                  <span className="text-xs font-bold text-slate-200 font-mono">Upload PDF, Word (.docx), or Text Resume File</span>
+                  <span className="text-[10px] text-slate-400">Supports PDF, DOCX, TXT, Markdown • Or paste text directly below</span>
                 </label>
               </div>
 
@@ -316,7 +342,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
               <div className="space-y-2 font-mono">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <FileText size={13} className="text-teal-400" /> PASTE RESUME TEXT (OR LINKEDIN PROFILE)
+                    <FileText size={13} className="text-teal-400" /> PASTE RESUME TEXT (OR LINKEDIN PROFILE / PDF STREAM)
                   </label>
                   <span className="text-[10px] text-slate-500">{resumeText.length} characters</span>
                 </div>
@@ -369,6 +395,13 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                     <h3 className="text-sm font-black text-white mt-0.5">{formData.marketArchetype || `${formData.seniorityLevel} ${formData.industry} Specialist`}</h3>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setActiveTab('upload')}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Upload a new resume file or paste new text"
+                    >
+                      <Upload size={11} className="text-teal-400" /> Re-Upload / Ingest
+                    </button>
                     <span className="px-2.5 py-1 rounded-lg bg-teal-950 text-teal-300 border border-teal-800 text-[10px] font-bold">
                       {formData.seniorityLevel} ({formData.yearsOfExperience} Yrs Exp)
                     </span>

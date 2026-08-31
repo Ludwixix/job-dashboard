@@ -886,13 +886,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             setEditingProfile(null);
           }}
           onProfileSaved={(savedProfile) => {
-            if (savedProfile) {
-              setActiveProfile(savedProfile);
-              if (savedProfile.suburb || savedProfile.location) {
-                setBaseLocation(savedProfile.suburb || savedProfile.location);
+            const profileToUse = Array.isArray(savedProfile) ? savedProfile[0] : (savedProfile || getActiveProfile());
+            if (profileToUse) {
+              setActiveProfile(profileToUse);
+              if (profileToUse.suburb || profileToUse.location) {
+                setBaseLocation(profileToUse.suburb || profileToUse.location);
               }
-            } else {
-              setActiveProfile(getActiveProfile());
+              if (profileToUse.industry) {
+                applyIndustryTheme(profileToUse.industry);
+              }
+              // Smartly apply search parameters and trigger live discovery scrape for fitting roles
+              triggerDiscoveryScrape(profileToUse);
+              refetch();
             }
           }}
         />

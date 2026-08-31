@@ -14,11 +14,11 @@ import { SCRAPER_BASE_URL } from './jobQueryService';
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const CLOUD_RUN_API = isLocalHost ? '' : (SCRAPER_BASE_URL || '');
 
-
 /**
  * Checks if a job is eligible for LinkedIn Easy Apply or SEEK Quick Apply
  */
 export const isQuickApplyEligible = (job) => {
+
   if (!job) return false;
   const src = (job.source || '').toLowerCase();
   const link = (job.link || job.portalLink || '').toLowerCase();
@@ -223,9 +223,7 @@ ${coverLetterText}
   // 4. Open job application portal tab
   const link = job.portalLink || job.link || job.url;
   let popupBlocked = false;
-
   if (link) {
-    const targetUrl = link.startsWith('http') ? link : `https://${link}`;
     const newWindow = window.open(targetUrl, '_blank');
     if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
       popupBlocked = true;

@@ -16,7 +16,9 @@ import { ProfileModal } from './ProfileModal';
 import { AuthModal } from './AuthModal';
 import { GoogleIntegrationModal } from './GoogleIntegrationModal';
 import { AutoApplyModal } from './AutoApplyModal';
+import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { DashboardGridSkeleton } from './SkeletonLoaders';
+
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile } from '../services/profileService';
@@ -641,43 +643,50 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         ) : (
           <>
             {activeSection === 'seeker' && (
-          <JobSeeker 
-            jobs={jobs} 
-            activeProfile={activeProfile}
-            scrapeProgress={scrapeProgress}
-            onSelectJob={(job) => setSelectedJob(job)} 
-            onRejectJob={rejectJob}
-            onUnrejectJob={unrejectJob}
-            baseLocation={baseLocation} 
-            onDispatchAsyncApplication={handleDispatchAsyncApplication}
-            asyncGeneratingIds={asyncGeneratingIds}
-            onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
-            onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
-          />
-        )}
+              <SafeErrorBoundary sectionName="Job Feed & Discoveries">
+                <JobSeeker 
+                  jobs={jobs} 
+                  activeProfile={activeProfile}
+                  scrapeProgress={scrapeProgress}
+                  onSelectJob={(job) => setSelectedJob(job)} 
+                  onRejectJob={rejectJob}
+                  onUnrejectJob={unrejectJob}
+                  baseLocation={baseLocation} 
+                  onDispatchAsyncApplication={handleDispatchAsyncApplication}
+                  asyncGeneratingIds={asyncGeneratingIds}
+                  onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
+                  onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
+                />
+              </SafeErrorBoundary>
+            )}
 
+            {activeSection === 'kanban' && (
+              <SafeErrorBoundary sectionName="Application Pipeline Kanban">
+                <ApplicationPipeline 
+                  jobs={jobs} 
+                  loading={loading}
+                  onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+                  onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                />
+              </SafeErrorBoundary>
+            )}
 
-        {activeSection === 'kanban' && (
-          <ApplicationPipeline 
-            jobs={jobs} 
-            loading={loading}
-            onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-          />
-        )}
+            {activeSection === 'market' && (
+              <SafeErrorBoundary sectionName="Market Intelligence">
+                <MarketIntelligence jobs={jobs} />
+              </SafeErrorBoundary>
+            )}
 
-        {activeSection === 'market' && (
-          <MarketIntelligence jobs={jobs} />
-        )}
-
-        {activeSection === 'analytics' && (
-          <AnalyticsDashboard 
-            jobs={jobs} 
-            onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
-            onSelectJob={(j) => setSelectedJob(j)}
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-          />
-        )}
+            {activeSection === 'analytics' && (
+              <SafeErrorBoundary sectionName="Analytics & Telemetry">
+                <AnalyticsDashboard 
+                  jobs={jobs} 
+                  onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+                  onSelectJob={(j) => setSelectedJob(j)}
+                  onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                />
+              </SafeErrorBoundary>
+            )}
           </>
         )}
       </main>
@@ -702,137 +711,156 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
       {/* Job Details Modal */}
       {liveSelectedJob && (
-        <JobModal 
-          job={liveSelectedJob} 
-          onClose={() => setSelectedJob(null)} 
-          onOpenGenerator={(j) => setSelectedForGenerator(j)}
-          onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
-          onJobStatusUpdate={(updated) => {
-            updateJobStatus(updated.id || updated.title, updated.status, updated);
-            setSelectedJob(updated);
-          }}
-          onRejectJob={(id) => {
-            rejectJob(id);
-            setSelectedJob(null);
-          }}
-          onUnrejectJob={(id) => {
-            unrejectJob(id);
-            setSelectedJob(prev => prev ? { ...prev, isRejected: false, status: 'Discovered' } : null);
-          }}
-        />
+        <SafeErrorBoundary sectionName="Job Detail Modal" onClose={() => setSelectedJob(null)}>
+          <JobModal 
+            job={liveSelectedJob} 
+            onClose={() => setSelectedJob(null)} 
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
+            onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
+            onJobStatusUpdate={(updated) => {
+              updateJobStatus(updated.id || updated.title, updated.status, updated);
+              setSelectedJob(updated);
+            }}
+            onRejectJob={(id) => {
+              rejectJob(id);
+              setSelectedJob(null);
+            }}
+            onUnrejectJob={(id) => {
+              unrejectJob(id);
+              setSelectedJob(prev => prev ? { ...prev, isRejected: false, status: 'Discovered' } : null);
+            }}
+          />
+        </SafeErrorBoundary>
       )}
 
       {/* 1-Click Auto-Apply Execution Modal */}
       {selectedAutoApplyJob && (
-        <AutoApplyModal
-          job={selectedAutoApplyJob}
-          onClose={() => setSelectedAutoApplyJob(null)}
-          onJobStatusUpdate={(updated) => {
-            updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
-            setSelectedAutoApplyJob(updated);
-          }}
-        />
+        <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
+          <AutoApplyModal
+            job={selectedAutoApplyJob}
+            onClose={() => setSelectedAutoApplyJob(null)}
+            onJobStatusUpdate={(updated) => {
+              updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
+              setSelectedAutoApplyJob(updated);
+            }}
+          />
+        </SafeErrorBoundary>
       )}
-
 
       {/* Generator Modal */}
       {liveSelectedForGenerator && (
-        <GeneratorModal 
-          job={liveSelectedForGenerator} 
-          onClose={() => setSelectedForGenerator(null)} 
-          onUpdateStatus={(jobId, status, extraData) => {
-            updateJobStatus(jobId, status, extraData);
-          }}
-          onSaveCustomDocs={(jobId, docData) => {
-            updateJobStatus(jobId, 'Package Prepared / To Submit', {
-              hasCustomDocs: true,
-              resumeText: docData.resumeText,
-              coverLetterText: docData.coverLetterText,
-              docsModel: docData.model,
-              docsGeneratedAt: docData.generatedAt || new Date().toISOString()
-            });
-          }}
-        />
+        <SafeErrorBoundary sectionName="Document Generator" onClose={() => setSelectedForGenerator(null)}>
+          <GeneratorModal 
+            job={liveSelectedForGenerator} 
+            onClose={() => setSelectedForGenerator(null)} 
+            onUpdateStatus={(jobId, status, extraData) => {
+              updateJobStatus(jobId, status, extraData);
+            }}
+            onSaveCustomDocs={(jobId, docData) => {
+              updateJobStatus(jobId, 'Package Prepared / To Submit', {
+                hasCustomDocs: true,
+                resumeText: docData.resumeText,
+                coverLetterText: docData.coverLetterText,
+                docsModel: docData.model,
+                docsGeneratedAt: docData.generatedAt || new Date().toISOString()
+              });
+            }}
+          />
+        </SafeErrorBoundary>
       )}
 
       {/* Interview Prep Super Intelligence Modal */}
       {liveSelectedForInterviewPrep && (
-        <InterviewPrepModal 
-          job={liveSelectedForInterviewPrep} 
-          onClose={() => setSelectedForInterviewPrep(null)} 
-        />
+        <SafeErrorBoundary sectionName="Interview Preparation" onClose={() => setSelectedForInterviewPrep(null)}>
+          <InterviewPrepModal 
+            job={liveSelectedForInterviewPrep} 
+            onClose={() => setSelectedForInterviewPrep(null)} 
+          />
+        </SafeErrorBoundary>
       )}
 
       {/* Omni-Command Palette Modal */}
-      <CommandPalette 
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        jobs={jobs}
-        onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
-        onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
-      />
+      <SafeErrorBoundary sectionName="Command Palette">
+        <CommandPalette 
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          jobs={jobs}
+          onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
+          onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
+        />
+      </SafeErrorBoundary>
 
       {/* Batch Application Dispatcher Modal */}
-      <BatchApplyModal 
-        jobs={jobs}
-        isOpen={isBatchApplyOpen}
-        onClose={() => setIsBatchApplyOpen(false)}
-        onComplete={(results) => {
-          results.forEach(res => {
-            if (res.success) {
-              updateJobStatus(res.job.id || res.job.title, 'Applied / Confirmation Received', res.result);
-            }
-          });
-        }}
-      />
+      <SafeErrorBoundary sectionName="Batch Apply Dispatcher">
+        <BatchApplyModal 
+          jobs={jobs}
+          isOpen={isBatchApplyOpen}
+          onClose={() => setIsBatchApplyOpen(false)}
+          onComplete={(results) => {
+            results.forEach(res => {
+              if (res.success) {
+                updateJobStatus(res.job.id || res.job.title, 'Applied / Confirmation Received', res.result);
+              }
+            });
+          }}
+        />
+      </SafeErrorBoundary>
 
       {/* Candidate Personalization & Resume Upload Modal */}
-      <ProfileModal 
-        isOpen={isProfileModalOpen}
-        profile={editingProfile}
-        onClose={() => {
-          setIsProfileModalOpen(false);
-          setEditingProfile(null);
-        }}
-        onProfileSaved={(savedProfile) => {
-          if (savedProfile) {
-            setActiveProfile(savedProfile);
-            if (savedProfile.suburb || savedProfile.location) {
-              setBaseLocation(savedProfile.suburb || savedProfile.location);
+      <SafeErrorBoundary sectionName="Profile Manager">
+        <ProfileModal 
+          isOpen={isProfileModalOpen}
+          profile={editingProfile}
+          onClose={() => {
+            setIsProfileModalOpen(false);
+            setEditingProfile(null);
+          }}
+          onProfileSaved={(savedProfile) => {
+            if (savedProfile) {
+              setActiveProfile(savedProfile);
+              if (savedProfile.suburb || savedProfile.location) {
+                setBaseLocation(savedProfile.suburb || savedProfile.location);
+              }
+            } else {
+              setActiveProfile(getActiveProfile());
             }
-          } else {
-            setActiveProfile(getActiveProfile());
-          }
-        }}
-      />
+          }}
+        />
+      </SafeErrorBoundary>
 
       {/* Google Authentication & Client Config Modal */}
-      <AuthModal 
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthChange={(user) => {
-          setAuthUser(user);
-          if (user) {
-            setIsGoogleIntegrationOpen(true);
-          }
-        }}
-      />
+      <SafeErrorBoundary sectionName="Settings & Health Sync">
+        <AuthModal 
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          activeProfile={activeProfile}
+          onAuthChange={(user) => {
+            setAuthUser(user);
+            if (user) {
+              setIsGoogleIntegrationOpen(true);
+            }
+          }}
+        />
+      </SafeErrorBoundary>
 
       {/* Google Sheets Tracker & Gmail Scanner Integration Modal */}
-      <GoogleIntegrationModal 
-        isOpen={isGoogleIntegrationOpen}
-        onClose={() => setIsGoogleIntegrationOpen(false)}
-        jobs={jobs}
-        activeProfile={activeProfile}
-        onImportGmailJobs={(importedJobs) => {
-          importedJobs.forEach(j => {
-            updateJobStatus(j.id, j.status, j);
-            if (currentUser?.accessToken && currentUser?.spreadsheetId) {
-              upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, j, activeProfile);
-            }
-          });
-        }}
-      />
+      <SafeErrorBoundary sectionName="Google Integration Modal">
+        <GoogleIntegrationModal 
+          isOpen={isGoogleIntegrationOpen}
+          onClose={() => setIsGoogleIntegrationOpen(false)}
+          jobs={jobs}
+          activeProfile={activeProfile}
+          onImportGmailJobs={(importedJobs) => {
+            importedJobs.forEach(j => {
+              updateJobStatus(j.id, j.status, j);
+              if (currentUser?.accessToken && currentUser?.spreadsheetId) {
+                upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, j, activeProfile);
+              }
+            });
+          }}
+        />
+      </SafeErrorBoundary>
+
 
       {/* Fixed Bottom Status Bar */}
       <footer className="fixed bottom-0 left-0 right-0 h-7 bg-slate-900 border-t border-slate-800 text-slate-400 font-mono text-[11px] font-bold px-4 flex items-center justify-between z-50 select-none shadow-md">

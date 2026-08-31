@@ -5,6 +5,18 @@ import App from './App.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import { ToastProvider } from './components/ToastContext.jsx'
 
+// Global Unhandled Rejection & Error Trap
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    console.warn('[Global Resilience Trap] Caught unhandled promise rejection:', event.reason);
+    event.preventDefault(); // Prevents browser console crashing
+  });
+
+  window.addEventListener('error', (event) => {
+    console.warn('[Global Resilience Trap] Caught runtime error:', event.message, event.filename, event.lineno);
+  });
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
@@ -14,3 +26,4 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+

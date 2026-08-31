@@ -26,7 +26,18 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
 
   const baseLocation = localStorage.getItem('userBaseLocation') || 'BALACLAVA VIC 3183';
 
-  const [activeTab, setActiveTab] = useState('fit'); // 'fit', 'description', 'assets'
+  const isOffer = (job?.status || '').toLowerCase().includes('offer');
+  const [activeTab, setActiveTab] = useState(() => isOffer ? 'offer' : 'fit');
+  const [offerDraftTab, setOfferDraftTab] = useState('accept'); // 'accept', 'counter', 'clarify', 'decline'
+  const [copiedOfferDraft, setCopiedOfferDraft] = useState(false);
+  const [dueDiligenceChecks, setDueDiligenceChecks] = useState({
+    salary: true,
+    probation: false,
+    notice: true,
+    hybrid: false,
+    allowances: false
+  });
+
   const [commuteTab, setCommuteTab] = useState('transit'); // 'transit', 'car', 'bike'
   const commute = useMemo(() => {
     return getCommuteDetails(baseLocation, job?.location);
@@ -40,6 +51,82 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   const [activeReceiptTab, setActiveReceiptTab] = useState('fields'); // 'fields', 'resume', 'cover'
 
   if (!job) return null;
+
+  const getOfferDraftText = (type, currentJob) => {
+    const title = currentJob.title || 'Technical Specialist';
+    const company = currentJob.company || 'the organization';
+    const salary = currentJob.salary || '$115,000 + Super';
+
+    switch (type) {
+      case 'accept':
+        return `Subject: Acceptance of Employment Offer - ${title} - Sam Ludwig
+
+Dear Hiring Team at ${company},
+
+Thank you very much for extending the formal offer of employment for the ${title} position. I am thrilled to accept the offer and excited to contribute to the team's ongoing success and key technical infrastructure initiatives.
+
+As discussed, I accept the offered starting remuneration of ${salary} and look forward to commencing on our agreed start date.
+
+Please let me know if there are any preliminary onboarding forms or documentation required prior to my first day.
+
+Warm regards,
+Sam Ludwig
+0405 993 245 | sam.ludwig@gmail.com
+Balaclava VIC 3183`;
+
+      case 'counter':
+        return `Subject: Offer of Employment - ${title} - Sam Ludwig
+
+Dear Hiring Manager,
+
+Thank you sincerely for extending the offer for the ${title} role with ${company}. I am very enthusiastic about the position and the opportunity to drive technical reliability and support operations across your environment.
+
+Given my 5+ years of enterprise systems administration experience, track record in hybrid cloud deployments, and current market benchmarks for this seniority level in Melbourne, I would like to propose a base salary adjustment to $125,000 + Super, alongside the provision for 2 fixed WFH days per week.
+
+I am confident this adjustment reflects the immediate impact, autonomous problem-solving, and high reliability I will bring to ${company} from Day 1.
+
+Thank you for your consideration, and I look forward to finalizing our agreement.
+
+Warm regards,
+Sam Ludwig
+0405 993 245`;
+
+      case 'clarify':
+        return `Subject: Inquiry regarding ${title} Offer Details - Sam Ludwig
+
+Dear Hiring Team,
+
+Thank you again for extending the formal offer for the ${title} role with ${company}. I am reviewing the contract particulars and would appreciate clarification on a few specific items:
+
+1. Field Travel & Vehicle Allowance: The specific reimbursement structure or vehicle provisioning for offsite client engagements.
+2. Overtime & On-Call Structure: The standard arrangements for after-hours operational escalation.
+3. Superannuation: Confirmation that the quoted package includes or excludes the 11.5% statutory super contribution.
+
+Thank you for your assistance, and I look forward to your guidance so we can execute the agreement.
+
+Warm regards,
+Sam Ludwig
+0405 993 245`;
+
+      case 'decline':
+        return `Subject: Employment Offer - ${title} - Sam Ludwig
+
+Dear Hiring Team,
+
+Thank you sincerely for offering me the position of ${title} with ${company}. I have greatly enjoyed learning about your organization, culture, and team throughout the interview process.
+
+After careful consideration, I have decided to accept another opportunity that aligns slightly closer with my current long-term career focus.
+
+I have the utmost respect for ${company} and hope our professional paths cross again in the future.
+
+Best regards,
+Sam Ludwig
+0405 993 245`;
+
+      default:
+        return '';
+    }
+  };
 
   const formatDaysAgo = (dateStr) => {
     if (!dateStr) return 'Active Opportunity';
@@ -226,7 +313,21 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
         </div>
 
         {/* Modal Sub-Navigation Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-100/80 px-6 pt-2 font-mono text-xs font-bold gap-2">
+        <div className="flex border-b border-slate-200 bg-slate-100/80 px-6 pt-2 font-mono text-xs font-bold gap-2 overflow-x-auto">
+          {isOffer && (
+            <button
+              onClick={() => setActiveTab('offer')}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'offer'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                  : 'text-amber-300 bg-amber-950/60 hover:bg-amber-900 border border-amber-500/40'
+              }`}
+            >
+              <Sparkles size={15} className={activeTab === 'offer' ? "text-slate-950 fill-slate-950" : "text-amber-400 fill-amber-400"} />
+              🎉 OFFER & ACTION PLAN
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('fit')}
             className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
@@ -308,6 +409,252 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
               </div>
             </div>
           )}
+          {/* TAB 0: OFFER RECEIVED & STRATEGIC NEGOTIATION PLAYBOOK */}
+          {activeTab === 'offer' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Offer Highlight Card */}
+              <div className="p-6 rounded-3xl bg-gradient-to-br from-amber-950 via-slate-900 to-emerald-950 text-white border-2 border-amber-500/80 shadow-xl space-y-4 font-mono">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/30 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-amber-500 text-slate-950 rounded-2xl font-black text-xl shadow-md">
+                      🎉
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+                        FORMAL EMPLOYMENT OFFER EXTENDED
+                      </div>
+                      <h3 className="text-lg font-black text-white">{job.title}</h3>
+                      <p className="text-xs text-slate-300 font-bold">{job.company} • {job.location || 'Melbourne, VIC'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowPsychology(true)}
+                      className="px-3 py-1.5 rounded-xl bg-teal-950/80 hover:bg-teal-900 text-teal-300 border border-teal-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Decode employer psychology and leverage"
+                    >
+                      <Sparkles size={13} className="text-teal-400" />
+                      <span>LEVERAGE INTEL</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Package Breakdown Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">BASE REMUNERATION</div>
+                    <div className="text-base font-black text-emerald-400">{job.salary || '$105,000 – $115,000'}</div>
+                    <div className="text-[9px] text-slate-500">Excl. superannuation</div>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">SUPERANNUATION</div>
+                    <div className="text-base font-black text-teal-400">11.5% AU Stat</div>
+                    <div className="text-[9px] text-slate-500">~$12,075 – $13,225/yr</div>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">WORK ARRANGEMENT</div>
+                    <div className="text-sm font-black text-indigo-300">{job.remote ? '100% Remote' : 'Hybrid (Melbourne)'}</div>
+                    <div className="text-[9px] text-slate-500">Office / Field visits</div>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">DECISION WINDOW</div>
+                    <div className="text-sm font-black text-amber-400">5 Business Days</div>
+                    <div className="text-[9px] text-slate-500">Action recommended</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Negotiation & Response Suite */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3 font-mono">
+                  <div>
+                    <div className="text-xs font-black text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <Zap size={14} className="text-amber-400" />
+                      1-Click Strategic Response Generator
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Select a posture below to generate a tailored, professional executive email response.
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const textToCopy = getOfferDraftText(offerDraftTab, job);
+                      navigator.clipboard.writeText(textToCopy);
+                      setCopiedOfferDraft(true);
+                      setTimeout(() => setCopiedOfferDraft(false), 2500);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all self-start sm:self-auto"
+                  >
+                    {copiedOfferDraft ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
+                    <span>{copiedOfferDraft ? 'COPIED TO CLIPBOARD' : 'COPY EMAIL DRAFT'}</span>
+                  </button>
+                </div>
+
+                {/* Response Posture Selector Pills */}
+                <div className="flex flex-wrap gap-2 font-mono text-xs">
+                  <button
+                    onClick={() => setOfferDraftTab('accept')}
+                    className={`px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      offerDraftTab === 'accept'
+                        ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    ✍️ 1. Formal Acceptance
+                  </button>
+                  <button
+                    onClick={() => setOfferDraftTab('counter')}
+                    className={`px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      offerDraftTab === 'counter'
+                        ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    💼 2. Counter-Offer (+8-12% & Hybrid)
+                  </button>
+                  <button
+                    onClick={() => setOfferDraftTab('clarify')}
+                    className={`px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      offerDraftTab === 'clarify'
+                        ? 'bg-indigo-500 text-white shadow-md font-black'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    🤝 3. Request Contract Details
+                  </button>
+                  <button
+                    onClick={() => setOfferDraftTab('decline')}
+                    className={`px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      offerDraftTab === 'decline'
+                        ? 'bg-rose-600 text-white shadow-md font-black'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    🛑 4. Polite Decline
+                  </button>
+                </div>
+
+                {/* Rendered Email Template Preview */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 leading-relaxed whitespace-pre-wrap selection:bg-indigo-500 selection:text-white">
+                  {getOfferDraftText(offerDraftTab, job)}
+                </div>
+              </div>
+
+              {/* Contract Due Diligence Checklist */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-4 font-mono text-xs">
+                <div className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
+                  <ShieldCheck size={16} className="text-emerald-400" />
+                  Pre-Signing Contract Due Diligence Checklist
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={dueDiligenceChecks.salary}
+                      onChange={(e) => setDueDiligenceChecks(prev => ({ ...prev, salary: e.target.checked }))}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-200">Base Salary & Super in Writing</div>
+                      <div className="text-[10px] text-slate-500">Ensure superannuation (11.5%) is explicitly stated as inclusive or exclusive.</div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={dueDiligenceChecks.probation}
+                      onChange={(e) => setDueDiligenceChecks(prev => ({ ...prev, probation: e.target.checked }))}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-200">Probation Terms Defined</div>
+                      <div className="text-[10px] text-slate-500">Standard 3-month or 6-month review criteria with mutual notice terms.</div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={dueDiligenceChecks.notice}
+                      onChange={(e) => setDueDiligenceChecks(prev => ({ ...prev, notice: e.target.checked }))}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-200">Notice Period & Termination</div>
+                      <div className="text-[10px] text-slate-500">Standard 4-week notice period following probation.</div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={dueDiligenceChecks.hybrid}
+                      onChange={(e) => setDueDiligenceChecks(prev => ({ ...prev, hybrid: e.target.checked }))}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-200">Work Location & Hybrid Policy</div>
+                      <div className="text-[10px] text-slate-500">Fixed WFH / office days documented to avoid arbitrary mandate changes.</div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={dueDiligenceChecks.allowances}
+                      onChange={(e) => setDueDiligenceChecks(prev => ({ ...prev, allowances: e.target.checked }))}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-200">Field Travel, Vehicle & Tool Allowances</div>
+                      <div className="text-[10px] text-slate-500">Cents-per-km ATO rate, company vehicle, or phone/laptop provisioning confirmed for field duties.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Stage Update Toggles */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+                <span className="text-slate-400 font-bold">Update Application Tracking:</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      if (onJobStatusUpdate) onJobStatusUpdate(job.id, 'Accepted / Hired');
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
+                  >
+                    🚀 Mark Accepted & Hired
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onJobStatusUpdate) onJobStatusUpdate(job.id, 'Offer / Negotiating');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    ⏳ Mark Counter-Offer Sent
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onJobStatusUpdate) onJobStatusUpdate(job.id, 'Offer Declined');
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-300 border border-slate-700 text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    🛑 Mark Offer Declined
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1: FIT & AI AUDIT */}
           {activeTab === 'fit' && (
             <div className="space-y-6 animate-in fade-in duration-200">
@@ -994,20 +1341,42 @@ ${data.pipeline_result?.cover_text || ''}`;
 
         {/* Footer */}
         <div className="bg-slate-100 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between font-mono shrink-0">
-          <button
-            onClick={() => {
-              if (onOpenAutoApply) {
-                onClose();
-                onOpenAutoApply(job);
-              } else {
-                setActiveTab('assets');
-              }
-            }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 hover:from-indigo-900 hover:to-purple-900 text-indigo-300 hover:text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer border border-indigo-500/40 flex items-center gap-1.5"
-          >
-            <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse" />
-            <span>⚡ {getQuickApplyPlatform(job).toUpperCase()} QUICK APPLY</span>
-          </button>
+          {isOffer ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (onJobStatusUpdate) onJobStatusUpdate(job.id, 'Accepted / Hired');
+                  onClose();
+                }}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 size={14} />
+                <span>ACCEPT OFFER & MARK HIRED</span>
+              </button>
+              <button
+                onClick={() => setShowPsychology(true)}
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-teal-300 border border-teal-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles size={13} className="text-teal-400" />
+                <span>DECODE LEVERAGE</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (onOpenAutoApply) {
+                  onClose();
+                  onOpenAutoApply(job);
+                } else {
+                  setActiveTab('assets');
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 hover:from-indigo-900 hover:to-purple-900 text-indigo-300 hover:text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer border border-indigo-500/40 flex items-center gap-1.5"
+            >
+              <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse" />
+              <span>⚡ {getQuickApplyPlatform(job).toUpperCase()}</span>
+            </button>
+          )}
 
           <button
             onClick={onClose}

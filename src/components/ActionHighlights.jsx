@@ -136,6 +136,22 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
                       <MessageSquare size={14} /> Simulator
                     </button>
                   </>
+                ) : isOffer ? (
+                  <>
+                    <button
+                      onClick={() => setPsychJob(job)}
+                      className="py-2 px-3 rounded-xl bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-teal-500/30"
+                      title="Decode Employer Psychology & Leverage"
+                    >
+                      <Sparkles size={14} />
+                    </button>
+                    <button
+                      onClick={() => onSelectJob(job)}
+                      className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                    >
+                      🎉 Review Offer & Plan <ArrowRight size={14} />
+                    </button>
+                  </>
                 ) : (
                   <button
                     onClick={() => onSelectJob(job)}

@@ -220,9 +220,10 @@ ${coverLetterText}
   }
 
   // 4. Open job application portal tab
-  const link = job.portalLink || job.link || job.url;
+  const rawLink = String(job.portalLink || job.link || job.url || '').trim();
+  const targetUrl = rawLink ? (rawLink.startsWith('http') ? rawLink : `https://${rawLink}`) : null;
   let popupBlocked = false;
-  if (link) {
+  if (targetUrl) {
     const newWindow = window.open(targetUrl, '_blank');
     if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
       popupBlocked = true;

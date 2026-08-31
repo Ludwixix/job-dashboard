@@ -931,6 +931,18 @@ def make_handler(app: DashboardApp):
                 return
 
 
+            if path == "/api/verify-job-url":
+                query_params = parse_qs(parsed.query)
+                target_url = query_params.get("url", [""])[0]
+                force = query_params.get("force", ["false"])[0].lower() in ("true", "1")
+                if not target_url:
+                    self.send_json(400, {"error": "Missing url parameter"})
+                    return
+                from .verifier import verify_job_url
+                res = verify_job_url(target_url, force=force)
+                self.send_json(200, res)
+                return
+
             if path == "/health":
                 import time
 
@@ -1415,6 +1427,15 @@ def make_handler(app: DashboardApp):
                     days = max(1, min(7, int(payload.get("days", 7))))
                     self.send_json(200, app.scan_gmail(username, app_password, days))
                     return
+                if path == "/api/verify-jobs":
+                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    urls = payload.get("urls", [])
+                    force = bool(payload.get("force", False))
+                    from .verifier import verify_job_urls
+                    results = verify_job_urls(urls, force=force)
+                    self.send_json(200, {"success": True, "results": results})
+                    return
+
                 if path == "/api/tracker/sync":
                     self.send_json(200, app.sync_tracker())
                     return

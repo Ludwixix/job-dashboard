@@ -44,6 +44,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REACT_DIR="$(cd "${SCRIPT_DIR}/../job-dashboard-react" && pwd)"
 if [ -d "${REACT_DIR}" ]; then
     cd "${REACT_DIR}"
+    echo "▶ Running React Vitest component & interaction tests..."
+    npm test
+    echo "▶ Running React lint checks..."
+    npm run lint
+    echo "▶ Compiling production bundle..."
     npm run build
     rm -rf "${SCRIPT_DIR}/src/job_dashboard/static/"*
     cp -r dist/* "${SCRIPT_DIR}/src/job_dashboard/static/"

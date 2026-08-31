@@ -48,19 +48,42 @@ class _TextExtractor(HTMLParser):
 
 
 def clean_description(value: Any, limit: int = 12000) -> str:
-    """Turn provider HTML into readable text while preserving paragraph breaks."""
-    html = re.sub(r"<\s*(?:br\s*/?|p|div|section|article|h[1-6]|ul|ol)\b[^>]*>", "\n\n", str(value or ""), flags=re.IGNORECASE)
-    html = re.sub(r"<\s*li\b[^>]*>", "\n- ", html, flags=re.IGNORECASE)
-    html = re.sub(r"<\s*/\s*(?:p|div|section|article|h[1-6]|ul|ol|li)\s*>", "\n", html, flags=re.IGNORECASE)
+    """Turn provider HTML or email formats into readable text while preserving paragraph breaks."""
+    raw = str(value or "")
+    if not raw.strip():
+        return ""
+
+    # Remove script and style tags completely
+    html = re.sub(r"<\s*style\b[^>]*>[\s\S]*?<\s*/\s*style\s*>", "", raw, flags=re.IGNORECASE)
+    html = re.sub(r"<\s*script\b[^>]*>[\s\S]*?<\s*/\s*script\s*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<\s*head\b[^>]*>[\s\S]*?<\s*/\s*head\s*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<!--[\s\S]*?-->", "", html)
+
+    # Strip email MIME/header artifacts
+    html = re.sub(r"(?i)^.*?Content-Type:\s*text/html.*?\n\n", "", html, flags=re.DOTALL)
+    html = re.sub(r"(?i)^.*?boundary=.*?\n\n", "", html, flags=re.DOTALL)
+    html = re.sub(r"(?i)(?:unsubscribe|view this job on seek|manage alerts|email preference|terms of service)[\s\S]*?$", "", html)
+
+    # Format paragraph, heading, and list tags
+    html = re.sub(r"<\s*(?:br\s*/?|p|div|section|article|h[1-6]|ul|ol|tr)\b[^>]*>", "\n\n", html, flags=re.IGNORECASE)
+    html = re.sub(r"<\s*li\b[^>]*>", "\n• ", html, flags=re.IGNORECASE)
+    html = re.sub(r"<\s*/\s*(?:p|div|section|article|h[1-6]|ul|ol|li|tr|table)\s*>", "\n", html, flags=re.IGNORECASE)
+
     parser = _TextExtractor()
     parser.feed(html)
+    
+    # Clean decoded text lines
     lines = []
-    for line in unescape("".join(parser.parts)).splitlines():
-        line = re.sub(r"\s+", " ", line).strip()
+    for raw_line in unescape("".join(parser.parts)).splitlines():
+        line = re.sub(r"[ \t]+", " ", raw_line).strip()
+        # Skip pure separator or garbage artifact lines
+        if re.match(r"^[-=_*~]{4,}$", line):
+            continue
         if line:
             lines.append(line)
         elif lines and lines[-1] != "":
             lines.append("")
+            
     text = "\n".join(lines).strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text[:limit].rstrip() + ("..." if len(text) > limit else "")
@@ -566,27 +589,63 @@ def posted_age(value: Any, now: datetime | None = None) -> str:
     return f"Posted {age} days ago"
 
 
+def _normalize_company_name(name: Any) -> str:
+    s = str(name or "").lower().strip()
+    s = re.sub(r"\b(pty|ltd|limited|inc|corporation|corp|australia|group|services|technologies|solutions|holdings)\b", "", s)
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
+def _normalize_job_title(title: Any) -> str:
+    s = str(title or "").lower().strip()
+    s = re.sub(r"[\(\[\{][^\)\]\}]*[\)\]\}]", "", s)
+    s = re.sub(r"\b(immediate start|urgent|urgent:?|contract|permanent|full time|part time|temp|hybrid|remote)\b", "", s)
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
+def _clean_job_url(url: Any) -> str:
+    s = str(url or "").strip().rstrip("/")
+    if "?" in s:
+        s = s.split("?")[0]
+    if "#" in s:
+        s = s.split("#")[0]
+    return s.rstrip("/")
+
+
 def deduplicate_jobs(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Deduplicate by URL first, then by normalized company/title."""
-    priority = {"LinkedIn": 0, "Seek": 1, "Indeed": 2}
+    """Deduplicate by clean URL and normalized company/title."""
+    priority = {"LinkedIn": 0, "Seek": 1, "Indeed": 2, "Adzuna": 3}
     ordered = sorted(jobs, key=lambda job: priority.get(str(job.get("source", "")), 99))
     seen_urls: set[str] = set()
-    seen_titles: dict[tuple[str, str], dict[str, Any]] = {}
+    seen_keys: dict[tuple[str, str], dict[str, Any]] = {}
     result: list[dict[str, Any]] = []
+    
     for raw in ordered:
         job = dict(raw)
-        url = str(job.get("url") or job.get("application_route") or "").rstrip("/")
-        key = (str(job.get("company", "")).strip().lower(), str(job.get("title", "")).strip().lower(), str(job.get("location", "")).strip().lower())
-        duplicate_key = key != ("", "", "") and key in seen_titles
-        if (url and url in seen_urls) or duplicate_key:
-            existing = seen_titles.get(key)
+        raw_url = str(job.get("url") or job.get("application_route") or "")
+        url = _clean_job_url(raw_url)
+        
+        comp_norm = _normalize_company_name(job.get("company", ""))
+        title_norm = _normalize_job_title(job.get("title", ""))
+        key = (comp_norm, title_norm)
+        
+        duplicate_key = comp_norm != "" and title_norm != "" and key in seen_keys
+        duplicate_url = bool(url and url in seen_urls)
+        
+        if duplicate_url or duplicate_key:
+            existing = seen_keys.get(key)
             if existing is not None:
                 existing["tags"] = sorted(set(existing.get("tags", [])) | set(job.get("tags", [])))
+                # Prefer longer and cleaner description
+                if len(str(job.get("description", ""))) > len(str(existing.get("description", ""))):
+                    existing["description"] = job.get("description", "")
             continue
+            
         if url:
             seen_urls.add(url)
-        seen_titles[key] = job
+        if comp_norm and title_norm:
+            seen_keys[key] = job
         result.append(job)
+        
     return result
 
 

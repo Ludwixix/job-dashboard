@@ -32,3 +32,14 @@ const localStorageMock = (() => {
   };
 })();
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+
+// Mock EventSource
+class MockEventSource {
+  constructor(url) {
+    this.url = url;
+    this.onmessage = null;
+    this.onerror = null;
+  }
+  close() {}
+}
+global.EventSource = MockEventSource;

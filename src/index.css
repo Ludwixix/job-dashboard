@@ -2,31 +2,32 @@
 
 @layer base {
   :root {
-    --industry-accent: #6366f1;
-    --industry-accent-rgb: 99, 102, 241;
-    --industry-light: #818cf8;
-    --industry-glow: rgba(99, 102, 241, 0.15);
-    --industry-border: rgba(99, 102, 241, 0.35);
-    --industry-subtle: rgba(99, 102, 241, 0.05);
-    --industry-badge-bg: rgba(49, 46, 129, 0.6);
-    --industry-badge-text: #a5b4fc;
+    --industry-accent: #0d9488;
+    --industry-accent-rgb: 13, 148, 136;
+    --industry-light: #2dd4bf;
+    --industry-glow: rgba(13, 148, 136, 0.12);
+    --industry-border: rgba(45, 212, 191, 0.25);
+    --industry-subtle: rgba(13, 148, 136, 0.04);
+    --industry-badge-bg: rgba(19, 78, 74, 0.5);
+    --industry-badge-text: #5eead4;
   }
 
   body {
     margin: 0;
-    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    background-color: #0f172a;
-    color: #cdd6f4;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #0b1120;
+    color: #e2e8f0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: background-color 1s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 
-/* Subtle Industry Ambient Glow & Theme Transitions */
+/* Zen-Data Ambient Atmosphere */
 .industry-ambient-bg {
   position: relative;
-  transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: #0b1120;
+  transition: background 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .industry-ambient-bg::before {
@@ -35,83 +36,106 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 480px;
-  background: radial-gradient(ellipse 80% 60% at 50% -20%, var(--industry-glow), transparent 70%);
+  height: 520px;
+  background: radial-gradient(ellipse 90% 60% at 50% -10%, rgba(20, 184, 166, 0.09), rgba(6, 182, 212, 0.04), transparent 75%);
   pointer-events: none;
   z-index: 0;
-  transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Glassmorphism Containers */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(45, 212, 191, 0.35);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 15px -3px rgba(45, 212, 191, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Industry Accent Helpers */
 .industry-accent-text {
   color: var(--industry-light);
-  transition: color 1s ease;
+  transition: color 0.6s ease;
 }
 
 .industry-accent-border {
   border-color: var(--industry-border);
-  transition: border-color 1s ease, box-shadow 1s ease;
+  transition: border-color 0.6s ease, box-shadow 0.6s ease;
 }
 
 .industry-accent-badge {
   background-color: var(--industry-badge-bg);
   color: var(--industry-badge-text);
   border: 1px solid var(--industry-border);
-  transition: all 1s ease;
+  transition: all 0.6s ease;
 }
 
 .industry-glow-shadow {
-  box-shadow: 0 0 20px var(--industry-glow);
-  transition: box-shadow 1s ease;
+  box-shadow: 0 0 24px var(--industry-glow);
+  transition: box-shadow 0.6s ease;
 }
 
-
-/* VS Code Editor Scrollbar */
+/* Minimalist Zen Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #181825;
+  background: #0b1120;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #45475a;
-  border-radius: 2px;
+  background: #334155;
+  border-radius: 9999px;
+  border: 2px solid #0b1120;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #c084fc;
+  background: #0d9488;
 }
 
-/* VS Code Tech Grid Pattern */
+/* Subtle Organic Grid Pattern */
 .bg-tech-grid {
-  background-image: linear-gradient(to right, rgba(205, 214, 244, 0.04) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(205, 214, 244, 0.04) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image: linear-gradient(to right, rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
-/* VS Code Card Hover Animation */
+/* Smooth Interactive Card Hover */
 .card-hover-lift {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
 }
 
 .card-hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.45);
 }
 
-/* VS Code Diagnostics & Token Highlights */
-.vscode-token-keyword { color: #c084fc; font-weight: 700; }
-.vscode-token-string { color: #a6e3a1; }
-.vscode-token-function { color: #89b4fa; font-weight: 700; }
-.vscode-token-number { color: #fab387; font-weight: 700; }
-.vscode-token-comment { color: #6c7086; font-style: italic; }
-
+/* Bioluminescent Pulse Accents */
 .pulse-emerald {
-  box-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
+  box-shadow: 0 0 14px rgba(45, 212, 191, 0.3);
 }
 
 .pulse-indigo {
-  box-shadow: 0 0 12px rgba(192, 132, 252, 0.4);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.3);
+}
+
+.pulse-amber {
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
 }

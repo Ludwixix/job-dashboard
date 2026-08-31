@@ -197,6 +197,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const apiBase = isLocalHost ? '' : (import.meta.env.VITE_SCRAPER_BASE_URL || '');
     
+    if (typeof EventSource === 'undefined') {
+      clearInterval(timer);
+      setScrapeProgress({ isActive: false, percent: 100, stage: 'Ready' });
+      setProfileScrapeStatus(null);
+      return;
+    }
+
     const eventSource = new EventSource(`${apiBase}/api/scrape/stream`);
     
     eventSource.onmessage = (event) => {
@@ -314,6 +321,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     );
     return match || selectedForInterviewPrep;
   }, [selectedForInterviewPrep, jobs]);
+
+  const liveSelectedForMockInterview = useMemo(() => {
+    if (!selectedForMockInterview) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForMockInterview.id)) ||
+      `${j.company}_${j.title}` === `${selectedForMockInterview.company}_${selectedForMockInterview.title}`
+    );
+    return match || selectedForMockInterview;
+  }, [selectedForMockInterview, jobs]);
 
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
@@ -534,7 +550,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             </div>
           </div>
 
-          {/* 4-Way Tab View Switcher */}
+          {/* 5-Way Tab View Switcher */}
           <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 overflow-x-auto">
             <button
               onClick={() => setActiveSection('seeker')}
@@ -551,6 +567,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   {preparedCount}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setActiveSection('highlights')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                activeSection === 'highlights' 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Zap size={14} className="text-amber-400" /> 
+              ACTION
             </button>
 
             <button

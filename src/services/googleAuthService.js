@@ -7,7 +7,9 @@
 import { setSession } from './authService';
 import { getActiveProfile, saveProfile, DEFAULT_PROFILES } from './profileService';
 import { scanAndSyncGmailApplications } from './gmailSyncService';
+import { synthesizeUserProfile } from './smartProfileBuilder';
 import { SCRAPER_BASE_URL } from './jobQueryService';
+
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const getApiBase = () => isLocalHost ? '' : (SCRAPER_BASE_URL || '');
@@ -278,22 +280,13 @@ export const loginWithGoogle = async ({
 
   setSession(sessionUser);
 
-  // Update candidate profile with Google information
-  const existingProfile = getActiveProfile() || DEFAULT_PROFILES[0];
-  const updatedProfile = {
-    ...existingProfile,
-    name: authUser.name || existingProfile.name,
-    email: authUser.email || existingProfile.email
-  };
-  saveProfile(updatedProfile);
-
   // Automatically scan Gmail for job records
   let applications = [];
   let scanCount = 0;
   if (autoScanGmail) {
     onStatusUpdate('Scanning Gmail inbox for application confirmations & interview invites...');
     try {
-      const syncResult = await scanAndSyncGmailApplications(authUser.accessToken, updatedProfile);
+      const syncResult = await scanAndSyncGmailApplications(authUser.accessToken, getActiveProfile() || DEFAULT_PROFILES[0]);
       applications = syncResult.applications || [];
       scanCount = syncResult.count || 0;
       onStatusUpdate(`Synced ${scanCount} application records from Gmail!`);
@@ -301,6 +294,16 @@ export const loginWithGoogle = async ({
       console.warn('Gmail sync non-blocking error:', e);
     }
   }
+
+  // Synthesize and auto-build an intelligent candidate profile
+  onStatusUpdate('Synthesizing bespoke candidate profile and ATS skill matrix...');
+  const existingProfile = getActiveProfile() || DEFAULT_PROFILES[0];
+  const updatedProfile = synthesizeUserProfile({
+    googleUser: authUser,
+    gmailApplications: applications,
+    existingProfile
+  });
+  saveProfile(updatedProfile);
 
   return {
     user: authUser,
@@ -310,3 +313,4 @@ export const loginWithGoogle = async ({
     scanCount
   };
 };
+

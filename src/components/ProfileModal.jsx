@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, User, Sparkles, Upload, FileText, CheckCircle2, 
   MapPin, DollarSign, Briefcase, Mail, Phone, ShieldCheck, 
-  Trash2, Plus, Tag, RefreshCw, AlertCircle
+  Trash2, Plus, Tag, RefreshCw, AlertCircle, Award, Target,
+  Compass, Zap, Brain, ChevronRight, Layers
 } from 'lucide-react';
 import { parseResumeWithAI, parseResumeTextClientSide, saveProfile, deleteProfile, DEFAULT_PROFILES } from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
@@ -15,28 +16,36 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
   const [parseError, setParseError] = useState('');
   const [apiKey, setApiKey] = useState(() => getActiveApiKey());
 
-
   // Form State
   const [formData, setFormData] = useState(() => ({
     id: profile?.id || '',
     name: profile?.name || '',
     title: profile?.title || '',
+    industry: profile?.industry || 'Technology & IT',
+    seniorityLevel: profile?.seniorityLevel || 'Senior',
+    yearsOfExperience: profile?.yearsOfExperience || 8,
+    marketArchetype: profile?.marketArchetype || 'Enterprise Specialist',
     email: profile?.email || '',
     phone: profile?.phone || '',
     location: profile?.location || 'Melbourne, VIC',
     suburb: profile?.suburb || 'Melbourne',
     workRights: profile?.workRights || 'Australian Citizen (Unrestricted)',
-    clearance: profile?.clearance || 'Citizen / Standard',
-    targetSalary: profile?.targetSalary || '$115,000 + Super',
+    clearance: profile?.clearance || 'Australian Citizen (Baseline / NV1 Eligible)',
+    targetSalary: profile?.targetSalary || '$135,000 - $160,000 + Super',
+    keyStrengths: profile?.keyStrengths ? [...profile.keyStrengths] : [],
+    managementStyle: profile?.managementStyle || 'Collaborative / Outcome-Driven',
     targetTitles: profile?.targetTitles ? [...profile.targetTitles] : ['Systems Engineer'],
     coreSkills: profile?.coreSkills ? [...profile.coreSkills] : ['Microsoft 365', 'Azure', 'PowerShell'],
     certifications: profile?.certifications ? [...profile.certifications] : [],
+    interviewTalkingPoints: profile?.interviewTalkingPoints ? [...profile.interviewTalkingPoints] : [],
     workHistorySummary: profile?.workHistorySummary || '',
     fullWorkExperienceText: profile?.fullWorkExperienceText || ''
   }));
 
   const [newTitleInput, setNewTitleInput] = useState('');
   const [newSkillInput, setNewSkillInput] = useState('');
+  const [newCertInput, setNewCertInput] = useState('');
+  const [newStrengthInput, setNewStrengthInput] = useState('');
 
   if (!isOpen) return null;
 
@@ -65,15 +74,19 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
     setParseError('');
 
     try {
-      const apiKey = getActiveApiKey();
-      const model = getActiveModel();
-      const parsed = await parseResumeWithAI(textToParse, apiKey, model);
+      const currentApiKey = getActiveApiKey();
+      const currentModel = getActiveModel();
+      const parsed = await parseResumeWithAI(textToParse, currentApiKey, currentModel);
 
       if (parsed) {
         setFormData(prev => ({
           ...prev,
           name: parsed.name || prev.name,
           title: parsed.title || prev.title,
+          industry: parsed.industry || prev.industry,
+          seniorityLevel: parsed.seniorityLevel || prev.seniorityLevel,
+          yearsOfExperience: parsed.yearsOfExperience || prev.yearsOfExperience,
+          marketArchetype: parsed.marketArchetype || prev.marketArchetype,
           email: parsed.email || prev.email,
           phone: parsed.phone || prev.phone,
           location: parsed.location || prev.location,
@@ -81,9 +94,12 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
           workRights: parsed.workRights || prev.workRights,
           clearance: parsed.clearance || prev.clearance,
           targetSalary: parsed.targetSalary || prev.targetSalary,
+          keyStrengths: parsed.keyStrengths?.length ? parsed.keyStrengths : prev.keyStrengths,
+          managementStyle: parsed.managementStyle || prev.managementStyle,
           targetTitles: parsed.targetTitles?.length ? parsed.targetTitles : prev.targetTitles,
           coreSkills: parsed.coreSkills?.length ? parsed.coreSkills : prev.coreSkills,
-          certifications: parsed.certifications || prev.certifications,
+          certifications: parsed.certifications?.length ? parsed.certifications : prev.certifications,
+          interviewTalkingPoints: parsed.interviewTalkingPoints?.length ? parsed.interviewTalkingPoints : prev.interviewTalkingPoints,
           workHistorySummary: parsed.workHistorySummary || prev.workHistorySummary,
           fullWorkExperienceText: parsed.fullWorkExperienceText || textToParse
         }));
@@ -91,7 +107,6 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
       }
     } catch (e) {
       console.warn('Parsing error:', e);
-      // Fallback
       const clientParsed = parseResumeTextClientSide(textToParse);
       setFormData(prev => ({ ...prev, ...clientParsed }));
       setActiveTab('edit');
@@ -111,10 +126,10 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
     }
   };
 
-  const handleRemoveTitle = (titleToRemove) => {
+  const handleRemoveTitle = (t) => {
     setFormData(prev => ({
       ...prev,
-      targetTitles: prev.targetTitles.filter(t => t !== titleToRemove)
+      targetTitles: prev.targetTitles.filter(item => item !== t)
     }));
   };
 
@@ -128,10 +143,44 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
     }
   };
 
-  const handleRemoveSkill = (skillToRemove) => {
+  const handleRemoveSkill = (s) => {
     setFormData(prev => ({
       ...prev,
-      coreSkills: prev.coreSkills.filter(s => s !== skillToRemove)
+      coreSkills: prev.coreSkills.filter(item => item !== s)
+    }));
+  };
+
+  const handleAddCert = () => {
+    if (newCertInput.trim() && !formData.certifications.includes(newCertInput.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        certifications: [...prev.certifications, newCertInput.trim()]
+      }));
+      setNewCertInput('');
+    }
+  };
+
+  const handleRemoveCert = (c) => {
+    setFormData(prev => ({
+      ...prev,
+      certifications: prev.certifications.filter(item => item !== c)
+    }));
+  };
+
+  const handleAddStrength = () => {
+    if (newStrengthInput.trim() && !formData.keyStrengths.includes(newStrengthInput.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        keyStrengths: [...prev.keyStrengths, newStrengthInput.trim()]
+      }));
+      setNewStrengthInput('');
+    }
+  };
+
+  const handleRemoveStrength = (str) => {
+    setFormData(prev => ({
+      ...prev,
+      keyStrengths: prev.keyStrengths.filter(item => item !== str)
     }));
   };
 
@@ -150,361 +199,318 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
   };
 
   const handleDelete = () => {
-    if (formData.id && confirm(`Delete profile "${formData.name}"?`)) {
+    if (window.confirm(`Are you sure you want to delete profile "${formData.name}"?`)) {
       deleteProfile(formData.id);
       if (onProfileSaved) {
-        onProfileSaved(null);
+        onProfileSaved(DEFAULT_PROFILES);
       }
       onClose();
     }
   };
 
-  const isDefaultProfile = formData.id === 'sam_ludwig';
-
+  const isDefaultProfile = DEFAULT_PROFILES.some(p => p.id === formData.id);
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md font-sans">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        >
-        {/* Header */}
-        <div className="p-6 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200 font-sans">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="bg-slate-900 rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative text-slate-100"
+      >
+        {/* Header Strip */}
+        <div className="relative bg-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 font-mono">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-cyan-500 to-indigo-500" />
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md">
-              <User size={22} />
+            <div className="p-2.5 bg-teal-500/15 border border-teal-400/30 rounded-2xl">
+              <Brain size={20} className="text-teal-400" />
             </div>
             <div>
-              <div className="text-[10px] font-mono font-black text-indigo-400 uppercase tracking-widest">
-                PERSONALIZATION ENGINE
-              </div>
-              <h2 className="text-xl font-black text-white">
-                {formData.name || 'Candidate Profile & Experience'}
+              <h2 className="text-base font-black text-white leading-tight flex items-center gap-2">
+                Candidate Intelligence Profile
+                {formData.industry && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800/80 font-mono">
+                    {formData.industry}
+                  </span>
+                )}
               </h2>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                {formData.marketArchetype || 'Intelligent Multi-Persona Resume Deductions'}
+              </p>
             </div>
           </div>
-
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Tab Selector */}
-        <div className="flex border-b border-slate-800 bg-slate-950/60 px-6 pt-2 font-mono text-xs font-bold gap-2">
+        {/* Tab Switcher */}
+        <div className="flex items-center px-6 border-b border-slate-800 bg-slate-950/60 font-mono text-xs gap-4 shrink-0">
           <button
             onClick={() => setActiveTab('upload')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'upload'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            className={`py-3 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
+              activeTab === 'upload' ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Upload size={14} /> 1-CLICK RESUME UPLOAD & PARSE
+            <Sparkles size={14} className="text-teal-400" />
+            1. AI RESUME INGEST & DEDUCTIONS
           </button>
           <button
             onClick={() => setActiveTab('edit')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'edit'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            className={`py-3 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
+              activeTab === 'edit' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <FileText size={14} /> PROFILE DETAILS & SKILLS
+            <User size={14} className="text-cyan-400" />
+            2. SYNTHESIZED CHARACTERISTICS & TRAITS
           </button>
           <button
             onClick={() => setActiveTab('api')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'api'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            className={`py-3 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
+              activeTab === 'api' ? 'border-indigo-400 text-indigo-300' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <ShieldCheck size={14} /> API SETTINGS
+            <ShieldCheck size={14} className="text-indigo-400" />
+            3. API & ENGINE SETTINGS
           </button>
         </div>
 
-        {/* Modal Scrollable Content */}
-        <div className="p-6 space-y-6 overflow-y-auto flex-1 text-slate-200">
-          {/* TAB 1: UPLOAD & AUTO-PARSE */}
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-900/60">
+          
+          {/* TAB 1: UPLOAD & PARSE */}
           {activeTab === 'upload' && (
-            <div className="space-y-5">
-              <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900 border border-indigo-500/40 font-mono text-xs space-y-2">
-                <div className="text-indigo-300 font-extrabold flex items-center gap-2 text-sm">
-                  <Sparkles size={16} className="text-amber-300" />
-                  AUTOMATIC CANDIDATE CUSTOMIZATION
+            <div className="space-y-6 max-w-2xl mx-auto">
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-teal-950/40 via-cyan-950/20 to-slate-900 border border-teal-500/30 space-y-2">
+                <div className="text-teal-300 font-extrabold flex items-center gap-2 text-sm font-mono uppercase">
+                  <Brain size={16} /> Autonomous Profile Synthesis
                 </div>
-                <p className="text-slate-300 text-[11px] leading-relaxed">
-                  Upload your resume or paste your work history. Our parsing engine will automatically extract your contact details, core skills, target titles, and career metrics to personalize the job match scores, commute distances, and tailored PDF generators.
+                <p className="text-slate-300 text-xs leading-relaxed font-sans">
+                  Paste your resume or career record below. The LLM engine will deep-read between the lines to extract your true seniority, market positioning, competitive superpowers, STAR interview talking points, and targeted salary benchmarks.
                 </p>
               </div>
 
-              {/* Drag and Drop File Upload Area */}
-              <div className="border-2 border-dashed border-slate-700 hover:border-indigo-400 rounded-2xl p-6 text-center transition-all bg-slate-950/40 font-mono">
+              {/* Upload Dropzone */}
+              <div className="border-2 border-dashed border-slate-700/80 hover:border-teal-500/60 rounded-2xl p-6 text-center transition-colors bg-slate-950/40">
                 <input
                   type="file"
                   id="resume-file-input"
-                  accept=".txt,.md,.rtf,.pdf"
+                  accept=".txt,.md,.json"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <label
-                  htmlFor="resume-file-input"
-                  className="cursor-pointer flex flex-col items-center justify-center space-y-2"
-                >
-                  <div className="p-3 bg-indigo-600/20 text-indigo-400 rounded-2xl border border-indigo-400/30">
-                    <Upload size={24} />
+                <label htmlFor="resume-file-input" className="cursor-pointer flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center border border-teal-500/20">
+                    <Upload size={22} />
                   </div>
-                  <div className="text-xs font-bold text-white">
-                    Drop your Resume File here, or <span className="text-indigo-400 underline">Browse</span>
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    Supports .txt, .pdf, .md, .rtf text documents
-                  </div>
+                  <span className="text-xs font-bold text-slate-200 font-mono">Upload Text/Markdown Resume File</span>
+                  <span className="text-[10px] text-slate-400">Or paste raw text directly below</span>
                 </label>
               </div>
 
-              {/* Raw Text Paste Area */}
+              {/* Raw Textarea */}
               <div className="space-y-2 font-mono">
-                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
-                  <span>OR PASTE RESUME / WORK EXPERIENCE TEXT DIRECTLY:</span>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <FileText size={13} className="text-teal-400" /> PASTE RESUME TEXT (OR LINKEDIN PROFILE)
+                  </label>
                   <span className="text-[10px] text-slate-500">{resumeText.length} characters</span>
-                </label>
+                </div>
                 <textarea
                   rows={8}
                   value={resumeText}
                   onChange={(e) => setResumeText(e.target.value)}
-                  placeholder="Paste your full resume text here (experience, skills, contact info)..."
-                  className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed"
+                  placeholder="Paste complete resume text here (e.g. Work experience, skills, certifications, key achievements)..."
+                  className="w-full p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-200 text-xs font-mono leading-relaxed focus:border-teal-500 focus:outline-none transition-colors placeholder-slate-600"
                 />
               </div>
 
               {parseError && (
-                <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs font-mono flex items-center gap-2">
+                <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs font-mono flex items-center gap-2">
                   <AlertCircle size={15} className="text-rose-400 shrink-0" />
                   <span>{parseError}</span>
                 </div>
               )}
 
+              {/* Action Button */}
               <button
                 onClick={() => handleParseResume()}
                 disabled={isParsing || !resumeText.trim()}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-mono font-black text-xs shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 disabled:opacity-50 text-white font-black text-xs shadow-lg transition-all cursor-pointer font-mono tracking-wider uppercase flex items-center justify-center gap-2"
               >
                 {isParsing ? (
                   <>
-                    <RefreshCw size={15} className="animate-spin text-amber-300" />
-                    <span>AI EXTRACTING CANDIDATE PROFILE (0–3s)...</span>
+                    <RefreshCw size={16} className="animate-spin text-teal-200" />
+                    <span>SYNTHESIZING CANDIDATE INTELLIGENCE...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={15} className="text-amber-300" />
-                    <span>⚡ EXTRACT & AUTOFLL PROFILE</span>
+                    <Sparkles size={16} className="text-amber-300" />
+                    <span>EXTRACT, DEDUCE & POPULATE PROFILE</span>
                   </>
                 )}
               </button>
-
-              {/* Multi-Industry Preset Candidates Quick Loader */}
-              <div className="pt-3 border-t border-slate-800 space-y-2 font-mono text-xs">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Tag size={12} className="text-indigo-400" /> OR LOAD A TEST CANDIDATE ACROSS MAJOR INDUSTRIES:
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {DEFAULT_PROFILES.map(preset => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setFormData({
-                          id: preset.id,
-                          name: preset.name,
-                          title: preset.title,
-                          email: preset.email,
-                          phone: preset.phone,
-                          location: preset.location,
-                          suburb: preset.suburb,
-                          workRights: preset.workRights,
-                          clearance: preset.clearance,
-                          targetSalary: preset.targetSalary,
-                          industry: preset.industry || 'Technology & IT',
-                          targetTitles: [...preset.targetTitles],
-                          coreSkills: [...preset.coreSkills],
-                          certifications: preset.certifications ? [...preset.certifications] : [],
-                          workHistorySummary: preset.workHistorySummary,
-                          fullWorkExperienceText: preset.fullWorkExperienceText
-                        });
-                        setResumeText(preset.fullWorkExperienceText || '');
-                        setActiveTab('edit');
-                      }}
-                      className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/50 transition-colors text-left flex items-start gap-2.5 cursor-pointer group"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-indigo-600/30 text-indigo-300 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-500/30 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        {preset.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-white text-[11px] truncate group-hover:text-indigo-300">{preset.name}</div>
-                        <div className="text-[10px] text-slate-400 truncate">{preset.title}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
-          {/* TAB 2: EDIT PROFILE FIELDS */}
+          {/* TAB 2: EDIT SYNTHESIZED PROFILE */}
           {activeTab === 'edit' && (
-            <div className="space-y-5 font-mono text-xs">
-              {/* Basic Contact Info Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-6 font-mono text-xs">
+              
+              {/* Executive Summary Card */}
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-900 border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider">Executive Positioning Archetype</span>
+                    <h3 className="text-sm font-black text-white mt-0.5">{formData.marketArchetype || `${formData.seniorityLevel} ${formData.industry} Specialist`}</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-teal-950 text-teal-300 border border-teal-800 text-[10px] font-bold">
+                      {formData.seniorityLevel} ({formData.yearsOfExperience} Yrs Exp)
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">
+                      {formData.targetSalary}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Key Superpowers */}
+                {formData.keyStrengths?.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Zap size={12} className="text-amber-400" /> Competitive Superpowers:
+                    </span>
+                    <ul className="space-y-1">
+                      {formData.keyStrengths.map((str, i) => (
+                        <li key={i} className="text-[11px] text-slate-300 flex items-start gap-2">
+                          <span className="text-teal-400 font-bold mt-0.5">•</span>
+                          <span>{str}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Primary Profile Attributes Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <User size={13} /> FULL NAME
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <User size={12} /> FULL CANDIDATE NAME
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:border-indigo-500 focus:outline-none"
-                    placeholder="e.g. Emma Watson"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
+                    placeholder="e.g. Sam Ludwig"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
-                    <Tag size={13} /> INDUSTRY / SECTOR
-                  </label>
-                  <select
-                    value={formData.industry || 'Technology & IT'}
-                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-indigo-500/50 text-indigo-300 font-bold focus:border-indigo-400 focus:outline-none"
-                  >
-                    <option value="Healthcare & Medical">🏥 Healthcare & Medical</option>
-                    <option value="Finance & Accounting">📈 Finance, Accounting & Banking</option>
-                    <option value="Marketing & Sales">📣 Marketing, Sales & Growth</option>
-                    <option value="Construction & Trades">🏗️ Construction, Trades & Engineering</option>
-                    <option value="HR & Operations">👥 Human Resources & People Ops</option>
-                    <option value="Legal & Governance">⚖️ Legal, Governance & Compliance</option>
-                    <option value="Technology & IT">💻 Technology, Software & IT</option>
-                    <option value="Education & Training">🎓 Education & Training</option>
-                    <option value="Hospitality & Retail">🛍️ Hospitality, Retail & Customer Service</option>
-                    <option value="General & Professional">🌐 General Professional / Other</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
-                    <Briefcase size={13} /> PRIMARY JOB TITLE
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <Briefcase size={12} /> PRIMARY MARKET TITLE
                   </label>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:border-indigo-500 focus:outline-none"
-                    placeholder="e.g. Clinical Nurse Specialist"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
+                    placeholder="e.g. Senior Systems Engineer"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <Mail size={13} /> EMAIL ADDRESS
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <Mail size={12} /> EMAIL ADDRESS
                   </label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-indigo-500 focus:outline-none"
-                    placeholder="e.g. sam.ludwig@gmail.com"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
+                    placeholder="e.g. candidate@example.com"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <Phone size={13} /> MOBILE PHONE
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <Phone size={12} /> PHONE NUMBER
                   </label>
                   <input
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-indigo-500 focus:outline-none"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
                     placeholder="e.g. 0405 993 245"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                    <MapPin size={13} /> LOCATION & COMMUTE BASE (SUBURB / POSTCODE)
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <MapPin size={12} /> PRIMARY LOCATION BASE
                   </label>
                   <input
                     type="text"
                     value={formData.location}
-                    onChange={(e) => {
-                      const loc = e.target.value;
-                      const sub = loc.split(',')[0].replace(/(VIC|NSW|QLD|WA|SA|TAS|ACT|NT|\d+)/gi, '').trim();
-                      setFormData({ ...formData, location: loc, suburb: sub || 'Melbourne' });
-                    }}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-emerald-500/50 text-emerald-300 font-bold focus:border-emerald-400 focus:outline-none"
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value, suburb: e.target.value.split(' ')[0] })}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
                     placeholder="e.g. Balaclava VIC 3183"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                    <DollarSign size={13} /> TARGET COMPENSATION / SALARY
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <DollarSign size={12} /> TARGET SALARY BENCHMARK
                   </label>
                   <input
                     type="text"
                     value={formData.targetSalary}
                     onChange={(e) => setFormData({ ...formData, targetSalary: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-emerald-500/50 text-emerald-300 font-bold focus:border-emerald-400 focus:outline-none"
-                    placeholder="e.g. $115,000 + Super"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
+                    placeholder="e.g. $140,000 - $165,000 + Super"
                   />
                 </div>
-              </div>
 
-              {/* Work Rights & Clearance */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <ShieldCheck size={13} /> WORK RIGHTS
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <ShieldCheck size={12} /> CITIZENSHIP & WORK RIGHTS
                   </label>
                   <input
                     type="text"
                     value={formData.workRights}
                     onChange={(e) => setFormData({ ...formData, workRights: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-indigo-500 focus:outline-none"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
                     placeholder="e.g. Australian Citizen (Unrestricted)"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <ShieldCheck size={13} /> SECURITY CLEARANCE
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <ShieldCheck size={12} /> SECURITY CLEARANCE ELIGIBILITY
                   </label>
                   <input
                     type="text"
                     value={formData.clearance}
                     onChange={(e) => setFormData({ ...formData, clearance: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-indigo-500 focus:outline-none"
-                    placeholder="e.g. Baseline / NV1 Ready"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
+                    placeholder="e.g. Australian Citizen (Baseline / NV1 Eligible)"
                   />
                 </div>
               </div>
 
               {/* Target Job Titles Tag Editor */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
-                <label className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
-                  <Tag size={13} /> TARGET JOB TITLES (Used for ATS matching & recommendations)
+                <label className="text-[11px] font-bold text-teal-300 flex items-center gap-1.5">
+                  <Target size={13} /> TARGET JOB TITLES (Auto-matches scraping feeds & telemetry)
                 </label>
                 <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]">
                   {formData.targetTitles.map((t, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold">
+                    <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-950/80 border border-teal-500/40 text-teal-300 text-[11px] font-bold">
                       {t}
                       <button onClick={() => handleRemoveTitle(t)} className="text-slate-400 hover:text-white cursor-pointer ml-1">×</button>
                     </span>
@@ -516,8 +522,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                     value={newTitleInput}
                     onChange={(e) => setNewTitleInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTitle())}
-                    placeholder="Add target title (e.g. Cloud Engineer)..."
-                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-indigo-500 focus:outline-none text-xs"
+                    placeholder="Add target title (e.g. Cloud Architect)..."
+                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-teal-500 focus:outline-none text-xs"
                   />
                   <button
                     onClick={handleAddTitle}
@@ -530,12 +536,12 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
 
               {/* Core Skills Tag Editor */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
-                <label className="text-[11px] font-bold text-purple-300 flex items-center gap-1.5">
-                  <Tag size={13} /> CORE TECHNICAL & PROFESSIONAL SKILLS (ATS Keyword Matching)
+                <label className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Tag size={13} /> CORE TECHNICAL & PROFESSIONAL SKILLS (ATS Algorithm Scoring)
                 </label>
                 <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]">
                   {formData.coreSkills.map((s, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-950/80 border border-purple-500/40 text-purple-300 text-[11px] font-bold">
+                    <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold">
                       {s}
                       <button onClick={() => handleRemoveSkill(s)} className="text-slate-400 hover:text-white cursor-pointer ml-1">×</button>
                     </span>
@@ -547,8 +553,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                     value={newSkillInput}
                     onChange={(e) => setNewSkillInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
-                    placeholder="Add skill (e.g. React, Azure, Python, SQL)..."
-                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-purple-500 focus:outline-none text-xs"
+                    placeholder="Add skill (e.g. React, Azure, Python, PowerShell)..."
+                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-cyan-500 focus:outline-none text-xs"
                   />
                   <button
                     onClick={handleAddSkill}
@@ -559,17 +565,51 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
                 </div>
               </div>
 
+              {/* Certifications Tag Editor */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                  <Award size={13} /> VERIFIED CERTIFICATIONS & ACCREDITATIONS
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-h-[44px]">
+                  {formData.certifications?.map((c, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[11px] font-bold">
+                      {c}
+                      <button onClick={() => handleRemoveCert(c)} className="text-slate-400 hover:text-white cursor-pointer ml-1">×</button>
+                    </span>
+                  ))}
+                  {(!formData.certifications || formData.certifications.length === 0) && (
+                    <span className="text-slate-500 text-[11px] italic py-1">No certifications listed yet</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCertInput}
+                    onChange={(e) => setNewCertInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCert())}
+                    placeholder="Add certification (e.g. AWS Solutions Architect, AZ-104, ITIL, CPA)..."
+                    className="flex-1 p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:border-amber-500 focus:outline-none text-xs"
+                  />
+                  <button
+                    onClick={handleAddCert}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition-colors"
+                  >
+                    <Plus size={14} /> Add
+                  </button>
+                </div>
+              </div>
+
               {/* Full Work Experience Text */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                  <FileText size={13} /> DETAILED WORK HISTORY & ACCOMPLISHMENTS (Injected into AI Resume Generator)
+                  <FileText size={13} className="text-teal-400" /> DETAILED WORK HISTORY & ACCOMPLISHMENTS (Fed directly to AI Document Generator)
                 </label>
                 <textarea
                   rows={6}
                   value={formData.fullWorkExperienceText}
                   onChange={(e) => setFormData({ ...formData, fullWorkExperienceText: e.target.value })}
                   placeholder="Detailed work experience history with metrics..."
-                  className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs leading-relaxed focus:border-indigo-500 focus:outline-none"
+                  className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs leading-relaxed focus:border-teal-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -578,28 +618,28 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
           {/* TAB 3: API SETTINGS */}
           {activeTab === 'api' && (
             <div className="space-y-6 font-mono text-xs max-w-xl mx-auto pt-4">
-              <div className="p-5 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 space-y-3">
-                <div className="text-indigo-300 font-extrabold flex items-center gap-2 text-sm">
-                  <ShieldCheck size={18} className="text-indigo-400" />
-                  OPENROUTER API INTEGRATION
+              <div className="p-5 rounded-2xl bg-teal-950/20 border border-teal-500/30 space-y-3">
+                <div className="text-teal-300 font-extrabold flex items-center gap-2 text-sm">
+                  <ShieldCheck size={18} className="text-teal-400" />
+                  OPENROUTER API ENGINE INTEGRATION
                 </div>
                 <p className="text-slate-400 leading-relaxed text-[11px]">
-                  Your OpenRouter API key is used to power the intelligent candidate matching, resume parsing, and bespoke document generation. It is stored securely in your browser's local storage and remains with your session.
+                  Your OpenRouter API key powers the intelligent candidate matching, deep resume characterization, and bespoke document generation. It is stored securely in your browser's local storage and remains completely confidential.
                 </p>
                 <div className="space-y-2 pt-2">
                   <label className="text-[11px] font-bold text-slate-300">
-                    API KEY
+                    OPENROUTER API KEY
                   </label>
                   <input
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:border-indigo-500 focus:outline-none transition-colors"
+                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:border-teal-500 focus:outline-none transition-colors"
                     placeholder="sk-or-v1-..."
                   />
                   {apiKey && (
-                    <p className="text-emerald-400 text-[10px] flex items-center gap-1.5 mt-2">
-                      <CheckCircle2 size={12} /> Key is currently configured
+                    <p className="text-teal-400 text-[10px] flex items-center gap-1.5 mt-2">
+                      <CheckCircle2 size={12} /> Key is active and ready
                     </p>
                   )}
                 </div>
@@ -630,7 +670,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved }) => {
             </button>
             <button
               onClick={handleSave}
-              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <CheckCircle2 size={16} /> SAVE & ACTIVATE PROFILE
             </button>

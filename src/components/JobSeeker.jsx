@@ -15,6 +15,8 @@ import {
 import { motion } from 'framer-motion';
 
 import { AutoApplyModal } from './AutoApplyModal';
+import { SafeErrorBoundary } from './SafeErrorBoundary';
+
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -1741,13 +1743,16 @@ export const JobSeeker = ({
 
       {/* Auto-Apply Engine Modal (LinkedIn Easy Apply & SEEK Quick Apply) */}
       {selectedAutoApplyJob && (
-        <AutoApplyModal 
-          job={selectedAutoApplyJob} 
-          onClose={() => setSelectedAutoApplyJob(null)}
-          onJobStatusUpdated={onJobStatusUpdate}
-        />
+        <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
+          <AutoApplyModal 
+            job={selectedAutoApplyJob} 
+            onClose={() => setSelectedAutoApplyJob(null)}
+            onJobStatusUpdated={onJobStatusUpdate}
+          />
+        </SafeErrorBoundary>
       )}
     </div>
   );
 };
+
 

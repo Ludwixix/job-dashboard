@@ -57,6 +57,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
   const [copiedPrompt, setCopiedPrompt]       = useState(false);
   const [copiedText, setCopiedText]           = useState(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [saveStatus, setSaveStatus]           = useState('saved'); // 'saved' | 'saving'
 
   // Settings modal state
   const [showSettings, setShowSettings]       = useState(false);
@@ -68,6 +69,37 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
     setInputKey(getActiveApiKey());
     setSelectedModel(getActiveModel());
   }, []);
+
+  // Debounced auto-save when user edits in the studio
+  useEffect(() => {
+    if (!resumeText && !coverLetterText) return;
+    setSaveStatus('saving');
+    const timer = setTimeout(() => {
+      if (onSaveCustomDocs) {
+        onSaveCustomDocs(job.id, {
+          resumeText,
+          coverLetterText,
+          model: genMeta?.model || 'Application Studio',
+          generatedAt: new Date().toISOString()
+        });
+      }
+      setSaveStatus('saved');
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [resumeText, coverLetterText, job.id, genMeta, onSaveCustomDocs]);
+
+  const handleManualSave = () => {
+    if (onSaveCustomDocs) {
+      onSaveCustomDocs(job.id, {
+        resumeText,
+        coverLetterText,
+        model: genMeta?.model || 'Application Studio',
+        generatedAt: new Date().toISOString()
+      });
+    }
+    setSaveStatus('saved');
+  };
 
   const handleSaveSettings = () => {
     setActiveApiKey(inputKey);
@@ -168,15 +200,39 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
   // ── Direct PDF Downloads ────────────────────────────────────────────────────
   const handleDownloadResume = () => {
     if (!resumeText) return;
+    if (onSaveCustomDocs) {
+      onSaveCustomDocs(job.id, {
+        resumeText,
+        coverLetterText,
+        model: genMeta?.model || 'Application Studio',
+        generatedAt: new Date().toISOString()
+      });
+    }
     downloadResumePdf(resumeText, job);
   };
 
   const handleDownloadCoverLetter = () => {
     if (!coverLetterText) return;
+    if (onSaveCustomDocs) {
+      onSaveCustomDocs(job.id, {
+        resumeText,
+        coverLetterText,
+        model: genMeta?.model || 'Application Studio',
+        generatedAt: new Date().toISOString()
+      });
+    }
     downloadCoverLetterPdf(coverLetterText, job);
   };
 
   const handleDownloadBoth = () => {
+    if (onSaveCustomDocs) {
+      onSaveCustomDocs(job.id, {
+        resumeText,
+        coverLetterText,
+        model: genMeta?.model || 'Application Studio',
+        generatedAt: new Date().toISOString()
+      });
+    }
     if (resumeText) downloadResumePdf(resumeText, job);
     if (coverLetterText) {
       setTimeout(() => downloadCoverLetterPdf(coverLetterText, job), 400);
@@ -184,6 +240,14 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
   };
 
   const handleAutoSubmit = () => {
+    if (onSaveCustomDocs) {
+      onSaveCustomDocs(job.id, {
+        resumeText,
+        coverLetterText,
+        model: genMeta?.model || 'Application Studio',
+        generatedAt: new Date().toISOString()
+      });
+    }
     if (onUpdateStatus) {
       onUpdateStatus(job.id, 'Applied / Confirmation Received', {
         appliedVia: 'Application Studio V2.0 (Double-Checked)',
@@ -197,6 +261,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
       onClose();
     }, 2200);
   };
+
 
   const hasDocuments = Boolean(resumeText && coverLetterText);
 
@@ -698,17 +763,30 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
           {/* RESUME tab */}
           {activeTab === 'resume' && (
             <div className="space-y-4 animate-in fade-in duration-300">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-800 gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tailored Master Resume</span>
                   <span className="text-[10px] text-slate-500 font-mono">({qualityAudit.wordCount.resumeWords} words)</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center gap-1.5">
+                    {saveStatus === 'saving' ? (
+                      <span className="text-amber-300 flex items-center gap-1">Saving to PDF…</span>
+                    ) : (
+                      <span className="text-emerald-400 flex items-center gap-1"><CheckCircle2 size={11} /> Saved to PDF</span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleDownloadResume}
-                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    onClick={handleManualSave}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
                   >
-                    <Download size={12} /> Direct PDF Download
+                    💾 Save Changes
+                  </button>
+                  <button
+                    onClick={handleDownloadResume}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md transition-all"
+                  >
+                    <Download size={12} /> Download Updated PDF
                   </button>
                   <button
                     onClick={() => setActiveTab('quality')}
@@ -723,6 +801,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 value={resumeText}
                 onChange={(e) => setResumeText(e.target.value)}
                 rows={22}
+                placeholder="Paste or write your tailored resume markdown here..."
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
               />
             </div>
@@ -731,17 +810,30 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
           {/* COVER LETTER tab */}
           {activeTab === 'cover_letter' && (
             <div className="space-y-4 animate-in fade-in duration-300">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-800 gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tailored 3-Paragraph Cover Letter</span>
                   <span className="text-[10px] text-slate-500 font-mono">({qualityAudit.wordCount.coverLetterWords} words)</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center gap-1.5">
+                    {saveStatus === 'saving' ? (
+                      <span className="text-amber-300 flex items-center gap-1">Saving to PDF…</span>
+                    ) : (
+                      <span className="text-emerald-400 flex items-center gap-1"><CheckCircle2 size={11} /> Saved to PDF</span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleDownloadCoverLetter}
-                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    onClick={handleManualSave}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
                   >
-                    <Download size={12} /> Direct PDF Download
+                    💾 Save Changes
+                  </button>
+                  <button
+                    onClick={handleDownloadCoverLetter}
+                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md transition-all"
+                  >
+                    <Download size={12} /> Download Updated PDF
                   </button>
                   <button
                     onClick={() => setActiveTab('quality')}
@@ -756,10 +848,12 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 value={coverLetterText}
                 onChange={(e) => setCoverLetterText(e.target.value)}
                 rows={18}
+                placeholder="Paste or write your tailored cover letter here..."
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
               />
             </div>
           )}
+
 
           {/* ATS ANALYSIS tab */}
           {activeTab === 'ats' && (

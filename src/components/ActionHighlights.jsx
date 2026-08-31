@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles } from 'lucide-react';
+import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 
 export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onSelectJob }) => {
   const [psychJob, setPsychJob] = React.useState(null);

@@ -81,3 +81,46 @@ def test_documents_and_psychology_persistence(temp_repo):
     psy = temp_repo.get_job_psychology(job_id)
     assert psy is not None
     assert psy["insights"]["culture"] == "fast-paced"
+
+
+def test_http_api_routes_persistence(temp_repo, tmp_path):
+    import io
+    import json
+    from unittest.mock import MagicMock
+    from job_dashboard.web import make_handler, DashboardApp
+
+    mock_app = DashboardApp(profile={}, sources=[], data_dir=tmp_path)
+    mock_app.repository = temp_repo
+    mock_app.db = temp_repo
+    handler_cls = make_handler(mock_app)
+
+    # 1. Test POST /api/profile
+    handler = handler_cls.__new__(handler_cls)
+    handler.path = "/api/profile"
+    handler.headers = {"Content-Length": "73", "X-User-Id": "test_http_user"}
+    payload = json.dumps({"name": "Sam Ludwig", "targetRole": "Senior Systems Engineer"}).encode('utf-8')
+    handler.headers["Content-Length"] = str(len(payload))
+    handler.rfile = io.BytesIO(payload)
+    handler.wfile = io.BytesIO()
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+
+    handler.do_POST()
+    assert handler.send_response.called
+    assert handler.send_response.call_args[0][0] == 200
+
+    # 2. Test GET /api/profile
+    get_handler = handler_cls.__new__(handler_cls)
+    get_handler.path = "/api/profile?user_id=test_http_user"
+    get_handler.headers = {"X-User-Id": "test_http_user"}
+    get_handler.rfile = io.BytesIO()
+    get_handler.wfile = io.BytesIO()
+    get_handler.send_response = MagicMock()
+    get_handler.send_header = MagicMock()
+    get_handler.end_headers = MagicMock()
+
+    get_handler.do_GET()
+    assert get_handler.send_response.called
+    assert get_handler.send_response.call_args[0][0] == 200
+

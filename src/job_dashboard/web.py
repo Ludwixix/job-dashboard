@@ -1181,8 +1181,11 @@ def make_handler(app: DashboardApp):
                     self.wfile.write(data)
                     return
 
-            
-            path = urlparse(self.path).path
+            self.send_json(404, {"error": "not found"})
+
+        def do_POST(self):
+            parsed = urlparse(self.path)
+            path = parsed.path
             try:
                 if path.startswith("/api/jobs/") and path.endswith("/compare"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/compare")
@@ -1713,149 +1716,7 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {"applications": result})
                     return
                 
-                if path.startswith("/api/smart-applications/") and path.endswith("/delete"):
-                    application_id = path.removeprefix("/api/smart-applications/").removesuffix("/delete")
-                    result = app.delete_smart_application(application_id)
-                    self.send_json(200, result)
-                    return
-                
-                self.send_json(404, {"error": "not found"})
-            except Exception as error:
-                self.send_json(500, {"error": str(error)})
-
-        def do_POST(self):
-            parsed = urlparse(self.path)
-            path = parsed.path
-            
-            try:
-                
-                if path == "/api/register":
-                    content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    email = payload.get("email")
-                    password = payload.get("password")
-                    name = payload.get("name", "")
-                    
-                    
-                    client_ip = self.client_address[0]
-                    current_time = time.time()
-                    
-                    # Clean up old attempts
-                    for ip in list(login_attempts.keys()):
-                        if current_time - login_attempts[ip]['time'] > 60:
-                            del login_attempts[ip]
-                            
-                    if client_ip in login_attempts:
-                        if login_attempts[client_ip]['count'] >= 5:
-                            if current_time - login_attempts[client_ip]['time'] < 60:
-                                self.send_json(429, {"error": "Too many login attempts. Please try again later."})
-                                return
-                            else:
-                                login_attempts[client_ip] = {'count': 1, 'time': current_time}
-                        else:
-                            login_attempts[client_ip]['count'] += 1
-                    else:
-                        login_attempts[client_ip] = {'count': 1, 'time': current_time}
-
-                    if not email or not password:
-                        self.send_json(400, {"error": "Missing email or password"})
-                        return
-                        
-                    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                    user_id = str(uuid.uuid4())
-                    now = datetime.datetime.utcnow().isoformat()
-                    
-                    try:
-                        with app.db.get_connection() as conn:
-                            cur = conn.cursor()
-                            cur.execute(
-                                "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-                                (user_id, email, name, password_hash, now)
-                            )
-                            conn.commit()
-                    except sqlite3.IntegrityError:
-                        self.send_json(400, {"error": "Email already exists"})
-                        return
-                    
-                    # Create token
-                    payload_data = {
-                        "sub": user_id,
-                        "email": email,
-                        "name": name,
-                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
-                    }
-                    token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
-                    
-                    self.send_json(200, {
-                        "success": True,
-                        "token": token,
-                        "user": {"id": user_id, "email": email, "name": name}
-                    })
-                    return
-
-                elif path == "/api/login":
-                    content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    email = payload.get("email")
-                    password = payload.get("password")
-                    
-                    
-                    client_ip = self.client_address[0]
-                    current_time = time.time()
-                    
-                    # Clean up old attempts
-                    for ip in list(login_attempts.keys()):
-                        if current_time - login_attempts[ip]['time'] > 60:
-                            del login_attempts[ip]
-                            
-                    if client_ip in login_attempts:
-                        if login_attempts[client_ip]['count'] >= 5:
-                            if current_time - login_attempts[client_ip]['time'] < 60:
-                                self.send_json(429, {"error": "Too many login attempts. Please try again later."})
-                                return
-                            else:
-                                login_attempts[client_ip] = {'count': 1, 'time': current_time}
-                        else:
-                            login_attempts[client_ip]['count'] += 1
-                    else:
-                        login_attempts[client_ip] = {'count': 1, 'time': current_time}
-
-                    if not email or not password:
-                        self.send_json(400, {"error": "Missing email or password"})
-                        return
-                        
-                    with app.db.get_connection() as conn:
-                        cur = conn.cursor()
-                        cur.execute("SELECT id, name, password_hash FROM users WHERE email = ?", (email,))
-                        row = cur.fetchone()
-                        
-                    if not row:
-                        self.send_json(401, {"error": "Invalid credentials"})
-                        return
-                        
-                    user_id, name, password_hash = row
-                    
-                    if not bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
-                        self.send_json(401, {"error": "Invalid credentials"})
-                        return
-                        
-                    payload_data = {
-                        "sub": user_id,
-                        "email": email,
-                        "name": name,
-                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
-                    }
-                    token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
-                    
-                    self.send_json(200, {
-                        "success": True,
-                        "token": token,
-                        "user": {"id": user_id, "email": email, "name": name}
-                    })
-                    return
-
-                
-                elif path == "/api/scrape/stream":
+                if path == "/api/scrape/stream":
                     self.send_response(200)
                     self.send_header('Content-Type', 'text/event-stream')
                     self.send_header('Cache-Control', 'no-cache')
@@ -1886,7 +1747,7 @@ def make_handler(app: DashboardApp):
                         pass
                     return
 
-                elif path in ("/api/refresh", "/api/scrape"):
+                if path in ("/api/refresh", "/api/scrape"):
                     content_len = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     raw_queries = payload.get("queries", [])
@@ -1925,14 +1786,6 @@ def make_handler(app: DashboardApp):
                     })
                     return
 
-
-
-                if path == "/api/search-criteria":
-                    content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    self.send_json(200, {"queries": app.update_search_queries(payload.get("queries", []))})
-                    return
-
                 if path == "/api/auto-apply/start":
                     content_len = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
@@ -1941,7 +1794,6 @@ def make_handler(app: DashboardApp):
                     task = auto_apply_manager.create_task(job, profile)
                     self.send_json(200, {"success": True, "task": task.to_dict()})
                     return
-
 
                 # Handle POST generation endpoints
                 if path.startswith("/api/jobs/") and path.endswith("/generate"):
@@ -1959,9 +1811,8 @@ def make_handler(app: DashboardApp):
                         return
                     self.send_json(200, app.generated_documents[job_id])
                     return
-                
+
                 self.send_json(404, {"error": f"Endpoint not found: {path}"})
-                
             except Exception as error:
                 self.send_json(500, {"error": str(error)})
 

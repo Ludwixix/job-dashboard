@@ -25,11 +25,29 @@ describe('Dashboard Top-Level Integration', () => {
     });
   });
 
-  it('renders Dashboard without crashing and navigates between top-level sections', async () => {
+  it('renders Zen Focus Auto-Pilot mode by default and allows switching to Studio', async () => {
     render(<Dashboard />);
 
-    // Check header branding
-    expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+    // Check Zen Auto-Pilot branding
+    expect(screen.getByText('AUTOPILOT')).toBeInTheDocument();
+    expect(screen.getByText('Open Studio')).toBeInTheDocument();
+
+    // Switch to Studio mode
+    const studioBtn = screen.getByText('Open Studio');
+    fireEvent.click(studioBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+    });
+  });
+
+  it('navigates sections in Studio mode and handles modal triggers cleanly', async () => {
+    window.localStorage.setItem('job_dashboard_view_mode', 'studio');
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+    });
 
     // Switch to Highlights section
     const actionTab = screen.getByRole('button', { name: /ACTION/i });
@@ -53,22 +71,6 @@ describe('Dashboard Top-Level Integration', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Conversion Pipeline/i)).toBeInTheDocument();
-    });
-  });
-
-  it('opens Mock Interview and Interview Prep modals without undefined reference crashes', async () => {
-    render(<Dashboard />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
-    });
-
-    // Switch to Action Highlights
-    const actionTab = screen.getByRole('button', { name: /ACTION/i });
-    fireEvent.click(actionTab);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Something went wrong/i)).not.toBeInTheDocument();
     });
   });
 });

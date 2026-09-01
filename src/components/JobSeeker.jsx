@@ -1476,19 +1476,48 @@ export const JobSeeker = ({
                         {/* Title, Company & Top Direct Job Link */}
                         <div className="flex items-start justify-between gap-3 pt-1">
                           <div className="flex-1 min-w-0">
-                            <h3 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onSelectJob) onSelectJob(job);
-                              }}
-                              className="font-black text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug cursor-pointer"
-                            >
-                              {job.title}
-                            </h3>
-                            <p className="text-xs font-bold text-slate-600 mt-1 flex items-center gap-1.5">
-                              <Building2 size={13} className="text-indigo-500 shrink-0" />
-                              <span className="font-extrabold text-slate-800">{job.company}</span>
-                            </p>
+                            {(() => {
+                              const jobUrl = job.portalLink || job.link || job.url;
+                              return (
+                                <>
+                                  {jobUrl ? (
+                                    <a
+                                      href={jobUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="font-black text-lg text-slate-900 hover:text-indigo-600 transition-colors leading-snug cursor-pointer inline-flex items-center gap-1.5"
+                                      title="Open original job posting in a new tab"
+                                    >
+                                      <span>{job.title}</span>
+                                      <ExternalLink size={14} className="text-slate-400 hover:text-indigo-600" />
+                                    </a>
+                                  ) : (
+                                    <h3 className="font-black text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">
+                                      {job.title}
+                                    </h3>
+                                  )}
+
+                                  <p className="text-xs font-bold text-slate-600 mt-1 flex items-center gap-1.5">
+                                    <Building2 size={13} className="text-indigo-500 shrink-0" />
+                                    {jobUrl ? (
+                                      <a
+                                        href={jobUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="font-extrabold text-slate-800 hover:text-indigo-600 hover:underline cursor-pointer"
+                                        title="Open original job posting in a new tab"
+                                      >
+                                        {job.company}
+                                      </a>
+                                    ) : (
+                                      <span className="font-extrabold text-slate-800">{job.company}</span>
+                                    )}
+                                  </p>
+                                </>
+                              );
+                            })()}
                           </div>
 
                           {(job.portalLink || job.link || job.url) && (

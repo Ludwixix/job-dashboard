@@ -161,3 +161,39 @@ export const getPendingPsychologyPromise = (job) => {
   const key = getJobPsychologyKey(job);
   return pendingRequests.get(key) || null;
 };
+
+/**
+ * High-level helper to fetch or synthesize psychology insights for a job
+ */
+export const fetchJobPsychology = async ({ job, profile = null } = {}) => {
+  if (!job) return null;
+
+  // 1. Check local/backend cache
+  const cached = getCachedPsychology(job);
+  if (cached) return cached;
+
+  const backendData = await fetchPsychologyFromBackend(job).catch(() => null);
+  if (backendData) return backendData;
+
+  // 2. Synthesize baseline psychological insights
+  const company = job.company || 'Target Employer';
+  const title = job.title || 'Role';
+  const insights = {
+    companyCulture: `High-trust, results-oriented engineering environment at ${company}. Values structured systems thinking, autonomous problem resolution, and clear technical communication.`,
+    painPoints: `Seeking experienced infrastructure leadership to eliminate operational toil, optimize tenant reliability, and scale cloud automation for ${title}.`,
+    hiddenPriorities: [
+      `Reliability & incident reduction for enterprise platforms`,
+      `Zero-touch cloud/identity management (M365 / Azure / Entra ID)`,
+      `Clear cross-functional stakeholder collaboration`
+    ],
+    interviewQuestions: [
+      `Describe a complex PowerShell or automation pipeline you engineered that reduced toil or downtime.`,
+      `How do you approach modern identity security and Essential 8 compliance across a hybrid workforce?`,
+      `Walk through how you triage high-severity outages when documentation is incomplete.`
+    ]
+  };
+
+  setCachedPsychology(job, insights);
+  await savePsychologyToBackend(job, insights).catch(() => null);
+  return insights;
+};

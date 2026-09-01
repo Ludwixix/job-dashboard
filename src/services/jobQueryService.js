@@ -5,16 +5,15 @@
  * titles, skills and location.
  */
 
-// ---------------------------------------------------------------------------
-// Cloud Run API URL
-// On localhost: uses relative URLs (Vite dev proxy → local Python server)
-// On GitHub Pages: routes to the Cloud Run deployment
-// After deploying: replace CLOUD_RUN_URL with your actual service URL from:
-//   gcloud run services describe job-dashboard --region australia-southeast1 --format "value(status.url)"
-// ---------------------------------------------------------------------------
-const CLOUD_RUN_URL = import.meta.env.VITE_SCRAPER_API_URL || 'https://job-dashboard-6xrdvjlrcq-ts.a.run.app';
+import { API_BASE, getBackendApiBase } from './apiConfig';
+
+// API Base URL configuration
+export const SCRAPER_BASE_URL = (() => {
+  const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  return isLocalDev ? '' : API_BASE;
+})();
+
 export const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-export const SCRAPER_BASE_URL = isLocalDev ? '' : CLOUD_RUN_URL;
 
 
 

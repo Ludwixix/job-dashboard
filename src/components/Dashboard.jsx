@@ -20,6 +20,8 @@ import { GoogleIntegrationModal } from './GoogleIntegrationModal';
 import { AutoApplyModal } from './AutoApplyModal';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { DashboardGridSkeleton } from './SkeletonLoaders';
+import ZenAutopilotDashboard from './ZenAutopilotDashboard';
+import { startAutopilot } from '../services/autopilotAgent';
 
 
 import { generateApplicationDocs } from '../services/generationService';
@@ -29,6 +31,7 @@ import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
 
 import { fetchJobsForProfile } from '../services/dataService';
+import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
 import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { 
@@ -54,6 +57,43 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
+
+  // Executive Minimalist Zen Auto-Pilot vs Full Studio Mode State
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('job_dashboard_view_mode') || 'zen';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('job_dashboard_view_mode', viewMode);
+    // Non-blocking backend sync so the mode follows the user across devices.
+    fetchPreferencesFromBackend()
+      .then((prefs) => savePreferencesToBackend({ ...(prefs || {}), viewMode }))
+      .catch(() => {});
+  }, [viewMode]);
+
+  // First-visit restore: if no local preference yet, adopt the backend's saved mode.
+  useEffect(() => {
+    if (localStorage.getItem('job_dashboard_view_mode')) return undefined;
+    let cancelled = false;
+    fetchPreferencesFromBackend()
+      .then((prefs) => {
+        const saved = prefs?.viewMode;
+        if (!cancelled && (saved === 'zen' || saved === 'studio')) {
+          setViewMode(saved);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (jobs && jobs.length > 0) {
+      const appsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+      startAutopilot({ jobs, profile: activeProfile, applications: appsList });
+    }
+  }, [jobs, activeProfile]);
 
   // Google Authentication & Integration State
   const [authUser, setAuthUser] = useState(() => getAuthenticatedUser());
@@ -378,6 +418,61 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     </div>
   );
 
+  const applicationsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+
+  if (viewMode === 'zen') {
+    return (
+      <SafeErrorBoundary>
+        <ZenAutopilotDashboard
+          jobs={jobs}
+          profile={activeProfile}
+          applications={applicationsList}
+          onSwitchToStudio={() => setViewMode('studio')}
+          onOpenJobModal={(job) => setSelectedJob(job)}
+          onOpenProfileModal={() => {
+            setEditingProfile(activeProfile);
+            setIsProfileModalOpen(true);
+          }}
+          onOpenMockInterview={(job) => setSelectedForMockInterview(job)}
+        />
+
+        {/* Global Modals in Zen Mode */}
+        {selectedJob && (
+          <JobModal
+            job={selectedJob}
+            onClose={() => setSelectedJob(null)}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
+            onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+            onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+            onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
+            profile={activeProfile}
+            allJobs={jobs}
+          />
+        )}
+
+        {selectedForMockInterview && (
+          <MockInterviewModal
+            job={selectedForMockInterview}
+            profile={activeProfile}
+            onClose={() => setSelectedForMockInterview(null)}
+          />
+        )}
+
+        {isProfileModalOpen && (
+          <ProfileModal
+            profile={editingProfile || activeProfile}
+            onClose={() => setIsProfileModalOpen(false)}
+            onSave={(updated) => {
+              setActiveProfile(updated);
+              saveProfile(updated);
+              setIsProfileModalOpen(false);
+            }}
+          />
+        )}
+      </SafeErrorBoundary>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
       {/* Top Live Engine Status Bar */}
@@ -462,6 +557,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               <span>SIGN IN</span>
             </button>
           )}
+
+          <button
+            onClick={() => setViewMode('zen')}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-950/80 border border-teal-500/50 text-teal-300 hover:text-white hover:bg-teal-900 transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+            title="Switch to Distraction-Free Zen Auto-Pilot Mode"
+          >
+            <Sparkles size={11} className="text-teal-400" />
+            <span>🌿 FOCUS AUTOPILOT</span>
+          </button>
 
           <button
             onClick={() => setIsBatchApplyOpen(true)}

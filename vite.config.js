@@ -8,6 +8,10 @@ import fs from 'fs'
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
+  
+  define: {
+    __API_BASE_URL__: JSON.stringify(process.env.VITE_API_BASE_URL || 'https://job-dashboard-6xrdvjlrcq-ts.a.run.app'),
+  },
 
   plugins: [
     react(),

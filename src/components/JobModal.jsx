@@ -242,11 +242,45 @@ Sam Ludwig
                 <Clock size={11} /> {formatDaysAgo(job.date).toUpperCase()}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white mt-1 leading-snug">{job.company}</h2>
-            <p className="text-sm font-semibold text-slate-300 mt-0.5 flex items-center gap-1.5">
-              <Briefcase size={14} className="text-indigo-400" />
-              <span>{job.title}</span>
-            </p>
+            {(() => {
+              const jobUrl = job.portalLink || job.link || job.url;
+              return (
+                <div className="mt-1">
+                  {jobUrl ? (
+                    <a
+                      href={jobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group/company inline-flex items-center gap-2 text-2xl font-black text-white hover:text-indigo-400 transition-colors leading-snug cursor-pointer"
+                      title="Open original job posting in a new tab"
+                    >
+                      <span>{job.company}</span>
+                      <ExternalLink size={18} className="text-slate-500 group-hover/company:text-indigo-400 transition-colors" />
+                    </a>
+                  ) : (
+                    <h2 className="text-2xl font-black text-white leading-snug">{job.company}</h2>
+                  )}
+
+                  {jobUrl ? (
+                    <a
+                      href={jobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group/title flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-indigo-300 mt-0.5 transition-colors cursor-pointer"
+                      title="Open original job posting in a new tab"
+                    >
+                      <Briefcase size={14} className="text-indigo-400" />
+                      <span className="underline decoration-slate-600 group-hover/title:decoration-indigo-400">{job.title}</span>
+                    </a>
+                  ) : (
+                    <p className="text-sm font-semibold text-slate-300 mt-0.5 flex items-center gap-1.5">
+                      <Briefcase size={14} className="text-indigo-400" />
+                      <span>{job.title}</span>
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="flex items-center gap-2">

@@ -14,3 +14,5 @@ data/compare_results.json
 data/applications/
 *.sqlite3
 *.backup
+
+*.bak.json

@@ -135,6 +135,22 @@ def test_score_explanation_is_derived_from_score_dimensions():
     assert "azure" in explanation["matched_skills"]
 
 
+def test_score_matches_non_it_profile_via_coreSkills_field():
+    """The live product stores resume-derived skills under coreSkills (not the
+    legacy 'skills' dict), and covers every industry, not just IT/Microsoft
+    stacks. Scoring must read that field and match arbitrary candidate skills."""
+    nurse_profile = {"industry": "Healthcare & Medical", "coreSkills": ["Acute Care", "Emergency Triage", "Medication Administration"]}
+    nursing_job = Job("1", "Registered Nurse", "Melbourne Health", description="Acute care ward providing emergency triage and medication administration to patients.")
+    unrelated_job = Job("2", "Azure Cloud Engineer", "Acme", description="Azure and PowerShell automation for cloud services.")
+
+    nursing_result = score_job(nursing_job, nurse_profile)
+    unrelated_result = score_job(unrelated_job, nurse_profile)
+
+    assert "acute care" in nursing_result.matched_skills
+    assert nursing_result.fit != "No skill match"
+    assert nursing_result.score > unrelated_result.score
+
+
 def test_adzuna_api_source_parses_results(monkeypatch):
     class FakeResponse:
         def __enter__(self):

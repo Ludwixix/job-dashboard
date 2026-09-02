@@ -1,6 +1,44 @@
 from job_dashboard.repository import JobRepository
 
 
+class FakeRefreshSource:
+    name = "fake"
+
+    def search(self, query):
+        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/1", "posted": "2026-08-24", "location": "Melbourne"}]
+
+
+def test_dashboard_app_refresh_persists_jobs_and_reports_progress(tmp_path):
+    from job_dashboard.sources import SearchQuery
+    from job_dashboard.web import DashboardApp
+
+    app = DashboardApp(profile={}, sources=[FakeRefreshSource()], data_dir=tmp_path, search_queries=[])
+    baseline_count = app.repository.count_jobs()
+    progress_events = []
+
+    _, _, stats = app.refresh(
+        [SearchQuery("cloud")],
+        on_progress=lambda stage, pct: progress_events.append((stage, pct)),
+    )
+
+    assert stats["queries_scraped"] == 1
+    assert app.repository.count_jobs() > baseline_count
+    assert progress_events
+
+
+def test_dashboard_app_refresh_skips_cached_queries_on_second_call(tmp_path):
+    from job_dashboard.sources import SearchQuery
+    from job_dashboard.web import DashboardApp
+
+    app = DashboardApp(profile={}, sources=[FakeRefreshSource()], data_dir=tmp_path, search_queries=[])
+    app.refresh([SearchQuery("cloud")])
+
+    _, _, stats = app.refresh([SearchQuery("cloud")], force=False, ttl_hours=12.0)
+
+    assert stats["cache_hit"] is True
+    assert stats["queries_scraped"] == 0
+
+
 def test_repository_filters_and_logs_status_transition(tmp_path):
     repository = JobRepository(tmp_path / "jobs.sqlite3")
     repository.replace_jobs([{

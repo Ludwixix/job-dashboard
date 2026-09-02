@@ -38,6 +38,7 @@ from .interview_simulator import get_interview_simulator
 from .compare import COMPARE_MODELS, CompareRunner
 from .documents import generate_documents
 from .email_connector import GmailApiScanner, GmailScanner
+from .gcs_backup import backup_to_gcs
 from .health import get_health_check
 from .logging import get_logger
 from .normalize import normalize_job
@@ -373,9 +374,19 @@ class DashboardApp:
     def materialize_jobs(self, jobs):
         materialized = []
         for raw in jobs:
-            job = normalize_job(raw)
-            analysis = self.dashboard.analyse(raw)
-            item = dict(raw)
+            # Confidential/blank-company ads are still valid postings — coerce
+            # rather than reject, since a single unnormalizable job previously
+            # raised and aborted materialization for the entire batch.
+            candidate = dict(raw)
+            if not str(candidate.get("company") or "").strip():
+                candidate["company"] = "Confidential"
+            try:
+                job = normalize_job(candidate)
+                analysis = self.dashboard.analyse(candidate)
+            except Exception as error:
+                logger.warning(f"Skipping unnormalizable job during materialization: {error}")
+                continue
+            item = dict(candidate)
             item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "fit_category": analysis.fit_category, "dimensions": analysis.score.dimensions, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "description": clean_description(job.description)})
             materialized.append(item)
         return materialized
@@ -516,7 +527,7 @@ class DashboardApp:
         dates.extend(event.get("received_at", "") for event in job.get("email_events", []))
         return any(value and is_recent({"posted": value}, days=days) for value in dates)
 
-    def refresh(self, queries, force: bool = False, ttl_hours: float = 12.0):
+    def refresh(self, queries, force: bool = False, ttl_hours: float = 12.0, on_progress=None):
         with self.lock:
             queries_to_scrape = []
             cached_query_terms = []
@@ -532,11 +543,15 @@ class DashboardApp:
 
             pipeline_errors = []
             if queries_to_scrape:
+                if on_progress:
+                    on_progress(f"Scanning {len(queries_to_scrape)} live employment gateway queries...", 10)
                 pipeline = ScrapePipeline(self.sources, days=14, health_check=self.health_check)
-                fresh = pipeline.run(queries_to_scrape)
+                fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
                 pipeline_errors = pipeline.errors
 
                 if fresh:
+                    if on_progress:
+                        on_progress("Saving & indexing positions...", 90)
                     # Materialize fresh jobs
                     fresh_materialized = self.materialize_jobs(fresh)
                     existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
@@ -550,12 +565,17 @@ class DashboardApp:
 
                     self.jobs = merged_jobs
                     self.save_jobs()
+                    from .config import settings
+                    if settings.gcs_data_bucket:
+                        backup_to_gcs(settings.gcs_data_bucket, self.data_dir)
 
                 # Record cache hit timestamps for freshly scraped queries
                 for q in queries_to_scrape:
                     term = q.term if hasattr(q, "term") else str(q.get("term", ""))
                     loc = q.location if hasattr(q, "location") else str(q.get("location", ""))
                     self.repository.record_query_scrape(term, loc, len(fresh or []))
+            elif on_progress:
+                on_progress(f"All {len(cached_query_terms)} queries already fresh (cached), skipping re-scan...", 60)
 
             # Recalibrate/score all database jobs against current profile
             self.jobs = self.materialize_jobs(self.jobs)
@@ -1174,16 +1194,11 @@ def make_handler(app: DashboardApp):
                         self.wfile.flush()
                     except Exception:
                         pass
-                        
+
                 queries = app.search_queries
-                pipeline = ScrapePipeline(app.sources, days=14, health_check=app.health_check)
-                on_progress("Connecting to job gateways...", 10)
+                on_progress("Connecting to job gateways...", 5)
                 try:
-                    fresh = pipeline.run(queries, on_progress=on_progress)
-                    fresh = deduplicate_jobs(fresh)
-                    fresh = ensure_descriptions(fresh)
-                    on_progress("Saving & indexing positions...", 90)
-                    app.repository.save_jobs(fresh)
+                    app.refresh(queries, force=False, ttl_hours=12.0, on_progress=on_progress)
                     on_progress("Discovery Complete", 100)
                 except Exception as scrape_err:
                     logger.warning(f"Live scrape stream warning: {scrape_err}")
@@ -1814,16 +1829,15 @@ def make_handler(app: DashboardApp):
                             self.wfile.flush()
                         except:
                             pass
-                            
+
                     queries = app.search_queries
-                    pipeline = ScrapePipeline(app.sources, days=14, health_check=app.health_check)
                     on_progress("Starting pipeline...", 0)
-                    fresh = pipeline.run(queries, on_progress=on_progress)
-                    fresh = deduplicate_jobs(fresh)
-                    fresh = ensure_descriptions(fresh)
-                    on_progress("Saving to SQLite WAL database...", 90)
-                    app.repository.save_jobs(fresh)
-                    on_progress("Done", 100)
+                    try:
+                        app.refresh(queries, force=False, ttl_hours=12.0, on_progress=on_progress)
+                        on_progress("Done", 100)
+                    except Exception as scrape_err:
+                        logger.warning(f"Live scrape stream warning: {scrape_err}")
+                        on_progress("Discovery complete (cached fallback)", 100)
                     try:
                         self.wfile.write(b"data: [DONE]\n\n")
                         self.wfile.flush()

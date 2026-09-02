@@ -56,6 +56,13 @@ class Settings:
         # Application behavior
         self.sync_interval_seconds = int(os.getenv("JOB_DASHBOARD_SYNC_INTERVAL_SECONDS", "1800"))
         self.recent_job_days = int(os.getenv("JOB_DASHBOARD_RECENT_JOB_DAYS", "14"))
+
+        # Persistent storage backup: Cloud Run's container filesystem is
+        # ephemeral, so the local SQLite index is restored from this GCS
+        # bucket on startup and backed up after each refresh, so scraped
+        # jobs survive cold starts and redeploys instead of resetting to
+        # whatever snapshot was baked into the container image.
+        self.gcs_data_bucket = os.getenv("JOB_DASHBOARD_GCS_DATA_BUCKET")
     
     def _load_dotenv(self):
         """Load .env file if present."""

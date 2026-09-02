@@ -60,6 +60,15 @@ def main():
     else:
         startup_logger.warning("OpenRouter API key not found (set JOB_DASHBOARD_OPENROUTER_API_KEY)")
 
+    # Cloud Run's filesystem is ephemeral: restore the last known-good index
+    # from GCS before anything opens the local SQLite file, so scraped jobs
+    # survive cold starts and redeploys instead of resetting every time.
+    if settings.gcs_data_bucket:
+        from .gcs_backup import restore_from_gcs
+        restore_from_gcs(settings.gcs_data_bucket, args.data_dir)
+    else:
+        startup_logger.warning("JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts")
+
     sources = [IndeedJobSpySource()]
     if settings.seek_enabled:
         sources.append(SeekApiSource(
@@ -92,6 +101,9 @@ def main():
             print("Sources refreshed in the background.", flush=True)
         except Exception as error:
             print(f"Source refresh failed: {error}", flush=True)
+        if settings.gcs_data_bucket:
+            from .gcs_backup import backup_to_gcs
+            backup_to_gcs(settings.gcs_data_bucket, args.data_dir)
         if list(PROJECT_ROOT.glob("client_secret_*.json")) and (args.data_dir / "gmail_token.json").exists():
             try:
                 app.scan_gmail(days=7)

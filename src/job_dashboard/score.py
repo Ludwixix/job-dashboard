@@ -29,7 +29,6 @@ _LEVEL_WEIGHT = {"expert": 1.0, "advanced": 0.8, "intermediate": 0.6, "basic": 0
 _CLUSTER_WEIGHT = {"primary": 1.0, "secondary": 0.45}
 _PRIMARY_SKILLS = {"sharepoint", "microsoft 365", "exchange", "intune", "azure", "powershell", "windows", "networking", "servicenow", "itil", "customer service"}
 _SECONDARY_SKILLS = {"linux", "cybersecurity", "data centre", "documentation", "python"}
-_TRADE_TERMS = ("hvac", "building management", "bms", "mechanical", "electrical", "plumbing", "refrigeration")
 _DATA_ROLE_TERMS = ("data engineer", "data warehouse", "data warehousing", "etl", "extract transform load", "data model", "dimensional model", "sql developer")
 _DATA_SPECIFIC_TERMS = ("data warehouse", "data warehousing", "etl", "extract transform load", "dimensional model", "data pipeline", "sql modeling", "data modelling")
 
@@ -43,10 +42,18 @@ def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, st
     values: dict[str, str] = {}
     if isinstance(raw, Mapping):
         values.update({str(name).lower(): str(value).lower() for name, value in raw.items()})
-    else:
+    elif raw:
         values.update({str(skill).lower(): "intermediate" for skill in raw})
     for group in profile.get("technical_expertise", {}).values():
         values.update({str(skill).lower(): "intermediate" for skill in group})
+    # coreSkills is the field the live product actually stores resume-derived
+    # skills under (any industry, not just the curated IT alias list below);
+    # without this, scoring never sees a candidate's own skills at all for
+    # profiles created via the current resume-parsing/onboarding flow.
+    for skill in profile.get("coreSkills", []) or []:
+        key = str(skill).strip().lower()
+        if key and key not in values:
+            values[key] = "intermediate"
 
     canonical: dict[str, str] = {}
     for skill, aliases in SKILL_ALIASES.items():
@@ -54,6 +61,11 @@ def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, st
             if any(re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", profile_skill) for alias in aliases):
                 canonical[skill] = level
                 break
+    # Retain every other candidate skill term verbatim (any industry) so it can
+    # still be matched directly against job text even when it falls outside
+    # the curated IT alias groups above.
+    for term, level in values.items():
+        canonical.setdefault(term, level)
     return canonical
 
 
@@ -69,11 +81,16 @@ def _profile_skills(profile: Mapping[str, Any]) -> dict[str, str]:
         raise ScoringError(f"Failed to extract profile skills: {e!s}", {"error": str(e)}) from e
 
 
-def _job_skills(job: Job) -> dict[str, float]:
+def _job_skills(job: Job, extra_terms: tuple[str, ...] = ()) -> dict[str, float]:
+    """Match the curated IT alias groups plus any candidate-specific skill
+    terms (any industry) directly against the job text, so scoring isn't
+    limited to a fixed Microsoft/IT vocabulary.
+    """
     fields = {"title": job.title, "tags": " ".join(job.tags), "why": job.why, "description": job.description}
     text = job.text().lower()
     found: dict[str, float] = {}
-    for skill, aliases in SKILL_ALIASES.items():
+
+    def _match(skill_key: str, aliases: tuple[str, ...]) -> None:
         for alias in aliases:
             if re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", text):
                 confidence = 0.6
@@ -83,8 +100,17 @@ def _job_skills(job: Job) -> dict[str, float]:
                     confidence = 0.9
                 elif alias in fields["why"].lower():
                     confidence = 0.8
-                found[skill] = confidence
-                break
+                found[skill_key] = confidence
+                return
+
+    for skill, aliases in SKILL_ALIASES.items():
+        _match(skill, aliases)
+
+    for term in extra_terms:
+        term = term.strip().lower()
+        if term and term not in found and len(term) > 2:
+            _match(term, (term,))
+
     return found
 
 
@@ -111,8 +137,6 @@ def _seniority_penalty(job: Job) -> float:
 
 def _role_domain(job: Job) -> str:
     text = job.text().lower()
-    if any(term in text for term in _TRADE_TERMS) and re.search(r"bms|building management|hvac|mechanical|electrical|plumbing", text):
-        return "trade"
     if any(term in text for term in _DATA_ROLE_TERMS):
         return "data"
     return "it"
@@ -146,12 +170,12 @@ def explain_score(result: ScoreResult) -> dict[str, Any]:
 def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
     """Calculate a deterministic fit audit from a job and injected profile."""
     try:
-        skills = _job_skills(job)
         profile_skills = _profile_skills(profile)
+        skills = _job_skills(job, extra_terms=tuple(profile_skills.keys()))
         domain = _role_domain(job)
         matched = tuple(
             skill for skill, confidence in skills.items()
-            if confidence >= 0.6 and skill in profile_skills and domain != "trade"
+            if confidence >= 0.6 and skill in profile_skills
         )
         missing = tuple(skill for skill in skills if skill not in profile_skills)
         total_weight = sum(
@@ -174,8 +198,6 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
         total = skill_match * 0.6 + title_category * 0.12 + location * 0.08 + experience * 0.08 + company * 0.04 + growth * 0.03 + recency * 0.05 - seniority_penalty
         if domain == "data" and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS):
             total = min(total, 0.5)
-        if domain == "trade":
-            total = min(total, 0.35)
         total = max(0.0, min(1.0, total))
         fit = "No skill match" if not matched else "Excellent fit" if total >= 0.85 else "Strong fit" if total >= 0.7 else "Good fit" if total >= 0.55 else "Partial fit"
         confidence = min(1.0, 0.5 + (0.2 if job.description else 0) + (0.1 if job.tags else 0) + (0.1 if job.why else 0) + (0.1 if len(skills) > 3 else 0))

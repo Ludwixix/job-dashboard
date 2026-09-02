@@ -6,6 +6,7 @@ from job_dashboard.models import Job
 from job_dashboard.score import explain_score, score_job
 from job_dashboard.sources import (
     AdzunaApiSource,
+    IndeedJobSpySource,
     RemoteOkApiSource,
     ScrapePipeline,
     SearchQuery,
@@ -14,6 +15,7 @@ from job_dashboard.sources import (
     normalize_posted_date,
     canonical_posted_date,
     posted_age,
+    _extract_balanced_json,
 )
 
 
@@ -71,6 +73,39 @@ def test_canonical_posted_date_freezes_relative_age_at_capture_time():
     captured = datetime(2026, 9, 2, tzinfo=timezone.utc)
     assert canonical_posted_date("3d ago", captured) == "2026-08-30"
     assert canonical_posted_date("3d ago•Expiring", captured) == "2026-08-30"
+
+
+def test_extract_balanced_json_handles_nested_strings_and_objects():
+    source = 'window.data={"results":[{"title":"Role with } brace","meta":{"id":1}}]};'
+    start = source.index("=") + 1
+    assert json.loads(_extract_balanced_json(source, start))["results"][0]["meta"]["id"] == 1
+
+
+def test_indeed_structured_fallback_recovers_when_jobspy_returns_empty(monkeypatch):
+    class EmptyResults:
+        empty = True
+
+    monkeypatch.setattr("jobspy.scrape_jobs", lambda **kwargs: EmptyResults(), raising=False)
+    html = (
+        'window.mosaic.providerData["mosaic-provider-jobcards"]='
+        '{"metaData":{"mosaicProviderJobCardsModel":{"results":['
+        '{"jobkey":"abc123","displayTitle":"Support Engineer","company":"Acme",'
+        '"formattedLocation":"Melbourne VIC","formattedRelativeTime":"2 days ago",'
+        '"snippet":"<b>Support</b> customers"}]}}};'
+    )
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc, tb): return False
+        def read(self, size=-1): return html.encode()[:size]
+
+    monkeypatch.setattr("job_dashboard.sources.urllib.request.urlopen", lambda *args, **kwargs: Response())
+    records = list(IndeedJobSpySource(results_wanted=5).search(SearchQuery("support engineer")))
+
+    assert len(records) == 1
+    assert records[0]["id"] == "indeed-abc123"
+    assert records[0]["posted"]
+    assert records[0]["description"] == "Support customers"
 
 
 def test_dedupe_merges_tags():

@@ -1,19 +1,14 @@
 """
 Batch scoring operations for improved performance.
 """
-from typing import List, Dict, Any, Tuple
-from functools import lru_cache
+from typing import List, Dict, Any
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
 
 from .models import Job, ScoreResult
-from .types import ScoringError, ProfileDict
+from .score import score_job
 from .score import (
-    SKILL_ALIASES, _LEVEL_WEIGHT, _CLUSTER_WEIGHT, _PRIMARY_SKILLS, _SECONDARY_SKILLS,
-    _TRADE_TERMS, _DATA_ROLE_TERMS, _DATA_SPECIFIC_TERMS,
     _profile_skills, _job_skills, _role_domain, _experience_level,
-    _seniority_penalty, _skill_cluster
+    _seniority_penalty, _skill_cluster, _LEVEL_WEIGHT, _CLUSTER_WEIGHT
 )
 
 
@@ -46,17 +41,19 @@ def score_jobs_batch(jobs: List[Job], profile: Dict[str, Any]) -> List[ScoreResu
                 results.append(error_result)
         
         return results
+    except Exception as e:
+        raise ScoringError(f"Batch scoring failed: {e!s}", {"jobs": len(jobs)}) from e
         
 def _score_single_job_fast(job: Job, profile_skills: Dict[str, str]) -> ScoreResult:
     """Optimized single job scoring using pre-computed profile skills."""
     # Extract job skills
-    skills = _job_skills(job)
+    skills = _job_skills(job, extra_terms=tuple(profile_skills.keys()))
     domain = _role_domain(job)
     
     # Calculate matched skills
     matched = tuple(
         skill for skill, confidence in skills.items()
-        if confidence >= 0.6 and skill in profile_skills and domain != "trade"
+        if confidence >= 0.6 and skill in profile_skills
     )
     missing = tuple(skill for skill in skills if skill not in profile_skills)
     
@@ -94,12 +91,6 @@ def _score_single_job_fast(job: Job, profile_skills: Dict[str, str]) -> ScoreRes
     
     total = skill_match * 0.6 + title_category * 0.12 + location * 0.08 + experience * 0.08 + company * 0.04 + growth * 0.03 + recency * 0.05 - seniority_penalty
     
-    # Apply domain-specific adjustments
-    if domain == "data" and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS):
-        total = min(total, 0.5)
-    if domain == "trade":
-        total = min(total, 0.35)
-    
     total = max(0.0, min(1.0, total))
     
     # Determine fit category
@@ -111,7 +102,7 @@ def _score_single_job_fast(job: Job, profile_skills: Dict[str, str]) -> ScoreRes
     # Determine strengths and risks
     strengths = ("Strong skill alignment", "Experience level matches role requirements", "Ideal location match")[:1 + (experience >= 0.8) + (location >= 0.9)]
     risks = ((f"Missing skills: {', '.join(missing[:3])}",) if missing else ()) + ("Verify exact requirements before applying",)
-    relevance = "No match" if domain == "trade" else "Strong"
+    relevance = "Strong"
     
     # Create ScoreResult
     return ScoreResult(

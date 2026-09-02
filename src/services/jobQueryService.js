@@ -328,13 +328,20 @@ export const buildQueriesFromProfile = (profile) => {
     queries.push({ term: term.trim(), location, stream, weight });
   };
 
+  // Keep one refresh bounded: sources are queried serially and a broad,
+  // 30-term profile made an interactive scrape take many minutes.
+  const maxQueries = 12;
+
   // 1. Explicit target titles — highest priority
-  for (const title of (profile.targetTitles || [])) add(title, 'core', 1.5);
+  for (const title of (profile.targetTitles || [])) {
+    add(title, 'core', 1.5);
+    if (queries.length >= maxQueries) break;
+  }
 
   // 2. Industry-mapped core titles
   for (const title of (industryData.titles || [])) {
     add(title, 'core', 1.0);
-    if (queries.length >= 20) break;
+    if (queries.length >= maxQueries) break;
   }
 
   // 3. Skills-inferred additions
@@ -343,13 +350,13 @@ export const buildQueriesFromProfile = (profile) => {
     if (profileSkills.some(s => s.includes(skill.toLowerCase()))) {
       for (const t of inferred) add(t, 'core', 0.8);
     }
-    if (queries.length >= 28) break;
+    if (queries.length >= maxQueries) break;
   }
 
   // 4. Bridge / adjacent titles
   for (const title of (industryData.bridgeTitles || [])) {
     add(title, 'bridge', 0.6);
-    if (queries.length >= 30) break;
+    if (queries.length >= maxQueries) break;
   }
 
   return queries;

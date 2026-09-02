@@ -33,7 +33,7 @@ import { logoutUser } from '../services/authService';
 
 import { fetchJobsForProfile } from '../services/dataService';
 import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
-import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
+import { suggestRelatedTitles, buildQueriesFromProfile, triggerProfileScrape } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../services/profileOnboardingPipeline';
 import { 
@@ -215,7 +215,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   });
 
   
-  const triggerDiscoveryScrape = useCallback((targetProfile) => {
+  const triggerDiscoveryScrape = useCallback(async (targetProfile) => {
     if (!targetProfile) return;
     const industry = targetProfile.industry || 'Technology & IT';
     const queries = buildQueriesFromProfile(targetProfile);
@@ -236,76 +236,42 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       setScrapeProgress(prev => ({ ...prev, elapsedSec: Math.round((Date.now() - startTime) / 1000) }));
     }, 1000);
 
-    const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const apiBase = isLocalHost ? '' : (import.meta.env.VITE_SCRAPER_BASE_URL || '');
-    
-    if (typeof EventSource === 'undefined') {
+    try {
+      const result = await triggerProfileScrape(targetProfile, { ttl_hours: 12.0 });
+      if (!result.success) throw new Error(result.error || 'Refresh failed');
       clearInterval(timer);
-      setScrapeProgress({ isActive: false, percent: 100, stage: 'Ready' });
-      setProfileScrapeStatus(null);
-      return;
-    }
-
-    const eventSource = new EventSource(`${apiBase}/api/scrape/stream`);
-    
-    eventSource.onmessage = (event) => {
-      if (event.data === '[DONE]') {
-        eventSource.close();
-        clearInterval(timer);
-        applyIndustryTheme(industry);
-        refetch();
-        setScrapeProgress({
-          isActive: false,
-          percent: 100,
-          stage: `Discovery Complete!`,
-          elapsedSec: Math.round((Date.now() - startTime) / 1000),
-          totalDiscovered: 15
-        });
-        setProfileScrapeStatus('done');
-        setProfileScrapeMsg(`✅ Discovery Complete: Updated matrix with fresh ${industry} opportunities`);
-        setTimeout(() => {
-          setScrapeProgress(prev => ({ ...prev, percent: 0, stage: '' }));
-          setProfileScrapeStatus(null);
-        }, 6000);
-      } else {
-        try {
-          const data = JSON.parse(event.data);
-          setScrapeProgress(prev => ({
-            ...prev,
-            percent: data.percent,
-            stage: data.stage
-          }));
-        } catch (e) {}
-      }
-    };
-    
-    eventSource.onerror = (err) => {
-      console.warn('EventSource error:', err);
-      eventSource.close();
-      clearInterval(timer);
+      applyIndustryTheme(industry);
       refetch();
-      setScrapeProgress(prev => ({
-        ...prev,
+      const stats = result.cacheStats || {};
+      setScrapeProgress({
         isActive: false,
         percent: 100,
-        stage: `Ready`,
-      }));
-      setProfileScrapeStatus(null);
-    };
+        stage: stats.cache_hit ? 'Index already fresh' : 'Discovery Complete!',
+        elapsedSec: Math.round((Date.now() - startTime) / 1000),
+        totalDiscovered: stats.total_jobs || result.jobs.length
+      });
+      setProfileScrapeStatus('done');
+      setProfileScrapeMsg(`✅ ${stats.cache_hit ? 'Using the fresh indexed roles' : `Updated index with ${industry} opportunities`}`);
+      setTimeout(() => {
+        setScrapeProgress(prev => ({ ...prev, percent: 0, stage: '' }));
+        setProfileScrapeStatus(null);
+      }, 6000);
+    } catch (error) {
+      clearInterval(timer);
+      setScrapeProgress(prev => ({ ...prev, isActive: false, percent: 100, stage: 'Index unchanged' }));
+      setProfileScrapeStatus('error');
+      setProfileScrapeMsg(`Refresh unavailable: ${error.message}`);
+    }
   }, [refetch]);
 
 
-  // Trigger discovery when activeProfile changes or on initial load.
-  // The backend's active search queries must be synced first, otherwise the
-  // scrape stream re-runs whatever queries it already had (ignoring the
-  // profile) instead of searching for this candidate's own titles/skills.
+  // Load the persisted index immediately. Profile queries are kept in sync,
+  // but only a deliberate user refresh/profile completion starts live work.
   useEffect(() => {
     if (activeProfile) {
-      syncProfileQueriesToBackend(activeProfile).finally(() => {
-        triggerDiscoveryScrape(activeProfile);
-      });
+      syncProfileQueriesToBackend(activeProfile);
     }
-  }, [activeProfile?.id, activeProfile?.industry, triggerDiscoveryScrape]);
+  }, [activeProfile?.id, activeProfile?.industry]);
 
 
 

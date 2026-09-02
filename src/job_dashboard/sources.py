@@ -462,12 +462,17 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
 
 _SEEK_EXTRACTOR = """() => Array.from(document.querySelectorAll('[data-testid=job-card]')).map(card => {
     const link = card.querySelector('[data-automation=jobTitle]');
+    // SEEK sometimes renders a "Featured"/"Promoted" badge in the same slot
+    // as the listing date for paid ads; only keep text that actually looks
+    // like a date so it doesn't get mistaken for a real posted date.
+    const rawPosted = card.querySelector('[data-automation=jobListingDate]')?.textContent.trim() || '';
+    const posted = /\\d/.test(rawPosted) ? rawPosted : '';
     return {
         title: card.querySelector('[data-testid=job-card-title]')?.textContent.trim() || '',
         company: card.querySelector('[data-automation=jobCompany]')?.textContent.trim() || '',
         location: card.querySelector('[data-automation=jobLocation]')?.textContent.trim() || '',
         description: card.querySelector('[data-automation=jobShortDescription]')?.textContent.trim() || '',
-        posted: card.querySelector('[data-automation=jobListingDate]')?.textContent.trim() || '',
+        posted: posted,
         url: link?.href || '',
         remote: /remote/i.test(card.textContent || '')
     };
@@ -546,16 +551,21 @@ def _linkedin_description(page: Any, record: dict[str, Any]) -> str:
 
 
 def is_recent(job: Mapping[str, Any], days: int = 14, now: datetime | None = None) -> bool:
+    """A job with no verifiable posted date cannot be vouched for as recent —
+    treating it as recent by default previously let stale, expired, or
+    garbage-dated listings (e.g. a scraper capturing a UI badge like
+    "Featured" instead of the real date) display as freshly posted.
+    """
     value = normalize_posted_date(job.get("posted", ""), now)
     if not value:
-        return True
+        return False
     try:
         posted = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         try:
             posted = datetime.strptime(value[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
         except ValueError:
-            return True
+            return False
     if posted.tzinfo is None:
         posted = posted.replace(tzinfo=timezone.utc)
     current = now or datetime.now(timezone.utc)

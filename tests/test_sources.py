@@ -47,9 +47,12 @@ def test_pipeline_filters_recent_and_deduplicates_sources():
     assert result[0]["title"] == "Cloud Engineer"
 
 
-def test_recent_accepts_missing_and_iso_dates():
+def test_recent_rejects_missing_dates_and_accepts_valid_iso_dates():
+    """A missing/unparseable posted date can't be verified as recent, so it
+    must be excluded rather than silently treated as freshly posted."""
     now = datetime(2026, 8, 25, tzinfo=timezone.utc)
-    assert is_recent({}, now=now)
+    assert not is_recent({}, now=now)
+    assert not is_recent({"posted": "Featured"}, now=now)
     assert is_recent({"posted": "2026-08-20T12:00:00Z"}, now=now)
     assert not is_recent({"posted": "2026-07-01"}, now=now)
 

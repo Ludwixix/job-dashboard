@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .sources import clean_description, is_recent
+from .sources import canonical_posted_date, clean_description, is_recent
 
 
 def _records(payload: Any) -> list[Mapping[str, Any]]:
@@ -34,7 +34,7 @@ def _normalize(record: Mapping[str, Any], days: int = 14) -> dict[str, Any] | No
     company = str(record.get("company") or "").strip()
     url = str(record.get("url") or record.get("application_route") or "").strip()
     description = clean_description(record.get("description") or record.get("teaser") or "")
-    posted = str(record.get("posted") or record.get("listingDate") or "").strip()
+    posted = canonical_posted_date(record.get("posted") or record.get("listingDate") or "")
     if not (title and company and description and url.startswith(("https://", "http://"))):
         return None
     normalized = {

@@ -916,7 +916,10 @@ def make_handler(app: DashboardApp):
             self.end_headers()
 
         def send_json(self, status, payload):
-            data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            # Provider metadata occasionally contains a date/decimal object;
+            # one such value must not turn an otherwise successful refresh
+            # into an opaque HTTP 500 while serializing a large response.
+            data = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
@@ -1636,7 +1639,26 @@ def make_handler(app: DashboardApp):
 
                 elif path == "/api/refresh":
                     payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    queries = [SearchQuery(item["term"], item.get("location", "Melbourne, VIC"), item.get("stream", "core-it"), item.get("group", ""), float(item.get("weight", 1.0)), tuple(item.get("exclude_terms", [])), bool(item.get("enabled", True))) for item in payload.get("queries", [])]
+                    raw_queries = payload.get("queries", [])
+                    if not isinstance(raw_queries, list):
+                        raise ValueError("queries must be a list")
+                    queries = []
+                    for item in raw_queries:
+                        if isinstance(item, str):
+                            term = item.strip()
+                            location, stream, group, weight, exclude_terms, enabled = "Melbourne, VIC", "core-it", "", 1.0, (), True
+                        elif isinstance(item, dict):
+                            term = str(item.get("term") or "").strip()
+                            location = str(item.get("location") or "Melbourne, VIC")
+                            stream = str(item.get("stream") or "core-it")
+                            group = str(item.get("group") or "")
+                            weight = float(item.get("weight", 1.0))
+                            exclude_terms = tuple(str(value) for value in (item.get("exclude_terms") or ()))
+                            enabled = bool(item.get("enabled", True))
+                        else:
+                            continue
+                        if term:
+                            queries.append(SearchQuery(term, location, stream, group, weight, exclude_terms, enabled))
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:

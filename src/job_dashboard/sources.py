@@ -134,7 +134,7 @@ def _indeed_record(row: Any, query: SearchQuery) -> dict[str, Any]:
         "description": clean_description(row.get("description", "")),
         "url": url,
         "source": "Indeed",
-        "posted": str(row.get("date_posted", "") or "")[:10],
+        "posted": canonical_posted_date(row.get("date_posted", "") or ""),
         "remote": bool(row.get("is_remote", False)),
         "tags": [query.term, "indeed", query.stream],
         "application_route": url,
@@ -199,7 +199,7 @@ def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]
         "description": description,
         "url": url,
         "source": "Adzuna",
-        "posted": created[:10] if created else "",
+        "posted": canonical_posted_date(created),
         "remote": remote_value,
         "tags": [query.term, "adzuna", query.stream],
         "application_route": url,
@@ -257,7 +257,7 @@ def _remoteok_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, An
         "description": description,
         "url": url,
         "source": "RemoteOK",
-        "posted": posted[:10] if posted else "",
+        "posted": canonical_posted_date(posted),
         "remote": remote_value,
         "tags": [query.term, "remoteok", query.stream],
         "application_route": url,
@@ -454,7 +454,7 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
         "description": clean_description(job.get("teaser", "")),
         "url": url,
         "source": "Seek",
-        "posted": str(job.get("listingDate", "") or "")[:10],
+        "posted": canonical_posted_date(job.get("listingDate", "") or ""),
         "remote": any(str(item.get("label", "")).lower() == "remote" for item in work_types),
         "tags": [query.term, "seek", query.stream],
         "application_route": url,
@@ -591,6 +591,16 @@ def normalize_posted_date(value: Any, now: datetime | None = None) -> str:
     if posted.tzinfo is None:
         posted = posted.replace(tzinfo=timezone.utc)
     return posted.astimezone(timezone.utc).date().isoformat()
+
+
+def canonical_posted_date(value: Any, captured_at: datetime | None = None) -> str:
+    """Convert provider-relative dates to absolute dates at capture time."""
+    text = str(value or "").strip().lower()
+    captured = captured_at or datetime.now(timezone.utc)
+    relative = re.fullmatch(r"(\d+)\s*d(?:ays?)?\s*ago(?:\s*[•|].*)?", text)
+    if relative:
+        return (captured - timedelta(days=int(relative.group(1)))).date().isoformat()
+    return normalize_posted_date(value, captured) or ""
 
 
 def posted_age(value: Any, now: datetime | None = None) -> str:

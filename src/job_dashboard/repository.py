@@ -359,7 +359,8 @@ class JobRepository:
             dedupe_id = job.get("id") or generate_dedupe_key(company, title, url, location)
             source = str(job.get("source") or "Job Board").strip()
             description = str(job.get("description") or job.get("notes") or "").strip()
-            posted = str(job.get("posted") or job.get("date") or "").strip()
+            from .sources import canonical_posted_date
+            posted = canonical_posted_date(job.get("posted") or job.get("date") or "")
             remote = 1 if bool(job.get("remote", False)) or "remote" in location.lower() else 0
             stream = str(job.get("stream") or job.get("industry") or "core-it").strip()
             score = int(job.get("score") or 0)

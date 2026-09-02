@@ -12,6 +12,7 @@ from job_dashboard.sources import (
     deduplicate_jobs,
     is_recent,
     normalize_posted_date,
+    canonical_posted_date,
     posted_age,
 )
 
@@ -64,6 +65,12 @@ def test_relative_seek_dates_are_normalized_and_age_checked():
     assert not is_recent({"posted": "28d ago"}, days=14, now=now)
     assert is_recent({"posted": "2d ago"}, days=14, now=now)
     assert posted_age("10d ago", now) == "Posted 10 days ago"
+
+
+def test_canonical_posted_date_freezes_relative_age_at_capture_time():
+    captured = datetime(2026, 9, 2, tzinfo=timezone.utc)
+    assert canonical_posted_date("3d ago", captured) == "2026-08-30"
+    assert canonical_posted_date("3d ago•Expiring", captured) == "2026-08-30"
 
 
 def test_dedupe_merges_tags():

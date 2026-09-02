@@ -1,5 +1,10 @@
 # Repository Synchronization Plan
 
+> **Historical document.** This plan predates the current architecture, where
+> `job-dashboard-react` (not `job-dashboard-site`) is the active frontend paired with this
+> backend. The specific commits/state described below are long since resolved. Kept for
+> historical reference only — see `README.md` for the current repo relationship.
+
 ## Current State Analysis
 
 ### job-dashboard-modular

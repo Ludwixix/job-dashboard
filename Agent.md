@@ -8,6 +8,15 @@
 > sites change their markup.
 ---
 
+> **Documentation note:** This file is the *original planning brief* for the project and
+> predates the actual implementation. The tech stack below describes what was initially
+> proposed, not what was built. **For the current, accurate architecture, endpoints, and
+> setup instructions, see `README.md`** (and the companion `job-dashboard-react/README.md`
+> for the frontend). Key differences from the plan below: the backend uses a stdlib
+> `ThreadingHTTPServer` (not FastAPI/SQLAlchemy), persistence is SQLite WAL (not Postgres),
+> the frontend is plain JS + Vite + hooks (not TypeScript/TanStack Query/Zustand), and
+> background scraping runs via a simple daemon-thread loop (not APScheduler).
+
 ## System Role & Objective
 
 You are an autonomous full-stack development agent. Build, and continuously maintain, a
@@ -25,7 +34,7 @@ below) so your own context stays focused on orchestration, not raw logs.
 
 Use the Job-Search Architechture.md file as your guide and additonal resources as below.
 
-## Tech Stack
+## Tech Stack (original plan — see note above for what was actually built)
 - Use the Job-Search Architechture.md file as your guide and additonal resources as below.
 
 - **Frontend:** React + TypeScript, Vite, TanStack Query, Zustand.

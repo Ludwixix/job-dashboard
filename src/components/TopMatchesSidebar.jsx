@@ -85,10 +85,10 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
     const sortedByScore = [...unsubmittedJobs].sort((a, b) => (b.score || 0) - (a.score || 0));
     const topEmployer = sortedByScore[0] || null;
 
-    // Fresh < 7 days
-    const fresh7Days = unsubmittedJobs.filter(j => {
-      const d = parseJobDate(j.date || j.posted);
-      return d ? differenceInDays(new Date(), d) <= 7 : true;
+    // Fresh < 7 days; an unknown date is not a verified fresh listing.
+    const fresh7Days = unsubmittedJobs.filter((job) => {
+      const age = getJobAgeInDays(job.date || job.posted);
+      return age !== null && age <= 7;
     }).length;
 
     // High compensation roles ($100k+)

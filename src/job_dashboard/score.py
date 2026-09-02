@@ -122,6 +122,27 @@ def _skill_cluster(skill: str) -> str:
     return "primary" if skill in _PRIMARY_SKILLS else "secondary"
 
 
+def explain_score(result: ScoreResult) -> dict[str, Any]:
+    """Return a stable, data-derived explanation suitable for API clients."""
+    strengths = list(result.strengths)
+    gaps = [f"Missing: {skill}" for skill in result.missing_skills[:3]]
+    if result.dimensions.get("location_fit", 0) >= 90:
+        strengths.append("Location or work mode aligns with your preferences")
+    if result.dimensions.get("experience_fit", 0) < 70:
+        gaps.append("Seniority may not align with your current experience")
+    return {
+        "tier": result.fit,
+        "score": result.score,
+        "confidence": result.confidence,
+        "matched_skills": list(result.matched_skills),
+        "missing_skills": list(result.missing_skills),
+        "strengths": strengths[:3],
+        "gaps": gaps[:3],
+        "dimensions": result.dimensions,
+        "relevance": result.relevance,
+    }
+
+
 def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
     """Calculate a deterministic fit audit from a job and injected profile."""
     try:

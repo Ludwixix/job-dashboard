@@ -43,6 +43,23 @@ def main():
     profile_path = args.profile or (PROJECT_ROOT.parent / "job-dashboard-site" / "job_profile.json")
     profile = load_profile(profile_path) if profile_path.exists() else {}
 
+    # Validate and warn about missing credentials
+    from .logging import get_logger
+    startup_logger = get_logger("job_dashboard.startup")
+    
+    if settings.seek_enabled:
+        startup_logger.info("Seek scraper enabled")
+    
+    if settings.adzuna_app_id and settings.adzuna_api_key:
+        startup_logger.info("Adzuna credentials loaded")
+    else:
+        startup_logger.warning("Adzuna credentials not found (set ADZUNA_APP_ID and ADZUNA_API_KEY)")
+    
+    if settings.openrouter_api_key:
+        startup_logger.info("OpenRouter API key loaded")
+    else:
+        startup_logger.warning("OpenRouter API key not found (set JOB_DASHBOARD_OPENROUTER_API_KEY)")
+
     sources = [IndeedJobSpySource()]
     if settings.seek_enabled:
         sources.append(SeekApiSource(

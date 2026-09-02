@@ -14,9 +14,17 @@ logger = get_logger("job_dashboard.repository")
 STATUSES = ("sourced", "shortlisted", "applied", "interviewing", "offer", "rejected")
 
 
-def generate_dedupe_key(company: str, title: str, url: str) -> str:
-    """Generate deterministic deduplication key for a job listing."""
-    norm = f"{(company or '').strip().lower()}|{(title or '').strip().lower()}|{(url or '').strip().lower()}"
+def generate_dedupe_key(company: str, title: str, url: str, location: str = "") -> str:
+    """Generate a canonical cross-source key while retaining URL-only fallbacks."""
+    normalized_company = re.sub(
+        r"[^a-z0-9]",
+        "",
+        re.sub(r"\b(pty|ltd|limited|inc|corporation|corp|australia|group|services|technologies|solutions|holdings)\b", "", (company or "").strip().lower()),
+    )
+    normalized_title = re.sub(r"[^a-z0-9]", "", (title or "").strip().lower())
+    normalized_location = re.sub(r"[^a-z0-9]", "", (location or "").strip().lower())
+    identity = "|".join((normalized_company, normalized_title, normalized_location))
+    norm = identity if normalized_company and normalized_title else f"{identity}|{(url or '').strip().lower()}"
     return hashlib.sha256(norm.encode('utf-8')).hexdigest()[:24]
 
 
@@ -128,6 +136,28 @@ class JobRepository:
                     created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_query_cache_term ON query_scrape_cache(term);
+                CREATE TABLE IF NOT EXISTS user_saved_searches (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    query_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(user_id, name)
+                );
+                CREATE INDEX IF NOT EXISTS idx_saved_searches_user ON user_saved_searches(user_id, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS application_reminders (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    job_id TEXT NOT NULL,
+                    reminder_type TEXT NOT NULL,
+                    remind_at TEXT NOT NULL,
+                    dismissed_at TEXT,
+                    details_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_reminders_due ON application_reminders(user_id, remind_at, dismissed_at);
             """)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
@@ -325,8 +355,8 @@ class JobRepository:
             if not company and not title:
                 continue
                 
-            dedupe_id = job.get("id") or generate_dedupe_key(company, title, url)
             location = str(job.get("location") or "Melbourne, VIC").strip()
+            dedupe_id = job.get("id") or generate_dedupe_key(company, title, url, location)
             source = str(job.get("source") or "Job Board").strip()
             description = str(job.get("description") or job.get("notes") or "").strip()
             posted = str(job.get("posted") or job.get("date") or "").strip()
@@ -563,6 +593,84 @@ class JobRepository:
             with conn:
                 cur = conn.execute("DELETE FROM user_applications WHERE user_id = ? AND job_id = ?", (user_id, job_id))
                 return cur.rowcount > 0
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT data_json, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            return None
+        job = json.loads(row[0])
+        job["status"] = row[1]
+        return job
+
+    def list_saved_searches(self, user_id: str) -> list[dict[str, Any]]:
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT id, name, query_json, created_at, updated_at FROM user_saved_searches WHERE user_id = ? ORDER BY updated_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [{**dict(row), "query": json.loads(row["query_json"])} for row in rows]
+
+    def upsert_saved_search(self, user_id: str, name: str, query: dict[str, Any], search_id: str = "") -> dict[str, Any]:
+        normalized_name = name.strip()[:100]
+        if not normalized_name:
+            raise ValueError("Saved search name is required")
+        now = datetime.now(timezone.utc).isoformat()
+        saved_id = search_id or hashlib.sha256(f"{user_id}|{normalized_name}".encode()).hexdigest()[:24]
+        payload = json.dumps(query, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute(
+                    """INSERT INTO user_saved_searches (id, user_id, name, query_json, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, name) DO UPDATE SET query_json = excluded.query_json, updated_at = excluded.updated_at""",
+                    (saved_id, user_id, normalized_name, payload, now, now),
+                )
+        return {"id": saved_id, "name": normalized_name, "query": query, "updated_at": now}
+
+    def delete_saved_search(self, user_id: str, search_id: str) -> bool:
+        with get_db_connection(self.path) as conn:
+            with conn:
+                return conn.execute("DELETE FROM user_saved_searches WHERE user_id = ? AND id = ?", (user_id, search_id)).rowcount > 0
+
+    def list_due_reminders(self, user_id: str, include_future: bool = False) -> list[dict[str, Any]]:
+        now = datetime.now(timezone.utc).isoformat()
+        due_clause = "" if include_future else "AND remind_at <= ?"
+        params = [user_id] + ([] if include_future else [now])
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                f"SELECT * FROM application_reminders WHERE user_id = ? AND dismissed_at IS NULL {due_clause} ORDER BY remind_at ASC",
+                params,
+            ).fetchall()
+        return [{**dict(row), "details": json.loads(row["details_json"])} for row in rows]
+
+    def create_reminder(self, user_id: str, job_id: str, reminder_type: str, remind_at: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+        if reminder_type not in {"follow_up", "interview_prep", "offer_deadline"}:
+            raise ValueError("Invalid reminder type")
+        try:
+            datetime.fromisoformat(remind_at.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError("remind_at must be an ISO-8601 timestamp") from error
+        now = datetime.now(timezone.utc).isoformat()
+        reminder_id = hashlib.sha256(f"{user_id}|{job_id}|{reminder_type}|{remind_at}".encode()).hexdigest()[:24]
+        payload = json.dumps(details or {}, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO application_reminders (id, user_id, job_id, reminder_type, remind_at, details_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (reminder_id, user_id, job_id, reminder_type, remind_at, payload, now, now),
+                )
+        return {"id": reminder_id, "job_id": job_id, "reminder_type": reminder_type, "remind_at": remind_at, "details": details or {}}
+
+    def dismiss_reminder(self, user_id: str, reminder_id: str) -> bool:
+        with get_db_connection(self.path) as conn:
+            with conn:
+                return conn.execute(
+                    "UPDATE application_reminders SET dismissed_at = ?, updated_at = ? WHERE id = ? AND user_id = ? AND dismissed_at IS NULL",
+                    (datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc).isoformat(), reminder_id, user_id),
+                ).rowcount > 0
 
     # ==========================================
     # USER PROFILES & RESUME INTELLIGENCE VAULT

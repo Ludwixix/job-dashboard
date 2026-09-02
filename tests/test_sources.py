@@ -1,8 +1,9 @@
 import json
 from datetime import datetime, timezone
 
+from job_dashboard.health import HealthCheck
 from job_dashboard.models import Job
-from job_dashboard.score import score_job
+from job_dashboard.score import explain_score, score_job
 from job_dashboard.sources import (
     AdzunaApiSource,
     RemoteOkApiSource,
@@ -88,6 +89,28 @@ def test_source_health_stays_healthy_after_partial_query_failure():
     assert pipeline.source_health["partial"]["last_error"] == "provider unavailable"
 
 
+def test_scrape_pipeline_persists_source_health(tmp_path):
+    health_check = HealthCheck(tmp_path)
+    pipeline = ScrapePipeline([PartialSource()], days=14, health_check=health_check)
+
+    pipeline.run([SearchQuery("cloud"), SearchQuery("broken")])
+
+    checks = health_check.get_recent_checks(component="scraper:partial")
+    assert len(checks) == 1
+    assert checks[0]["status"] == "degraded"
+    assert checks[0]["details"]["jobs"] == 1
+    assert checks[0]["details"]["last_error"] == "provider unavailable"
+
+
+def test_dedupe_preserves_indeed_jk_identity_params():
+    """Indeed URLs differ only by the ?jk= job id; stripping it collapses every job into one."""
+    result = deduplicate_jobs([
+        {"title": f"Barista {i}", "company": f"Cafe {i}", "url": f"https://au.indeed.com/viewjob?jk={'abcdefgh'[:2]+str(i)+'000000'[:5]}", "source": "Indeed", "tags": [f"t{i}"]}
+        for i in range(3)
+    ])
+    assert len(result) == 3
+
+
 def test_dedupe_uses_location_when_titles_match():
     result = deduplicate_jobs([
         {"title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://x", "source": "Seek", "tags": ["one"]},
@@ -101,6 +124,15 @@ def test_score_penalises_seniority_mismatch():
     engineer = score_job(Job("1", "Azure Engineer", "Acme", description="Azure and PowerShell automation for cloud services"), profile)
     manager = score_job(Job("1", "Head of Cloud Platform", "Acme", description="Azure strategy and platform leadership with PowerShell automation"), profile)
     assert engineer.score > manager.score + 15
+
+
+def test_score_explanation_is_derived_from_score_dimensions():
+    profile = {"skills": {"azure": "advanced", "powershell": "advanced"}}
+    result = score_job(Job("1", "Azure Engineer", "Acme", location="Melbourne", description="Azure and PowerShell automation"), profile)
+    explanation = explain_score(result)
+    assert explanation["tier"] == result.fit
+    assert explanation["score"] == result.score
+    assert "azure" in explanation["matched_skills"]
 
 
 def test_adzuna_api_source_parses_results(monkeypatch):

@@ -12,6 +12,7 @@ login_attempts = {}
 
 import re
 import threading
+import sqlite3
 import time
 import urllib.error
 import urllib.request
@@ -36,14 +37,20 @@ from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
 from .compare import COMPARE_MODELS, CompareRunner
 from .documents import generate_documents
+from .email_connector import GmailApiScanner, GmailScanner
+from .health import get_health_check
 from .logging import get_logger
 from .normalize import normalize_job
 from .predictive_analytics import get_predictive_analytics
 from .repository import JobRepository
+from .models import Job
+from .score import explain_score, score_job
 from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .smart_applications import get_smart_application_tracker
-from .sources import SearchQuery, ScrapePipeline
+from .sources import SearchQuery, ScrapePipeline, clean_description, deduplicate_jobs, ensure_descriptions, is_recent, posted_age
+from datetime import timedelta
+from urllib.error import URLError
 
 
 logger = get_logger("job_dashboard.web")
@@ -64,6 +71,7 @@ class DashboardApp:
         self.search_queries = self._load_search_queries(search_queries)
         self.jobs: list[dict] = self._load_jobs()
         self.repository = JobRepository(self.data_dir / "jobs.sqlite3")
+        self.health_check = get_health_check(self.data_dir)
         self.db = self.repository
         self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
         self.generation_progress: dict[str, dict[str, object]] = {}
@@ -358,6 +366,23 @@ class DashboardApp:
                     logger.error(f"Error loading jobs from {p}: {e}")
         return []
 
+    def save_jobs(self):
+        self.jobs_path.write_text(json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        self.repository.replace_jobs(self.jobs)
+
+    def materialize_jobs(self, jobs):
+        materialized = []
+        for raw in jobs:
+            job = normalize_job(raw)
+            analysis = self.dashboard.analyse(raw)
+            item = dict(raw)
+            item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "fit_category": analysis.fit_category, "dimensions": analysis.score.dimensions, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "description": clean_description(job.description)})
+            materialized.append(item)
+        return materialized
+
+    def analyses(self):
+        return [self.dashboard.analyse(job) for job in self.jobs]
+
     def rejected_applications(self):
         archived = []
         seen = set()
@@ -507,7 +532,7 @@ class DashboardApp:
 
             pipeline_errors = []
             if queries_to_scrape:
-                pipeline = ScrapePipeline(self.sources, days=14)
+                pipeline = ScrapePipeline(self.sources, days=14, health_check=self.health_check)
                 fresh = pipeline.run(queries_to_scrape)
                 pipeline_errors = pipeline.errors
 
@@ -838,22 +863,28 @@ def resolve_user_id(handler, query_params=None) -> str:
     return "sam_ludwig"
 
 
-def make_handler(app: DashboardApp):
-    # Allowed origins — GitHub Pages deployment + localhost dev
-    _ALLOWED_ORIGINS = {
-        "https://ludwixix.github.io",
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:8787",
-    }
+# Allowed origins — GitHub Pages deployment + localhost dev + Cloud Run
+_ALLOWED_ORIGINS = {
+    "https://ludwixix.github.io",
+    "https://job-dashboard-6xrdvjlrcq-ts.a.run.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8787",
+    "http://localhost:8080",
+}
 
+def make_handler(app: DashboardApp):
     class Handler(BaseHTTPRequestHandler):
         def _cors_origin(self):
             origin = self.headers.get("Origin", "")
-            return origin or "*"
+            if origin in _ALLOWED_ORIGINS:
+                return origin
+            return ""
 
         def _send_cors_headers(self):
-            self.send_header("Access-Control-Allow-Origin", self._cors_origin())
+            origin = self._cors_origin()
+            if origin:
+                self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id")
             self.send_header("Access-Control-Max-Age", "86400")
@@ -936,6 +967,35 @@ def make_handler(app: DashboardApp):
                 user_id = resolve_user_id(self, query_params)
                 prefs = app.repository.get_user_preferences(user_id)
                 self.send_json(200, {"success": True, "preferences": prefs})
+                return
+
+            if path == "/api/saved-searches":
+                user_id = resolve_user_id(self, query_params)
+                self.send_json(200, {"success": True, "saved_searches": app.repository.list_saved_searches(user_id)})
+                return
+
+            if path == "/api/reminders":
+                user_id = resolve_user_id(self, query_params)
+                include_future = query_params.get("include_future", ["false"])[0].lower() in ("1", "true")
+                self.send_json(200, {"success": True, "reminders": app.repository.list_due_reminders(user_id, include_future)})
+                return
+
+            if path == "/api/source-health":
+                hours = max(1, min(168, int(query_params.get("hours", ["24"])[0])))
+                self.send_json(200, {"success": True, "checks": app.health_check.get_recent_checks(hours=hours)})
+                return
+
+            if path == "/api/job-explanation":
+                user_id = resolve_user_id(self, query_params)
+                job_id = query_params.get("job_id", [""])[0]
+                job_data = app.repository.get_job(job_id)
+                if not job_data:
+                    self.send_json(404, {"error": "Job not found"})
+                    return
+                profile = app.repository.get_user_profile(user_id) or app.dashboard.profile
+                fields = {key: job_data.get(key, "") for key in Job.__dataclass_fields__}
+                fields["tags"] = tuple(job_data.get("tags") or ())
+                self.send_json(200, {"success": True, "explanation": explain_score(score_job(Job(**fields), profile))})
                 return
 
             if path == "/api/documents":
@@ -1116,7 +1176,7 @@ def make_handler(app: DashboardApp):
                         pass
                         
                 queries = app.search_queries
-                pipeline = ScrapePipeline(app.sources, days=14)
+                pipeline = ScrapePipeline(app.sources, days=14, health_check=app.health_check)
                 on_progress("Connecting to job gateways...", 10)
                 try:
                     fresh = pipeline.run(queries, on_progress=on_progress)
@@ -1216,6 +1276,30 @@ def make_handler(app: DashboardApp):
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     res = app.repository.upsert_user_preferences(user_id, body)
                     self.send_json(200, {"success": True, "preferences": res})
+                    return
+
+                if path == "/api/saved-searches":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    saved = app.repository.upsert_saved_search(user_id, str(body.get("name") or ""), body.get("query") or {}, str(body.get("id") or ""))
+                    self.send_json(200, {"success": True, "saved_search": saved})
+                    return
+
+                if path == "/api/reminders":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    reminder = app.repository.create_reminder(user_id, str(body.get("job_id") or ""), str(body.get("reminder_type") or ""), str(body.get("remind_at") or ""), body.get("details"))
+                    self.send_json(201, {"success": True, "reminder": reminder})
+                    return
+
+                if path == "/api/reminders/dismiss":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    dismissed = app.repository.dismiss_reminder(user_id, str(body.get("id") or ""))
+                    self.send_json(200, {"success": dismissed})
                     return
 
                 if path == "/api/documents":
@@ -1732,7 +1816,7 @@ def make_handler(app: DashboardApp):
                             pass
                             
                     queries = app.search_queries
-                    pipeline = ScrapePipeline(app.sources, days=14)
+                    pipeline = ScrapePipeline(app.sources, days=14, health_check=app.health_check)
                     on_progress("Starting pipeline...", 0)
                     fresh = pipeline.run(queries, on_progress=on_progress)
                     fresh = deduplicate_jobs(fresh)

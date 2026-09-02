@@ -57,7 +57,7 @@ class HealthCheck:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_component ON health_checks(component)")
             conn.commit()
     
-    def _record_check(self, component: str, status: str, duration: float, details: dict[str, Any]):
+    def record_check(self, component: str, status: str, duration: float, details: dict[str, Any]) -> None:
         """Record a health check result."""
         try:
             import json
@@ -80,6 +80,10 @@ class HealthCheck:
                 
         except Exception as e:
             logger.error(f"Failed to record health check: {e!s}")
+
+    def _record_check(self, component: str, status: str, duration: float, details: dict[str, Any]) -> None:
+        """Backward-compatible alias for internal health check callers."""
+        self.record_check(component, status, duration, details)
     
     def get_recent_checks(self, hours: int = 24, component: str | None = None) -> list[dict[str, Any]]:
         """

@@ -59,3 +59,21 @@ def test_upsert_pagination_and_user_applications(tmp_path):
     # Other users should see empty applications
     other_apps = repo.get_user_applications("different_user")
     assert len(other_apps) == 0
+
+
+def test_saved_searches_reminders_and_cross_source_deduplication(tmp_path):
+    repo = JobRepository(tmp_path / "jobs.sqlite3")
+    repo.upsert_scraped_jobs([
+        {"title": "Cloud Engineer", "company": "Acme Pty Ltd", "location": "Melbourne", "url": "https://seek.test/1"},
+        {"title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://indeed.test/2"},
+    ])
+    assert repo.count_jobs() == 1
+
+    saved = repo.upsert_saved_search("user-1", "Cloud roles", {"include": ["azure"], "remote": True})
+    assert repo.list_saved_searches("user-1")[0]["query"]["include"] == ["azure"]
+    assert repo.delete_saved_search("user-1", saved["id"])
+
+    reminder = repo.create_reminder("user-1", "job-1", "follow_up", "2020-01-01T00:00:00+00:00")
+    assert len(repo.list_due_reminders("user-1")) == 1
+    assert repo.dismiss_reminder("user-1", reminder["id"])
+    assert repo.list_due_reminders("user-1") == []

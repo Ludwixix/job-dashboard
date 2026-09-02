@@ -4,14 +4,15 @@ Basic security and authentication module.
 import hashlib
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 try:
-    from jose import JWTError, jwt
-    JOSE_AVAILABLE = True
+    import jwt
+    from jwt import PyJWTError as JWTError
+    JWT_AVAILABLE = True
 except ImportError:
-    JOSE_AVAILABLE = False
-    print("Note: python-jose not installed. JWT tokens will be simulated.")
+    JWT_AVAILABLE = False
+    print("Note: PyJWT not installed. JWT tokens will be simulated.")
 
 try:
     from passlib.context import CryptContext
@@ -56,9 +57,9 @@ class SecurityManager:
             return False
     
     def create_token(self, data: dict, expires_minutes: int = 30) -> str:
-        if JOSE_AVAILABLE:
+        if JWT_AVAILABLE:
             to_encode = data.copy()
-            expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+            expire = datetime.now(UTC) + timedelta(minutes=expires_minutes)
             to_encode.update({"exp": expire})
             return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         else:
@@ -67,13 +68,13 @@ class SecurityManager:
             import json
             payload = {
                 "data": data,
-                "exp": (datetime.utcnow() + timedelta(minutes=expires_minutes)).timestamp(),
+                "exp": (datetime.now(UTC) + timedelta(minutes=expires_minutes)).timestamp(),
                 "signature": hashlib.sha256(str(data).encode()).hexdigest()[:32]
             }
             return base64.b64encode(json.dumps(payload).encode()).decode()
     
     def verify_token(self, token: str) -> dict | None:
-        if JOSE_AVAILABLE:
+        if JWT_AVAILABLE:
             try:
                 return jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             except JWTError:
@@ -85,7 +86,7 @@ class SecurityManager:
                 import json
                 from datetime import datetime
                 payload = json.loads(base64.b64decode(token).decode())
-                if payload.get("exp", 0) < datetime.utcnow().timestamp():
+                if payload.get("exp", 0) < datetime.now(UTC).timestamp():
                     return None
                 return payload.get("data")
             except Exception:

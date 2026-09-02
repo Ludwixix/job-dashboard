@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 
+from .logging import get_logger
+from .health import HealthCheck
+
+logger = get_logger("job_dashboard.sources")
+
 
 @dataclass(frozen=True)
 class SearchQuery:
@@ -71,10 +76,11 @@ def clean_description(value: Any, limit: int = 12000) -> str:
 
     parser = _TextExtractor()
     parser.feed(html)
+    text = unescape("".join(parser.parts)).replace("\u00a0", " ")
     
     # Clean decoded text lines
     lines = []
-    for raw_line in unescape("".join(parser.parts)).splitlines():
+    for raw_line in text.splitlines():
         line = re.sub(r"[ \t]+", " ", raw_line).strip()
         # Skip pure separator or garbage artifact lines
         if re.match(r"^[-=_*~]{4,}$", line):
@@ -101,17 +107,22 @@ class IndeedJobSpySource:
             from jobspy import scrape_jobs
         except ImportError as error:
             raise RuntimeError("Indeed requires the optional 'jobspy' dependency") from error
-        results = scrape_jobs(
-            site_name=["indeed"],
-            search_term=query.term,
-            location=query.location,
-            country_indeed="australia",
-            results_wanted=self.results_wanted,
-            hours_old=self.hours_old,
-        )
-        if results is None:
+        
+        try:
+            results = scrape_jobs(
+                site_name=["indeed"],
+                search_term=query.term,
+                location=query.location,
+                country_indeed="australia",
+                results_wanted=self.results_wanted,
+                hours_old=self.hours_old,
+            )
+            if results is None:
+                return []
+            return (_indeed_record(row, query) for _, row in results.iterrows())
+        except Exception as error:
+            logger.warning(f"Indeed scraper failed for {query.term}: {error}")
             return []
-        return (_indeed_record(row, query) for _, row in results.iterrows())
 
 
 def _indeed_record(row: Any, query: SearchQuery) -> dict[str, Any]:
@@ -144,26 +155,30 @@ class AdzunaApiSource:
         app_id = self.app_id or os.getenv("ADZUNA_APP_ID")
         api_key = self.api_key or os.getenv("ADZUNA_API_KEY")
         if not app_id or not api_key:
-            raise RuntimeError("ADZUNA_APP_ID and ADZUNA_API_KEY environment variables are required")
+            return []  # Silently skip if credentials missing
 
-        params = urllib.parse.urlencode({
-            "app_id": app_id,
-            "app_key": api_key,
-            "results_per_page": self.results_wanted,
-            "what": query.term,
-            "where": query.location,
-            "sort_by": "relevance",
-            "content-type": "application/json",
-        })
-        request = urllib.request.Request(
-            f"{self.endpoint}?{params}",
-            headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
-        )
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-
-        for result in payload.get("results", []):
-            yield _adzuna_record(result, query)
+        try:
+            params = urllib.parse.urlencode({
+                "app_id": app_id,
+                "app_key": api_key,
+                "results_per_page": self.results_wanted,
+                "what": query.term,
+                "where": query.location,
+                "sort_by": "relevance",
+                "content-type": "application/json",
+            })
+            request = urllib.request.Request(
+                f"{self.endpoint}?{params}",
+                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            
+            for result in payload.get("results", []):
+                yield _adzuna_record(result, query)
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+            logger.warning(f"Adzuna scraper failed for {query.term}: {error}")
+            return
 
 
 def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
@@ -602,13 +617,22 @@ def _normalize_job_title(title: Any) -> str:
     return re.sub(r"[^a-z0-9]", "", s)
 
 
+_TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "fbclid", "gclid", "msclkid", "ref", "source", "spm", "from", "xptdk",
+    "cmpid", "fromage", "pub", "vsk",
+}
+
+
 def _clean_job_url(url: Any) -> str:
     s = str(url or "").strip().rstrip("/")
-    if "?" in s:
-        s = s.split("?")[0]
     if "#" in s:
         s = s.split("#")[0]
-    return s.rstrip("/")
+    if "?" in s:
+        base, _, qs = s.partition("?")
+        kept = [kv for kv in qs.split("&") if kv and kv.split("=")[0].lower() not in _TRACKING_PARAMS]
+        s = base + ("?" + "&".join(kept) if kept else "")
+    return s.rstrip("/?")
 
 
 def deduplicate_jobs(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -690,10 +714,17 @@ def ensure_descriptions(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any
 
 
 class ScrapePipeline:
-    def __init__(self, sources: Iterable[JobSource], days: int = 14, pause_seconds: float = 0.0):
+    def __init__(
+        self,
+        sources: Iterable[JobSource],
+        days: int = 14,
+        pause_seconds: float = 0.0,
+        health_check: HealthCheck | None = None,
+    ):
         self.sources = tuple(sources)
         self.days = days
         self.pause_seconds = pause_seconds
+        self.health_check = health_check
         self.source_health: dict[str, dict[str, Any]] = {}
 
     def run(self, queries: Iterable[SearchQuery], on_progress=None) -> list[dict[str, Any]]:
@@ -701,6 +732,7 @@ class ScrapePipeline:
         self.errors: list[str] = []
         total_sources = len(self.sources)
         for idx, source in enumerate(self.sources):
+            started_at = time.monotonic()
             if on_progress:
                 on_progress(f'Scraping {source.name}...', int((idx / total_sources) * 100))
             health = self.source_health.setdefault(source.name, {"jobs": 0, "queries": 0, "success": False, "last_error": ""})
@@ -723,4 +755,12 @@ class ScrapePipeline:
                     self.errors.append(f"{source.name} / {query.term}: {error}")
                 if self.pause_seconds:
                     time.sleep(self.pause_seconds)
+            if self.health_check:
+                status = "healthy" if health["success"] and not health["last_error"] else "degraded" if health["success"] else "unhealthy"
+                self.health_check.record_check(
+                    component=f"scraper:{source.name}",
+                    status=status,
+                    duration=time.monotonic() - started_at,
+                    details=dict(health),
+                )
         return ensure_descriptions(deduplicate_jobs(job for job in collected if is_recent(job, self.days)))

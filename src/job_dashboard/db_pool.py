@@ -54,8 +54,8 @@ class ConnectionPool:
             "max_wait_time": 0.0,
         }
         
-        # Register cleanup
-        atexit.register(self.cleanup)
+        # Register cleanup; interpreter shutdown may have already closed log streams
+        atexit.register(self.cleanup, log_cleanup=False)
         
         logger.info(f"Connection pool initialized for {self.db_path}")
     
@@ -229,10 +229,11 @@ class ConnectionPool:
                 "avg_wait_time": self._stats["wait_time_total"] / max(1, self._stats["connections_created"] + self._stats["connections_reused"])
             }
     
-    def cleanup(self):
+    def cleanup(self, log_cleanup: bool = True):
         """Clean up all connections in the pool."""
         with self._lock:
-            logger.info(f"Cleaning up connection pool for {self.db_path}")
+            if log_cleanup:
+                logger.info(f"Cleaning up connection pool for {self.db_path}")
             while self._pool:
                 conn = self._pool.popleft()
                 try:
@@ -242,11 +243,12 @@ class ConnectionPool:
                 self._stats["connections_closed"] += 1
             
             self._active_connections = 0
-            logger.info(f"Connection pool cleaned up: {self.get_stats()}")
+            if log_cleanup:
+                logger.info(f"Connection pool cleaned up: {self.get_stats()}")
     
     def __del__(self):
         """Destructor to ensure cleanup."""
-        self.cleanup()
+        self.cleanup(log_cleanup=False)
 
 
 # Global connection pools

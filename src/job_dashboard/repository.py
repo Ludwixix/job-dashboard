@@ -440,7 +440,8 @@ class JobRepository:
         page_size = max(1, min(10000, int(page_size)))
         offset = (page - 1) * page_size
         
-        clauses = ["1=1"]
+        # Gmail messages are workflow records, not public job listings.
+        clauses = ["lower(source) != 'gmail'"]
         params: list[Any] = []
         
         if search:

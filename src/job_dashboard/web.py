@@ -1912,6 +1912,7 @@ def make_handler(app: DashboardApp):
 
                 self.send_json(404, {"error": f"Endpoint not found: {path}"})
             except Exception as error:
+                logger.error(f"POST {path} failed: {error}", exc_info=True)
                 self.send_json(500, {"error": str(error)})
 
         

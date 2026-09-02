@@ -14,20 +14,7 @@ import {
   fetchUserApplicationsFromBackend, 
   syncApplicationsToBackend 
 } from '../services/trackerService';
-
-const formatDaysAgo = (dateStr) => {
-  if (!dateStr) return 'Recently';
-  try {
-    const d = parseISO(dateStr);
-    if (!isValid(d)) return 'Recently';
-    const days = differenceInDays(new Date(), d);
-    if (days <= 0) return 'Today';
-    if (days === 1) return '1 day ago';
-    return `${days} days ago`;
-  } catch {
-    return 'Recently';
-  }
-};
+import { formatJobPostedAge } from '../utils/dateUtils';
 
 const getJobTimestamp = (job) => {
   if (job.appliedDate) {
@@ -125,7 +112,7 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
   const appliedTodayCount = useMemo(() => {
     return (jobs || []).filter(j => {
       const isTrackerJob = isValidTrackerJob(j);
-      const isToday = formatDaysAgo(j.date) === 'Today' || (j.date && j.date.startsWith(new Date().toISOString().split('T')[0]));
+      const isToday = formatJobPostedAge(j.date) === 'Today' || (j.date && j.date.startsWith(new Date().toISOString().split('T')[0]));
       return isTrackerJob && isToday;
     }).length;
   }, [jobs]);
@@ -162,7 +149,7 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
         // Date Applied Filter (Default: All or Today)
         let matchesDate = true;
         if (appliedDateFilter === 'today') {
-          matchesDate = formatDaysAgo(job.date) === 'Today' || (job.date && job.date.startsWith(new Date().toISOString().split('T')[0]));
+          matchesDate = formatJobPostedAge(job.date) === 'Today' || (job.date && job.date.startsWith(new Date().toISOString().split('T')[0]));
         } else if (appliedDateFilter === '7days') {
           try {
             const d = parseISO(job.date);
@@ -365,7 +352,7 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
                 </div>
               ) : (
                 recentlyAppliedJobs.map(job => {
-                  const daysAgoStr = formatDaysAgo(job.date);
+                  const daysAgoStr = formatJobPostedAge(job.date);
                   const isInterview = (job.status || '').toLowerCase().includes('interview');
                   const isConfirmation = (job.status || '').toLowerCase().includes('confirmation') || (job.status || '').toLowerCase().includes('applied');
 

@@ -4,7 +4,7 @@ import {
   Flame, Award, Sparkles, ArrowRight, MapPin, ExternalLink, Dices, Navigation,
   ChevronDown, ChevronUp, Clock, Activity, DollarSign
 } from 'lucide-react';
-import { parseISO, isValid, differenceInDays } from 'date-fns';
+import { getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 
 const BALACLAVA_TIER_1 = [
   'balaclava', 'st kilda', 'prahran', 'windsor', 'elsternwick', 'elwood', 
@@ -28,47 +28,6 @@ const getProximityTier = (locationStr = '') => {
 };
 
 const IT_KEYWORDS = ['engineer', 'developer', 'sysadmin', 'systems admin', 'network', 'cloud', 'azure', 'devops', 'software', 'database', 'it support', 'help desk', 'cyber', 'intune', 'm365'];
-
-const parseJobDate = (dateStr) => {
-  if (!dateStr) return null;
-  if (typeof dateStr !== 'string') return null;
-  const str = dateStr.trim();
-  if (str.toLowerCase().includes('today') || str.toLowerCase().includes('just now') || str.toLowerCase().includes('hour')) {
-    return new Date();
-  }
-  const dayMatch = str.match(/(\d+)\s*d(?:ay)?/i);
-  if (dayMatch) {
-    const d = new Date();
-    d.setDate(d.getDate() - parseInt(dayMatch[1], 10));
-    return d;
-  }
-  try {
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) return parsed;
-  } catch {}
-  try {
-    const d = parseISO(str);
-    if (isValid(d)) return d;
-  } catch {}
-  return null;
-};
-
-const getAgeInDays = (dateStr) => {
-  const d = parseJobDate(dateStr);
-  if (!d) return 2;
-  const diff = differenceInDays(new Date(), d);
-  return diff >= 0 ? diff : 0;
-};
-
-const formatDaysAgo = (dateStr) => {
-  const d = parseJobDate(dateStr);
-  if (!d) return 'Recently';
-  const days = differenceInDays(new Date(), d);
-  if (days <= 0) return 'Today';
-  if (days === 1) return '1 day ago';
-  if (days < 30) return `${days} days ago`;
-  return 'Recently';
-};
 
 export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
   const [showTopMatches, setShowTopMatches] = useState(true); // Open by default
@@ -101,9 +60,12 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
     return [...unsubmittedJobs]
       .map(job => {
         const score = Number(job.score) || 75;
-        const age = getAgeInDays(job.date || job.posted);
-        // Composite priority: 65% match score + 35% date recency
-        const recencyScore = Math.max(0, 100 - (age * 7));
+        const age = getJobAgeInDays(job.date || job.posted);
+        // Composite priority: 65% match score + 35% date recency. An unknown
+        // posted date can't be vouched for as recent, so it gets a neutral
+        // mid-range recency score instead of the best possible one (age=0
+        // previously let stale/garbage-dated listings rank as if brand new).
+        const recencyScore = age === null ? 40 : Math.max(0, 100 - (age * 7));
         const compositeRank = (score * 0.65) + (recencyScore * 0.35);
         return { ...job, compositeRank, ageInDays: age };
       })
@@ -445,7 +407,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
                     {job.company}
                   </span>
                   <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded shrink-0">
-                    {formatDaysAgo(job.date)}
+                    {formatJobPostedAge(job.date)}
                   </span>
                 </div>
                 <p className="text-[11px] font-semibold text-slate-600 truncate mb-2">{job.title}</p>
@@ -514,7 +476,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                      <Clock size={9} /> {formatDaysAgo(job.date)}
+                      <Clock size={9} /> {formatJobPostedAge(job.date)}
                     </span>
                     <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
                       <Award size={10} /> {job.score}%

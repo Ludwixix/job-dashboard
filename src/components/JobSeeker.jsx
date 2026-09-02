@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { GeneratorModal } from './GeneratorModal';
 import { TopMatchesSidebar } from './TopMatchesSidebar';
 import { 
@@ -38,33 +37,8 @@ import {
   classifyJobRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
+import { getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 
-
-const getAgeInDays = (dateStr) => {
-  if (!dateStr) return 0;
-  try {
-    const d = parseISO(dateStr);
-    if (!isValid(d)) return 0;
-    const diff = differenceInDays(new Date(), d);
-    return diff >= 0 ? diff : 0;
-  } catch {
-    return 0;
-  }
-};
-
-const formatDaysAgo = (dateStr) => {
-  if (!dateStr) return 'Recently';
-  try {
-    const d = parseISO(dateStr);
-    if (!isValid(d)) return 'Recently';
-    const days = differenceInDays(new Date(), d);
-    if (days <= 0) return 'Today';
-    if (days === 1) return '1 day ago';
-    return `${days} days ago`;
-  } catch {
-    return 'Recently';
-  }
-};
 
 // Categorize jobs into expanded multi-industry streams
 const getJobSubStream = (job) => {
@@ -483,14 +457,18 @@ export const JobSeeker = ({
       }
 
       // Strict 13-Day Expiry Filter
+      // A null age means the posted date is missing/unparseable — such jobs
+      // cannot be verified as recent, so they must not silently pass an
+      // age-window filter (this previously defaulted to age=0, making
+      // stale/garbage-dated listings appear freshly posted).
       let matchesAge = true;
-      const ageDays = getAgeInDays(job.date);
+      const ageDays = getJobAgeInDays(job.date);
       if (maxAgeFilter === '13days') {
-        matchesAge = ageDays <= 13;
+        matchesAge = ageDays !== null && ageDays <= 13;
       } else if (maxAgeFilter === '7days') {
-        matchesAge = ageDays <= 7;
+        matchesAge = ageDays !== null && ageDays <= 7;
       } else if (maxAgeFilter === '3days') {
-        matchesAge = ageDays <= 3;
+        matchesAge = ageDays !== null && ageDays <= 3;
       }
 
       // Multi-Role Archetype Filter
@@ -1613,7 +1591,7 @@ export const JobSeeker = ({
                           </div>
                           <div className="flex items-center gap-1 shrink-0 text-slate-900 font-extrabold text-xs px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-md">
                             <Clock size={12} className="text-indigo-600" />
-                            {formatDaysAgo(job.date)}
+                            {formatJobPostedAge(job.date)}
                           </div>
                         </div>
 

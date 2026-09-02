@@ -6,7 +6,6 @@ import {
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation
 } from 'lucide-react';
-import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
@@ -15,6 +14,7 @@ import { getCommuteDetails } from '../services/commuteService';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 import { cleanDescriptionText } from '../services/dataService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
+import { formatJobPostedAge } from '../utils/dateUtils';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep }) => {
   const jobId = job?.id || `${job?.company}_${job?.title}`;
@@ -129,20 +129,6 @@ Sam Ludwig
     }
   };
 
-  const formatDaysAgo = (dateStr) => {
-    if (!dateStr) return 'Active Opportunity';
-    try {
-      const parsed = parseISO(dateStr);
-      if (!isValid(parsed)) return 'Active Opportunity';
-      const days = differenceInDays(new Date(), parsed);
-      if (days === 0) return 'Posted Today';
-      if (days === 1) return 'Posted Yesterday';
-      return `${days}d ago`;
-    } catch {
-      return 'Active Opportunity';
-    }
-  };
-
   const audit = job.audit || {};
   const dimensions = audit.dimensions || {};
   const matchedTerms = audit.matched_terms || job.tags || [];
@@ -208,7 +194,7 @@ Sam Ludwig
     );
   };
 
-  const isLongText = (job.notes || '').length > 350;
+  const isLongText = (job.description || job.notes || '').length > 350;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
@@ -239,7 +225,7 @@ Sam Ludwig
                 </span>
               )}
               <span className="text-[10px] font-mono font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                <Clock size={11} /> {formatDaysAgo(job.date).toUpperCase()}
+                <Clock size={11} /> {formatJobPostedAge(job.date).toUpperCase()}
               </span>
             </div>
             {(() => {
@@ -915,7 +901,7 @@ Sam Ludwig
                   <Clock size={15} className="text-indigo-600 shrink-0" />
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">POSTED</div>
-                    <div className="font-extrabold text-slate-900">{formatDaysAgo(job.date)}</div>
+                    <div className="font-extrabold text-slate-900">{formatJobPostedAge(job.date)}</div>
                   </div>
                 </div>
 
@@ -999,7 +985,7 @@ Sam Ludwig
               )}
 
               {/* Expandable Formatted Job Description */}
-              {job.notes ? (
+              {(job.description || job.notes) ? (
                 <div className="space-y-3 font-mono">
                   <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                     <div className="flex items-center gap-2">
@@ -1018,9 +1004,9 @@ Sam Ludwig
                   
                   <div className="relative">
                     <div className={`p-5 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs transition-all duration-300 ${
-                      !isDescriptionExpanded && isLongText ? 'max-h-[280px] overflow-hidden' : ''
+                      !isDescriptionExpanded && isLongText ? 'max-h-[280px] overflow-hidden' : 'max-h-[70vh] overflow-y-auto'
                     }`}>
-                      {renderFormattedDescription(job.notes)}
+                      {renderFormattedDescription(job.description || job.notes)}
                     </div>
 
                     {!isDescriptionExpanded && isLongText && (
@@ -1034,7 +1020,7 @@ Sam Ludwig
                 </div>
               ) : (
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 font-mono text-xs text-slate-500">
-                  NO EXTRA DESCRIPTION NOTES AVAILABLE FOR THIS POSITION.
+                  NO JOB DESCRIPTION AVAILABLE FOR THIS POSITION.
                 </div>
               )}
             </div>

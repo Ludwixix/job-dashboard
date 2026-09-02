@@ -43,6 +43,7 @@ def test_seek_uses_cache_after_api_and_browser_fail(tmp_path):
         "url": "https://www.seek.com.au/job/123",
         "description": "Azure platform work",
         "tags": ["cloud"],
+        "posted": "2d ago",
     }]}))
     source = BrowserAndApiBlockedSeek(
         allow_browser_fallback=True,
@@ -68,3 +69,21 @@ def test_seek_does_not_use_cache_after_api_success(tmp_path):
     source = SuccessfulSeek(cache_path=tmp_path / "unused.json", allow_cache_fallback=True)
 
     assert [job["id"] for job in source.search(SearchQuery("cloud"))] == ["api-1"]
+
+
+def test_seek_cache_fallback_ignores_stale_and_undated_records(tmp_path):
+    cache_path = tmp_path / "seek.json"
+    cache_path.write_text(json.dumps({"jobs": [
+        {"id": "fresh", "title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://seek.test/fresh", "description": "Azure platform work", "posted": "2d ago"},
+        {"id": "old", "title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://seek.test/old", "description": "Azure platform work", "posted": "30d ago"},
+        {"id": "badge", "title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://seek.test/badge", "description": "Azure platform work", "posted": "Featured"},
+    ]}))
+    source = BrowserAndApiBlockedSeek(
+        allow_browser_fallback=False,
+        cache_path=cache_path,
+        allow_cache_fallback=True,
+    )
+
+    jobs = list(source.search(SearchQuery("cloud")))
+
+    assert [job["id"] for job in jobs] == ["fresh"]

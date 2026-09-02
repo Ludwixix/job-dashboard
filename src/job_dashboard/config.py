@@ -35,8 +35,7 @@ class Settings:
         self.seek_cache_fallback = self._get_bool("JOB_DASHBOARD_SEEK_CACHE_FALLBACK", True)
         self.seek_cache_path = self._get_optional_path("JOB_DASHBOARD_SEEK_CACHE_PATH")
         if self.seek_cache_path is None:
-            project_root = Path(__file__).resolve().parents[2]
-            self.seek_cache_path = project_root.parent / "job-dashboard-site" / "scrapers" / "jobs_seek.json"
+            self.seek_cache_path = self.data_dir / "seek_cache.json"
         
         # LinkedIn configuration
         self.linkedin_enabled = self._get_bool("JOB_DASHBOARD_LINKEDIN_ENABLED", True)

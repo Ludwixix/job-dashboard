@@ -418,6 +418,8 @@ class SeekApiSource:
         for record in records:
             if not isinstance(record, Mapping):
                 continue
+            if not is_recent(record, days=14):
+                continue
             searchable = " ".join(str(record.get(field) or "") for field in (
                 "title", "company", "location", "description", "tags"
             )).casefold()

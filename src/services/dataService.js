@@ -360,7 +360,8 @@ export const fetchJobsFromApi = async ({
 
   try {
     const res = await fetch(`${apiBase}/api/jobs?${params.toString()}`, {
-      signal: AbortSignal.timeout(6000)
+      // Large indexed responses need time to serialize on Cloud Run.
+      signal: AbortSignal.timeout(30000)
     });
     if (res.ok) {
       const data = await res.json();

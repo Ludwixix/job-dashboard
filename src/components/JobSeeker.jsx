@@ -37,7 +37,7 @@ import {
   classifyJobRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
-import { getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
+import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 
 
 // Categorize jobs into expanded multi-industry streams
@@ -186,6 +186,7 @@ export const JobSeeker = ({
   const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
   const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
   const [sortBy, setSortBy] = useState('best_and_newest'); // DEFAULT: BEST MATCHES & MOST RECENT
+  const [sortDirection, setSortDirection] = useState('desc');
   const [showSidebar, setShowSidebar] = useState(true);
 
 
@@ -494,14 +495,12 @@ export const JobSeeker = ({
         if (tierA !== tierB) {
           return tierB - tierA; // Higher match tier first
         }
-        const dateA = a.date || a.posted || '';
-        const dateB = b.date || b.posted || '';
-        const dateComp = dateB.localeCompare(dateA);
+        const dateComp = compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
         if (dateComp !== 0) return dateComp;
         
         return scoreB - scoreA;
       } else if (sortBy === 'date') {
-        return (b.date || b.posted || '').localeCompare(a.date || a.posted || '');
+        return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
       } else if (sortBy === 'score') {
         return (b.score || 0) - (a.score || 0);
       } else if (sortBy === 'company') {
@@ -509,7 +508,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [completeJobs, missingDataJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, currentProfile, userPrefs]);
+  }, [completeJobs, missingDataJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
 
 
   // Paginated Sliced Jobs
@@ -595,7 +594,7 @@ export const JobSeeker = ({
     setCurrentPage(1);
   };
 
-  const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date';
+  const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date' || sortDirection !== 'desc';
 
   const handleRunScraper = async () => {
     setScrapeElapsedSeconds(0);
@@ -1034,6 +1033,16 @@ export const JobSeeker = ({
                   <option value="score">MATCH SCORE (HIGH → LOW)</option>
                   <option value="company">COMPANY (A-Z)</option>
                 </select>
+                {sortBy === 'date' || sortBy === 'best_and_newest' ? (
+                  <button
+                    type="button"
+                    onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
+                    className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2 py-1 text-[10px] font-black text-indigo-700 hover:bg-indigo-50"
+                    title={`Reverse posting order: currently ${sortDirection === 'desc' ? 'newest first' : 'oldest first'}`}
+                  >
+                    {sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑'}
+                  </button>
+                ) : null}
               </div>
             </div>
 

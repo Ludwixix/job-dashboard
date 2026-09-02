@@ -61,3 +61,14 @@ export const formatJobPostedAge = (dateStr) => {
   if (age === 1) return '1 day ago';
   return `${age} days ago`;
 };
+
+/** Compare two posted-date values; unknown dates always sort after known dates. */
+export const compareJobPostedDates = (left, right, direction = 'desc') => {
+  const leftDate = parseJobPostedDate(left);
+  const rightDate = parseJobPostedDate(right);
+  if (!leftDate && !rightDate) return 0;
+  if (!leftDate) return 1;
+  if (!rightDate) return -1;
+  const comparison = leftDate.getTime() - rightDate.getTime();
+  return direction === 'asc' ? comparison : -comparison;
+};

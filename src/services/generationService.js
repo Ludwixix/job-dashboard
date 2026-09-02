@@ -113,17 +113,25 @@ export const calculateAtsScore = (jobDescription) => {
 /**
  * Client-Side Grounded Document Generator (Fast, Reliable Fallback)
  */
-export const generateClientSideTailoredDocs = (job) => {
+export const generateClientSideTailoredDocs = (job, candidateProfile) => {
+  const profile = candidateProfile || getActiveProfile();
   const title = job.title || 'Senior Systems & Infrastructure Engineer';
   const company = job.company || 'Target Employer';
   const location = job.location || 'Melbourne, VIC';
   const matchedKw = extractJobKeywords(job.notes || job.description || '');
   const kwList = matchedKw.length ? matchedKw.join(', ') : 'Microsoft 365, Azure, Intune, Active Directory, PowerShell, ACSC Essential 8';
+  const candidateName = profile.name || 'Candidate';
+  const candidateLocation = profile.location || 'Melbourne, VIC';
+  const candidatePhone = profile.phone || '';
+  const candidateEmail = profile.email || '';
+  const candidateSummary = [profile.fullWorkExperienceText, profile.workHistorySummary]
+    .filter(value => typeof value === 'string' && value.trim())
+    .join('\n\n') || MASTER_RESUME_HIGHLIGHTS;
 
-  const resume = `# SAM LUDWIG
+  const resume = `# ${candidateName.toUpperCase()}
 **${title}**
-Melbourne, VIC | 0405 993 245 | sam.ludwig@gmail.com
-Australian Citizen (Unrestricted Work Rights) | Clearance Eligible: Baseline / NV1 | linkedin.com/in/sam-ludwig
+${candidateLocation} | ${candidatePhone} | ${candidateEmail}
+${profile.workRights || ''} | ${profile.clearance || ''}
 
 ---
 
@@ -147,42 +155,9 @@ Demonstrated history of driving measurable operational efficiencies, including r
 
 ## PROFESSIONAL EXPERIENCE
 
-### Senior Managed Services Engineer | Capgemini (to Department of Education Victoria)
-*Dec 2021 – Present | Melbourne, VIC*
-- Managed the Southern Hemisphere's largest SharePoint farm (660,000+ active users) under stringent Victorian Government SLAs, maintaining 99.9% uptime.
-- Engineered automated MFA compliance auditing using PnP PowerShell across 200+ SharePoint sites, eliminating a month-long manual audit overhead.
-- Authored custom ServiceNow workload distribution engine integrating M365 user presence data, preventing SLA breaches during peak operational periods.
-- Reduced repeat infrastructure incidents by 15% through systematic root cause analysis (RCA) and durable preventive engineering.
-- Maintained enterprise hybrid identity synchronization across on-premises Active Directory, Entra ID, and Google Workspace.
+The following verified profile history and accomplishments must be used as the source of truth when tailoring this resume:
 
-### L2/L3 Technical Support Specialist | Australia Post (via Capgemini)
-*2023 – 2024 | Melbourne, VIC*
-- Engineered automated keystroke injection tools in ServiceNow, eliminating hundreds of manual administrative hours monthly across enterprise ticket workflows.
-- Managed complete endpoint lifecycle operations, executing Autopilot device enrolments, OS migrations, and compliant hardware decommissioning.
-- Served as primary technical escalation authority for complex L2/L3 enterprise faults, collaborating with Tier-3 cloud engineering teams to maintain >95% SLA compliance.
-- Supported the enterprise self-service kiosk rollout, measurably decreasing walk-in IT support ticket volume.
-
-### Endpoint Migration Engineer | St John of God Health Care
-*2023 | Melbourne, VIC*
-- Led Windows 11 enterprise endpoint migration across 100+ clinical devices with zero disruption to patient care or acute clinical services.
-- Maintained 100% Standard Operating Environment (SOE) compliance via Microsoft Intune Autopilot provisioning in a live healthcare environment.
-- Acted as primary technical liaison between clinical healthcare staff and engineering teams, resolving EMR and PACS software compatibility issues.
-
-### Application Support Engineer | Knosys
-*Dec 2020 – Dec 2021 | Melbourne, VIC*
-- Delivered 95% SLA first-contact resolution for GreenOrbit enterprise intranet platforms across tier-1 retail & healthcare clients (Cotton On, Harvey Norman, Healthscope).
-- Reduced batch processing lead times by 87% (from 2 hours down to 15 minutes) by authoring custom multi-threaded PowerShell migration utilities.
-- Supported AWS infrastructure migration and authored comprehensive RCA engineering runbooks resolving complex versioning conflicts.
-
-### SharePoint Developer & Cloud Consultant | Engage Squared
-*Mar 2018 – Dec 2020 | Melbourne, VIC*
-- Architected and deployed 5+ bespoke SharePoint Online intranet platforms using SPFx, React, and TypeScript for marquee Victorian clients including Victoria Police and Transurban.
-- Reduced deployment cycle duration by 25% via Azure DevOps CI/CD pipeline automation.
-- Delivered end-to-end cloud migrations into M365 aligning with ISO 27001 governance and security frameworks.
-
-### Telecommunications Technician | NBN
-*Oct 2016 – Nov 2017 | Melbourne, VIC*
-- Delivered Layer 1 physical telecommunications infrastructure deployments, structured cabling, and network fault diagnosis across residential and commercial environments.
+${candidateSummary}
 
 
 ---
@@ -201,9 +176,9 @@ Demonstrated history of driving measurable operational efficiencies, including r
 - **MFA Audit Framework:** Scalable PnP PowerShell framework executing automated compliance verification across 200+ enterprise workspaces.
 `;
 
-  const coverLetter = `Sam Ludwig
-Melbourne, VIC 3183
-0405 993 245 | sam.ludwig@gmail.com
+  const coverLetter = `${candidateName}
+${candidateLocation}
+${candidatePhone} | ${candidateEmail}
 ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
 
 Hiring Selection Committee
@@ -214,7 +189,7 @@ RE: Application for ${title}
 
 Dear Hiring Manager,
 
-I am writing to express my strong enthusiasm and formal application for the ${title} opportunity at ${company}. Having delivered enterprise infrastructure, modern workplace architecture, and operational automation for prominent Victorian public and private sector organisations—including Victoria Police, Transurban, and the Department of Education Victoria—I am confident in my capacity to deliver immediate technical reliability and value to your team.
+I am applying for the ${title} opportunity at ${company}. My verified career record includes the following detailed work history and accomplishments: ${candidateSummary.replace(/\s+/g, ' ').slice(0, 900)}
 
 My background bridges high-level Microsoft 365 and Azure cloud administration with pragmatic, hands-on automation and L3 technical support. Across previous engagements, I managed the Southern Hemisphere's largest SharePoint farm (660,000+ users) with 99.9% uptime, reduced batch processing lead times by 87% through custom PowerShell engineering, and executed 100+ clinical endpoint migrations with zero service downtime. Whether enforcing ACSC Essential 8 compliance, managing hybrid Entra ID identities, or configuring zero-touch Intune provisioning, I focus on building resilient systems that eliminate operational toil.
 
@@ -222,8 +197,8 @@ The opportunity to support and scale the technical infrastructure at ${company} 
 
 Sincerely,
 
-Sam Ludwig
-Australian Citizen | Unrestricted Work Rights`;
+${candidateName}
+${profile.workRights || ''}`;
 
   return {
     success: true,
@@ -259,7 +234,9 @@ export const generateApplicationDocs = async (job, onProgress, onLog, candidateP
   log(`Initializing OpenRouter API stream for ${profile.name} [Model: ${model}]`, 'init');
   log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
 
-  const candidateSummary = profile.fullWorkExperienceText || profile.workHistorySummary || MASTER_RESUME_HIGHLIGHTS;
+  const candidateSummary = [profile.fullWorkExperienceText, profile.workHistorySummary]
+    .filter(value => typeof value === 'string' && value.trim())
+    .join('\n\n') || MASTER_RESUME_HIGHLIGHTS;
 
   const systemPrompt = `You are an elite, top-tier executive ATS resume and cover letter architect for ${profile.name}.
 
@@ -274,8 +251,10 @@ Clearance: ${profile.clearance}
 Core Skills: ${(profile.coreSkills || []).join(', ')}
 Certifications: ${(profile.certifications || []).join(', ')}
 
-CAREER & WORK EXPERIENCE HISTORY:
+DETAILED WORK HISTORY & ACCOMPLISHMENTS (PROFILE SOURCE OF TRUTH):
 ${candidateSummary}
+
+Use this profile history as the authoritative source for BOTH the resume and cover letter. Preserve relevant role names, dates, responsibilities, and measurable accomplishments. Do not substitute generic or default career history when this field is present.
 
 STRICT ARCHITECTURAL REQUIREMENTS:
 

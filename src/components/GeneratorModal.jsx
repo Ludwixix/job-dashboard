@@ -11,6 +11,7 @@ import {
   getActiveModel, setActiveModel, AVAILABLE_MODELS
 } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
+import { getActiveProfile } from '../services/profileService';
 
 const GEMINI_GEM_URL = "https://gemini.google.com/gem/1Bxx-IAsb1aBD0T6rxC6aJB1frzm4Yphz?usp=drive_link";
 
@@ -138,7 +139,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
     };
 
     try {
-      const result = await generateApplicationDocs(job, setGenProgress, handleLog);
+      const result = await generateApplicationDocs(job, setGenProgress, handleLog, getActiveProfile());
 
       if (!result) {
         setGenError('Unable to connect to generation engine.');

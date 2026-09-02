@@ -142,7 +142,7 @@ const processNextTask = async (profile) => {
         assets = await generateApplicationDocs(job, null, null, profile);
       } catch (genErr) {
         // Fall back gracefully to deterministic expert synthesis if API key is not yet set
-        assets = generateClientSideTailoredDocs(job);
+        assets = generateClientSideTailoredDocs(job, profile);
       }
 
       if (assets && assets.resume) {

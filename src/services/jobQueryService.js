@@ -374,16 +374,20 @@ export const suggestRelatedTitles = (profile) => {
 };
 
 /**
- * Push profile-derived queries to the Python backend's PUT /api/search-criteria.
- * Only succeeds when running locally (backend on localhost).
+ * Push profile-derived queries to the Python backend's POST /api/search-criteria,
+ * replacing the server's active scrape queries so subsequent discovery runs
+ * (including the SSE /api/scrape/stream) search for this candidate's own
+ * titles and skills instead of whatever queries were previously configured.
  */
 export const pushQueriesToBackend = async (profile) => {
   const queries = buildQueriesFromProfile(profile);
   if (!queries.length) return { success: false, error: 'No queries generated' };
   try {
+    // The backend HTTP server only registers a POST handler for this path
+    // (no do_PUT exists) — using PUT here silently 501s and profile-derived
+    // queries never reach the scraper.
     const res = await fetch(`${SCRAPER_BASE_URL}/api/search-criteria`, {
-
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ queries }),
       signal: AbortSignal.timeout(5000),

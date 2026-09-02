@@ -35,6 +35,7 @@ import { fetchJobsForProfile } from '../services/dataService';
 import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
 import { suggestRelatedTitles, buildQueriesFromProfile } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
+import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../services/profileOnboardingPipeline';
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
@@ -294,10 +295,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   }, [refetch]);
 
 
-  // Trigger discovery when activeProfile changes or on initial load
+  // Trigger discovery when activeProfile changes or on initial load.
+  // The backend's active search queries must be synced first, otherwise the
+  // scrape stream re-runs whatever queries it already had (ignoring the
+  // profile) instead of searching for this candidate's own titles/skills.
   useEffect(() => {
     if (activeProfile) {
-      triggerDiscoveryScrape(activeProfile);
+      syncProfileQueriesToBackend(activeProfile).finally(() => {
+        triggerDiscoveryScrape(activeProfile);
+      });
     }
   }, [activeProfile?.id, activeProfile?.industry, triggerDiscoveryScrape]);
 
@@ -1012,11 +1018,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               if (profileToUse.suburb || profileToUse.location) {
                 setBaseLocation(profileToUse.suburb || profileToUse.location);
               }
-              if (profileToUse.industry) {
-                applyIndustryTheme(profileToUse.industry);
-              }
-              // Smartly apply search parameters and trigger live discovery scrape for fitting roles
-              triggerDiscoveryScrape(profileToUse);
+              // Full onboarding pipeline: theme, personalised backend search
+              // queries, seeded ranking preferences, and a default saved search —
+              // then trigger discovery once the backend has the new queries.
+              runProfileOnboardingPipeline(profileToUse).finally(() => {
+                triggerDiscoveryScrape(profileToUse);
+              });
               refetch();
             }
           }}

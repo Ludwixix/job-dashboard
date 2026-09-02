@@ -59,9 +59,9 @@ def test_upsert_pagination_and_user_applications(tmp_path):
     
     # 1. Test upsert with deduplication
     raw_jobs = [
-        {"title": "M365 Admin", "company": "Contoso", "url": "https://job.test/1", "stream": "core-it", "remote": True, "score": 90},
-        {"title": "M365 Admin", "company": "Contoso", "url": "https://job.test/1", "stream": "core-it", "remote": True, "score": 92}, # Duplicate
-        {"title": "Azure Consultant", "company": "Fabrikam", "url": "https://job.test/2", "stream": "cloud", "remote": False, "score": 85}
+        {"title": "M365 Admin", "company": "Contoso", "url": "https://job.test/1", "stream": "core-it", "remote": True, "score": 90, "posted": "2026-08-28"},
+        {"title": "M365 Admin", "company": "Contoso", "url": "https://job.test/1", "stream": "core-it", "remote": True, "score": 92, "posted": "2026-08-28"}, # Duplicate
+        {"title": "Azure Consultant", "company": "Fabrikam", "url": "https://job.test/2", "stream": "cloud", "remote": False, "score": 85, "posted": "2026-08-27"}
     ]
     upsert_count = repo.upsert_scraped_jobs(raw_jobs)
     assert upsert_count == 3
@@ -115,3 +115,18 @@ def test_saved_searches_reminders_and_cross_source_deduplication(tmp_path):
     assert len(repo.list_due_reminders("user-1")) == 1
     assert repo.dismiss_reminder("user-1", reminder["id"])
     assert repo.list_due_reminders("user-1") == []
+
+
+def test_public_job_index_excludes_gmail_and_unverifiable_dates_and_sorts_dates(tmp_path):
+    repo = JobRepository(tmp_path / "jobs.sqlite3")
+    repo.replace_jobs([
+        {"id": "featured", "title": "Featured role", "company": "Acme", "source": "Seek", "posted": "Featured"},
+        {"id": "gmail", "title": "Application confirmation", "company": "Acme", "source": "Gmail", "posted": "2026-08-30"},
+        {"id": "old", "title": "Older role", "company": "Acme", "source": "Indeed", "posted": "2026-08-20"},
+        {"id": "new", "title": "Newer role", "company": "Acme", "source": "Indeed", "posted": "2026-08-28"},
+    ])
+
+    result = repo.query_jobs_paginated(page=1, page_size=10)
+
+    assert [job["id"] for job in result["jobs"]] == ["new", "old"]
+    assert result["total"] == 2

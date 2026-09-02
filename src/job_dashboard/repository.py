@@ -471,25 +471,46 @@ class JobRepository:
             
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
-            
-            # Count total matching rows
-            count_row = conn.execute(f"SELECT COUNT(*) AS total FROM jobs WHERE {where_sql}", params).fetchone()
-            total_count = count_row["total"] if count_row else 0
-            
-            # Fetch slice
-            query_sql = f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?"
-            query_params = params + [page_size, offset]
-            rows = conn.execute(query_sql, query_params).fetchall()
-            
+
+            # Public job reads are intentionally materialized and filtered in
+            # Python: SQLite's lexical ORDER BY would place values such as
+            # "Featured" above ISO dates, and it cannot reliably interpret
+            # provider-relative values such as "9d ago". This also keeps
+            # workflow/email records out of the public index.
+            rows = conn.execute(
+                f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql}",
+                params,
+            ).fetchall()
+
         jobs = []
         for row in rows:
             try:
                 job_data = json.loads(row["data_json"])
+                if str(job_data.get("source") or "").strip().lower() == "gmail":
+                    continue
+                posted = self._parse_posted_timestamp(job_data.get("posted") or job_data.get("date"))
+                if posted is None:
+                    continue
                 job_data["status"] = row["status"]
+                job_data["_posted_timestamp"] = posted
                 jobs.append(job_data)
             except Exception:
                 continue
-                
+
+        if sort_by == "score":
+            jobs.sort(key=lambda job: (int(job.get("score") or 0), job["_posted_timestamp"]), reverse=True)
+        elif sort_by == "company":
+            jobs.sort(key=lambda job: (str(job.get("company") or "").casefold(), -job["_posted_timestamp"]))
+        elif sort_by == "title":
+            jobs.sort(key=lambda job: (str(job.get("title") or "").casefold(), -job["_posted_timestamp"]))
+        else:
+            jobs.sort(key=lambda job: job["_posted_timestamp"], reverse=True)
+
+        total_count = len(jobs)
+        jobs = jobs[offset:offset + page_size]
+        for job in jobs:
+            job.pop("_posted_timestamp", None)
+
         total_pages = max(1, (total_count + page_size - 1) // page_size)
         
         return {
@@ -499,6 +520,27 @@ class JobRepository:
             "pageSize": page_size,
             "totalPages": total_pages
         }
+
+    @staticmethod
+    def _parse_posted_timestamp(value: Any) -> float | None:
+        """Return a UTC timestamp for a provider date, or None if unverifiable."""
+        text = str(value or "").strip().casefold()
+        if not text:
+            return None
+        import re
+        relative = re.fullmatch(r"(\d+)\s*d(?:ays?)?\s*ago(?:\s*[•|].*)?", text)
+        if relative:
+            return datetime.now(timezone.utc).timestamp() - int(relative.group(1)) * 86400
+        try:
+            parsed = datetime.fromisoformat(text.replace("z", "+00:00"))
+        except ValueError:
+            try:
+                parsed = datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
+                return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).timestamp()
 
     def get_user_applications(self, user_id: str) -> list[dict[str, Any]]:
         """Fetch private application tracking records for a specific authenticated user."""

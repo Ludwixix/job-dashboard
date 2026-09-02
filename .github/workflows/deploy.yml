@@ -37,6 +37,9 @@ jobs:
           fi
           echo "Preserved full job data: $(wc -c < public/jobs_combined.json) bytes"
 
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
         env:

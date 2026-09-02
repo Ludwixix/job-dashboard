@@ -21,6 +21,7 @@ import { AutoApplyModal } from './AutoApplyModal';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { DashboardGridSkeleton } from './SkeletonLoaders';
 import ZenAutopilotDashboard from './ZenAutopilotDashboard';
+import { CareerOperations } from './CareerOperations';
 import { startAutopilot } from '../services/autopilotAgent';
 
 
@@ -37,7 +38,7 @@ import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeS
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock
 } from 'lucide-react';
 
 
@@ -720,6 +721,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               <Target size={14} /> 
               ANALYTICS
             </button>
+
+            <button
+              onClick={() => setActiveSection('operations')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                activeSection === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <CalendarClock size={14} /> OPERATIONS
+            </button>
           </div>
         </div>
       </header>
@@ -846,6 +856,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   onSelectJob={(j) => setSelectedJob(j)}
                   onOpenGenerator={(j) => setSelectedForGenerator(j)}
                 />
+              </SafeErrorBoundary>
+            )}
+
+            {activeSection === 'operations' && (
+              <SafeErrorBoundary sectionName="Career Operations">
+                <CareerOperations jobs={jobs} />
               </SafeErrorBoundary>
             )}
           </>

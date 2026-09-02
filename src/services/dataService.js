@@ -302,7 +302,9 @@ export const parseMetadata = (row, index) => {
 
   const jobObject = {
     id: String(rowId),
-    date: row['Date'] || row['date'] || row['posted'] || new Date().toISOString().split('T')[0],
+    // Never manufacture today's date: a missing provider date must remain
+    // unknown so it cannot appear as a freshly posted job.
+    date: row['Date'] || row['date'] || row['posted'] || '',
     company,
     title,
     status,

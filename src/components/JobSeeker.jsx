@@ -371,7 +371,9 @@ export const JobSeeker = ({
 
 
   const seekerJobs = useMemo(() => {
-    const sourcePool = activeStreamTab === 'Rejected Jobs' 
+    const sourcePool = sourceFilter !== 'All' && activeStreamTab === 'All'
+      ? unsubmittedJobs
+      : activeStreamTab === 'Rejected Jobs' 
       ? rejectedJobs 
       : activeStreamTab === 'MissingData' 
       ? missingDataJobs 
@@ -508,7 +510,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [completeJobs, missingDataJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
+  }, [completeJobs, missingDataJobs, unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
 
 
   // Paginated Sliced Jobs

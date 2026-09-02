@@ -741,14 +741,20 @@ class ScrapePipeline:
         collected: list[Mapping[str, Any]] = []
         self.errors: list[str] = []
         total_sources = len(self.sources)
+        active_queries = [query for query in queries if query.enabled]
+        total_attempts = max(1, total_sources * len(active_queries))
+        completed_attempts = 0
         for idx, source in enumerate(self.sources):
             started_at = time.monotonic()
             if on_progress:
                 on_progress(f'Scraping {source.name}...', int((idx / total_sources) * 100))
             health = self.source_health.setdefault(source.name, {"jobs": 0, "queries": 0, "success": False, "last_error": ""})
-            for query in queries:
-                if not query.enabled:
-                    continue
+            for query in active_queries:
+                if on_progress:
+                    on_progress(
+                        f"{source.name}: searching '{query.term}' ({completed_attempts + 1}/{total_attempts})...",
+                        min(89, 10 + int((completed_attempts / total_attempts) * 75)),
+                    )
                 try:
                     results = source.search(query)
                     health["queries"] += 1
@@ -763,6 +769,7 @@ class ScrapePipeline:
                     health["queries"] += 1
                     health["last_error"] = str(error)
                     self.errors.append(f"{source.name} / {query.term}: {error}")
+                completed_attempts += 1
                 if self.pause_seconds:
                     time.sleep(self.pause_seconds)
             if self.health_check:

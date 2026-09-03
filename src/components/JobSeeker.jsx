@@ -246,6 +246,10 @@ export const JobSeeker = ({
                            s.includes('rejected') || 
                            s.includes('dismissed') || 
                            s.includes('expired');
+      // Custom jobs that the user manually created should remain visible in the active pool
+      if (job.isCustom || String(job.id || '').startsWith('custom_')) {
+        return true;
+      }
       return !isProgressed;
     });
   }, [jobs]);
@@ -339,6 +343,7 @@ export const JobSeeker = ({
   const streamCounts = useMemo(() => {
     const counts = { 
       All: completeJobs.length,
+      Custom: completeJobs.filter(j => j.isCustom || String(j.id || '').startsWith('custom_')).length,
       Starred: completeJobs.filter(j => starredJobIds.includes(j.id || `${j.company}_${j.title}`)).length,
       TopFit: 0,
       QuickApply: 0,
@@ -406,7 +411,9 @@ export const JobSeeker = ({
 
       // Stream Tab filter
       let matchesStream = true;
-      if (activeStreamTab === 'TopFit') {
+      if (activeStreamTab === 'Custom') {
+        matchesStream = Boolean(job.isCustom || String(job.id || '').startsWith('custom_'));
+      } else if (activeStreamTab === 'TopFit') {
         matchesStream = (job.score || 0) >= 85;
       } else if (activeStreamTab === 'Starred') {
         matchesStream = starredJobIds.includes(job.id);
@@ -640,6 +647,7 @@ export const JobSeeker = ({
 
   const STREAM_TAB_DEFINITIONS = [
     { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
+    { id: 'Custom', name: '✨ CUSTOM JOBS', icon: Sparkles, color: 'purple', highlight: true },
     { id: 'Starred', name: '⭐ SAVED', icon: Star, color: 'amber', highlight: true },
     { id: 'TopFit', name: '🔥 TOP MATCHES', icon: Flame, color: 'rose', highlight: true },
     { id: 'QuickApply', name: '⚡ AUTO-APPLY (LINKEDIN & SEEK)', icon: Zap, color: 'indigo', highlight: true },
@@ -1021,6 +1029,28 @@ export const JobSeeker = ({
                   docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
                 }`}>
                   {readyToSubmitCount}
+                </span>
+              </button>
+
+              {/* View Custom Jobs Quick Button */}
+              <button
+                onClick={() => {
+                  setActiveStreamTab(activeStreamTab === 'Custom' ? 'All' : 'Custom');
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 ${
+                  activeStreamTab === 'Custom'
+                    ? 'bg-purple-600 text-white border-purple-400 shadow-md ring-2 ring-purple-500/40'
+                    : 'bg-[#181825] text-purple-300 border-purple-500/40 hover:bg-purple-950/40'
+                }`}
+                title="Filter to view all custom generated jobs"
+              >
+                <Sparkles size={14} className={activeStreamTab === 'Custom' ? "text-white" : "text-purple-400"} />
+                <span>MY CUSTOM JOBS</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                  activeStreamTab === 'Custom' ? 'bg-slate-950 text-purple-300' : 'bg-purple-500/20 text-purple-300 border border-purple-400/40'
+                }`}>
+                  {streamCounts.Custom || 0}
                 </span>
               </button>
 

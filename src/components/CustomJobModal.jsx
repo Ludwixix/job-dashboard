@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Link as LinkIcon, FileText, Download, Loader2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { generateApplicationDocs } from '../services/generationService';
+import { generateApplicationDocs, generateClientSideTailoredDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { getActiveProfile } from '../services/profileService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
@@ -81,7 +81,19 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
 
       const profile = getActiveProfile();
       setStatusMsg('Synthesizing tailored resume and cover letter with AI...');
-      const docs = await generateApplicationDocs(newJob, (phase) => setStatusMsg(phase), null, profile);
+      let docs = null;
+      try {
+        docs = await generateApplicationDocs(newJob, (phase) => setStatusMsg(phase), null, profile);
+      } catch (aiErr) {
+        console.warn('AI document generation failed, using client-side grounded fallback:', aiErr);
+        // Seamless fallback to deterministic synthesis if API key is not configured or fails
+        const fallbackDocs = generateClientSideTailoredDocs(newJob, profile);
+        docs = {
+          resume: fallbackDocs.resume,
+          coverLetter: fallbackDocs.cover_letter,
+          model: 'Executive ATS Template Engine'
+        };
+      }
 
       if (!docs || (!docs.resume && !docs.coverLetter)) {
         throw new Error('Document synthesis engine returned empty application assets.');
@@ -92,9 +104,20 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
         resumeText: docs.resume || '',
         coverLetterText: docs.coverLetter || '',
         hasCustomDocs: true,
+        isCustom: true,
         docsModel: docs.model || 'Application Studio AI',
         docsGeneratedAt: new Date().toISOString(),
       };
+
+      // Persist to custom jobs storage so it appears in the JobSeeker list
+      try {
+        const existingCustom = JSON.parse(localStorage.getItem('job_dashboard_custom_jobs') || '[]');
+        const filteredCustom = existingCustom.filter(j => j.id !== jobId);
+        filteredCustom.unshift(updatedJob);
+        localStorage.setItem('job_dashboard_custom_jobs', JSON.stringify(filteredCustom));
+      } catch (err) {
+        console.warn('Failed to save to job_dashboard_custom_jobs:', err);
+      }
 
       try {
         const localApps = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');

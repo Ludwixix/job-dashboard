@@ -635,7 +635,32 @@ export const fetchJobsData = async () => {
     deduplicatedJobs.push(job);
   }
 
-  // Return strictly genuine scraped job ads
+  // Load user-added custom jobs so they always appear in the dashboard index
+  try {
+    const rawCustom = localStorage.getItem('job_dashboard_custom_jobs');
+    if (rawCustom) {
+      const customJobs = JSON.parse(rawCustom);
+      if (Array.isArray(customJobs)) {
+        customJobs.forEach((customJob, idx) => {
+          const parsed = parseMetadata(customJob, customJob.id || `custom_${idx}`);
+          parsed.isCustom = true;
+          // Apply any user applications state if present
+          const userApp = userAppsMap.get(String(parsed.id));
+          if (userApp) {
+            parsed.status = userApp.status || parsed.status;
+            parsed.resumeText = userApp.resume_text || userApp.resumeText || parsed.resumeText;
+            parsed.coverLetterText = userApp.cover_letter_text || userApp.coverLetterText || parsed.coverLetterText;
+            parsed.hasCustomDocs = Boolean(parsed.resumeText || parsed.coverLetterText);
+          }
+          deduplicatedJobs.unshift(parsed);
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to load local custom jobs:", err);
+  }
+
+  // Return strictly genuine scraped & custom job ads
   return deduplicatedJobs;
 };
 

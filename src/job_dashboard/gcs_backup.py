@@ -22,7 +22,16 @@ from .logging import get_logger
 
 logger = get_logger("job_dashboard.gcs_backup")
 
-BACKUP_FILENAMES = ("jobs.sqlite3", "jobs.sqlite3-wal", "jobs.sqlite3-shm", "jobs.json")
+# Keep SQLite files as opaque objects; do not mount the bucket as a filesystem.
+BACKUP_FILENAMES = (
+    "jobs.sqlite3",
+    "jobs.sqlite3-wal",
+    "jobs.sqlite3-shm",
+    "health.sqlite3",
+    "health.sqlite3-wal",
+    "health.sqlite3-shm",
+    "jobs.json",
+)
 
 
 def _get_client():
@@ -42,8 +51,6 @@ def restore_from_gcs(bucket_name: str | None, data_dir: Path) -> int:
     """Download the last known-good index into data_dir if missing locally. Returns files restored."""
     if not bucket_name:
         return 0
-    if (data_dir / "jobs.sqlite3").exists():
-        return 0  # local data already present (warm instance or pre-seeded image); don't overwrite it
     client = _get_client()
     if client is None:
         return 0
@@ -51,7 +58,15 @@ def restore_from_gcs(bucket_name: str | None, data_dir: Path) -> int:
     restored = 0
     try:
         bucket = client.bucket(bucket_name)
+        # Restore each database independently: the job index may be present
+        # in the image while health history exists only in GCS.
         for filename in BACKUP_FILENAMES:
+            if (data_dir / filename).exists():
+                continue
+            if filename.endswith("-wal") or filename.endswith("-shm"):
+                base = filename.removesuffix("-wal").removesuffix("-shm")
+                if not (data_dir / base).exists():
+                    continue
             blob = bucket.blob(filename)
             if blob.exists():
                 data_dir.mkdir(parents=True, exist_ok=True)

@@ -118,6 +118,7 @@ class IndeedJobSpySource:
                 country_indeed="australia",
                 results_wanted=self.results_wanted,
                 hours_old=self.hours_old,
+                description_format="markdown",
             )
             if results is not None and not results.empty:
                 records = [_indeed_record(row, query) for _, row in results.iterrows()]

@@ -70,14 +70,14 @@ gcloud run deploy "${SERVICE_NAME}" \
     --image "${IMAGE}" \
     --region "${REGION}" \
     --allow-unauthenticated \
-    --timeout 300 \
+    --timeout 3600 \
     --memory 2Gi \
     --cpu 2 \
     --concurrency 10 \
     --min-instances 0 \
     --max-instances 5 \
     --port 8080 \
-    --set-env-vars="HOST=0.0.0.0" \
+    --set-env-vars="HOST=0.0.0.0,JOB_DASHBOARD_DATA_DIR=/app/data,JOB_DASHBOARD_GCS_DATA_BUCKET=${PROJECT_ID}-job-dashboard-data,JOB_DASHBOARD_SEEK_CACHE_PATH=/app/data/seek_cache.json,JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,JOB_DASHBOARD_LINKEDIN_ENABLED=false" \
     --project="${PROJECT_ID}" \
     --quiet
 

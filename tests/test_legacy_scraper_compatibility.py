@@ -13,10 +13,13 @@ LEGACY_OUTPUTS = tuple(sorted(LEGACY_SCRAPERS.glob("jobs_*.json")))
 def test_legacy_scraper_records_normalize_to_job(output_path: Path):
     payload = json.loads(output_path.read_text())
     records = payload.get("jobs", payload) if isinstance(payload, dict) else payload
-    if not records:
-        pytest.skip("legacy output contains no job records")
+    # Gmail-derived application digests are email records, not scraped job
+    # listings; they legitimately have no URL and are out of scope here.
+    listings = [r for r in records if str(r.get("source", "")).lower() != "gmail" and r.get("url")]
+    if not listings:
+        pytest.skip("legacy output contains no scraped job records")
 
-    job = normalize_job(records[0])
+    job = normalize_job(listings[0])
 
     assert job.id
     assert job.title

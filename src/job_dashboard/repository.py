@@ -447,8 +447,8 @@ class JobRepository:
         
         if search:
             search_pattern = f"%{search.strip().lower()}%"
-            clauses.append("(lower(title) LIKE ? OR lower(company) LIKE ? OR lower(location) LIKE ? OR lower(description) LIKE ?)")
-            params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
+            clauses.append("(lower(title) LIKE ? OR lower(company) LIKE ? OR lower(location) LIKE ? OR lower(description) LIKE ? OR lower(source) LIKE ?)")
+            params.extend([search_pattern, search_pattern, search_pattern, search_pattern, search_pattern])
             
         if industry and industry.lower() != "all":
             clauses.append("(lower(stream) LIKE ? OR lower(data_json) LIKE ?)")

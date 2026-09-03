@@ -93,8 +93,26 @@ def backup_to_gcs(bucket_name: str | None, data_dir: Path) -> int:
         for filename in BACKUP_FILENAMES:
             local_path = data_dir / filename
             if local_path.exists():
-                bucket.blob(filename).upload_from_filename(str(local_path))
-                uploaded += 1
+                blob = bucket.blob(filename)
+                # Reload metadata to obtain current generation for optimistic concurrency
+                generation_match = None
+                try:
+                    blob.reload()
+                    generation_match = blob.generation
+                except Exception:
+                    # Blob doesn't exist yet; condition on non-existence (generation 0)
+                    generation_match = 0
+
+                try:
+                    blob.upload_from_filename(
+                        str(local_path),
+                        if_generation_match=generation_match,
+                    )
+                    uploaded += 1
+                except Exception as upload_err:
+                    logger.warning(
+                        f"GCS backup precondition failed for {filename} (concurrent writer detected): {upload_err}"
+                    )
         if uploaded:
             logger.info(f"Backed up {uploaded} data file(s) to gs://{bucket_name}")
     except Exception as error:

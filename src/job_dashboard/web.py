@@ -86,11 +86,21 @@ class DashboardApp:
         self.compare_runner = CompareRunner(self.data_dir, generator_factory=generator_factory)
         # Phase 6: Smart Application Tracker
         self.application_tracker = get_smart_application_tracker(self.data_dir)
+        self.lock = threading.Lock()
+        self.db_ready_event = threading.Event()
         if self.jobs:
             if self.repository.count_jobs() == 0:
                 logger.info(f"Seeding database with {len(self.jobs)} scraped jobs...")
-                threading.Thread(target=self.repository.upsert_scraped_jobs, args=(self.jobs,), daemon=True).start()
-        self.lock = threading.Lock()
+                def _seed():
+                    try:
+                        self.repository.upsert_scraped_jobs(self.jobs)
+                    finally:
+                        self.db_ready_event.set()
+                threading.Thread(target=_seed, daemon=True).start()
+            else:
+                self.db_ready_event.set()
+        else:
+            self.db_ready_event.set()
 
     def save_search_queries(self):
         payload = [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
@@ -373,6 +383,7 @@ class DashboardApp:
 
     def materialize_jobs(self, jobs):
         materialized = []
+        skipped = []
         for raw in jobs:
             # Confidential/blank-company ads are still valid postings — coerce
             # rather than reject, since a single unnormalizable job previously
@@ -385,10 +396,12 @@ class DashboardApp:
                 analysis = self.dashboard.analyse(candidate)
             except Exception as error:
                 logger.warning(f"Skipping unnormalizable job during materialization: {error}")
+                skipped.append({"job": candidate, "error": str(error)})
                 continue
             item = dict(candidate)
             item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "fit_category": analysis.fit_category, "dimensions": analysis.score.dimensions, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "description": clean_description(job.description)})
             materialized.append(item)
+        self.last_skipped_jobs = skipped
         return materialized
 
     def analyses(self):
@@ -498,27 +511,50 @@ class DashboardApp:
 
     def public_jobs(self, filters=None):
         filters = filters or {}
+        # SQLite repository is the single source of truth
         stored = self.repository.list_jobs(**filters)
-        stored_by_id = {job.get("id"): job for job in stored}
         result = []
-        for analysis in self.analyses():
-            if analysis.job.id not in stored_by_id:
-                continue
-            stored_job = stored_by_id[analysis.job.id]
-            posted = next((job.get("posted", "") for job in self.jobs if job.get("id") == analysis.job.id or job.get("url") == analysis.job.url), "")
-            raw = next((job for job in self.jobs if job.get("id") == analysis.job.id or job.get("url") == analysis.job.url), {})
-            if str(analysis.job.source).lower() == "gmail":
+        for stored_job in stored:
+            if str(stored_job.get("source", "")).lower() == "gmail":
                 continue
             if not filters.get("status") and stored_job.get("status", "sourced") != "sourced":
                 continue
-            # Only apply recent activity filter when no status filter is provided
-            if not filters.get("status") and (stored_job.get("status") == "rejected" or not self._has_recent_activity(raw)):
+            if not filters.get("status") and (stored_job.get("status") == "rejected" or not self._has_recent_activity(stored_job)):
                 continue
-            generated = raw.get("generated") or self.generated_documents.get(analysis.job.id)
-            email_events = raw.get("email_events", [])
+
+            job_id = stored_job.get("id")
+            raw_memory = next((j for j in self.jobs if j.get("id") == job_id or j.get("url") == stored_job.get("url")), {})
+            posted = stored_job.get("posted") or raw_memory.get("posted", "")
+            generated = raw_memory.get("generated") or self.generated_documents.get(job_id)
+            email_events = stored_job.get("email_events") or raw_memory.get("email_events", [])
             email_id = email_events[-1].get("email_id") if email_events else ""
-            result.append({"id": analysis.job.id, "title": analysis.job.title, "company": analysis.job.company, "location": analysis.job.location, "description": analysis.job.description, "source": analysis.job.source, "url": analysis.job.url, "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "salary": raw.get("salary", ""), "posted": posted, "posted_age": posted_age(posted), "remote": analysis.job.remote, "stream": analysis.stream, "fit_category": analysis.fit_category, "score": analysis.score.score, "fit": analysis.score.fit, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "dimensions": analysis.score.dimensions, "generated": generated})
-            result[-1]["status"] = stored_job.get("status", "sourced")
+
+            # Extract analysis or compute from stored job data
+            analysis = self.dashboard.analyse(stored_job)
+
+            result.append({
+                "id": job_id,
+                "title": stored_job.get("title", ""),
+                "company": stored_job.get("company", ""),
+                "location": stored_job.get("location", ""),
+                "description": clean_description(stored_job.get("description", "")),
+                "source": stored_job.get("source", ""),
+                "url": stored_job.get("url", ""),
+                "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "",
+                "salary": stored_job.get("salary") or raw_memory.get("salary", ""),
+                "posted": posted,
+                "posted_age": posted_age(posted),
+                "remote": bool(stored_job.get("remote", False)),
+                "stream": stored_job.get("stream") or analysis.stream,
+                "fit_category": stored_job.get("fit_category") or analysis.fit_category,
+                "score": stored_job.get("score") if stored_job.get("score") is not None else analysis.score.score,
+                "fit": analysis.score.fit,
+                "matched_skills": analysis.score.matched_skills,
+                "missing_skills": analysis.score.missing_skills,
+                "dimensions": analysis.score.dimensions,
+                "generated": generated,
+                "status": stored_job.get("status", "sourced"),
+            })
         return result
 
     @staticmethod
@@ -554,6 +590,7 @@ class DashboardApp:
                         on_progress("Saving & indexing positions...", 90)
                     # Materialize fresh jobs
                     fresh_materialized = self.materialize_jobs(fresh)
+                    # Rebuild merged_jobs from current self.jobs at merge point under lock
                     existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
                     merged_jobs = list(self.jobs)
 
@@ -585,7 +622,9 @@ class DashboardApp:
                 "queries_scraped": len(queries_to_scrape),
                 "queries_cached": len(cached_query_terms),
                 "cache_hit": len(queries_to_scrape) == 0,
-                "cached_terms": cached_query_terms
+                "cached_terms": cached_query_terms,
+                "skipped_jobs_count": len(getattr(self, "last_skipped_jobs", [])),
+                "skipped_jobs": getattr(self, "last_skipped_jobs", []),
             }
             return self.public_jobs(), pipeline_errors, stats
 
@@ -624,56 +663,57 @@ class DashboardApp:
         return len(title_overlap) >= 2 and (not company or not left.get("company") or company_overlap)
 
     def scan_gmail(self, username: str | None = None, app_password: str | None = None, days: int = 7):
-        days = max(1, min(7, int(days)))
-        credential_candidates = []
-        for candidate in Path(__file__).resolve().parents[2].glob("client_secret_*.json"):
-            try:
-                config = json.loads(candidate.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if "installed" in config:
-                credential_candidates.insert(0, candidate)
+        with self.lock:
+            days = max(1, min(7, int(days)))
+            credential_candidates = []
+            for candidate in Path(__file__).resolve().parents[2].glob("client_secret_*.json"):
+                try:
+                    config = json.loads(candidate.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if "installed" in config:
+                    credential_candidates.insert(0, candidate)
+                else:
+                    credential_candidates.append(candidate)
+            if credential_candidates:
+                scanner = GmailApiScanner(str(credential_candidates[0]), str(self.data_dir / "gmail_token.json"), days=days)
+            elif username and app_password:
+                scanner = GmailScanner(username, app_password, days=days)
             else:
-                credential_candidates.append(candidate)
-        if credential_candidates:
-            scanner = GmailApiScanner(str(credential_candidates[0]), str(self.data_dir / "gmail_token.json"), days=days)
-        elif username and app_password:
-            scanner = GmailScanner(username, app_password, days=days)
-        else:
-            raise RuntimeError("Gmail OAuth client file or IMAP credentials are required")
-        matched = created = updated = 0
-        messages = scanner.application_messages()
-        for message, category, confidence in messages:
-            title, company = self._gmail_job_details(message)
-            existing = next((job for job in self.jobs if self._same_job(job, title, company)), None)
-            status = self._gmail_status(category)
-            if existing:
-                job_id = normalize_job(existing).id
-                existing.setdefault("email_events", []).append({"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence})
-                self.repository.update_status(job_id, status)
-                updated += 1
-                matched += 1
-                continue
-            new_job = {
-                "id": f"gmail-{message.email_id}",
-                "title": title,
-                "company": company,
-                "location": "",
-                "description": message.body_preview or message.snippet,
-                "source": "Gmail",
-                "url": "",
-                "posted": message.received_at[:10],
-                "remote": False,
-                "tags": ["gmail", "application", category],
-                "email_events": [{"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence}],
-            }
-            self.jobs.extend(self.materialize_jobs([new_job]))
-            self.save_jobs()
-            self.repository.update_status(new_job["id"], status)
-            created += 1
-        if updated:
-            self.save_jobs()
-        return {"scanned": len(messages), "matched": matched, "updated": updated, "created": created, "jobs": self.public_jobs()}
+                raise RuntimeError("Gmail OAuth client file or IMAP credentials are required")
+            matched = created = updated = 0
+            messages = scanner.application_messages()
+            for message, category, confidence in messages:
+                title, company = self._gmail_job_details(message)
+                existing = next((job for job in self.jobs if self._same_job(job, title, company)), None)
+                status = self._gmail_status(category)
+                if existing:
+                    job_id = normalize_job(existing).id
+                    existing.setdefault("email_events", []).append({"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence})
+                    self.repository.update_status(job_id, status)
+                    updated += 1
+                    matched += 1
+                    continue
+                new_job = {
+                    "id": f"gmail-{message.email_id}",
+                    "title": title,
+                    "company": company,
+                    "location": "",
+                    "description": message.body_preview or message.snippet,
+                    "source": "Gmail",
+                    "url": "",
+                    "posted": message.received_at[:10],
+                    "remote": False,
+                    "tags": ["gmail", "application", category],
+                    "email_events": [{"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence}],
+                }
+                self.jobs.extend(self.materialize_jobs([new_job]))
+                self.save_jobs()
+                self.repository.update_status(new_job["id"], status)
+                created += 1
+            if updated:
+                self.save_jobs()
+            return {"scanned": len(messages), "matched": matched, "updated": updated, "created": created, "jobs": self.public_jobs()}
 
     def start_gmail_scan(self):
         thread = threading.Thread(target=self.scan_gmail, kwargs={"days": 7}, daemon=True)
@@ -964,6 +1004,7 @@ def make_handler(app: DashboardApp):
                 return
 
             if path == "/api/jobs":
+                app.db_ready_event.wait(timeout=10.0)
                 page = int(query_params.get("page", ["1"])[0])
                 page_size = int(query_params.get("pageSize", ["50"])[0])
                 search = query_params.get("search", [""])[0]

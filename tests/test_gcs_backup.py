@@ -7,15 +7,24 @@ class FakeBlob:
     def __init__(self, objects, name):
         self.objects = objects
         self.name = name
+        self.generation = 1 if name in objects else 0
 
     def exists(self):
         return self.name in self.objects
 
+    def reload(self):
+        if self.name not in self.objects:
+            raise Exception("NotFound")
+        self.generation = 1
+
     def download_to_filename(self, filename):
         Path(filename).write_bytes(self.objects[self.name])
 
-    def upload_from_filename(self, filename):
+    def upload_from_filename(self, filename, if_generation_match=None):
+        if if_generation_match is not None and if_generation_match != self.generation:
+            raise Exception("PreconditionFailed")
         self.objects[self.name] = Path(filename).read_bytes()
+        self.generation = (self.generation or 0) + 1
 
 
 class FakeBucket:

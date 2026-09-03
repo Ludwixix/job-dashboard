@@ -1,31 +1,53 @@
 #!/bin/bash
 set -e
 
+LOCK_FILE=/tmp/job-dashboard-scrape.lock
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "Another job scrape is already running; exiting."
+    exit 0
+fi
+
 echo "=== Starting daily job update $(date) ==="
 
-# 1. Run the scraper
-cd /home/s/.openclaw/workspace/job-dashboard-site/scrapers
-echo "Running Python scraper..."
-python3 scrape_all.py
+# 1. Run the authoritative backend scraper.
+# Do not call the archived job-dashboard-site scraper here: its output is a
+# legacy JSON snapshot and the React app reads the modular backend's SQLite
+# index through /api/jobs.
+BACKEND=/home/s/.openclaw/workspace/job-dashboard-modular
+SCRAPE_OUTPUT=$(mktemp --suffix=.json)
+trap 'rm -f "$SCRAPE_OUTPUT"' EXIT
+cd "$BACKEND"
+mkdir -p /home/s/.openclaw/workspace/job-dashboard-react
+exec >> /home/s/.openclaw/workspace/job-dashboard-react/cron.log 2>&1
+echo "=== Scraper log started $(date -Is) ==="
+echo "Running modular backend scraper..."
+PYTHONPATH=src python3 -m job_dashboard.scrape \
+    --source indeed --source seek --source adzuna --source remoteok \
+    --days 14 --output "$SCRAPE_OUTPUT" \
+    --seek-cache-path "$BACKEND/data/seek_cache.json" \
+    --seek-cache-fallback
+
+test -s "$SCRAPE_OUTPUT"
 
 # 2. Copy the resulting json & upsert into SQLite jobs database
 echo "Copying data to React app & updating SQLite database..."
-cp jobs_combined.json /home/s/.openclaw/workspace/job-dashboard-react/public/jobs_combined.json
+cp "$SCRAPE_OUTPUT" /home/s/.openclaw/workspace/job-dashboard-react/public/jobs_combined.json
 python3 -c '
 import json, sys
 from pathlib import Path
 sys.path.insert(0, "/home/s/.openclaw/workspace/job-dashboard-modular/src")
 from job_dashboard.repository import JobRepository
 
-p = Path("jobs_combined.json")
+p = Path(sys.argv[1])
 if p.exists():
     raw = json.loads(p.read_text(encoding="utf-8"))
     jobs = raw.get("jobs", raw) if isinstance(raw, dict) else raw
-    for db_path in ["/home/s/.openclaw/workspace/job-dashboard-modular/data/jobs.sqlite3", "/home/s/.openclaw/workspace/job-dashboard-modular/jobs.sqlite3"]:
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        repo = JobRepository(db_path)
-        repo.upsert_scraped_jobs(jobs)
-'
+    db_path = "/home/s/.openclaw/workspace/job-dashboard-modular/data/jobs.sqlite3"
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    repo = JobRepository(db_path)
+    print(f"Indexed {repo.upsert_scraped_jobs(jobs)} scraped jobs")
+' "$SCRAPE_OUTPUT"
 
 # 3. Commit and push
 cd /home/s/.openclaw/workspace/job-dashboard-react

@@ -32,7 +32,8 @@ import {
 import { getActiveProfile } from '../services/profileService';
 import { SCRAPER_BASE_URL } from '../services/jobQueryService';
 import { 
-  getProfileAutoRoles, 
+  ROLE_ARCHETYPES,
+  getProfileAutoRoles,
   getRoleArchetypeCounts, 
   classifyJobRole
 } from '../services/roleClusteringService';
@@ -211,24 +212,6 @@ export const JobSeeker = ({
   const [prefToast, setPrefToast] = useState(null);
 
   // Auto-Generated Roles based on Candidate Profile
-  const profileAutoRoles = useMemo(() => {
-    return getProfileAutoRoles(currentProfile);
-  }, [currentProfile]);
-
-  const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
-    return getProfileAutoRoles(currentProfile);
-  });
-
-  const [isRoleSelectorOpen, setIsRoleSelectorOpen] = useState(true);
-
-  // Update selected roles whenever active profile changes
-  useEffect(() => {
-    if (currentProfile) {
-      const autoRoles = getProfileAutoRoles(currentProfile);
-      setSelectedRoleIds(autoRoles);
-    }
-  }, [currentProfile?.id, currentProfile?.industry, JSON.stringify(currentProfile?.targetTitles || [])]);
-
   // Unsubmitted jobs pool (strictly genuine scraped ads, discarding email pseudo-jobs)
   const unsubmittedJobs = useMemo(() => {
     return (jobs || []).filter(job => {
@@ -280,6 +263,27 @@ export const JobSeeker = ({
   const roleArchetypeCounts = useMemo(() => {
     return getRoleArchetypeCounts(completeJobs, currentProfile);
   }, [completeJobs, currentProfile]);
+
+  const profileAutoRoles = useMemo(() => {
+    return getProfileAutoRoles(currentProfile);
+  }, [currentProfile]);
+
+  // Start with every available role enabled. The previous profile-only
+  // default could hide valid Indeed/SEEK listings whose title did not match
+  // an inferred archetype, making the source filters appear empty despite
+  // API results.
+  const [selectedRoleIds, setSelectedRoleIds] = useState(() =>
+    roleArchetypeCounts.map(role => role.id)
+  );
+
+  const [isRoleSelectorOpen, setIsRoleSelectorOpen] = useState(true);
+
+  // Update selected roles whenever active profile changes
+  useEffect(() => {
+    if (currentProfile) {
+      setSelectedRoleIds(roleArchetypeCounts.map(role => role.id));
+    }
+  }, [currentProfile?.id, currentProfile?.industry, JSON.stringify(currentProfile?.targetTitles || []), roleArchetypeCounts.length]);
 
   useEffect(() => {
     const handlePrefChange = (e) => {
@@ -479,8 +483,6 @@ export const JobSeeker = ({
       if (selectedRoleIds.length > 0 && selectedRoleIds.length < roleArchetypeCounts.length) {
         const jobRole = classifyJobRole(job);
         matchesRole = selectedRoleIds.includes(jobRole.id);
-      } else if (selectedRoleIds.length === 0) {
-        matchesRole = false;
       }
 
       return matchesSearch && matchesSource && matchesStream && matchesRole && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;

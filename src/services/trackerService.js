@@ -203,8 +203,12 @@ Balaclava VIC 3183`;
 /**
  * Persists an applied job to backend SQLite database.
  */
-export const saveUserApplicationToBackend = async (job, userId = 'sam_ludwig') => {
+export const saveUserApplicationToBackend = async (job, userId) => {
   if (!job || typeof job !== 'object') return null;
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    throw new Error('Authentication required: valid userId or active profile is required to save application.');
+  }
   const apiBase = getBackendApiBase();
   const jobId = job.id || `${job.company}_${job.title}`;
 
@@ -213,7 +217,7 @@ export const saveUserApplicationToBackend = async (job, userId = 'sam_ludwig') =
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': userId
+        'X-User-Id': targetUserId
       },
       body: JSON.stringify({
         job_id: jobId,
@@ -240,8 +244,12 @@ export const saveUserApplicationToBackend = async (job, userId = 'sam_ludwig') =
 /**
  * Synchronizes batch application array to backend database.
  */
-export const syncApplicationsToBackend = async (appsList, userId = 'sam_ludwig') => {
+export const syncApplicationsToBackend = async (appsList, userId) => {
   if (!Array.isArray(appsList) || appsList.length === 0) return null;
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    throw new Error('Authentication required: valid userId or active profile is required to sync applications.');
+  }
   const apiBase = getBackendApiBase();
 
   try {
@@ -249,7 +257,7 @@ export const syncApplicationsToBackend = async (appsList, userId = 'sam_ludwig')
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': userId
+        'X-User-Id': targetUserId
       },
       body: JSON.stringify({
         applications: appsList.map(j => ({
@@ -275,12 +283,17 @@ export const syncApplicationsToBackend = async (appsList, userId = 'sam_ludwig')
 /**
  * Fetches all saved applications for user from backend database.
  */
-export const fetchUserApplicationsFromBackend = async (userId = 'sam_ludwig') => {
+export const fetchUserApplicationsFromBackend = async (userId) => {
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    console.warn('fetchUserApplicationsFromBackend called without userId or active profile; returning empty');
+    return [];
+  }
   const apiBase = getBackendApiBase();
 
   try {
-    const res = await fetch(`${apiBase}/api/applications?user_id=${encodeURIComponent(userId)}`, {
-      headers: { 'X-User-Id': userId }
+    const res = await fetch(`${apiBase}/api/applications?user_id=${encodeURIComponent(targetUserId)}`, {
+      headers: { 'X-User-Id': targetUserId }
     });
     if (res.ok) {
       const data = await res.json();
@@ -295,14 +308,18 @@ export const fetchUserApplicationsFromBackend = async (userId = 'sam_ludwig') =>
 /**
  * Scans targeted Gmail inbox for recruiter/ATS updates for applied jobs.
  */
-export const scanGmailForApplicationUpdates = async ({ username, appPassword, jobId = null, days = 14, userId = 'sam_ludwig' }) => {
+export const scanGmailForApplicationUpdates = async ({ username, appPassword, jobId = null, days = 14, userId }) => {
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    throw new Error('Authentication required: valid userId or active profile is required to scan application updates.');
+  }
   const apiBase = getBackendApiBase();
 
   const res = await fetch(`${apiBase}/api/applications/scan-updates`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-User-Id': userId
+      'X-User-Id': targetUserId
     },
     body: JSON.stringify({
       username,

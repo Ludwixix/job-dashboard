@@ -132,8 +132,12 @@ export const saveUserPreferences = (prefs) => {
 /**
  * Persists recommendation preferences to backend SQLite database.
  */
-export const savePreferencesToBackend = async (prefs, userId = 'sam_ludwig') => {
+export const savePreferencesToBackend = async (prefs, userId) => {
   if (!prefs || typeof prefs !== 'object') return null;
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    throw new Error('Authentication required: valid userId or active profile is required to save preferences.');
+  }
   const apiBase = getBackendApiBase();
 
   try {
@@ -141,7 +145,7 @@ export const savePreferencesToBackend = async (prefs, userId = 'sam_ludwig') => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': userId
+        'X-User-Id': targetUserId
       },
       body: JSON.stringify(prefs)
     });
@@ -158,12 +162,17 @@ export const savePreferencesToBackend = async (prefs, userId = 'sam_ludwig') => 
 /**
  * Fetches recommendation preferences from backend SQLite database.
  */
-export const fetchPreferencesFromBackend = async (userId = 'sam_ludwig') => {
+export const fetchPreferencesFromBackend = async (userId) => {
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    console.warn('fetchPreferencesFromBackend called without userId or active profile; using local prefs');
+    return getUserPreferences();
+  }
   const apiBase = getBackendApiBase();
 
   try {
-    const res = await fetch(`${apiBase}/api/preferences?user_id=${encodeURIComponent(userId)}`, {
-      headers: { 'X-User-Id': userId }
+    const res = await fetch(`${apiBase}/api/preferences?user_id=${encodeURIComponent(targetUserId)}`, {
+      headers: { 'X-User-Id': targetUserId }
     });
     if (res.ok) {
       const data = await res.json();

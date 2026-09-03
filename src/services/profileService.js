@@ -163,6 +163,11 @@ export const saveProfile = (updatedProfile) => {
  */
 export const saveProfileToBackend = async (profile) => {
   if (!profile || typeof profile !== 'object') return null;
+  const userId = profile.id;
+  if (!userId) {
+    console.warn('saveProfileToBackend called without valid profile.id; aborting backend sync');
+    return null;
+  }
   const apiBase = getBackendApiBase();
 
   try {
@@ -170,7 +175,7 @@ export const saveProfileToBackend = async (profile) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': profile.id || 'sam_ludwig'
+        'X-User-Id': userId
       },
       body: JSON.stringify(profile)
     });
@@ -187,12 +192,17 @@ export const saveProfileToBackend = async (profile) => {
 /**
  * Fetches user profile from backend SQLite database with local storage fallback.
  */
-export const fetchProfileFromBackend = async (userId = 'sam_ludwig') => {
+export const fetchProfileFromBackend = async (userId) => {
+  const resolvedUserId = userId || getActiveProfile()?.id;
+  if (!resolvedUserId) {
+    console.warn('fetchProfileFromBackend called without userId; using local profile');
+    return getActiveProfile();
+  }
   const apiBase = getBackendApiBase();
 
   try {
-    const res = await fetch(`${apiBase}/api/profile?user_id=${encodeURIComponent(userId)}`, {
-      headers: { 'X-User-Id': userId }
+    const res = await fetch(`${apiBase}/api/profile?user_id=${encodeURIComponent(resolvedUserId)}`, {
+      headers: { 'X-User-Id': resolvedUserId }
     });
     if (res.ok) {
       const data = await res.json();
@@ -215,7 +225,7 @@ export const setActiveProfile = (profileId) => {
 export const setActiveProfileId = setActiveProfile;
 
 export const getActiveProfileId = () => {
-  return getActiveProfile()?.id || 'sam_ludwig';
+  return getActiveProfile()?.id || null;
 };
 
 export const deleteProfile = () => {
@@ -401,7 +411,7 @@ ${resumeText.slice(0, 9000)}`;
     const parsed = JSON.parse(cleanJson);
 
     return {
-      id: 'sam_ludwig',
+      id: parsed.id || `profile_${Date.now()}`,
       ...parsed,
       fullWorkExperienceText: parsed.fullWorkExperienceText || resumeText
     };

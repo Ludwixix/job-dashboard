@@ -48,9 +48,15 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
   const [isScanningGmail, setIsScanningGmail] = useState(false);
   const [showGmailModal, setShowGmailModal] = useState(false);
   const [gmailUsername, setGmailUsername] = useState(() => localStorage.getItem('gmail_scanner_username') || 'sam.ludwig@gmail.com');
-  const [gmailAppPassword, setGmailAppPassword] = useState(() => localStorage.getItem('gmail_scanner_app_password') || '');
+  // Ephemeral: collected at scan-time only, never stored in localStorage
+  const [gmailAppPassword, setGmailAppPassword] = useState('');
   const [scanResult, setScanResult] = useState(null);
   const [isSyncingBackend, setIsSyncingBackend] = useState(false);
+
+  // Clean up legacy plaintext app password from localStorage if present
+  useEffect(() => {
+    localStorage.removeItem('gmail_scanner_app_password');
+  }, []);
 
   // Hydrate from and sync to backend on mount
   useEffect(() => {
@@ -81,7 +87,7 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
 
     try {
       localStorage.setItem('gmail_scanner_username', gmailUsername);
-      localStorage.setItem('gmail_scanner_app_password', gmailAppPassword);
+      // Security fix: never persist the Gmail app password in localStorage
 
       const res = await scanGmailForApplicationUpdates({
         username: gmailUsername,
@@ -96,6 +102,8 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
     } catch (err) {
       alert(`Gmail status scan failed: ${err.message}`);
     } finally {
+      // Discard password from memory after scan completion
+      setGmailAppPassword('');
       setIsScanningGmail(false);
     }
   };
@@ -494,7 +502,7 @@ export const ApplicationTracker = ({ jobs = [], onSelectJob }) => {
                       className="w-full px-3 py-2 rounded bg-[#1e1e2e] border border-[#313244] text-white focus:outline-none focus:border-purple-400 text-xs"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
-                      Generated at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-purple-400 underline">myaccount.google.com/apppasswords</a>. Credentials are never written to source repositories.
+                      Generated at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-purple-400 underline">myaccount.google.com/apppasswords</a>. App password is kept in memory only for this scan and discarded immediately afterward.
                     </p>
                   </div>
                 </div>

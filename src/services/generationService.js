@@ -48,13 +48,20 @@ export const AVAILABLE_MODELS = [
   { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Fast Flash Tier)', description: 'Rapid, lightweight generation' }
 ];
 
+// In-memory key state to avoid unnecessary localStorage exposure
+let inMemoryApiKey = '';
+
 export const getActiveApiKey = () => {
-  return localStorage.getItem('openrouter_api_key') || '';
+  return inMemoryApiKey || localStorage.getItem('openrouter_api_key') || '';
 };
 
-export const setActiveApiKey = (key) => {
-  if (key) localStorage.setItem('openrouter_api_key', key.trim());
-  else localStorage.removeItem('openrouter_api_key');
+export const setActiveApiKey = (key, persist = true) => {
+  inMemoryApiKey = key ? key.trim() : '';
+  if (persist && key) {
+    localStorage.setItem('openrouter_api_key', key.trim());
+  } else {
+    localStorage.removeItem('openrouter_api_key');
+  }
 };
 
 export const getActiveModel = () => {
@@ -416,8 +423,12 @@ Generate (1) Tailored Resume, then ===COVER_LETTER===, then (2) Tailored Cover L
 /**
  * Persists tailored application documents to backend SQLite database.
  */
-export const saveDocumentToBackend = async (jobId, docType, contentText, modelName = '', metadata = {}, userId = 'sam_ludwig') => {
+export const saveDocumentToBackend = async (jobId, docType, contentText, modelName = '', metadata = {}, userId) => {
   if (!jobId || !contentText) return null;
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    throw new Error('Authentication required: valid userId or active profile is required to save document.');
+  }
   const apiBase = getBackendApiBase();
 
   try {
@@ -425,7 +436,7 @@ export const saveDocumentToBackend = async (jobId, docType, contentText, modelNa
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': userId
+        'X-User-Id': targetUserId
       },
       body: JSON.stringify({
         job_id: jobId,
@@ -448,13 +459,18 @@ export const saveDocumentToBackend = async (jobId, docType, contentText, modelNa
 /**
  * Fetches cached tailored document for a job from backend SQLite database.
  */
-export const fetchDocumentFromBackend = async (jobId, docType = 'resume', userId = 'sam_ludwig') => {
+export const fetchDocumentFromBackend = async (jobId, docType = 'resume', userId) => {
   if (!jobId) return null;
+  const targetUserId = userId || getActiveProfile()?.id;
+  if (!targetUserId) {
+    console.warn('fetchDocumentFromBackend called without userId or active profile; returning null');
+    return null;
+  }
   const apiBase = getBackendApiBase();
 
   try {
     const res = await fetch(`${apiBase}/api/documents?job_id=${encodeURIComponent(jobId)}&doc_type=${encodeURIComponent(docType)}`, {
-      headers: { 'X-User-Id': userId }
+      headers: { 'X-User-Id': targetUserId }
     });
     if (res.ok) {
       const data = await res.json();

@@ -54,7 +54,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
   const [formData, setFormData] = useState(() => {
     const current = getActiveProfile() || profile || {};
     return {
-      id: current.id || 'sam_ludwig',
+      id: current.id || (current.email ? `user_${current.email.replace(/[^a-zA-Z0-9]/g, '_')}` : ''),
       name: current.name || '',
       title: current.title || '',
       industry: current.industry || 'Technology & IT',
@@ -91,7 +91,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
       const active = getActiveProfile() || profile;
       if (active) {
         setFormData({
-          id: active.id || 'sam_ludwig',
+          id: active.id || (active.email ? `user_${active.email.replace(/[^a-zA-Z0-9]/g, '_')}` : ''),
           name: active.name || '',
           title: active.title || '',
           industry: active.industry || 'Technology & IT',

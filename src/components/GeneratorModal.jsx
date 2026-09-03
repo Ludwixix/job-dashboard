@@ -528,7 +528,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                     OpenRouter API Key Required
                   </div>
                   <p className="text-xs text-slate-300">
-                    Enter your OpenRouter key to activate live role tailoring with <strong className="text-white">z-ai/glm-5.3-flash</strong>:
+                    Enter your OpenRouter key to activate live role tailoring with <strong className="text-white">z-ai/glm-5.3-flash</strong> (stored unencrypted in your local browser storage):
                   </p>
                   <div className="flex items-center gap-2 pt-1">
                     <input

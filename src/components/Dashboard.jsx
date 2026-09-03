@@ -32,6 +32,7 @@ import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
 
 import { fetchJobsForProfile } from '../services/dataService';
+import { CustomJobModal } from './CustomJobModal';
 import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
 import { suggestRelatedTitles, buildQueriesFromProfile, triggerProfileScrape } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
@@ -53,6 +54,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
+  const [isCustomJobModalOpen, setIsCustomJobModalOpen] = useState(false);
 
 
   // Candidate Personalization Profile State
@@ -425,6 +427,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             </button>
           </div>
         )}
+        {/* Custom Job / External Link Generator Modal */}
+        <CustomJobModal
+          isOpen={isCustomJobModalOpen}
+          onClose={() => setIsCustomJobModalOpen(false)}
+          onJobCreated={(newJob) => {
+            refetch();
+          }}
+          onOpenGenerator={(j) => setSelectedForGenerator(j)}
+        />
+
         <ZenAutopilotDashboard
           jobs={jobs}
           profile={activeProfile}
@@ -582,6 +594,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           >
             <Sparkles size={11} className="text-teal-400" />
             <span>🌿 FOCUS AUTOPILOT</span>
+          </button>
+
+          <button
+            onClick={() => setIsCustomJobModalOpen(true)}
+            className="flex items-center gap-1 text-purple-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-purple-950 border border-purple-500/40 px-2 py-1 rounded-xl shadow-xs"
+            title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
+          >
+            <Sparkles size={12} className="text-purple-400" /> + CUSTOM JOB
           </button>
 
           <button
@@ -984,6 +1004,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           />
         </SafeErrorBoundary>
       )}
+
+      {/* Custom Job / External Link Generator Modal */}
+      <CustomJobModal
+        isOpen={isCustomJobModalOpen}
+        onClose={() => setIsCustomJobModalOpen(false)}
+        onJobCreated={(newJob) => {
+          refetch();
+        }}
+        onOpenGenerator={(j) => setSelectedForGenerator(j)}
+      />
 
       {/* Omni-Command Palette Modal */}
       <SafeErrorBoundary sectionName="Command Palette">

@@ -300,11 +300,20 @@ export const parseMetadata = (row, index) => {
   // Extract structured sections
   const structured = extractStructuredJobSections(notesStr);
 
+  const cleanDate = (val) => {
+    if (!val || typeof val !== 'string') return '';
+    const trimmed = val.trim();
+    if (trimmed === 'None' || trimmed === 'none' || trimmed === 'null' || trimmed === 'undefined') return '';
+    return trimmed;
+  };
+
+  const rawDate = cleanDate(row['Date']) || cleanDate(row['date']) || cleanDate(row['posted']) || cleanDate(row['raw_posted']) || '';
+
   const jobObject = {
     id: String(rowId),
     // Never manufacture today's date: a missing provider date must remain
     // unknown so it cannot appear as a freshly posted job.
-    date: row['Date'] || row['date'] || row['posted'] || '',
+    date: rawDate,
     company,
     title,
     status,

@@ -186,7 +186,7 @@ export const JobSeeker = ({
   const [workModeFilter, setWorkModeFilter] = useState('All');
   const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
   const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
-  const [sortBy, setSortBy] = useState('best_and_newest'); // DEFAULT: BEST MATCHES & MOST RECENT
+  const [sortBy, setSortBy] = useState('date'); // DEFAULT: MOST RECENT (NEWEST) FIRST
   const [sortDirection, setSortDirection] = useState('desc');
   const [showSidebar, setShowSidebar] = useState(true);
 
@@ -1033,7 +1033,8 @@ export const JobSeeker = ({
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                 >
-                  <option value="date">MOST RECENT POSTINGS (DEFAULT)</option>
+                  <option value="date">MOST RECENT (NEWEST FIRST)</option>
+                  <option value="best_and_newest">⭐ BEST & MOST RECENT</option>
                   <option value="score">MATCH SCORE (HIGH → LOW)</option>
                   <option value="company">COMPANY (A-Z)</option>
                 </select>
@@ -1144,8 +1145,8 @@ export const JobSeeker = ({
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                 >
+                  <option value="date">📅 MOST RECENT DATE (NEWEST)</option>
                   <option value="best_and_newest">⭐ BEST & MOST RECENT</option>
-                  <option value="date">📅 MOST RECENT DATE</option>
                   <option value="score">🎯 HIGHEST ATS FIT SCORE</option>
                   <option value="company">🏢 COMPANY (A-Z)</option>
                 </select>

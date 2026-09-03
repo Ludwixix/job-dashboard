@@ -60,6 +60,9 @@ async def upsert_job(session: AsyncSession, job: StandardJob) -> tuple[StandardJ
     else:
         record.last_seen_at = now
         record.tier_retrieved = item.tier_retrieved
+        # Update URL policy: refresh with incoming URL if non-empty
+        if item.url:
+            record.url = item.url
         if item.salary:
             record.salary = item.salary
         if item.description:
@@ -102,6 +105,9 @@ async def upsert_jobs(session: AsyncSession, jobs: Sequence[StandardJob]) -> tup
         else:
             record.last_seen_at = now
             record.tier_retrieved = item.tier_retrieved
+            # Update URL policy: refresh with incoming URL if non-empty
+            if item.url:
+                record.url = item.url
             if item.salary:
                 record.salary = item.salary
             if item.description:

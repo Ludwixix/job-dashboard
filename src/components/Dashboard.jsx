@@ -65,6 +65,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return localStorage.getItem('job_dashboard_view_mode') || 'zen';
   });
 
+  // Fallback banner state when static fallback jobs are loaded
+  const [fallbackBanner, setFallbackBanner] = useState(null);
+
+  useEffect(() => {
+    const handleFallbackActive = (e) => {
+      const detail = e.detail || {};
+      const ts = detail.fallbackTimestamp;
+      const formattedAge = ts ? new Date(ts).toLocaleString() : 'Cached Snapshot';
+      setFallbackBanner(`Serving static fallback data (Snapshot: ${formattedAge}). Live scraper API offline or unreachable.`);
+    };
+
+    window.addEventListener('jobs-fallback-active', handleFallbackActive);
+    return () => window.removeEventListener('jobs-fallback-active', handleFallbackActive);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('job_dashboard_view_mode', viewMode);
     // Non-blocking backend sync so the mode follows the user across devices.
@@ -396,6 +411,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   if (viewMode === 'zen') {
     return (
       <SafeErrorBoundary>
+        {fallbackBanner && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              {fallbackBanner}
+            </span>
+            <button
+              onClick={() => setFallbackBanner(null)}
+              className="text-amber-400 hover:text-white ml-4 text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <ZenAutopilotDashboard
           jobs={jobs}
           profile={activeProfile}
@@ -449,6 +478,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   return (
     <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
       {/* Top Live Engine Status Bar */}
+
+      {fallbackBanner && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            {fallbackBanner}
+          </span>
+          <button
+            onClick={() => setFallbackBanner(null)}
+            className="text-amber-400 hover:text-white ml-4 text-xs font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[11px] border-b border-slate-800 flex items-center justify-between font-semibold">
         <div className="flex items-center gap-4 truncate">

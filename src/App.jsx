@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { OnboardingFlow } from './components/OnboardingFlow';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { getCurrentSession, validateSession, logoutUser } from './services/authService';
 import { Loader2 } from 'lucide-react';
 
@@ -18,13 +19,22 @@ function App() {
           return;
         }
 
-        // Validate or refresh session without destroying local session
+        // Explicitly validate session; on failure or expiry, clear session safely
         const restored = await validateSession();
         if (isMounted) {
-          setSession(restored || local);
+          if (restored) {
+            setSession(restored);
+          } else {
+            logoutUser();
+            setSession(null);
+          }
         }
       } catch (e) {
-        console.warn('Session verification fallback:', e);
+        console.warn('Session verification failed, logging out expired/invalid session:', e);
+        logoutUser();
+        if (isMounted) {
+          setSession(null);
+        }
       } finally {
         if (isMounted) setIsValidating(false);
       }
@@ -45,26 +55,30 @@ function App() {
 
   if (!session || !session.onboardingCompleted) {
     return (
-      <div className="App">
-        <OnboardingFlow 
-          onComplete={(newSession) => {
-            setSession(newSession);
-          }} 
-        />
-      </div>
+      <ErrorBoundary>
+        <div className="App">
+          <OnboardingFlow 
+            onComplete={(newSession) => {
+              setSession(newSession);
+            }} 
+          />
+        </div>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <div className="App">
-      <Dashboard 
-        currentUser={session}
-        onSignOut={() => {
-          logoutUser();
-          setSession(null);
-        }}
-      />
-    </div>
+    <ErrorBoundary>
+      <div className="App">
+        <Dashboard 
+          currentUser={session}
+          onSignOut={() => {
+            logoutUser();
+            setSession(null);
+          }}
+        />
+      </div>
+    </ErrorBoundary>
   );
 }
 

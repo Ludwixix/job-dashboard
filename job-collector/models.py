@@ -21,12 +21,18 @@ class JobSource(str, Enum):
     GOOGLE_JOBS = "GOOGLE_JOBS"
 
 
-def job_id(company: str, title: str, location: str, algorithm: Literal["sha256", "md5"] = "sha256") -> str:
+def job_id(company: str, title: str, location: str, source: str = "", algorithm: Literal["sha256", "md5"] = "sha256") -> str:
     """
-    Generate a deterministic hash ID from company + title + location.
+    Generate a deterministic hash ID from company + title + location + source.
+    Including source prevents cross-source collisions between job boards.
     Defaults to SHA256 (64 hex characters) or MD5 (32 hex characters).
     """
-    normalized = "|".join((company.strip().lower(), title.strip().lower(), location.strip().lower()))
+    normalized = "|".join((
+        company.strip().lower(),
+        title.strip().lower(),
+        location.strip().lower(),
+        source.strip().lower(),
+    ))
     raw_bytes = normalized.encode("utf-8")
     if algorithm == "md5":
         return hashlib.md5(raw_bytes).hexdigest()
@@ -60,7 +66,7 @@ class StandardJob(BaseModel):
         resolved_source = self.source.value if isinstance(self.source, JobSource) else str(self.source)
         return self.model_copy(
             update={
-                "id": self.id or job_id(self.company, self.title, self.location),
+                "id": self.id or job_id(self.company, self.title, self.location, resolved_source),
                 "source": resolved_source,
                 "first_seen_at": self.first_seen_at or now,
                 "last_seen_at": self.last_seen_at or now,

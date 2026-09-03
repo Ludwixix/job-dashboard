@@ -520,8 +520,10 @@ export const saveUserApplication = async (jobData) => {
 
 const fetchDemoFallbackJobs = async () => {
   const fallbackPaths = [
+    `${import.meta.env.BASE_URL || '/'}jobs_combined.json`,
     `${import.meta.env.BASE_URL || '/'}data/scraped_jobs.json`,
     `${import.meta.env.BASE_URL || '/'}demo_jobs.json`,
+    './jobs_combined.json',
     './demo_jobs.json'
   ];
 
@@ -531,13 +533,16 @@ const fetchDemoFallbackJobs = async () => {
       if (res.ok) {
         const raw = await res.json();
         const arrayData = Array.isArray(raw) ? raw : (raw.jobs || []);
+        const fallbackUpdated = raw.updated || raw.scraped_at || null;
         if (arrayData.length > 0) {
           return {
             jobs: arrayData.map((row, index) => parseMetadata(row, index)),
             total: arrayData.length,
             page: 1,
             pageSize: arrayData.length,
-            totalPages: 1
+            totalPages: 1,
+            isFallback: true,
+            fallbackTimestamp: fallbackUpdated
           };
         }
       }
@@ -549,7 +554,9 @@ const fetchDemoFallbackJobs = async () => {
     total: (MULTI_INDUSTRY_JOBS || []).length,
     page: 1,
     pageSize: (MULTI_INDUSTRY_JOBS || []).length,
-    totalPages: 1
+    totalPages: 1,
+    isFallback: true,
+    fallbackTimestamp: null
   };
 };
 
@@ -562,6 +569,16 @@ export const fetchJobsData = async () => {
     fetchJobsFromApi({ page: 1, pageSize: 5000 }),
     fetchUserApplications()
   ]);
+
+  const jobs = apiJobsResult?.jobs || [];
+  if (apiJobsResult?.isFallback && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('jobs-fallback-active', {
+      detail: {
+        isFallback: true,
+        fallbackTimestamp: apiJobsResult.fallbackTimestamp
+      }
+    }));
+  }
 
   // Index user applications by exact ID, direct company_title, and normalized company_title
   const userAppsMap = new Map();

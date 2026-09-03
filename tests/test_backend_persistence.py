@@ -119,6 +119,19 @@ def test_http_api_routes_persistence(temp_repo, tmp_path):
     get_handler.send_response = MagicMock()
     get_handler.send_header = MagicMock()
     get_handler.end_headers = MagicMock()
+    # 3. Test GET /api/profile without user_id returns 401 Unauthorized
+    unauth_handler = handler_cls.__new__(handler_cls)
+    unauth_handler.path = "/api/profile"
+    unauth_handler.headers = {}
+    unauth_handler.rfile = io.BytesIO()
+    unauth_handler.wfile = io.BytesIO()
+    unauth_handler.send_response = MagicMock()
+    unauth_handler.send_header = MagicMock()
+    unauth_handler.end_headers = MagicMock()
+
+    unauth_handler.do_GET()
+    assert unauth_handler.send_response.call_args[0][0] == 401
+
 
     get_handler.do_GET()
     assert get_handler.send_response.called

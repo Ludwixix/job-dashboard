@@ -864,7 +864,12 @@ class DashboardApp:
         return self.generation_progress[job_id]
 
 
-def resolve_user_id(handler, query_params=None) -> str:
+def resolve_user_id(handler, query_params=None) -> str | None:
+    """
+    Resolve the authenticated user ID from Authorization Bearer token,
+    explicit X-User-Id header, or query parameters.
+    Returns None if no user identity is provided.
+    """
     auth_header = handler.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -876,11 +881,16 @@ def resolve_user_id(handler, query_params=None) -> str:
         except Exception:
             pass
     uid = handler.headers.get("X-User-Id")
-    if uid:
+    if uid and str(uid).strip():
         return str(uid).strip()
     if query_params and "user_id" in query_params:
-        return str(query_params["user_id"][0]).strip()
-    return "sam_ludwig"
+        param_val = str(query_params["user_id"][0]).strip()
+        if param_val:
+            return param_val
+    # Explicit demo/guest parameter support if requested
+    if query_params and query_params.get("demo", [""])[0].lower() in ("true", "1"):
+        return "demo_user"
+    return None
 
 
 # Allowed origins — GitHub Pages deployment + localhost dev + Cloud Run
@@ -982,23 +992,35 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/profile":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 prof = app.repository.get_user_profile(user_id)
                 self.send_json(200, {"success": True, "profile": prof})
                 return
 
             if path == "/api/preferences":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 prefs = app.repository.get_user_preferences(user_id)
                 self.send_json(200, {"success": True, "preferences": prefs})
                 return
 
             if path == "/api/saved-searches":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 self.send_json(200, {"success": True, "saved_searches": app.repository.list_saved_searches(user_id)})
                 return
 
             if path == "/api/reminders":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 include_future = query_params.get("include_future", ["false"])[0].lower() in ("1", "true")
                 self.send_json(200, {"success": True, "reminders": app.repository.list_due_reminders(user_id, include_future)})
                 return
@@ -1010,6 +1032,9 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/job-explanation":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 job_id = query_params.get("job_id", [""])[0]
                 job_data = app.repository.get_job(job_id)
                 if not job_data:
@@ -1023,6 +1048,9 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 job_id = query_params.get("job_id", [""])[0]
                 doc_type = query_params.get("doc_type", ["resume"])[0]
                 doc = app.repository.get_generated_document(user_id, job_id, doc_type)
@@ -1037,6 +1065,9 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/interview-sessions":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 job_id = query_params.get("job_id", [""])[0] or None
                 sessions = app.repository.get_interview_sessions(user_id, job_id)
                 self.send_json(200, {"success": True, "sessions": sessions})
@@ -1044,6 +1075,9 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/applications":
                 user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
                 apps = app.repository.get_user_applications(user_id)
                 self.send_json(200, {"success": True, "applications": apps})
                 return
@@ -1282,6 +1316,9 @@ def make_handler(app: DashboardApp):
                 
                 if path == "/api/profile":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     res = app.repository.upsert_user_profile(user_id, body)
@@ -1290,6 +1327,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/preferences":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     res = app.repository.upsert_user_preferences(user_id, body)
@@ -1298,6 +1338,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/saved-searches":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     saved = app.repository.upsert_saved_search(user_id, str(body.get("name") or ""), body.get("query") or {}, str(body.get("id") or ""))
@@ -1306,6 +1349,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/reminders":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     reminder = app.repository.create_reminder(user_id, str(body.get("job_id") or ""), str(body.get("reminder_type") or ""), str(body.get("remind_at") or ""), body.get("details"))
@@ -1314,14 +1360,17 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/reminders/dismiss":
                     user_id = resolve_user_id(self)
-                    content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    dismissed = app.repository.dismiss_reminder(user_id, str(body.get("id") or ""))
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     self.send_json(200, {"success": dismissed})
                     return
 
                 if path == "/api/documents":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     job_id = str(body.get("job_id") or "")
@@ -1347,6 +1396,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/interview-sessions":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     job_id = str(body.get("job_id") or "")
@@ -1360,6 +1412,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/applications":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     job_id = str(body.get("job_id") or body.get("id") or "").strip()
@@ -1373,6 +1428,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/applications/sync":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     apps_list = body.get("applications") or []
@@ -1386,6 +1444,9 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/applications/scan-updates":
                     user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     username = body.get("username")

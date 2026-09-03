@@ -66,6 +66,17 @@ gcloud builds submit \
 
 # Deploy to Cloud Run
 echo "▶ Deploying to Cloud Run (${REGION})…"
+
+# Ensure persistent JWT_SECRET_KEY across Cloud Run revisions
+if [ -z "${JWT_SECRET_KEY}" ]; then
+    EXISTING_JWT_KEY=$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format="value(spec.template.spec.containers[0].env[JWT_SECRET_KEY])" 2>/dev/null || true)
+    if [ -n "${EXISTING_JWT_KEY}" ]; then
+        JWT_SECRET_KEY="${EXISTING_JWT_KEY}"
+    else
+        JWT_SECRET_KEY=$(openssl rand -hex 32)
+    fi
+fi
+
 gcloud run deploy "${SERVICE_NAME}" \
     --image "${IMAGE}" \
     --region "${REGION}" \
@@ -77,7 +88,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --min-instances 0 \
     --max-instances 5 \
     --port 8080 \
-    --set-env-vars="HOST=0.0.0.0,JOB_DASHBOARD_DATA_DIR=/app/data,JOB_DASHBOARD_GCS_DATA_BUCKET=${PROJECT_ID}-job-dashboard-data,JOB_DASHBOARD_SEEK_CACHE_PATH=/app/data/seek_cache.json,JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,JOB_DASHBOARD_LINKEDIN_ENABLED=false" \
+    --set-env-vars="HOST=0.0.0.0,ENVIRONMENT=production,JWT_SECRET_KEY=${JWT_SECRET_KEY},JOB_DASHBOARD_DATA_DIR=/app/data,JOB_DASHBOARD_GCS_DATA_BUCKET=${PROJECT_ID}-job-dashboard-data,JOB_DASHBOARD_SEEK_CACHE_PATH=/app/data/seek_cache.json,JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,JOB_DASHBOARD_LINKEDIN_ENABLED=false" \
     --project="${PROJECT_ID}" \
     --quiet
 

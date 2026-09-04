@@ -45,3 +45,13 @@ The repository is divided into two primary subtrees:
 - Root Monorepo Guide: `README.md`
 - Backend Documentation: `backend/README.md`, `backend/docs/`
 - Frontend Documentation: `frontend/README.md`
+- OpenAPI Contract: `packages/shared/openapi.json`
+- Task Specifications: `docs/tasks/`
+- Component Workflows: `.agent/`
+
+## Core Engineering Rules & Invariants
+1. **Zero Secret Exposure**: Never read, print, stage, or commit `.env*`, `client_secret*.json`, `KEYS.md`, `OpenRouterAPI.txt`, or credentials.
+2. **Review-Queue Boundary**: Never auto-submit applications or dispatch emails without explicit user approval. Applications sit at `draft_ready` / `pending_review` until manually triggered.
+3. **Factual Grounding**: Generated resumes and cover letters must draw strictly from factual career data (`Source of truth/` or candidate profile) with zero hallucinations or unverified claims.
+4. **Scraper Isolation**: Each scraper adapter (`sources/`) operates as an independent module. A change to one provider must not alter another provider's adapter. Use `MOCK_SCRAPERS=true` for local testing.
+5. **Local Orchestration**: Use `npm run dev` at the repository root to boot backend and frontend concurrently. Run `npm run generate-openapi` to refresh API schema contracts.

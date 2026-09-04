@@ -214,13 +214,67 @@ class ScrapePipeline:
         self.health_check = health_check
         self.source_health: dict[str, dict[str, Any]] = {}
 
+    def _load_mock_fixture(self) -> list[dict[str, Any]]:
+        import json
+        from pathlib import Path
+        candidate_paths = [
+            Path(__file__).resolve().parent.parent.parent.parent / "data" / "mock_jobs_fixture.json",
+            Path(__file__).resolve().parent.parent / "data" / "mock_jobs_fixture.json",
+            Path("/app/data/mock_jobs_fixture.json"),
+            Path("data/mock_jobs_fixture.json"),
+        ]
+        for path in candidate_paths:
+            if path.exists():
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    jobs = data.get("jobs", data) if isinstance(data, dict) else data
+                    today_iso = datetime.now(timezone.utc).date().isoformat()
+                    for j in jobs:
+                        if not j.get("posted") or j.get("posted") == "today":
+                            j["posted"] = today_iso
+                    return jobs
+                except Exception:
+                    pass
+        today = datetime.now(timezone.utc).date().isoformat()
+        return [
+            {
+                "id": "mock-01",
+                "title": "Senior Software Engineer",
+                "company": "Canva",
+                "location": "Sydney NSW",
+                "description": "Full stack web application development in React and Python.",
+                "source": "SEEK",
+                "url": "https://www.seek.com.au/job/mock-01",
+                "posted": today,
+                "tags": ["react", "python"],
+            }
+        ]
+
     def run(self, queries: Iterable[SearchQuery], on_progress=None) -> list[dict[str, Any]]:
+        import os
         from .dedup import deduplicate_jobs
+
+        active_queries = [query for query in queries if query.enabled]
+        is_mock = os.environ.get("MOCK_SCRAPERS", "").strip().lower() in ("true", "1", "yes")
+        if is_mock:
+            if on_progress:
+                on_progress("Mock scrapers active (MOCK_SCRAPERS=true): loading static fixture...", 50)
+            mock_jobs = self._load_mock_fixture()
+            for source in self.sources:
+                self.source_health[source.name] = {
+                    "jobs": len(mock_jobs),
+                    "queries": len(active_queries) or 1,
+                    "success": True,
+                    "last_success": datetime.now(timezone.utc).isoformat(),
+                    "last_error": "",
+                }
+            if on_progress:
+                on_progress("Mock scrapers complete", 100)
+            return ensure_descriptions(deduplicate_jobs(job for job in mock_jobs if is_recent(job, self.days)))
 
         collected: list[Mapping[str, Any]] = []
         self.errors: list[str] = []
         total_sources = len(self.sources)
-        active_queries = [query for query in queries if query.enabled]
         total_attempts = max(1, total_sources * len(active_queries))
         completed_attempts = 0
         for idx, source in enumerate(self.sources):

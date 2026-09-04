@@ -1,0 +1,77 @@
+{
+  "description": "Static job scraper mock fixture to bypass live HTTP rate limits during testing and local development.",
+  "jobs": [
+    {
+      "id": "mock-seek-101",
+      "title": "Senior Full Stack Engineer",
+      "company": "Canva",
+      "location": "Sydney NSW",
+      "description": "Join our core product team designing scalable web applications in React 19, TypeScript, and Python microservices on Google Cloud.",
+      "source": "SEEK",
+      "url": "https://www.seek.com.au/job/mock-101",
+      "posted": "today",
+      "tags": ["react", "typescript", "python", "gcp"],
+      "remote": true
+    },
+    {
+      "id": "mock-indeed-102",
+      "title": "Staff Systems & Cloud Platform Engineer",
+      "company": "Atlassian",
+      "location": "Sydney NSW",
+      "description": "Lead cloud infrastructure, multi-region Docker/Kubernetes clusters, CI/CD pipelines, and high-reliability platform observability.",
+      "source": "Indeed",
+      "url": "https://au.indeed.com/viewjob?jk=mock-102",
+      "posted": "1d ago",
+      "tags": ["kubernetes", "docker", "python", "terraform"],
+      "remote": true
+    },
+    {
+      "id": "mock-linkedin-103",
+      "title": "Lead AI / ML Systems Architect",
+      "company": "Harrison.ai",
+      "location": "Sydney NSW",
+      "description": "Design distributed inference systems, model evaluation pipelines, and medical imaging AI infrastructure using Python and PyTorch.",
+      "source": "LinkedIn",
+      "url": "https://www.linkedin.com/jobs/view/mock-103",
+      "posted": "today",
+      "tags": ["python", "machine-learning", "pytorch", "distributed-systems"],
+      "remote": false
+    },
+    {
+      "id": "mock-adzuna-104",
+      "title": "Principal Python Developer",
+      "company": "Macquarie Group",
+      "location": "Sydney NSW",
+      "description": "Architect high-throughput financial risk and real-time streaming engines in Python, PostgreSQL, and event-driven architectures.",
+      "source": "Adzuna",
+      "url": "https://www.adzuna.com.au/details/mock-104",
+      "posted": "2d ago",
+      "tags": ["python", "postgresql", "streaming", "architecture"],
+      "remote": true
+    },
+    {
+      "id": "mock-remoteok-105",
+      "title": "Senior Frontend Engineer (React/Vite)",
+      "company": "SafetyCulture",
+      "location": "Remote, Australia",
+      "description": "Deliver intuitive, responsive interfaces with React, Tailwind CSS, and modern state machines for global workplace operations.",
+      "source": "RemoteOK",
+      "url": "https://remoteok.com/remote-jobs/mock-105",
+      "posted": "today",
+      "tags": ["react", "tailwind", "vite", "frontend"],
+      "remote": true
+    },
+    {
+      "id": "mock-seek-106",
+      "title": "Data Engineering Team Lead",
+      "company": "WooliesX",
+      "location": "Surry Hills NSW",
+      "description": "Drive real-time retail analytics, BigQuery data platforms, Apache Beam pipelines, and automated ingestion pipelines.",
+      "source": "SEEK",
+      "url": "https://www.seek.com.au/job/mock-106",
+      "posted": "today",
+      "tags": ["bigquery", "data-engineering", "python", "sql"],
+      "remote": true
+    }
+  ]
+}

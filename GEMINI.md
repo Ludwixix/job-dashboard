@@ -1,6 +1,9 @@
 # Job Dashboard Context Map
 
 Permanent navigation map and operational guide for the `job-dashboard` polyglot monorepo.
+- **Canonical Repository**: [https://github.com/Ludwixix/job-dashboard](https://github.com/Ludwixix/job-dashboard)
+- **Local Path**: `/home/s/.openclaw/workspace/job-dashboard`
+- **Default Branch**: `master`
 
 ## Operating Modes
 - Default to Fast mode for isolated single-file edits; only use Planning mode for cross-module refactors.

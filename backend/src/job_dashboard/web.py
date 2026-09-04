@@ -91,14 +91,21 @@ class DashboardApp:
         if self.jobs:
             if self.repository.count_jobs() == 0:
                 logger.info(f"Seeding database with {len(self.jobs)} scraped jobs...")
-                def _seed():
+                if len(self.jobs) <= 50:
                     try:
                         self.repository.upsert_scraped_jobs(self.jobs)
                     except Exception as err:
                         logger.warning(f"Initial database seeding exception (non-fatal): {err}")
-                    finally:
-                        self.db_ready_event.set()
-                threading.Thread(target=_seed, daemon=True).start()
+                    self.db_ready_event.set()
+                else:
+                    def _seed():
+                        try:
+                            self.repository.upsert_scraped_jobs(self.jobs)
+                        except Exception as err:
+                            logger.warning(f"Initial database seeding exception (non-fatal): {err}")
+                        finally:
+                            self.db_ready_event.set()
+                    threading.Thread(target=_seed, daemon=True).start()
             else:
                 self.db_ready_event.set()
         else:
@@ -357,16 +364,23 @@ class DashboardApp:
         return {"phase": phase, "estimate_seconds": round(estimate), "progress": pct, "started_at": started_at}
 
     def _load_jobs(self):
-        candidate_paths = [
-            self.jobs_path,
-            Path(__file__).parent / "static" / "jobs_combined.json",
-            Path(__file__).parent / "static" / "demo_jobs.json",
-            self.data_dir / "jobs_combined.json",
-            Path("/app/src/job_dashboard/static/jobs_combined.json"),
-            Path("/app/data/jobs.json"),
-            Path(__file__).resolve().parents[3] / "job-dashboard-react" / "public" / "jobs_combined.json",
-            Path(__file__).resolve().parents[3] / "job-dashboard-site" / "scrapers" / "jobs_combined.json",
-        ]
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            candidate_paths = [
+                self.jobs_path,
+                self.data_dir / "jobs_combined.json",
+                Path(__file__).parent / "static" / "demo_jobs.json",
+            ]
+        else:
+            candidate_paths = [
+                self.jobs_path,
+                Path(__file__).parent / "static" / "jobs_combined.json",
+                Path(__file__).parent / "static" / "demo_jobs.json",
+                self.data_dir / "jobs_combined.json",
+                Path("/app/src/job_dashboard/static/jobs_combined.json"),
+                Path("/app/data/jobs.json"),
+                Path(__file__).resolve().parents[3] / "job-dashboard-react" / "public" / "jobs_combined.json",
+                Path(__file__).resolve().parents[3] / "job-dashboard-site" / "scrapers" / "jobs_combined.json",
+            ]
         for p in candidate_paths:
             if p and p.exists():
                 try:

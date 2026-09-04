@@ -1220,6 +1220,11 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, **stats})
                 return
 
+            if path == "/api/openapi.json":
+                from job_dashboard.openapi import generate_openapi_spec
+                self.send_json(200, generate_openapi_spec())
+                return
+
             if path == "/api/rejections":
                 self.send_json(200, {"rejections": app.rejected_applications()})
                 return

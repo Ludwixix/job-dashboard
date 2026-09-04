@@ -1,0 +1,531 @@
+"""OpenAPI schema generator for Job Dashboard API.
+
+Generates an OpenAPI 3.1.0 specification covering all backend REST endpoints,
+query parameters, request bodies, and models.
+Saves schema to packages/shared/openapi.json for frontend contracts and agent consumption.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+
+def generate_openapi_spec() -> dict[str, Any]:
+    """Build the comprehensive OpenAPI specification dictionary."""
+    return {
+        "openapi": "3.1.0",
+        "info": {
+            "title": "Job Dashboard API",
+            "version": "1.0.0",
+            "description": (
+                "Automated Job Discovery, Classification, Hourly Ingestion, "
+                "Scoring, and Autonomous Application Pipeline API."
+            ),
+        },
+        "servers": [
+            {
+                "url": "https://job-dashboard-6xrdvjlrcq-ts.a.run.app",
+                "description": "Production Cloud Run Backend",
+            },
+            {
+                "url": "https://staging---job-dashboard-6xrdvjlrcq-ts.a.run.app",
+                "description": "Staging Tagged Revision",
+            },
+            {
+                "url": "http://127.0.0.1:8080",
+                "description": "Local Development Server",
+            },
+        ],
+        "paths": {
+            "/health": {
+                "get": {
+                    "summary": "Health Check",
+                    "description": "Returns service health status, memory, uptime, and database connectivity.",
+                    "responses": {
+                        "200": {
+                            "description": "Service is healthy",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/HealthStatus"}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/jobs": {
+                "get": {
+                    "summary": "Query Jobs",
+                    "description": "Paginated and filtered job listings with match scores and status.",
+                    "parameters": [
+                        {"name": "q", "in": "query", "schema": {"type": "string"}, "description": "Search keyword in title or company"},
+                        {"name": "source", "in": "query", "schema": {"type": "string"}, "description": "Filter by job provider (e.g. seek, indeed, linkedin, adzuna)"},
+                        {"name": "location", "in": "query", "schema": {"type": "string"}, "description": "Filter by location"},
+                        {"name": "status", "in": "query", "schema": {"type": "string"}, "description": "Filter by application/pipeline status"},
+                        {"name": "min_score", "in": "query", "schema": {"type": "integer"}, "description": "Minimum match score threshold (0-100)"},
+                        {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}, "description": "Page number"},
+                        {"name": "page_size", "in": "query", "schema": {"type": "integer", "default": 50}, "description": "Items per page"},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Paginated job results",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/PaginatedJobs"}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/metrics/summary": {
+                "get": {
+                    "summary": "Metrics Summary",
+                    "description": "System-wide metrics including total jobs, application counts, source share, and hourly ingestion stats.",
+                    "responses": {
+                        "200": {
+                            "description": "Metrics summary payload",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/MetricsSummary"}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/metrics/hourly": {
+                "get": {
+                    "summary": "Hourly Ingestion Velocity",
+                    "description": "Velocity metrics tracking jobs added in the last hour, past 24 hours, and hourly discovery timeline.",
+                    "parameters": [
+                        {"name": "hours", "in": "query", "schema": {"type": "integer", "default": 24}, "description": "Number of past hours to compute breakdown for"},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Hourly metrics breakdown",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/HourlyMetrics"}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/refresh": {
+                "post": {
+                    "summary": "Trigger Scraper Ingestion",
+                    "description": "Triggers multi-source scrapers (SEEK, Indeed, LinkedIn, Adzuna) with optional dynamic criteria.",
+                    "requestBody": {
+                        "required": False,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/RefreshRequest"}
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Scrape completed or initiated",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "status": {"type": "string"},
+                                            "jobs_found": {"type": "integer"},
+                                            "jobs_added": {"type": "integer"},
+                                            "errors": {"type": "array", "items": {"type": "string"}},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/search-criteria": {
+                "get": {
+                    "summary": "Get Search Criteria",
+                    "description": "Fetches currently active job search criteria and target parameters.",
+                    "parameters": [
+                        {"name": "user_id", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "List of active search criteria",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "criteria": {"type": "array", "items": {"$ref": "#/components/schemas/SearchCriteriaItem"}},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                },
+                "post": {
+                    "summary": "Save Search Criteria",
+                    "description": "Updates or sets saved job search query targets.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "criteria": {"type": "array", "items": {"$ref": "#/components/schemas/SearchCriteriaItem"}},
+                                    },
+                                    "required": ["criteria"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Criteria saved successfully"},
+                    },
+                },
+            },
+            "/api/search-criteria/defaults": {
+                "get": {
+                    "summary": "Default Search Criteria",
+                    "description": "Returns suggested baseline search criteria for target tech roles.",
+                    "responses": {
+                        "200": {"description": "Default criteria list"},
+                    },
+                }
+            },
+            "/api/profile": {
+                "get": {
+                    "summary": "Get Candidate Profile",
+                    "description": "Fetches candidate resume profile, core skills, and target roles.",
+                    "responses": {
+                        "200": {
+                            "description": "Candidate profile data",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/CandidateProfile"}
+                                }
+                            },
+                        }
+                    },
+                },
+                "post": {
+                    "summary": "Update Candidate Profile",
+                    "description": "Saves updated candidate skills, experience, and preferences.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/CandidateProfile"}
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Profile updated successfully"},
+                    },
+                },
+            },
+            "/api/applications": {
+                "get": {
+                    "summary": "Get Applications",
+                    "description": "Retrieves candidate pipeline applications and tracked statuses.",
+                    "responses": {
+                        "200": {
+                            "description": "List of user applications",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/ApplicationRecord"},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                },
+                "post": {
+                    "summary": "Save or Update Application",
+                    "description": "Creates or updates an application record.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ApplicationRecord"}
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Application record updated"},
+                    },
+                },
+            },
+            "/api/applications/sync": {
+                "post": {
+                    "summary": "Sync Applications Batch",
+                    "description": "Batch syncs local application records to SQLite backend.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "applications": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/ApplicationRecord"},
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Synced successfully"},
+                    },
+                }
+            },
+            "/api/verify-job-url": {
+                "get": {
+                    "summary": "Verify Job URL",
+                    "description": "Performs liveness check on a single external job URL.",
+                    "parameters": [
+                        {"name": "url", "in": "query", "required": True, "schema": {"type": "string"}},
+                        {"name": "force", "in": "query", "schema": {"type": "boolean", "default": False}},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Verification status",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "url": {"type": "string"},
+                                            "is_live": {"type": "boolean"},
+                                            "status_code": {"type": "integer"},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/verify-jobs": {
+                "post": {
+                    "summary": "Batch Verify Job URLs",
+                    "description": "Checks multiple external job links in parallel.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "urls": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                    "required": ["urls"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "Batch verification results"},
+                    },
+                }
+            },
+            "/api/gmail/scan": {
+                "post": {
+                    "summary": "Gmail Radar Scan",
+                    "description": "Scans inbox for recruiter replies, interview invites, or rejections.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "username": {"type": "string"},
+                                        "appPassword": {"type": "string"},
+                                        "days": {"type": "integer", "default": 14},
+                                    },
+                                    "required": ["username", "appPassword"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Scan summary",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "updates_count": {"type": "integer"},
+                                            "updates": {"type": "array", "items": {"type": "object"}},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/openapi.json": {
+                "get": {
+                    "summary": "OpenAPI Specification",
+                    "description": "Serves this OpenAPI 3.1.0 schema document directly.",
+                    "responses": {
+                        "200": {
+                            "description": "OpenAPI Specification JSON",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        }
+                    },
+                }
+            },
+        },
+        "components": {
+            "schemas": {
+                "HealthStatus": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string", "example": "ok"},
+                        "timestamp": {"type": "string", "format": "date-time"},
+                        "environment": {"type": "string", "example": "production"},
+                        "database": {"type": "string", "example": "connected"},
+                    },
+                    "required": ["status"],
+                },
+                "Job": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "title": {"type": "string"},
+                        "company": {"type": "string"},
+                        "location": {"type": "string"},
+                        "description": {"type": "string"},
+                        "url": {"type": "string"},
+                        "source": {"type": "string"},
+                        "date": {"type": "string"},
+                        "created_at": {"type": "string"},
+                        "score": {"type": "integer"},
+                        "status": {"type": "string"},
+                        "tags": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["id", "title", "company"],
+                },
+                "PaginatedJobs": {
+                    "type": "object",
+                    "properties": {
+                        "jobs": {"type": "array", "items": {"$ref": "#/components/schemas/Job"}},
+                        "total": {"type": "integer"},
+                        "page": {"type": "integer"},
+                        "page_size": {"type": "integer"},
+                        "total_pages": {"type": "integer"},
+                    },
+                    "required": ["jobs", "total", "page", "page_size"],
+                },
+                "HourlyBreakdownItem": {
+                    "type": "object",
+                    "properties": {
+                        "hour": {"type": "string", "example": "2026-09-04 12:00"},
+                        "count": {"type": "integer", "example": 14},
+                    },
+                    "required": ["hour", "count"],
+                },
+                "HourlyMetrics": {
+                    "type": "object",
+                    "properties": {
+                        "added_last_hour": {"type": "integer", "example": 5},
+                        "added_past_24h": {"type": "integer", "example": 42},
+                        "hours_requested": {"type": "integer", "example": 24},
+                        "hourly_breakdown": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/HourlyBreakdownItem"},
+                        },
+                        "timestamp": {"type": "string", "format": "date-time"},
+                    },
+                    "required": ["added_last_hour", "added_past_24h", "hourly_breakdown"],
+                },
+                "MetricsSummary": {
+                    "type": "object",
+                    "properties": {
+                        "total_jobs": {"type": "integer"},
+                        "new_jobs": {"type": "integer"},
+                        "total_applications": {"type": "integer"},
+                        "hourly_ingestion": {"$ref": "#/components/schemas/HourlyMetrics"},
+                    },
+                },
+                "RefreshRequest": {
+                    "type": "object",
+                    "properties": {
+                        "queries": {"type": "array", "items": {"type": "string"}},
+                        "force": {"type": "boolean", "default": False},
+                        "ttl_hours": {"type": "integer", "default": 24},
+                    },
+                },
+                "SearchCriteriaItem": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "role": {"type": "string"},
+                        "location": {"type": "string"},
+                        "sources": {"type": "array", "items": {"type": "string"}},
+                        "enabled": {"type": "boolean"},
+                    },
+                    "required": ["role"],
+                },
+                "CandidateProfile": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "title": {"type": "string"},
+                        "skills": {"type": "array", "items": {"type": "string"}},
+                        "target_roles": {"type": "array", "items": {"type": "string"}},
+                        "experience_years": {"type": "number"},
+                    },
+                },
+                "ApplicationRecord": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "company": {"type": "string"},
+                        "title": {"type": "string"},
+                        "status": {"type": "string"},
+                        "applied_at": {"type": "string"},
+                        "url": {"type": "string"},
+                        "notes": {"type": "string"},
+                    },
+                    "required": ["company", "title"],
+                },
+            }
+        },
+    }
+
+
+def save_openapi_spec(output_path: Path | str | None = None) -> Path:
+    """Generate and write the OpenAPI schema to disk."""
+    if output_path is None:
+        # Default to packages/shared/openapi.json relative to repository root
+        repo_root = Path(__file__).resolve().parent.parent.parent.parent
+        output_path = repo_root / "packages" / "shared" / "openapi.json"
+    else:
+        output_path = Path(output_path)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    spec = generate_openapi_spec()
+    output_path.write_text(json.dumps(spec, indent=2), encoding="utf-8")
+    return output_path
+
+
+if __name__ == "__main__":
+    out = save_openapi_spec()
+    print(f"✓ OpenAPI spec successfully generated and saved to: {out}")

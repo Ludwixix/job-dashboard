@@ -31,6 +31,7 @@ export default function ZenAutopilotDashboard({
   profile = null,
   applications = [],
   onSwitchToStudio,
+  onSwitchToMonolith,
   onOpenJobModal,
   onOpenProfileModal,
   onOpenMockInterview
@@ -172,6 +173,16 @@ export default function ZenAutopilotDashboard({
             <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isScanningGmail ? 'animate-spin' : ''}`} />
             <span>{isScanningGmail ? 'Scanning Radar...' : 'Gmail Radar'}</span>
           </button>
+
+          {onSwitchToMonolith && (
+            <button
+              onClick={onSwitchToMonolith}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1a1612] hover:bg-[#251f18] text-[#d48b38] border border-[#b87326]/40 transition-all shadow-sm hover:border-[#b87326]/60 cursor-pointer tracking-wider"
+              title="Switch to Dune Monolith Minimalist Mode"
+            >
+              <span>▲ Monolith</span>
+            </button>
+          )}
 
           <button
             onClick={onSwitchToStudio}

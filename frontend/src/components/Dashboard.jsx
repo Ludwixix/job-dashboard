@@ -21,6 +21,7 @@ import { AutoApplyModal } from './AutoApplyModal';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { DashboardGridSkeleton } from './SkeletonLoaders';
 import ZenAutopilotDashboard from './ZenAutopilotDashboard';
+import MonolithMode from './MonolithMode';
 import { CareerOperations } from './CareerOperations';
 import { startAutopilot } from '../services/autopilotAgent';
 
@@ -97,7 +98,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     fetchPreferencesFromBackend()
       .then((prefs) => {
         const saved = prefs?.viewMode;
-        if (!cancelled && (saved === 'zen' || saved === 'studio')) {
+        if (!cancelled && (saved === 'zen' || saved === 'studio' || saved === 'monolith')) {
           setViewMode(saved);
         }
       })
@@ -410,6 +411,88 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
   const applicationsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
 
+  if (viewMode === 'monolith') {
+    return (
+      <SafeErrorBoundary>
+        {fallbackBanner && (
+          <div className="bg-[#b87326]/15 border-b border-[#b87326]/30 text-[#d48b38] px-4 py-2 text-xs font-mono flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#d48b38] animate-pulse" />
+              {fallbackBanner}
+            </span>
+            <button
+              onClick={() => setFallbackBanner(null)}
+              className="text-[#d48b38] hover:text-white ml-4 text-xs font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        <MonolithMode
+          jobs={jobs}
+          profile={activeProfile}
+          applications={applicationsList}
+          onSwitchMode={(mode) => setViewMode(mode)}
+          onOpenJobModal={(job) => setSelectedJob(job)}
+          onOpenGenerator={(job) => setSelectedForGenerator(job)}
+          onOpenProfileModal={() => {
+            setEditingProfile(activeProfile);
+            setIsProfileModalOpen(true);
+          }}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        />
+
+        {/* Global Modals in Monolith Mode */}
+        {selectedJob && (
+          <JobModal
+            job={selectedJob}
+            onClose={() => setSelectedJob(null)}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
+            onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+            onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+            onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
+            profile={activeProfile}
+            allJobs={jobs}
+          />
+        )}
+
+        {selectedForGenerator && (
+          <GeneratorModal
+            job={selectedForGenerator}
+            profile={activeProfile}
+            isOpen={Boolean(selectedForGenerator)}
+            onClose={() => setSelectedForGenerator(null)}
+            onApplicationCreated={(app) => {
+              updateJobStatus(selectedForGenerator.id || `${selectedForGenerator.company}_${selectedForGenerator.title}`, 'Package Prepared / To Submit', app);
+            }}
+          />
+        )}
+
+        {isProfileModalOpen && (
+          <ProfileModal
+            profile={editingProfile || activeProfile}
+            onClose={() => setIsProfileModalOpen(false)}
+            onSave={(updated) => {
+              setActiveProfile(updated);
+              saveProfile(updated);
+              setIsProfileModalOpen(false);
+            }}
+          />
+        )}
+
+        {isCommandPaletteOpen && (
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            jobs={jobs}
+            onSelectJob={(j) => setSelectedJob(j)}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
+          />
+        )}
+      </SafeErrorBoundary>
+    );
+  }
+
   if (viewMode === 'zen') {
     return (
       <SafeErrorBoundary>
@@ -442,6 +525,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           profile={activeProfile}
           applications={applicationsList}
           onSwitchToStudio={() => setViewMode('studio')}
+          onSwitchToMonolith={() => setViewMode('monolith')}
           onOpenJobModal={(job) => setSelectedJob(job)}
           onOpenProfileModal={() => {
             setEditingProfile(activeProfile);
@@ -586,6 +670,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               <span>SIGN IN</span>
             </button>
           )}
+
+          <button
+            onClick={() => setViewMode('monolith')}
+            className="flex items-center gap-1.5 px-3 py-1 bg-[#1a1612] border border-[#b87326]/50 text-[#d48b38] hover:text-white hover:bg-[#251f18] transition-colors font-bold text-[10px] shadow-xs cursor-pointer tracking-wider"
+            title="Switch to Dune Monolithic Minimalist Mode"
+          >
+            <span>▲ MONOLITH</span>
+          </button>
 
           <button
             onClick={() => setViewMode('zen')}

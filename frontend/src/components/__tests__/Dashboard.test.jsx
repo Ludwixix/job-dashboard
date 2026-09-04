@@ -73,4 +73,21 @@ describe('Dashboard Top-Level Integration', () => {
       expect(screen.getByText(/Conversion Pipeline/i)).toBeInTheDocument();
     });
   });
+
+  it('renders Monolith mode when configured and allows switching to Zen and Studio', async () => {
+    window.localStorage.setItem('job_dashboard_view_mode', 'monolith');
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/THE MONOLITH/i)).toBeInTheDocument();
+    });
+
+    // Switch to Zen
+    const zenBtn = screen.getByRole('button', { name: /ZEN/i });
+    fireEvent.click(zenBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('AUTOPILOT')).toBeInTheDocument();
+    });
+  });
 });

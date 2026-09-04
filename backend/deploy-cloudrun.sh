@@ -39,13 +39,20 @@ if ! gcloud artifacts repositories describe "${REPO_NAME}" --location="${REGION}
 fi
 
 # Build modern React SPA into static directory
-echo "▶ Building job-dashboard-react frontend for Cloud Run deployment…"
+echo "▶ Building frontend for Cloud Run deployment…"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REACT_DIR="$(cd "${SCRIPT_DIR}/../job-dashboard-react" && pwd)"
-if [ -d "${REACT_DIR}" ]; then
+if [ -d "${SCRIPT_DIR}/../frontend" ]; then
+    REACT_DIR="$(cd "${SCRIPT_DIR}/../frontend" && pwd)"
+elif [ -d "${SCRIPT_DIR}/../job-dashboard-react" ]; then
+    REACT_DIR="$(cd "${SCRIPT_DIR}/../job-dashboard-react" && pwd)"
+else
+    REACT_DIR=""
+fi
+
+if [ -n "${REACT_DIR}" ] && [ -d "${REACT_DIR}" ]; then
     cd "${REACT_DIR}"
     echo "▶ Running React Vitest component & interaction tests..."
-    npm test
+    npm test -- --run
     echo "▶ Running React lint checks..."
     npm run lint
     echo "▶ Compiling production bundle..."

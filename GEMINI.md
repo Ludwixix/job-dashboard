@@ -12,6 +12,9 @@ The repository is divided into two primary subtrees:
 - `backend/`: Python service package (`job_dashboard`) handling domain models, multi-provider scrapers, SQLite/WAL persistence, and HTTP/REST endpoints.
 - `frontend/`: Vite + React SPA providing the user interface (Kanban board, tailored document generation, psychology profiler, and minimalist Zen Autopilot).
 
+## Production Deployment
+- The live production backend targets Google Cloud Run: https://job-dashboard-6xrdvjlrcq-ts.a.run.app/
+
 ## Backend Modules (`backend/src/job_dashboard/`)
 - API Boundary: `api/` is the sole entrypoint the frontend may interact with; request handlers must not import internal domain modules or `service.py` directly.
 - Domain Models & Types: `models.py`, `types.py`

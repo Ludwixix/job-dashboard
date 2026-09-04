@@ -5,34 +5,54 @@ import urllib.parse
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from ..logging import get_logger
 from .base import SearchQuery
+from .browser import create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
+from .proxy import ProxyRotator
+
+logger = get_logger("job_dashboard.sources.linkedin")
 
 
 class LinkedInBrowserSource:
     name = "LinkedIn"
 
-    def __init__(self, max_pages: int = 4, results_per_query: int = 25, pause_seconds: float = 2.0):
+    def __init__(
+        self,
+        max_pages: int = 4,
+        results_per_query: int = 25,
+        pause_seconds: float = 2.0,
+        proxy: str | None = None,
+    ):
         self.max_pages = max_pages
         self.results_per_query = results_per_query
         self.pause_seconds = pause_seconds
+        self.proxy_rotator = ProxyRotator([proxy] if proxy else None)
 
     def search(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         try:
             from playwright.sync_api import sync_playwright
         except ImportError as error:
             raise RuntimeError("LinkedIn requires the optional 'playwright' dependency") from error
+
+        playwright_proxy = self.proxy_rotator.get_playwright_proxy()
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
-            context = browser.new_context(locale="en-AU")
+            browser, context = create_stealth_browser(playwright, headless=True, proxy=playwright_proxy)
             page = context.new_page()
             detail_page = context.new_page()
             try:
                 for page_number in range(self.max_pages):
                     encoded_term = urllib.parse.quote(query.term)
-                    url = ("https://www.linkedin.com/jobs/search/?"
-                           f"keywords={encoded_term}&location=Melbourne%2C%20Victoria%2C%20Australia"
-                           f"&f_TPR=r1209600&start={page_number * self.results_per_query}")
+                    url = (
+                        "https://www.linkedin.com/jobs/search/?"
+                        f"keywords={encoded_term}&location=Melbourne%2C%20Victoria%2C%20Australia"
+                        f"&f_TPR=r1209600&start={page_number * self.results_per_query}"
+                    )
                     page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                    wait_for_challenge_clearance(page, max_wait_seconds=4.0)
+                    if is_challenge_page(page.title()):
+                        logger.warning(f"LinkedIn challenge page encountered on page {page_number}")
+                        return
+
                     records = page.evaluate(_LINKEDIN_EXTRACTOR)
                     if not records:
                         return
@@ -66,7 +86,7 @@ def _linkedin_description(page: Any, record: dict[str, Any]) -> str:
     if not record.get("url"):
         return ""
     try:
-        page.goto(record["url"], wait_until="domcontentloaded", timeout=20000)
+        page.goto(record["url"], wait_until="domcontentloaded", timeout=15000)
         page.wait_for_timeout(500)
         return page.evaluate("""() => {
             for (const selector of ['.show-more-less-html__markup', '.description__text', '[data-testid="job-details"]']) {

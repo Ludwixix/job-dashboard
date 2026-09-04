@@ -33,6 +33,8 @@ from .dedup import (
 )
 from .indeed import IndeedJobSpySource, _extract_balanced_json, _indeed_record
 from .linkedin import LinkedInBrowserSource, _linkedin_description
+from .proxy import ProxyInfo, ProxyRotator, get_configured_proxies, parse_proxy, sanitize_proxy_url
+from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
 from .remoteok import RemoteOkApiSource, _remoteok_record
 from .seek import SeekApiSource, _seek_record
 
@@ -53,6 +55,15 @@ __all__ = [
     "RemoteOkApiSource",
     "SeekApiSource",
     "LinkedInBrowserSource",
+    "ProxyInfo",
+    "ProxyRotator",
+    "parse_proxy",
+    "sanitize_proxy_url",
+    "get_configured_proxies",
+    "create_stealth_browser",
+    "is_challenge_page",
+    "wait_for_challenge_clearance",
+    "BotBlockedError",
     # Internal utilities preserved for backward-compatibility & test coverage
     "_TextExtractor",
     "_page_description",

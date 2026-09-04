@@ -44,11 +44,15 @@ def main() -> int:
     parser.add_argument("--seek-browser-fallback", action="store_true")
     parser.add_argument("--seek-cache-path", type=Path)
     parser.add_argument("--seek-cache-fallback", action="store_true")
+    parser.add_argument("--proxy", type=str, default=None, help="Proxy URL (http://user:pass@host:port or socks5://...)")
     args = parser.parse_args()
 
     source_names = args.sources or ["indeed", "seek", "linkedin", "adzuna", "remoteok"]
     sources = build_sources(source_names)
     for source in sources:
+        if hasattr(source, "proxy_rotator") and args.proxy:
+            from .sources.proxy import ProxyRotator
+            source.proxy_rotator = ProxyRotator([args.proxy])
         if isinstance(source, SeekApiSource):
             source.allow_browser_fallback = args.seek_browser_fallback
             source.cache_path = args.seek_cache_path

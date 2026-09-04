@@ -69,23 +69,29 @@ def main():
     else:
         startup_logger.warning("JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts")
 
-    sources = [IndeedJobSpySource()]
+    sources = [IndeedJobSpySource(
+        proxy=settings.proxy_url,
+        multi_board=settings.multi_board_enabled,
+        browser_fallback=settings.stealth_browser_enabled,
+    )]
     if settings.seek_enabled:
         sources.append(SeekApiSource(
             max_pages=settings.seek_max_pages,
             max_results=settings.seek_max_results,
             pause_seconds=settings.seek_pause_seconds,
             endpoint=settings.seek_api_endpoint,
-            allow_browser_fallback=settings.seek_browser_fallback,
+            allow_browser_fallback=settings.seek_browser_fallback and settings.stealth_browser_enabled,
             cache_path=settings.seek_cache_path,
             allow_cache_fallback=settings.seek_cache_fallback,
+            allow_cross_source_fallback=settings.multi_board_enabled,
+            proxy=settings.proxy_url,
         ))
     sources.extend([AdzunaApiSource(
         app_id=settings.adzuna_app_id,
         api_key=settings.adzuna_api_key,
     ), RemoteOkApiSource()])
     if not args.no_linkedin and settings.linkedin_enabled:
-        sources.append(LinkedInBrowserSource())
+        sources.append(LinkedInBrowserSource(proxy=settings.proxy_url))
     generator = OpenRouterDocumentGenerator(
         args.source_dir,
         args.guidelines_dir,

@@ -62,6 +62,17 @@ class Settings:
         # jobs survive cold starts and redeploys instead of resetting to
         # whatever snapshot was baked into the container image.
         self.gcs_data_bucket = os.getenv("JOB_DASHBOARD_GCS_DATA_BUCKET")
+
+        # Proxy and anti-blocking configuration
+        self.proxy_url = (
+            os.getenv("JOB_DASHBOARD_PROXY_URL")
+            or os.getenv("HTTPS_PROXY")
+            or os.getenv("HTTP_PROXY")
+            or os.getenv("ALL_PROXY")
+        )
+        self.proxy_list = [p.strip() for p in (os.getenv("JOB_DASHBOARD_PROXIES") or "").split(",") if p.strip()]
+        self.multi_board_enabled = self._get_bool("JOB_DASHBOARD_MULTI_BOARD_ENABLED", True)
+        self.stealth_browser_enabled = self._get_bool("JOB_DASHBOARD_STEALTH_BROWSER_ENABLED", True)
     
     def _load_dotenv(self):
         """Load .env file if present."""

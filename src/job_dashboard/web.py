@@ -94,6 +94,8 @@ class DashboardApp:
                 def _seed():
                     try:
                         self.repository.upsert_scraped_jobs(self.jobs)
+                    except Exception as err:
+                        logger.warning(f"Initial database seeding exception (non-fatal): {err}")
                     finally:
                         self.db_ready_event.set()
                 threading.Thread(target=_seed, daemon=True).start()
@@ -530,12 +532,29 @@ class DashboardApp:
             email_id = email_events[-1].get("email_id") if email_events else ""
 
             # Extract analysis or compute from stored job data
-            analysis = self.dashboard.analyse(stored_job)
+            analysis = None
+            try:
+                norm_target = dict(stored_job)
+                if not str(norm_target.get("company") or "").strip():
+                    norm_target["company"] = "Confidential"
+                if not str(norm_target.get("title") or "").strip():
+                    norm_target["title"] = "Untitled Position"
+                analysis = self.dashboard.analyse(norm_target)
+            except Exception as e:
+                logger.warning(f"Error analysing stored job {job_id}: {e}")
+
+            fit_val = analysis.score.fit if analysis else "Moderate Match"
+            matched_skills = analysis.score.matched_skills if analysis else []
+            missing_skills = analysis.score.missing_skills if analysis else []
+            dimensions = analysis.score.dimensions if analysis else {}
+            score_val = stored_job.get("score") if stored_job.get("score") is not None else (analysis.score.score if analysis else 70)
+            stream_val = stored_job.get("stream") or (analysis.stream if analysis else "core-it")
+            fit_cat = stored_job.get("fit_category") or (analysis.fit_category if analysis else "Core IT")
 
             result.append({
                 "id": job_id,
                 "title": stored_job.get("title", ""),
-                "company": stored_job.get("company", ""),
+                "company": stored_job.get("company") or "Confidential",
                 "location": stored_job.get("location", ""),
                 "description": clean_description(stored_job.get("description", "")),
                 "source": stored_job.get("source", ""),
@@ -545,13 +564,13 @@ class DashboardApp:
                 "posted": posted,
                 "posted_age": posted_age(posted),
                 "remote": bool(stored_job.get("remote", False)),
-                "stream": stored_job.get("stream") or analysis.stream,
-                "fit_category": stored_job.get("fit_category") or analysis.fit_category,
-                "score": stored_job.get("score") if stored_job.get("score") is not None else analysis.score.score,
-                "fit": analysis.score.fit,
-                "matched_skills": analysis.score.matched_skills,
-                "missing_skills": analysis.score.missing_skills,
-                "dimensions": analysis.score.dimensions,
+                "stream": stream_val,
+                "fit_category": fit_cat,
+                "score": score_val,
+                "fit": fit_val,
+                "matched_skills": matched_skills,
+                "missing_skills": missing_skills,
+                "dimensions": dimensions,
                 "generated": generated,
                 "status": stored_job.get("status", "sourced"),
             })
@@ -564,6 +583,7 @@ class DashboardApp:
         return any(value and is_recent({"posted": value}, days=days) for value in dates)
 
     def refresh(self, queries, force: bool = False, ttl_hours: float = 12.0, on_progress=None):
+        self.db_ready_event.wait(timeout=5.0)
         with self.lock:
             queries_to_scrape = []
             cached_query_terms = []
@@ -614,8 +634,9 @@ class DashboardApp:
             elif on_progress:
                 on_progress(f"All {len(cached_query_terms)} queries already fresh (cached), skipping re-scan...", 60)
 
-            # Recalibrate/score all database jobs against current profile
-            self.jobs = self.materialize_jobs(self.jobs)
+            # Recalibrate/score all database jobs against current profile when updated
+            if queries_to_scrape or force:
+                self.jobs = self.materialize_jobs(self.jobs)
 
             stats = {
                 "total_jobs": len(self.jobs),
@@ -675,10 +696,10 @@ class DashboardApp:
                     credential_candidates.insert(0, candidate)
                 else:
                     credential_candidates.append(candidate)
-            if credential_candidates:
-                scanner = GmailApiScanner(str(credential_candidates[0]), str(self.data_dir / "gmail_token.json"), days=days)
-            elif username and app_password:
+            if username and app_password:
                 scanner = GmailScanner(username, app_password, days=days)
+            elif credential_candidates:
+                scanner = GmailApiScanner(str(credential_candidates[0]), str(self.data_dir / "gmail_token.json"), days=days)
             else:
                 raise RuntimeError("Gmail OAuth client file or IMAP credentials are required")
             matched = created = updated = 0

@@ -64,6 +64,11 @@ class ConnectionPool:
         try:
             conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=self.timeout)
             conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA journal_mode=WAL;")
+                conn.execute(f"PRAGMA busy_timeout={int(self.timeout * 1000)};")
+            except sqlite3.Error:
+                pass
             self._stats["connections_created"] += 1
             logger.debug(f"Created new connection to {self.db_path}")
             return conn

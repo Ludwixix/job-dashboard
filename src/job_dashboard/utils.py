@@ -7,9 +7,15 @@ from .types import JobDict, ProfileDict, ValidationResult, validate_profile_data
 
 def convert_to_job_dict(data: dict[str, Any]) -> JobDict:
     """Convert any dictionary to a properly typed JobDict."""
+    company = str(data.get("company") or "").strip()
+    if not company:
+        company = "Confidential"
+    title = str(data.get("title") or "").strip()
+    if not title:
+        title = "Untitled Position"
     result: JobDict = {
-        "title": str(data.get("title", "")).strip(),
-        "company": str(data.get("company", "")).strip(),
+        "title": title,
+        "company": company,
     }
     
     # Optional fields with type conversion

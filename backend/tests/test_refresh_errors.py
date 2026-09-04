@@ -34,7 +34,6 @@ def test_public_jobs_hides_non_new_jobs_by_default(tmp_path):
 def test_refresh_handles_empty_body_cleanly(tmp_path):
     from io import BytesIO
     from job_dashboard.web import DashboardApp, make_handler
-    from unittest.mock import MagicMock
 
     app = DashboardApp({}, [], tmp_path)
     app.sync_tracker = lambda: None

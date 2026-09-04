@@ -38,6 +38,8 @@ def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, st
     """Cached version of profile skills extraction."""
     import json
     profile = json.loads(profile_data)
+    if isinstance(profile, Mapping) and "profile" in profile and isinstance(profile["profile"], Mapping):
+        profile = profile["profile"]
     raw = profile.get("skills", {})
     values: dict[str, str] = {}
     if isinstance(raw, Mapping):

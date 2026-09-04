@@ -31,7 +31,7 @@ import {
 } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
 import { SCRAPER_BASE_URL, buildQueriesFromProfile } from '../services/jobQueryService';
-import { 
+import {
   ROLE_ARCHETYPES,
   getProfileAutoRoles,
   getRoleArchetypeCounts, 
@@ -407,7 +407,7 @@ export const JobSeeker = ({
                             job.notes.toLowerCase().includes(search.toLowerCase()) ||
                             job.location.toLowerCase().includes(search.toLowerCase());
       
-      const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
+      const matchesSource = sourceFilter === 'All' || (job.source || '').toLowerCase() === sourceFilter.toLowerCase();
 
       // Stream Tab filter
       let matchesStream = true;
@@ -616,7 +616,7 @@ export const JobSeeker = ({
     setScraping(true);
     setScrapeSuccess(false);
     setScrapedCount(null);
-    
+
     try {
       const endpoint = `${SCRAPER_BASE_URL}/api/refresh`;
       const queries = currentProfile ? buildQueriesFromProfile(currentProfile) : [];
@@ -626,7 +626,7 @@ export const JobSeeker = ({
         body: JSON.stringify({ queries, force: true })
       });
       const data = await res.json();
-      
+
       if (data.success || Array.isArray(data.jobs)) {
         const count = data.jobs ? data.jobs.length : (data.count || 25);
         setScrapedCount(count);

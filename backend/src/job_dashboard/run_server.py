@@ -39,9 +39,16 @@ def main():
     host = os.environ.get("HOST") or args.host or "0.0.0.0"
 
 
-    # Profile is optional on Cloud Run — use empty profile if not found
-    profile_path = args.profile or (PROJECT_ROOT.parent / "job-dashboard-site" / "job_profile.json")
-    profile = load_profile(profile_path) if profile_path.exists() else {}
+    # Resolve job profile path across Docker container (/app) and local repository
+    profile_candidates = [
+        args.profile,
+        Path("job_profile.json"),
+        Path("/app/job_profile.json"),
+        PROJECT_ROOT.parent / "job_profile.json",
+        PROJECT_ROOT.parents[1] / "backend" / "job_profile.json",
+    ]
+    profile_path = next((p for p in profile_candidates if p and Path(p).exists()), None)
+    profile = load_profile(profile_path) if profile_path else {}
 
     # Validate and warn about missing credentials
     from .logging import get_logger

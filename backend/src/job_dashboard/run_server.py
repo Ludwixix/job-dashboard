@@ -44,8 +44,8 @@ def main():
         args.profile,
         Path("job_profile.json"),
         Path("/app/job_profile.json"),
+        PROJECT_ROOT / "job_profile.json",
         PROJECT_ROOT.parent / "job_profile.json",
-        PROJECT_ROOT.parents[1] / "backend" / "job_profile.json",
     ]
     profile_path = next((p for p in profile_candidates if p and Path(p).exists()), None)
     profile = load_profile(profile_path) if profile_path else {}

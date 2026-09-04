@@ -1,0 +1,30 @@
+# Minimal requirements for Cloud Run deployment
+# Only what the server actually imports at runtime
+
+# Core scraping
+python-jobspy>=1.1.0
+playwright>=1.40.0
+
+# PDF generation (application documents)
+reportlab>=4.0.0
+pypdf>=5.0.0
+
+# Data processing (used by scoring/analytics modules)
+numpy>=1.24.0
+pandas>=2.1.0
+
+# PDF/resume parsing
+python-dotenv>=1.0.0
+
+# Date utilities
+python-dateutil>=2.8.0
+
+# Optional: metrics endpoint
+prometheus-client>=0.19.0
+bcrypt==4.1.2
+passlib[bcrypt]>=1.7.4
+PyJWT==2.8.0
+
+# Persistent index backup/restore (Cloud Run filesystem is ephemeral)
+google-cloud-storage>=2.13.0
+

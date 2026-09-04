@@ -1,11 +1,21 @@
 #!/bin/bash
 # deploy-cloudrun.sh
 # One-command deploy of job-dashboard to Google Cloud Run
-# Run: bash deploy-cloudrun.sh [PROJECT_ID]
+# Run: bash deploy-cloudrun.sh [--staging] [PROJECT_ID]
 
 set -e
 
-PROJECT_ID="${1:-$(gcloud config get-value project 2>/dev/null)}"
+IS_STAGING=false
+REMAINING_ARGS=()
+for arg in "$@"; do
+    if [ "$arg" = "--staging" ] || [ "$arg" = "-s" ]; then
+        IS_STAGING=true
+    else
+        REMAINING_ARGS+=("$arg")
+    fi
+done
+
+PROJECT_ID="${REMAINING_ARGS[0]:-$(gcloud config get-value project 2>/dev/null)}"
 REGION="australia-southeast1"
 SERVICE_NAME="job-dashboard"
 REPO_NAME="cloud-run-source-deploy"
@@ -16,7 +26,11 @@ if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
     exit 1
 fi
 
-echo "🚀 Deploying ${SERVICE_NAME} to Cloud Run"
+if [ "$IS_STAGING" = true ]; then
+    echo "🚀 Deploying ${SERVICE_NAME} to Cloud Run [STAGING TAG - 0% BASE TRAFFIC]"
+else
+    echo "🚀 Deploying ${SERVICE_NAME} to Cloud Run [PRODUCTION - 100% TRAFFIC]"
+fi
 echo "   Project : ${PROJECT_ID}"
 echo "   Region  : ${REGION}"
 echo "   Image   : ${IMAGE}"
@@ -84,6 +98,11 @@ if [ -z "${JWT_SECRET_KEY}" ]; then
     fi
 fi
 
+EXTRA_FLAGS=()
+if [ "$IS_STAGING" = true ]; then
+    EXTRA_FLAGS+=("--no-traffic" "--tag=staging")
+fi
+
 gcloud run deploy "${SERVICE_NAME}" \
     --image "${IMAGE}" \
     --region "${REGION}" \
@@ -97,25 +116,40 @@ gcloud run deploy "${SERVICE_NAME}" \
     --port 8080 \
     --set-env-vars="HOST=0.0.0.0,ENVIRONMENT=production,JWT_SECRET_KEY=${JWT_SECRET_KEY},JOB_DASHBOARD_DATA_DIR=/app/data,JOB_DASHBOARD_GCS_DATA_BUCKET=${PROJECT_ID}-job-dashboard-data,JOB_DASHBOARD_SEEK_CACHE_PATH=/app/data/seek_cache.json,JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,JOB_DASHBOARD_LINKEDIN_ENABLED=false" \
     --project="${PROJECT_ID}" \
+    "${EXTRA_FLAGS[@]}" \
     --quiet
 
+if [ "$IS_STAGING" = true ]; then
+    STAGING_URL=$(gcloud run services describe "${SERVICE_NAME}" \
+        --region="${REGION}" \
+        --project="${PROJECT_ID}" \
+        --format="value(status.traffic[?tag=='staging'].url)" 2>/dev/null || true)
+    if [ -z "$STAGING_URL" ]; then
+        STAGING_URL="https://staging---job-dashboard-6xrdvjlrcq-ts.a.run.app"
+    fi
 
-# Get service URL
-SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
-    --region="${REGION}" \
-    --project="${PROJECT_ID}" \
-    --format="value(status.url)")
+    echo ""
+    echo "✅ Staging revision deployed with 0% production traffic!"
+    echo "   Staging URL: ${STAGING_URL}"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Test staging health:  curl ${STAGING_URL}/health"
+    echo "  2. Test staging API:     curl ${STAGING_URL}/api/metrics/summary"
+    echo ""
+    echo "  To promote staging to 100% production traffic:"
+    echo "     gcloud run services update-traffic ${SERVICE_NAME} --region=${REGION} --project=${PROJECT_ID} --to-tags=staging=100"
+else
+    # Get production service URL
+    SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
+        --region="${REGION}" \
+        --project="${PROJECT_ID}" \
+        --format="value(status.url)")
 
-echo ""
-echo "✅ Deployed successfully!"
-echo "   Service URL: ${SERVICE_URL}"
-echo ""
-echo "Next steps:"
-echo "  1. Test health:  curl ${SERVICE_URL}/health"
-echo "  2. Set env var in job-dashboard-react:"
-echo "     echo 'VITE_SCRAPER_API_URL=${SERVICE_URL}' >> .env.local"
-echo "  3. Rebuild React app:  npm run build"
-echo "  4. Push to GitHub Pages to deploy"
-echo ""
-echo "  To add the URL permanently, edit .env.production in job-dashboard-react:"
-echo "     VITE_SCRAPER_API_URL=${SERVICE_URL}"
+    echo ""
+    echo "✅ Deployed successfully to production (100% traffic)!"
+    echo "   Service URL: ${SERVICE_URL}"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Test health:  curl ${SERVICE_URL}/health"
+    echo "  2. Test metrics: curl ${SERVICE_URL}/api/metrics/summary"
+fi

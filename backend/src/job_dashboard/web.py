@@ -1213,6 +1213,13 @@ def make_handler(app: DashboardApp):
                 metrics["tracker_state"] = app.tracker_state
                 self.send_json(200, metrics)
                 return
+            if path == "/api/metrics/hourly":
+                query = parse_qs(parsed.query)
+                hours = int(query.get("hours", [24])[0])
+                stats = app.repository.hourly_metrics(hours=hours)
+                self.send_json(200, {"success": True, **stats})
+                return
+
             if path == "/api/rejections":
                 self.send_json(200, {"rejections": app.rejected_applications()})
                 return

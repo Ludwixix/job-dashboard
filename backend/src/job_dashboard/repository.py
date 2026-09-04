@@ -325,6 +325,47 @@ class JobRepository:
         
         return {"job_id": job_id, "status": status}
 
+    def hourly_metrics(self, hours: int = 24) -> dict[str, Any]:
+        """Calculates hourly job additions and recent discovery velocity."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # 1. Jobs added in the last 1 hour
+            last_hour_row = conn.execute("""
+                SELECT COUNT(*) AS count
+                FROM jobs
+                WHERE substr(created_at, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', datetime('now', '-1 hour'))
+            """).fetchone()
+            added_last_hour = int(last_hour_row["count"]) if last_hour_row else 0
+            
+            # 2. Jobs added in the past 24 hours
+            past_24h_row = conn.execute("""
+                SELECT COUNT(*) AS count
+                FROM jobs
+                WHERE substr(created_at, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', datetime('now', '-24 hours'))
+            """).fetchone()
+            added_past_24h = int(past_24h_row["count"]) if past_24h_row else 0
+            
+            # 3. Hourly breakdown for the specified time window
+            hours_limit = max(1, min(hours, 168))  # max 7 days
+            breakdown_rows = conn.execute(f"""
+                SELECT 
+                    strftime('%Y-%m-%dT%H:00:00Z', substr(created_at, 1, 19)) AS hour,
+                    COUNT(*) AS count
+                FROM jobs
+                WHERE substr(created_at, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', datetime('now', '-{hours_limit} hours'))
+                GROUP BY hour
+                ORDER BY hour DESC
+            """).fetchall()
+            
+            breakdown = [{"hour": row["hour"], "count": int(row["count"])} for row in breakdown_rows]
+            
+            return {
+                "added_last_hour": added_last_hour,
+                "added_past_24h": added_past_24h,
+                "hourly_breakdown": breakdown
+            }
+
     def metrics(self) -> dict[str, Any]:
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
@@ -338,7 +379,14 @@ class JobRepository:
             # Get event count
             event_count = conn.execute("SELECT COUNT(*) FROM application_events").fetchone()[0]
             
-            return {"total": total, "by_status": counts, "events": event_count}
+        hourly = self.hourly_metrics(hours=24)
+        return {
+            "total": total,
+            "by_status": counts,
+            "events": event_count,
+            "hourly_ingestion": hourly
+        }
+
 
     def upsert_scraped_jobs(self, raw_jobs: list[dict[str, Any]]) -> int:
         """Upsert a list of scraped jobs into the database with high-performance batch executemany."""

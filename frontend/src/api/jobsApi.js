@@ -58,5 +58,20 @@ export const jobsApi = {
       method: 'POST',
       body: { urls }
     });
+  },
+
+  /**
+   * Fetch hourly ingestion metrics
+   */
+  async getHourlyMetrics(hours = 24) {
+    return await apiRequest(`/api/metrics/hourly?hours=${encodeURIComponent(hours)}`);
+  },
+
+  /**
+   * Fetch full metrics summary including hourly ingestion
+   */
+  async getMetricsSummary() {
+    return await apiRequest('/api/metrics/summary');
   }
 };
+

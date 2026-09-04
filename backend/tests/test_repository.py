@@ -130,3 +130,39 @@ def test_public_job_index_excludes_gmail_and_unverifiable_dates_and_sorts_dates(
 
     assert [job["id"] for job in result["jobs"]] == ["new", "old"]
     assert result["total"] == 2
+
+
+def test_repository_hourly_metrics(tmp_path):
+    from datetime import datetime, timezone, timedelta
+    repo = JobRepository(tmp_path / "jobs.sqlite3")
+    
+    now = datetime.now(timezone.utc)
+    two_hours_ago = (now - timedelta(hours=2)).isoformat()
+    thirty_hours_ago = (now - timedelta(hours=30)).isoformat()
+    
+    # 1. Add recent job via upsert_scraped_jobs (created_at = now)
+    repo.upsert_scraped_jobs([
+        {"id": "recent_job", "title": "DevOps Engineer", "company": "TechCorp", "location": "Melbourne", "url": "https://test.com/1"}
+    ])
+    
+    # 2. Insert older jobs directly to simulate historic ingestion
+    with repo.get_connection() as conn:
+        conn.execute("""
+            INSERT INTO jobs (id, title, company, location, source, url, posted, remote, stream, score, data_json, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'core', 80, '{}', 'sourced', ?, ?)
+        """, ("two_h_job", "SysAdmin", "OlderCorp", "Melbourne", "Seek", "https://test.com/2", "2026-09-04", two_hours_ago, two_hours_ago))
+        conn.execute("""
+            INSERT INTO jobs (id, title, company, location, source, url, posted, remote, stream, score, data_json, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'core', 70, '{}', 'sourced', ?, ?)
+        """, ("thirty_h_job", "Helpdesk", "OldestCorp", "Melbourne", "Indeed", "https://test.com/3", "2026-09-02", thirty_hours_ago, thirty_hours_ago))
+
+    stats = repo.hourly_metrics(hours=24)
+    assert stats["added_last_hour"] == 1
+    assert stats["added_past_24h"] == 2
+    assert len(stats["hourly_breakdown"]) >= 1
+    
+    # Check that summary metrics() incorporates hourly_ingestion
+    summary = repo.metrics()
+    assert "hourly_ingestion" in summary
+    assert summary["hourly_ingestion"]["added_last_hour"] == 1
+    assert summary["hourly_ingestion"]["added_past_24h"] == 2

@@ -49,3 +49,12 @@ class ApiGateway:
 
     def generate_documents(self, job_id: str) -> dict[str, Any]:
         return self._app.generate(job_id)
+
+    def get_metrics(self) -> dict[str, Any]:
+        metrics = self._app.repository.metrics()
+        metrics["tracker_state"] = getattr(self._app, "tracker_state", None)
+        return metrics
+
+    def get_hourly_metrics(self, hours: int = 24) -> dict[str, Any]:
+        return self._app.repository.hourly_metrics(hours=hours)
+

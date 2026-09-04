@@ -1,33 +1,57 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, Percent, Award, Globe, 
-  BarChart3, PieChart, ChevronDown, ChevronUp 
+  BarChart3, PieChart, ChevronDown, ChevronUp, Zap, Clock 
 } from 'lucide-react';
-import { parseISO, isValid, differenceInDays } from 'date-fns';
+import { parseISO, isValid, differenceInDays, differenceInHours } from 'date-fns';
+import { jobsApi } from '../api';
 
-export const MetricsPanel = ({ jobs }) => {
+export const MetricsPanel = ({ jobs = [] }) => {
   const [showSourceMatrix, setShowSourceMatrix] = useState(false);
+  const [hourlyData, setHourlyData] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    jobsApi.getHourlyMetrics(24)
+      .then((data) => {
+        if (isMounted && data) {
+          setHourlyData(data);
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully if API is offline or in mock environment
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const metrics = useMemo(() => {
-    const submittedJobs = jobs.filter(j => 
+    const jobList = jobs || [];
+    const submittedJobs = jobList.filter(j => 
+      j && j.status && 
       !j.status.toLowerCase().includes('package prepared') && 
       !j.status.toLowerCase().includes('to submit')
     );
 
     const totalSubmitted = submittedJobs.length || 1;
 
-    const interviews = submittedJobs.filter(j => j.status.toLowerCase().includes('interview')).length;
+    const interviews = submittedJobs.filter(j => j.status && j.status.toLowerCase().includes('interview')).length;
     const actionRequired = submittedJobs.filter(j => 
-      j.status.toLowerCase().includes('action required') || 
-      j.status.toLowerCase().includes('verification')
+      j.status && (
+        j.status.toLowerCase().includes('action required') || 
+        j.status.toLowerCase().includes('verification')
+      )
     ).length;
-    const confirmation = submittedJobs.filter(j => j.status.toLowerCase().includes('confirmation')).length;
-    const underReview = submittedJobs.filter(j => j.status.toLowerCase().includes('under review')).length;
-    const appliedViewed = submittedJobs.filter(j => j.status.toLowerCase().includes('applied') || j.status.toLowerCase().includes('viewed')).length;
+    const confirmation = submittedJobs.filter(j => j.status && j.status.toLowerCase().includes('confirmation')).length;
+    const underReview = submittedJobs.filter(j => j.status && j.status.toLowerCase().includes('under review')).length;
+    const appliedViewed = submittedJobs.filter(j => j.status && (j.status.toLowerCase().includes('applied') || j.status.toLowerCase().includes('viewed'))).length;
     const closed = submittedJobs.filter(j => 
-      j.status.toLowerCase().includes('closed') || 
-      j.status.toLowerCase().includes('expired') || 
-      j.status.toLowerCase().includes('unsuccessful')
+      j.status && (
+        j.status.toLowerCase().includes('closed') || 
+        j.status.toLowerCase().includes('expired') || 
+        j.status.toLowerCase().includes('unsuccessful')
+      )
     ).length;
 
     const interviewRate = ((interviews / totalSubmitted) * 100).toFixed(1);
@@ -64,6 +88,44 @@ export const MetricsPanel = ({ jobs }) => {
       } catch { return false; }
     }).length;
 
+    // Calculate local fallback for hourly metrics if backend response is pending/unavailable
+    let localAddedLastHour = 0;
+    let localAddedPast24h = 0;
+    const localBuckets = {};
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 3600 * 1000);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:00`;
+      localBuckets[key] = 0;
+    }
+
+    jobList.forEach(j => {
+      const dateStr = j.created_at || j.date || j.first_seen;
+      if (dateStr) {
+        try {
+          const d = parseISO(dateStr);
+          if (isValid(d)) {
+            const hoursDiff = differenceInHours(now, d);
+            if (hoursDiff <= 1) localAddedLastHour++;
+            if (hoursDiff <= 24) {
+              localAddedPast24h++;
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:00`;
+              if (localBuckets[key] !== undefined) {
+                localBuckets[key]++;
+              }
+            }
+          }
+        } catch { /* ignore invalid dates */ }
+      }
+    });
+
+    const addedLastHour = hourlyData?.added_last_hour ?? localAddedLastHour;
+    const addedPast24h = hourlyData?.added_past_24h ?? localAddedPast24h;
+    const hourlyBreakdown = (hourlyData?.hourly_breakdown && hourlyData.hourly_breakdown.length > 0)
+      ? hourlyData.hourly_breakdown
+      : Object.entries(localBuckets).map(([hour, count]) => ({ hour, count }));
+
+    const maxHourlyCount = Math.max(...hourlyBreakdown.map(h => h.count), 1);
+
     return {
       totalSubmitted,
       interviews,
@@ -76,9 +138,13 @@ export const MetricsPanel = ({ jobs }) => {
       responseRate,
       sourcesList,
       last7Days,
-      last30Days
+      last30Days,
+      addedLastHour,
+      addedPast24h,
+      hourlyBreakdown,
+      maxHourlyCount
     };
-  }, [jobs]);
+  }, [jobs, hourlyData]);
 
   return (
     <div className="bg-slate-900 rounded-2xl p-6 border-2 border-slate-800 shadow-md space-y-6 font-sans text-white">
@@ -95,7 +161,19 @@ export const MetricsPanel = ({ jobs }) => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
+        {/* Hourly Discovery Velocity */}
+        <div className="p-4 rounded-lg bg-cyan-50/70 border border-cyan-300 flex items-center gap-4">
+          <div className="p-3 bg-cyan-600 text-white rounded-lg shadow-2xs">
+            <Zap size={22} className="animate-pulse" />
+          </div>
+          <div>
+            <div className="text-[11px] font-bold text-cyan-900 uppercase tracking-wider">HOURLY DISCOVERY</div>
+            <div className="text-2xl font-black text-cyan-950 mt-0.5">+{metrics.addedLastHour} <span className="text-xs font-bold text-cyan-700">/ HOUR</span></div>
+            <div className="text-[11px] text-cyan-800 font-bold">+{metrics.addedPast24h} IN PAST 24H</div>
+          </div>
+        </div>
+
         {/* Interview Rate */}
         <div className="p-4 rounded-lg bg-emerald-50/70 border border-emerald-300 flex items-center gap-4">
           <div className="p-3 bg-emerald-600 text-white rounded-lg shadow-2xs">
@@ -135,6 +213,52 @@ export const MetricsPanel = ({ jobs }) => {
 
       {/* Breakdown Grids */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+        {/* Hourly Ingestion Velocity Sparkline / Timeline */}
+        <div className="col-span-1 md:col-span-2 bg-slate-50/60 p-4 rounded-xl border border-slate-200/80 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h4 className="text-xs font-mono font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+              <Clock size={15} className="text-cyan-600" /> HOURLY DISCOVERY TIMELINE (LAST 24 HOURS)
+            </h4>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">
+                <Zap size={12} className="text-cyan-600" /> +{metrics.addedLastHour} last hour
+              </span>
+              <span className="text-[11px] font-mono font-bold text-slate-600">
+                +{metrics.addedPast24h} added past 24h
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <div className="flex items-end gap-1 h-20 bg-white/80 p-2 rounded-lg border border-slate-200">
+              {metrics.hourlyBreakdown.map((item, idx) => {
+                const heightPercent = Math.max((item.count / metrics.maxHourlyCount) * 100, item.count > 0 ? 15 : 4);
+                return (
+                  <div 
+                    key={idx} 
+                    className="flex-1 flex flex-col items-center h-full justify-end group relative"
+                    title={`${item.hour}: ${item.count} job(s) discovered`}
+                  >
+                    <div 
+                      className={`w-full rounded-t transition-all duration-300 ${
+                        item.count > 0 
+                          ? 'bg-cyan-500 hover:bg-cyan-600 cursor-pointer' 
+                          : 'bg-slate-200 hover:bg-slate-300'
+                      }`}
+                      style={{ height: `${heightPercent}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-1.5 px-1">
+              <span>24h ago</span>
+              <span>12h ago</span>
+              <span>Current Hour (+{metrics.addedLastHour})</span>
+            </div>
+          </div>
+        </div>
+
         {/* Source Share Breakdown (Minimizable) */}
         <div className="space-y-3 bg-slate-50/60 p-4 rounded-xl border border-slate-200/80">
           <div 

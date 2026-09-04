@@ -169,14 +169,22 @@ export const saveProfileToBackend = async (profile) => {
     return null;
   }
   const apiBase = getBackendApiBase();
+  const token = typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('job_dashboard_auth_token') || localStorage.getItem('job_dashboard_token'))
+    : null;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-User-Id': userId
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
     const res = await fetch(`${apiBase}/api/profile`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId
-      },
+      headers,
       body: JSON.stringify(profile)
     });
     if (res.ok) {
@@ -199,10 +207,20 @@ export const fetchProfileFromBackend = async (userId) => {
     return getActiveProfile();
   }
   const apiBase = getBackendApiBase();
+  const token = typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('job_dashboard_auth_token') || localStorage.getItem('job_dashboard_token'))
+    : null;
+
+  const headers = {
+    'X-User-Id': resolvedUserId
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
     const res = await fetch(`${apiBase}/api/profile?user_id=${encodeURIComponent(resolvedUserId)}`, {
-      headers: { 'X-User-Id': resolvedUserId }
+      headers
     });
     if (res.ok) {
       const data = await res.json();

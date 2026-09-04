@@ -16,6 +16,7 @@ import {
 } from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
 import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
+import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
 
 const INDUSTRY_OPTIONS = [
   'Technology & IT',
@@ -305,6 +306,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
 
     setActiveApiKey(apiKey);
     const saved = saveProfile(formData);
+    runProfileOnboardingPipeline(saved).catch(() => {});
     setSaveSuccess(true);
     if (onProfileSaved) {
       onProfileSaved(saved);

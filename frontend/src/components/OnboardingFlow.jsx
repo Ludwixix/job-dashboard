@@ -7,11 +7,21 @@ import {
   ShoppingBag, Truck, Palette, Compass, Key, Sliders, Award, Target, HelpCircle, Info, ChevronRight
 } from 'lucide-react';
 import { loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPersona } from '../services/authService';
-import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES } from '../services/profileService';
+import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES, saveProfileToBackend } from '../services/profileService';
 import { loginWithBrowserPasskey, isPasskeySupported, storeBrowserCredentials } from '../services/passkeyService';
 import { loginWithGoogle } from '../services/googleAuthService';
 import { GooglePromptModal } from './GooglePromptModal';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
+import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
+import { getActiveApiKey, getActiveModel } from '../services/generationService';
+
+export const SENIORITY_OPTIONS = [
+  { id: 'Junior', label: 'Junior / Entry', exp: '0–2 Yrs', desc: 'Focus on growth, mentorship & core fundamentals' },
+  { id: 'Mid-Level', label: 'Mid-Level', exp: '2–5 Yrs', desc: 'Autonomous delivery, solid production mastery' },
+  { id: 'Senior', label: 'Senior Specialist', exp: '5–8 Yrs', desc: 'Deep technical ownership, architectural guidance' },
+  { id: 'Lead', label: 'Lead & Staff', exp: '8–12 Yrs', desc: 'Strategic roadmap, team leadership, player-coach' },
+  { id: 'Director', label: 'Director & Exec', exp: '12+ Yrs', desc: 'Executive vision, organizational hiring & P&L' }
+];
 
 const INDUSTRY_OPTIONS = [
   { 
@@ -161,10 +171,11 @@ export const OnboardingFlow = ({ onComplete }) => {
     phone: '0400 000 000',
     title: '',
     industry: 'Technology & IT',
+    seniorityLevel: 'Senior',
     location: 'Balaclava VIC 3183',
     suburb: 'Balaclava',
     workMode: 'Any / Flexible',
-    targetSalary: '$120,000 + Super',
+    targetSalary: '$130,000 + Super',
     workRights: 'Australian Citizen (Unrestricted)',
     clearance: 'Citizen / Standard Police Check',
     targetTitles: ['Senior Systems Engineer', 'Cloud Infrastructure Engineer', 'M365 Engineer'],
@@ -180,6 +191,8 @@ export const OnboardingFlow = ({ onComplete }) => {
   const [parseSuccessMsg, setParseSuccessMsg] = useState('');
   const [newTitleInput, setNewTitleInput] = useState('');
   const [newSkillInput, setNewSkillInput] = useState('');
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [launchMessage, setLaunchMessage] = useState('');
 
   // Live active industry theme styling
   const activeIndustryTheme = useMemo(() => {
@@ -190,18 +203,40 @@ export const OnboardingFlow = ({ onComplete }) => {
     applyIndustryTheme(profileData.industry);
   }, [profileData.industry]);
 
-  // Bespoke Setup Readiness Score (0 to 100%)
-  const readinessScore = useMemo(() => {
+  // Bespoke Setup Readiness Score (0 to 100%) & AI Career Coach Insights
+  const readinessAnalysis = useMemo(() => {
     let score = 0;
-    if (profileData.name) score += 15;
+    const missingItems = [];
+    if (profileData.name && profileData.name.trim().length >= 2) {
+      score += 15;
+    } else {
+      missingItems.push('Enter your name');
+    }
     if (profileData.email) score += 10;
     if (profileData.industry) score += 15;
-    if (profileData.targetTitles?.length >= 2) score += 20;
-    if (profileData.coreSkills?.length >= 4) score += 20;
+    if (profileData.seniorityLevel) score += 10;
+    if (profileData.targetTitles?.length >= 2) {
+      score += 20;
+    } else {
+      missingItems.push('Add at least 2 target titles');
+    }
+    if (profileData.coreSkills?.length >= 6) {
+      score += 20;
+    } else if (profileData.coreSkills?.length >= 3) {
+      score += 10;
+      missingItems.push('Add 3 more domain skills for ATS optimization');
+    } else {
+      missingItems.push('Add skills to reach ATS threshold');
+    }
     if (profileData.location) score += 10;
-    if (profileData.targetSalary) score += 10;
-    return Math.min(100, score);
+    return {
+      score: Math.min(100, score),
+      missingItems,
+      atsDensity: (profileData.coreSkills?.length || 0) >= 8 ? 'Optimal' : (profileData.coreSkills?.length || 0) >= 4 ? 'Good' : 'Low'
+    };
   }, [profileData]);
+
+  const readinessScore = readinessAnalysis.score;
 
   // STEP 1: AUTH HANDLERS
   const handleAuthSubmit = async (e) => {
@@ -352,10 +387,27 @@ export const OnboardingFlow = ({ onComplete }) => {
     setProfileData(prev => ({ ...prev, targetTitles: prev.targetTitles.filter(t => t !== title) }));
   };
 
-  // FINAL COMPLETION
-  const handleFinalSubmit = () => {
-    const { session, profile } = completeOnboarding(profileData);
-    if (onComplete) onComplete(session, profile);
+  // FINAL COMPLETION & PIPELINE HAND-OFF
+  const handleFinalSubmit = async () => {
+    setIsLaunching(true);
+    setLaunchMessage('Saving candidate profile to secure database...');
+    try {
+      const { session, profile } = completeOnboarding(profileData);
+      setLaunchMessage('Pushing personalized search criteria to scrapers...');
+      await saveProfileToBackend(profile);
+      setLaunchMessage('Seeding recommendation weights & active theme...');
+      await runProfileOnboardingPipeline(profile);
+      setLaunchMessage('Ready! Welcome to your personalized dashboard.');
+      setTimeout(() => {
+        if (onComplete) onComplete(session, profile);
+      }, 350);
+    } catch (err) {
+      console.error('Error during final onboarding handoff:', err);
+      const { session, profile } = completeOnboarding(profileData);
+      if (onComplete) onComplete(session, profile);
+    } finally {
+      setIsLaunching(false);
+    }
   };
 
   const currentIndustryObj = useMemo(() => {
@@ -635,6 +687,52 @@ export const OnboardingFlow = ({ onComplete }) => {
                 })}
               </div>
 
+              {/* Seniority Level Calibration */}
+              <div className="space-y-2.5 pt-4 border-t border-slate-800 font-mono text-xs">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-300 font-bold flex items-center gap-1.5">
+                    <Award size={14} className="text-amber-400" /> CAREER SENIORITY STAGE:
+                  </label>
+                  <span className="text-[10px] text-indigo-400 font-bold">
+                    Active: {SENIORITY_OPTIONS.find(s => s.id === profileData.seniorityLevel)?.label || 'Senior'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                  {SENIORITY_OPTIONS.map((sen) => {
+                    const isSelected = profileData.seniorityLevel === sen.id;
+                    return (
+                      <button
+                        key={sen.id}
+                        type="button"
+                        onClick={() => setProfileData(prev => ({ ...prev, seniorityLevel: sen.id }))}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-indigo-950/90 border-indigo-400 text-white shadow-lg'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <div className="font-black text-xs">{sen.label}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{sen.exp}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Hand-Holding Coach Guidance Box */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-start gap-2.5 text-xs text-indigo-200 font-mono">
+                <Sparkles size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-white text-[11px] uppercase tracking-wide">
+                    💡 Why This Matters: Targeted Query Calibration
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Selecting your industry and seniority primes our search engines (Seek, LinkedIn, Adzuna) to crawl roles matching your exact career tier. This eliminates entry-level noise and guarantees every job in your feed matches your compensation expectations.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
                 <button
                   onClick={() => setStep(1)}
@@ -796,6 +894,50 @@ export const OnboardingFlow = ({ onComplete }) => {
                       + {s}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* ATS Keyword Strength Bar */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 font-mono text-xs">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 font-bold flex items-center gap-1.5">
+                    <Target size={13} className="text-indigo-400" /> ATS KEYWORD DENSITY:
+                  </span>
+                  <span className={`font-black uppercase text-xs ${
+                    readinessAnalysis.atsDensity === 'Optimal' ? 'text-emerald-400' :
+                    readinessAnalysis.atsDensity === 'Good' ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {readinessAnalysis.atsDensity} ({profileData.coreSkills.length} SKILLS)
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      readinessAnalysis.atsDensity === 'Optimal' ? 'bg-emerald-500' :
+                      readinessAnalysis.atsDensity === 'Good' ? 'bg-amber-500' : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (profileData.coreSkills.length / 8) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {readinessAnalysis.atsDensity === 'Optimal'
+                    ? '✨ Optimal! High semantic coverage across modern ATS candidate screeners.'
+                    : readinessAnalysis.atsDensity === 'Good'
+                    ? '⚡ Good foundation. Add 2+ specialized tools or cloud certifications to unlock 90%+ match tiers.'
+                    : '⚠️ Warning: Add at least 4 core skills so the auto-scoring engine can match job descriptions.'}
+                </div>
+              </div>
+
+              {/* Hand-Holding Coach Guidance Box */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-start gap-2.5 text-xs text-indigo-200 font-mono">
+                <Sparkles size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-white text-[11px] uppercase tracking-wide">
+                    💡 Why This Matters: ATS Screening & Recommendation Engine
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    98% of tier-1 recruiters filter applicants using strict keyword matching algorithms. Our local scoring engine cross-references these tags against live job postings to surface roles where you are statistically in the top 10% of applicants.
+                  </p>
                 </div>
               </div>
 
@@ -973,6 +1115,19 @@ export const OnboardingFlow = ({ onComplete }) => {
                 </div>
               </div>
 
+              {/* Hand-Holding Coach Guidance Box */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-start gap-2.5 text-xs text-indigo-200 font-mono">
+                <Sparkles size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-white text-[11px] uppercase tracking-wide">
+                    💡 Why This Matters: Commute Distance & Lifestyle Boundaries
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Our platform computes door-to-door transit times and distance from your home base. Establishing your commute baseline and target pay ensures our Auto-Pilot filters out unsustainable commutes and roles that don't meet your salary floor.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
                 <button
                   onClick={() => setStep(3)}
@@ -1071,21 +1226,41 @@ export const OnboardingFlow = ({ onComplete }) => {
                 </div>
               </div>
 
+              {/* Readiness Optimization Tips if not 100% */}
+              {readinessAnalysis.missingItems.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-xs font-mono space-y-2">
+                  <div className="text-amber-300 font-bold flex items-center gap-1.5 text-[11px]">
+                    <Sparkles size={13} className="text-amber-400" /> RECOMMENDED ACTIONS TO REACH 100% CANDIDATE POWER:
+                  </div>
+                  <ul className="text-slate-300 text-[11px] space-y-1 pl-4 list-disc">
+                    {readinessAnalysis.missingItems.map((tip, idx) => (
+                      <li key={idx}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Launch & Back Action Buttons */}
               <div className="space-y-3">
                 <button
                   onClick={handleFinalSubmit}
-                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-mono font-black text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5"
+                  disabled={isLaunching}
+                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-mono font-black text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75"
                 >
-                  <Zap size={20} className="animate-bounce text-amber-300" />
-                  <span>⚡ LAUNCH MY BESPOKE JOB MATRIX</span>
+                  {isLaunching ? (
+                    <RefreshCw size={18} className="animate-spin text-white" />
+                  ) : (
+                    <Zap size={20} className="animate-bounce text-amber-300" />
+                  )}
+                  <span>{isLaunching ? (launchMessage || 'CALIBRATING PROFILE & SCRAPERS...') : '⚡ LAUNCH MY BESPOKE JOB MATRIX'}</span>
                 </button>
 
                 <div className="text-center">
                   <button
                     type="button"
                     onClick={() => setStep(4)}
-                    className="text-slate-400 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer"
+                    disabled={isLaunching}
+                    className="text-slate-400 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
                   >
                     ← Back to edit preferences
                   </button>

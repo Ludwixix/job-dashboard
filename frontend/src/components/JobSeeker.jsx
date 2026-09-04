@@ -408,7 +408,6 @@ export const JobSeeker = ({
                             job.location.toLowerCase().includes(search.toLowerCase());
       
       const matchesSource = sourceFilter === 'All' || (job.source || '').toLowerCase() === sourceFilter.toLowerCase();
-
       // Stream Tab filter
       let matchesStream = true;
       if (activeStreamTab === 'Custom') {

@@ -1026,13 +1026,18 @@ def make_handler(app: DashboardApp):
                 token = auth_header.split(" ")[1]
                 try:
                     payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+                    user_id = payload.get("sub")
+                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
+                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
                     self.send_json(200, {
                         "success": True,
                         "user": {
-                            "id": payload.get("sub"),
+                            "id": user_id,
                             "email": payload.get("email"),
                             "name": payload.get("name")
-                        }
+                        },
+                        "profile": user_profile if user_profile else None,
+                        "has_profile": has_profile
                     })
                 except Exception as e:
                     self.send_json(401, {"error": str(e)})
@@ -1601,6 +1606,8 @@ def make_handler(app: DashboardApp):
                         "exp": now + datetime.timedelta(days=7)
                     }, JWT_SECRET, algorithm="HS256")
                     
+                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
+                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
                     self.send_json(200, {
                         "success": True,
                         "token": token,
@@ -1608,7 +1615,9 @@ def make_handler(app: DashboardApp):
                             "id": user_id,
                             "email": email,
                             "name": name
-                        }
+                        },
+                        "profile": user_profile if user_profile else None,
+                        "has_profile": has_profile
                     })
                     return
 
@@ -1650,6 +1659,8 @@ def make_handler(app: DashboardApp):
                         "exp": datetime.datetime.utcnow() + datetime.timedelta(days=7)
                     }, JWT_SECRET, algorithm="HS256")
                     
+                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
+                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
                     self.send_json(200, {
                         "success": True,
                         "token": token,
@@ -1657,7 +1668,9 @@ def make_handler(app: DashboardApp):
                             "id": user_id,
                             "email": email,
                             "name": name
-                        }
+                        },
+                        "profile": user_profile if user_profile else None,
+                        "has_profile": has_profile
                     })
                     return
 
@@ -1721,7 +1734,9 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {
                         "success": True,
                         "token": token,
-                        "user": {"id": user_id, "email": email, "name": name}
+                        "user": {"id": user_id, "email": email, "name": name},
+                        "profile": None,
+                        "has_profile": False
                     })
                     return
 
@@ -1779,10 +1794,14 @@ def make_handler(app: DashboardApp):
                     }
                     token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
                     
+                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
+                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
                     self.send_json(200, {
                         "success": True,
                         "token": token,
-                        "user": {"id": user_id, "email": email, "name": name}
+                        "user": {"id": user_id, "email": email, "name": name},
+                        "profile": user_profile if user_profile else None,
+                        "has_profile": has_profile
                     })
                     return
 

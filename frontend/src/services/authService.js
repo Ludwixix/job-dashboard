@@ -42,6 +42,14 @@ export const setSession = (userData, token = null) => {
   }
 };
 
+export const getAuthToken = () => {
+  try {
+    return localStorage.getItem(LS_TOKEN) || localStorage.getItem('job_dashboard_token') || null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Validates or restores the active user session on page load / refresh
  */
@@ -49,7 +57,7 @@ export const validateSession = async () => {
   const current = getCurrentSession();
   if (!current) return null;
 
-  const token = localStorage.getItem(LS_TOKEN);
+  const token = getAuthToken();
   if (!token) {
     return current;
   }
@@ -63,12 +71,17 @@ export const validateSession = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.user) {
+        const hasProfile = Boolean(data.has_profile && data.profile);
         const verifiedSession = {
           ...current,
           ...data.user,
-          authProvider: current.authProvider || 'email'
+          authProvider: current.authProvider || 'email',
+          onboardingCompleted: current.onboardingCompleted !== undefined ? current.onboardingCompleted : hasProfile
         };
         setSession(verifiedSession, token);
+        if (hasProfile && data.profile) {
+          saveProfile(data.profile);
+        }
         return verifiedSession;
       }
     }
@@ -102,13 +115,20 @@ export const loginWithEmail = async (email, password) => {
     throw new Error(data.error || 'Invalid credentials');
   }
 
+  const hasProfile = Boolean(data.has_profile && data.profile);
   const sessionUser = {
     ...data.user,
     authProvider: 'email',
-    onboardingCompleted: true // Assuming if they have an account, they onboarded. Or derive from profile sync.
+    onboardingCompleted: hasProfile,
+    profileId: data.user.id
   };
 
   setSession(sessionUser, data.token);
+
+  if (hasProfile && data.profile) {
+    saveProfile(data.profile);
+  }
+
   return sessionUser;
 };
 
@@ -151,16 +171,16 @@ export const registerWithEmail = async (name, email, password) => {
 export const completeOnboarding = (profileData) => {
   const current = getCurrentSession() || {
     id: `user_${Date.now()}`,
-    name: profileData.name || 'Candidate',
-    email: profileData.email || 'user@example.com',
+    name: profileData?.name || 'Candidate',
+    email: profileData?.email || 'user@example.com',
     authProvider: 'email'
   };
 
   const finalProfile = {
     ...profileData,
-    id: profileData.id || current.id || `profile_${Date.now()}`,
-    name: profileData.name || current.name,
-    email: profileData.email || current.email
+    id: current.id || profileData?.id || `user_${Date.now()}`,
+    name: profileData?.name || current.name,
+    email: profileData?.email || current.email
   };
 
   saveProfile(finalProfile);
@@ -176,7 +196,7 @@ export const completeOnboarding = (profileData) => {
     lastActiveAt: new Date().toISOString()
   };
 
-  setSession(updatedSession, localStorage.getItem(LS_TOKEN)); // preserve token
+  setSession(updatedSession, getAuthToken()); // preserve token
   return { session: updatedSession, profile: finalProfile };
 };
 
@@ -209,4 +229,8 @@ export const loginWithDemoPersona = (presetId) => {
 export const logoutUser = () => {
   localStorage.removeItem(LS_SESSION);
   localStorage.removeItem(LS_TOKEN);
+  localStorage.removeItem('job_dashboard_token');
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth-logged-out'));
+  }
 };

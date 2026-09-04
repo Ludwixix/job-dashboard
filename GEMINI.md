@@ -13,13 +13,14 @@ The repository is divided into two primary subtrees:
 - `frontend/`: Vite + React SPA providing the user interface (Kanban board, tailored document generation, psychology profiler, and minimalist Zen Autopilot).
 
 ## Backend Modules (`backend/src/job_dashboard/`)
+- API Boundary: `api/` is the sole entrypoint the frontend may interact with; request handlers must not import internal domain modules or `service.py` directly.
 - Domain Models & Types: `models.py`, `types.py`
 - Normalization & Cleaning: `normalize.py`, `utils.py`
 - Classification & Taxonomy: `classify.py`
 - Match Scoring Engine: `score.py`
 - Applications & Tracking: `applications.py`, `smart_applications.py`
 - Domain Services & Facades: `service.py`
-- Scraper Contracts & Adapters: `sources/` (provider adapters and deduplication)
+- Scraper Contracts & Adapters: `sources/` (`indeed.py`, `adzuna.py`, `remoteok.py`, `seek.py`, `linkedin.py`, `base.py`, `dedup.py`)
 - Database & WAL Persistence: `db_pool.py`, `repository.py`
 - Server & HTTP Endpoints: `web.py`, `run_server.py`
 - Diagnostics & Integrity: `health.py`, `verifier.py`

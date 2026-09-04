@@ -16,8 +16,11 @@ from .sources import (
     SeekApiSource,
 )
 
+from .api import ApiGateway
+
 __all__ = [
     "AdzunaApiSource",
+    "ApiGateway",
     "ApplicationRecord",
     "IndeedJobSpySource",
     "Job",

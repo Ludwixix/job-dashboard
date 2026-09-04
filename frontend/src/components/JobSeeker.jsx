@@ -30,7 +30,7 @@ import {
   resetUserPreferences
 } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
-import { SCRAPER_BASE_URL } from '../services/jobQueryService';
+import { SCRAPER_BASE_URL, buildQueriesFromProfile } from '../services/jobQueryService';
 import { 
   ROLE_ARCHETYPES,
   getProfileAutoRoles,
@@ -608,6 +608,10 @@ export const JobSeeker = ({
   const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date' || sortDirection !== 'desc';
 
   const handleRunScraper = async () => {
+    if (typeof onTriggerScrape === 'function') {
+      onTriggerScrape();
+      return;
+    }
     setScrapeElapsedSeconds(0);
     setScraping(true);
     setScrapeSuccess(false);
@@ -615,7 +619,12 @@ export const JobSeeker = ({
     
     try {
       const endpoint = `${SCRAPER_BASE_URL}/api/refresh`;
-      const res = await fetch(endpoint, { method: 'POST' });
+      const queries = currentProfile ? buildQueriesFromProfile(currentProfile) : [];
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queries, force: true })
+      });
       const data = await res.json();
       
       if (data.success || Array.isArray(data.jobs)) {

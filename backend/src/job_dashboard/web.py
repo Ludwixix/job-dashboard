@@ -1787,10 +1787,18 @@ def make_handler(app: DashboardApp):
                     return
 
                 elif path == "/api/refresh":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = {}
+                    if content_len > 0:
+                        try:
+                            payload = json.loads(self.rfile.read(content_len))
+                        except Exception:
+                            payload = {}
+                    if not isinstance(payload, dict):
+                        payload = {}
                     raw_queries = payload.get("queries", [])
                     if not isinstance(raw_queries, list):
-                        raise ValueError("queries must be a list")
+                        raw_queries = []
                     queries = []
                     for item in raw_queries:
                         if isinstance(item, str):
@@ -1808,6 +1816,8 @@ def make_handler(app: DashboardApp):
                             continue
                         if term:
                             queries.append(SearchQuery(term, location, stream, group, weight, exclude_terms, enabled))
+                    if not queries:
+                        queries = list(app.search_queries)
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:

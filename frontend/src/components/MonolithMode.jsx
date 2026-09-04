@@ -25,6 +25,7 @@ export default function MonolithMode({
   onSwitchMode,
   onOpenJobModal,
   onOpenGenerator,
+  onOpenBatchApply,
   onOpenProfileModal,
   onOpenCommandPalette
 }) {
@@ -132,6 +133,18 @@ export default function MonolithMode({
             </div>
 
             {/* Profile Action */}
+            {onOpenBatchApply && (
+              <button
+                type="button"
+                onClick={onOpenBatchApply}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#b87326]/60 hover:border-[#d48b38] bg-[#1a1612] text-[#d48b38] hover:text-[#ede6dc] text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                title="Dispatch 1-Click Batch Automated Applications"
+              >
+                <Zap size={11} className="text-[#d48b38]" />
+                <span>BATCH DISPATCH</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onOpenProfileModal}

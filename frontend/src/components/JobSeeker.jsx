@@ -160,7 +160,8 @@ export const JobSeeker = ({
   onDispatchAsyncApplication,
   asyncGeneratingIds = new Set(),
   onJobStatusUpdate,
-  onSaveCustomDocs
+  onSaveCustomDocs,
+  onOpenBatchApply
 }) => {
 
   const currentProfile = activeProfile || getActiveProfile();
@@ -758,6 +759,17 @@ export const JobSeeker = ({
               {readyToSubmitCount}
             </span>
           </button>
+
+          {onOpenBatchApply && (
+            <button
+              onClick={onOpenBatchApply}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-mono font-black text-xs transition-all cursor-pointer border border-emerald-300 shadow-sm"
+              title="Open 1-Click Batch Auto-Apply Dispatcher"
+            >
+              <Zap size={14} className="text-slate-950 fill-slate-950" />
+              <span>BATCH APPLY</span>
+            </button>
+          )}
 
           <button
             onClick={() => setShowSidebar(!showSidebar)}

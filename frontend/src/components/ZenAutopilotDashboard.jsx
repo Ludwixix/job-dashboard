@@ -19,7 +19,8 @@ import {
   Copy, 
   Check, 
   TrendingUp,
-  ShieldCheck
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { subscribeAutopilot, triggerAutonomousGmailScan } from '../services/autopilotAgent';
 import { fetchDocumentFromBackend } from '../services/generationService';
@@ -33,6 +34,7 @@ export default function ZenAutopilotDashboard({
   onSwitchToStudio,
   onSwitchToMonolith,
   onOpenJobModal,
+  onOpenBatchApply,
   onOpenProfileModal,
   onOpenMockInterview
 }) {
@@ -173,6 +175,17 @@ export default function ZenAutopilotDashboard({
             <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isScanningGmail ? 'animate-spin' : ''}`} />
             <span>{isScanningGmail ? 'Scanning Radar...' : 'Gmail Radar'}</span>
           </button>
+
+          {onOpenBatchApply && (
+            <button
+              onClick={onOpenBatchApply}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 transition-all shadow-sm hover:border-emerald-400/60 cursor-pointer"
+              title="Open 1-Click Batch Auto-Apply Dispatcher"
+            >
+              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Batch Apply</span>
+            </button>
+          )}
 
           {onSwitchToMonolith && (
             <button

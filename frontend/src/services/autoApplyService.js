@@ -243,6 +243,6 @@ ${coverLetterText}
     screeningQuestions: screeningMap,
     clipboardSuccess,
     popupBlocked,
-    targetUrl: link ? (link.startsWith('http') ? link : `https://${link}`) : null
+    targetUrl
   };
 };

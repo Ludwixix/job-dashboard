@@ -440,7 +440,28 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             setIsProfileModalOpen(true);
           }}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenBatchApply={() => setIsBatchApplyOpen(true)}
         />
+
+        {isBatchApplyOpen && (
+          <BatchApplyModal 
+            jobs={jobs}
+            isOpen={isBatchApplyOpen}
+            onClose={() => setIsBatchApplyOpen(false)}
+            onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
+            onNavigateToTracker={() => {
+              setViewMode('studio');
+              setActiveSection('kanban');
+            }}
+            onComplete={(results) => {
+              results.forEach(res => {
+                if (res.success) {
+                  updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
+                }
+              });
+            }}
+          />
+        )}
 
         {/* Global Modals in Monolith Mode */}
         {selectedJob && (
@@ -527,12 +548,33 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           onSwitchToStudio={() => setViewMode('studio')}
           onSwitchToMonolith={() => setViewMode('monolith')}
           onOpenJobModal={(job) => setSelectedJob(job)}
+          onOpenBatchApply={() => setIsBatchApplyOpen(true)}
           onOpenProfileModal={() => {
             setEditingProfile(activeProfile);
             setIsProfileModalOpen(true);
           }}
           onOpenMockInterview={(job) => setSelectedForMockInterview(job)}
         />
+
+        {isBatchApplyOpen && (
+          <BatchApplyModal 
+            jobs={jobs}
+            isOpen={isBatchApplyOpen}
+            onClose={() => setIsBatchApplyOpen(false)}
+            onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
+            onNavigateToTracker={() => {
+              setViewMode('studio');
+              setActiveSection('kanban');
+            }}
+            onComplete={(results) => {
+              results.forEach(res => {
+                if (res.success) {
+                  updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
+                }
+              });
+            }}
+          />
+        )}
 
         {/* Global Modals in Zen Mode */}
         {selectedJob && (
@@ -930,6 +972,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   baseLocation={baseLocation} 
                   onDispatchAsyncApplication={handleDispatchAsyncApplication}
                   asyncGeneratingIds={asyncGeneratingIds}
+                  onOpenBatchApply={() => setIsBatchApplyOpen(true)}
                   onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
                   onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
                   onSaveCustomDocs={(jobId, docData) => {
@@ -1124,10 +1167,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           jobs={jobs}
           isOpen={isBatchApplyOpen}
           onClose={() => setIsBatchApplyOpen(false)}
+          onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
+          onNavigateToTracker={() => setActiveSection('kanban')}
           onComplete={(results) => {
             results.forEach(res => {
               if (res.success) {
-                updateJobStatus(res.job.id || res.job.title, 'Applied / Confirmation Received', res.result);
+                updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
               }
             });
           }}

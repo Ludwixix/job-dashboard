@@ -30,12 +30,14 @@ const SettingsModal = lazy(() => import('./SettingsModal').then(m => ({ default:
 const FollowUpEmailModal = lazy(() => import('./FollowUpEmailModal').then(m => ({ default: m.FollowUpEmailModal })));
 const OfferActionHubModal = lazy(() => import('./OfferActionHubModal').then(m => ({ default: m.OfferActionHubModal })));
 const ExecutiveDossierModal = lazy(() => import('./ExecutiveDossierModal').then(m => ({ default: m.ExecutiveDossierModal })));
+const RecruiterRelationshipModal = lazy(() => import('./RecruiterRelationshipModal').then(m => ({ default: m.RecruiterRelationshipModal })));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
 import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
+import { fetchCadenceRadar } from '../services/recruiterCrmService';
 
 import { fetchJobsForProfile } from '../services/dataService';
 import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
@@ -45,7 +47,7 @@ import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../se
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users
 } from 'lucide-react';
 
 
@@ -59,10 +61,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForOutreach, setSelectedForOutreach] = useState(null);
   const [selectedForOfferHub, setSelectedForOfferHub] = useState(null);
   const [selectedForDossier, setSelectedForDossier] = useState(null);
+  const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
+  const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
+  const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
   const [isCustomJobModalOpen, setIsCustomJobModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchCadenceRadar().then((radar) => {
+      if (radar && typeof radar.overdue_count === 'number') {
+        setOverdueTouchpointCount(radar.overdue_count);
+      }
+    }).catch(() => {});
+  }, []);
 
 
   // Candidate Personalization Profile State
@@ -515,6 +528,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenBatchApply={() => setIsBatchApplyOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenRecruiterCrm={() => setIsRecruiterCrmOpen(true)}
+          overdueTouchpointCount={overdueTouchpointCount}
         />
 
         {isBatchApplyOpen && (
@@ -548,6 +563,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
               onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
               onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
+              onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
               profile={activeProfile}
               allJobs={jobs}
@@ -573,8 +589,31 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           <Suspense fallback={<ModalSkeleton />}>
             <MockInterviewModal
               job={selectedForMockInterview}
-              profile={activeProfile}
+              isOpen={Boolean(selectedForMockInterview)}
               onClose={() => setSelectedForMockInterview(null)}
+              profile={activeProfile}
+            />
+          </Suspense>
+        )}
+
+        {selectedForInterviewPrep && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <InterviewPrepModal
+              job={selectedForInterviewPrep}
+              isOpen={Boolean(selectedForInterviewPrep)}
+              onClose={() => setSelectedForInterviewPrep(null)}
+              profile={activeProfile}
+            />
+          </Suspense>
+        )}
+
+        {selectedForOutreach && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <FollowUpEmailModal
+              job={selectedForOutreach}
+              isOpen={Boolean(selectedForOutreach)}
+              onClose={() => setSelectedForOutreach(null)}
+              prefillRecruiter={selectedForOutreach.contactEmail ? { recipientEmail: selectedForOutreach.contactEmail, company: selectedForOutreach.company } : null}
             />
           </Suspense>
         )}
@@ -596,6 +635,27 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onClose={() => setSelectedForDossier(null)}
               job={selectedForDossier}
               profile={activeProfile}
+            />
+          </Suspense>
+        )}
+
+        {isRecruiterCrmOpen && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <RecruiterRelationshipModal
+              isOpen={isRecruiterCrmOpen}
+              onClose={() => {
+                setIsRecruiterCrmOpen(false);
+                setSelectedForRecruiterCrm(null);
+              }}
+              activeJob={selectedForRecruiterCrm}
+              onOpenFollowUpEmail={(recruiterInfo) => {
+                setIsRecruiterCrmOpen(false);
+                setSelectedForOutreach({
+                  ...(selectedForRecruiterCrm || {}),
+                  contactEmail: recruiterInfo.recipientEmail,
+                  company: recruiterInfo.company || selectedForRecruiterCrm?.company || '',
+                });
+              }}
             />
           </Suspense>
         )}
@@ -715,6 +775,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             }}
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
+
+          {/* Recruiter & Talent CRM Hub */}
+          <button
+            onClick={() => setIsRecruiterCrmOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-500/50 text-purple-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+            title="Recruiter & Talent Network CRM: Agency Directory & Follow-Up Radar"
+          >
+            <Users size={12} className="text-purple-400" />
+            <span>RECRUITER CRM</span>
+            {overdueTouchpointCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse">
+                {overdueTouchpointCount}
+              </span>
+            )}
+          </button>
 
           {/* Dashboard Settings & LLM Configuration */}
           <button
@@ -1097,6 +1172,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenOutreach={(j) => { setSelectedJob(null); setSelectedForOutreach(j); }}
               onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
               onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
+              onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               job={liveSelectedJob} 
               onClose={() => setSelectedJob(null)} 
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
@@ -1217,6 +1293,30 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               profile={activeProfile}
               isOpen={Boolean(liveSelectedForDossier)}
               onClose={() => setSelectedForDossier(null)}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Recruiter & Talent CRM Hub Modal */}
+      {isRecruiterCrmOpen && (
+        <SafeErrorBoundary sectionName="Recruiter CRM Hub" onClose={() => { setIsRecruiterCrmOpen(false); setSelectedForRecruiterCrm(null); }}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <RecruiterRelationshipModal
+              isOpen={isRecruiterCrmOpen}
+              onClose={() => {
+                setIsRecruiterCrmOpen(false);
+                setSelectedForRecruiterCrm(null);
+              }}
+              activeJob={selectedForRecruiterCrm}
+              onOpenFollowUpEmail={(recruiterInfo) => {
+                setIsRecruiterCrmOpen(false);
+                setSelectedForOutreach({
+                  ...(selectedForRecruiterCrm || {}),
+                  contactEmail: recruiterInfo.recipientEmail,
+                  company: recruiterInfo.company || selectedForRecruiterCrm?.company || '',
+                });
+              }}
             />
           </Suspense>
         </SafeErrorBoundary>

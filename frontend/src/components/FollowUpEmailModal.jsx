@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Mail, Copy, Check, X, Send, Sparkles, UserCheck, MessageSquareQuote } from 'lucide-react';
 import { generateFollowUpEmail } from '../services/trackerService';
 
-export const FollowUpEmailModal = ({ job, onClose, initialMode = 'followup' }) => {
+export const FollowUpEmailModal = ({ job, onClose, initialMode = 'followup', prefillRecruiter = null }) => {
   const [activeMode, setActiveMode] = useState(initialMode); // 'followup' | 'recruiter_pitch' | 'thank_you'
 
   const emailData = generateFollowUpEmail(job, { type: activeMode });
-  const [recipient, setRecipient] = useState(emailData.contactEmail || '');
+  const [recipient, setRecipient] = useState(prefillRecruiter?.recipientEmail || emailData.contactEmail || '');
   const [subject, setSubject] = useState(emailData.subject);
   const [body, setBody] = useState(emailData.body);
   const [copied, setCopied] = useState(false);
+  const [loggedToCrm, setLoggedToCrm] = useState(false);
 
   const handleModeSwitch = (newMode) => {
     setActiveMode(newMode);

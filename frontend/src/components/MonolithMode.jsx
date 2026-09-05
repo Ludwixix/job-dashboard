@@ -22,7 +22,8 @@ import {
   RefreshCw,
   Mail,
   Sliders,
-  Send
+  Send,
+  Users
 } from 'lucide-react';
 import AlienMonolithNav from './AlienMonolithNav';
 import { formatJobPostedAge, getJobAgeInDays } from '../utils/dateUtils';
@@ -41,7 +42,9 @@ export default function MonolithMode({
   onOpenBatchApply,
   onOpenProfileModal,
   onOpenCommandPalette,
-  onOpenSettings
+  onOpenSettings,
+  onOpenRecruiterCrm,
+  overdueTouchpointCount = 0
 }) {
   // Navigation active tab: 'prime' | 'autopilot' | 'radar'
   const [activeTab, setActiveTab] = useState('prime');
@@ -281,6 +284,24 @@ export default function MonolithMode({
                 >
                   <Zap size={11} className="text-[#d48b38]" />
                   <span>BATCH DISPATCH</span>
+                </button>
+              )}
+
+              {/* Recruiter & Talent CRM Hub */}
+              {onOpenRecruiterCrm && (
+                <button
+                  type="button"
+                  onClick={onOpenRecruiterCrm}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-purple-800/60 hover:border-purple-500 bg-[#160d21] text-purple-300 hover:text-white text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  title="Recruiter & Talent Network CRM"
+                >
+                  <Users size={11} className="text-purple-400" />
+                  <span>RECRUITER CRM</span>
+                  {overdueTouchpointCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black">
+                      {overdueTouchpointCount}
+                    </span>
+                  )}
                 </button>
               )}
 

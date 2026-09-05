@@ -158,6 +158,30 @@ class JobRepository:
                     updated_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_reminders_due ON application_reminders(user_id, remind_at, dismissed_at);
+                CREATE TABLE IF NOT EXISTS network_contacts (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL DEFAULT 'default_user',
+                    name TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT '',
+                    organization TEXT NOT NULL DEFAULT '',
+                    contact_type TEXT NOT NULL DEFAULT 'agency_recruiter',
+                    sector TEXT NOT NULL DEFAULT 'technology',
+                    email TEXT DEFAULT '',
+                    phone TEXT DEFAULT '',
+                    linkedin_url TEXT DEFAULT '',
+                    notes TEXT DEFAULT '',
+                    relationship_health TEXT NOT NULL DEFAULT 'warm',
+                    cadence_frequency_days INTEGER NOT NULL DEFAULT 14,
+                    last_interaction_date TEXT,
+                    next_follow_up_date TEXT,
+                    associated_job_ids_json TEXT NOT NULL DEFAULT '[]',
+                    interactions_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_net_contacts_user ON network_contacts(user_id);
+                CREATE INDEX IF NOT EXISTS idx_net_contacts_health ON network_contacts(relationship_health);
+                CREATE INDEX IF NOT EXISTS idx_net_contacts_followup ON network_contacts(next_follow_up_date);
             """)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",

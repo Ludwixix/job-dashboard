@@ -5,7 +5,7 @@ import {
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
-  RefreshCw, Loader2, Scale, Building2
+  RefreshCw, Loader2, Scale, Building2, Users
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -491,6 +491,14 @@ ${candidatePhone}`;
           </button>
 
           <div className="ml-auto flex items-center gap-2 pb-1.5">
+            <button
+              onClick={() => onOpenRecruiterCrm?.(job)}
+              className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+              title="Recruiter & Talent CRM: Link or view agency and hiring contacts for this role"
+            >
+              <Users size={13} className="text-purple-400" />
+              <span>RECRUITER CRM</span>
+            </button>
             <button
               onClick={() => onOpenExecutiveDossier?.(job)}
               className="px-3 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
@@ -1739,7 +1747,19 @@ ${data.pipeline_result?.cover_text || ''}`;
                 </div>
 
                 {/* Interview & Outreach Quick Actions */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 font-mono pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 font-mono pt-1">
+                  <button
+                    onClick={() => { onClose(); if (onOpenRecruiterCrm) onOpenRecruiterCrm(job); }}
+                    className="p-3 rounded-2xl bg-purple-50/80 hover:bg-purple-100/90 border border-purple-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-black text-purple-950 group-hover:text-purple-700">
+                      <Users size={14} className="text-purple-600" /> RECRUITER CRM
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      Link talent partners &amp; manage cadence.
+                    </p>
+                  </button>
+
                   <button
                     onClick={() => { onClose(); if (onOpenExecutiveDossier) onOpenExecutiveDossier(job); }}
                     className="p-3 rounded-2xl bg-cyan-50/80 hover:bg-cyan-100/90 border border-cyan-200/80 text-left transition-all cursor-pointer group shadow-2xs"

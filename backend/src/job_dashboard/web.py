@@ -66,6 +66,7 @@ from .semantic_tailoring import analyze_semantic_gap, generate_tailored_cover_le
 from .offer_analytics import calculate_compensation_benchmark, scan_employment_contract_risks
 from .executive_dossier import generate_executive_dossier, export_dossier_markdown
 from .smart_applications import get_smart_application_tracker
+from .network_crm import NetworkCRMManager, NetworkContact
 from datetime import timedelta
 from urllib.error import URLError
 
@@ -102,6 +103,8 @@ class DashboardApp:
         self.compare_runner = CompareRunner(self.data_dir, generator_factory=generator_factory)
         # Phase 6: Smart Application Tracker
         self.application_tracker = get_smart_application_tracker(self.data_dir)
+        # Phase 16: Recruiter & Talent Network CRM
+        self.network_crm = NetworkCRMManager(self.data_dir / "jobs.sqlite3")
         self.lock = threading.Lock()
         self.db_ready_event = threading.Event()
         if self.jobs:
@@ -1272,6 +1275,43 @@ def make_handler(app: DashboardApp):
                 dossier = generate_executive_dossier(job_data, profile)
                 self.send_json(200, {"success": True, "dossier": dossier})
                 return
+
+            if path == "/api/network/cadence":
+                user_id = resolve_user_id(self, query_params) or "default_user"
+                cadence_data = app.network_crm.get_cadence_radar(user_id=user_id)
+                self.send_json(200, {"success": True, "cadence": cadence_data})
+                return
+
+            if path in ("/api/network/contacts", "/api/network/contacts/"):
+                user_id = resolve_user_id(self, query_params) or "default_user"
+                if not app.network_crm.list_contacts(user_id=user_id):
+                    app.network_crm.seed_default_contacts(user_id=user_id)
+
+                sector = query_params.get("sector", [None])[0]
+                contact_type = query_params.get("contact_type", [None])[0]
+                health = query_params.get("health", [None])[0]
+                search = query_params.get("search", [None])[0]
+
+                contacts = app.network_crm.list_contacts(
+                    user_id=user_id,
+                    sector=sector,
+                    contact_type=contact_type,
+                    health=health,
+                    search=search,
+                )
+                self.send_json(200, {"success": True, "contacts": [c.to_dict() for c in contacts]})
+                return
+
+            if path.startswith("/api/network/contacts/"):
+                contact_id = path.removeprefix("/api/network/contacts/").strip("/")
+                if contact_id:
+                    user_id = resolve_user_id(self, query_params) or "default_user"
+                    contact = app.network_crm.get_contact(contact_id, user_id=user_id)
+                    if contact:
+                        self.send_json(200, {"success": True, "contact": contact.to_dict()})
+                    else:
+                        self.send_json(404, {"error": "Contact not found"})
+                    return
 
             if path == "/api/semantic-gap" or (path.startswith("/api/jobs/") and path.endswith("/semantic-gap")):
                 job_id = ""
@@ -2634,6 +2674,44 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {"success": True, "markdown": markdown})
                     return
 
+                # Phase 16: Network CRM POST Endpoints
+                if path in ("/api/network/contacts", "/api/network/contacts/"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    user_id = resolve_user_id(self, query_params) or "default_user"
+                    saved = app.network_crm.upsert_contact(payload, user_id=user_id)
+                    self.send_json(200, {"success": True, "contact": saved.to_dict()})
+                    return
+
+                if path in ("/api/network/contacts/delete", "/api/network/delete") or (path.startswith("/api/network/contacts/") and path.endswith("/delete")):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    contact_id = payload.get("id") or payload.get("contact_id") or ""
+                    if not contact_id and path.startswith("/api/network/contacts/") and path.endswith("/delete"):
+                        contact_id = path.removeprefix("/api/network/contacts/").removesuffix("/delete").strip("/")
+                    user_id = resolve_user_id(self, query_params) or "default_user"
+                    deleted = app.network_crm.delete_contact(contact_id, user_id=user_id)
+                    self.send_json(200, {"success": True, "deleted": deleted})
+                    return
+
+                if path in ("/api/network/interactions", "/api/network/contacts/interaction") or (path.startswith("/api/network/contacts/") and path.endswith("/interactions")):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    contact_id = payload.get("contact_id") or payload.get("id") or ""
+                    if not contact_id and path.startswith("/api/network/contacts/") and path.endswith("/interactions"):
+                        contact_id = path.removeprefix("/api/network/contacts/").removesuffix("/interactions").strip("/")
+                    interaction = payload.get("interaction") or payload
+                    user_id = resolve_user_id(self, query_params) or "default_user"
+                    updated = app.network_crm.add_interaction(contact_id, interaction, user_id=user_id)
+                    self.send_json(200, {"success": True, "contact": updated.to_dict()})
+                    return
+
+                if path == "/api/network/seed":
+                    user_id = resolve_user_id(self, query_params) or "default_user"
+                    seeded = app.network_crm.seed_default_contacts(user_id=user_id, force=True)
+                    self.send_json(200, {"success": True, "contacts": [c.to_dict() for c in seeded]})
+                    return
+
                 # Handle POST generation endpoints
                 if path.startswith("/api/jobs/") and path.endswith("/generate"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/generate")
@@ -2654,6 +2732,22 @@ def make_handler(app: DashboardApp):
                 self.send_json(404, {"error": f"Endpoint not found: {path}"})
             except Exception as error:
                 logger.error(f"POST {path} failed: {error}", exc_info=True)
+                self.send_json(500, {"error": str(error)})
+
+        def do_DELETE(self):
+            parsed = urlparse(self.path)
+            path = parsed.path
+            query_params = parse_qs(parsed.query)
+            try:
+                if path.startswith("/api/network/contacts/"):
+                    contact_id = path.removeprefix("/api/network/contacts/").strip("/")
+                    user_id = resolve_user_id(self, query_params) or "default_user"
+                    deleted = app.network_crm.delete_contact(contact_id, user_id=user_id)
+                    self.send_json(200, {"success": True, "deleted": deleted})
+                    return
+                self.send_json(404, {"error": f"Endpoint not found: {path}"})
+            except Exception as error:
+                logger.error(f"DELETE {path} failed: {error}", exc_info=True)
                 self.send_json(500, {"error": str(error)})
 
         

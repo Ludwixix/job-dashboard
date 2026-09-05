@@ -497,6 +497,41 @@ Delivers comprehensive executive briefing intelligence, organizational profiling
 - `frontend/src/components/__tests__/ExecutiveDossierModal.test.jsx`: 5 component tests verifying tab switching, header metadata, and clipboard actions.
 - Full regression suite: 173 backend pytest tests and 111 frontend vitest tests pass (100% pass rate, 0 lint errors).
 
+---
+
+## Phase 16: Recruiter & Talent Network Relationship CRM ("Recruiter Relationship Hub" / Networking Command Center)
+
+**Status**: ✅ Complete — Implemented, tested, built, and deployed to Cloud Run
+**Deployed**: 2026-09-06
+
+### Overview
+
+Empowers candidates to manage long-term recruiter and hiring manager relationships systematically across all industry tracks (Technology, Healthcare, Finance, Trades, Legal):
+1. **Multi-Sector Talent Directory & Classification (`network_crm.py`, `recruiterCrmService.js`)**:
+   - Categorized by contact type: `agency_recruiter`, `internal_talent`, `hiring_manager`, `executive_search`, and `peer_referral`.
+   - Filterable across all 5 sector tracks plus general cross-sector recruitment.
+   - Relationship health tracking: `active`, `warm`, and `dormant`.
+2. **Interaction Timeline & Touchpoint History**:
+   - Chronological logging of outreach channels: Email Outreach, Phone Call, LinkedIn Message, Coffee Catchup, Interview Scheduled, Offer Discussion.
+   - Structured note-taking capturing conversation summaries and actionable outcomes/next steps.
+3. **Cadence & Overdue Follow-ups Radar**:
+   - Automated cadence tracking (7, 14, 21, 30, 60, 90-day intervals).
+   - Proactive alert radar identifying overdue follow-ups, touchpoints due today, and upcoming scheduled contacts.
+   - Dynamic alert badges displayed in the dashboard header indicating overdue follow-up count.
+4. **Pre-seeded Australian Recruitment Powerhouses**:
+   - Curated starter contacts representing leading Australian recruitment firms: Hays Australia, Michael Page, Robert Walters, Davidson People, Adecco, and Canva Internal Talent.
+5. **Cross-Modal Integrations (`RecruiterRelationshipModal.jsx`, `JobModal.jsx`, `FollowUpEmailModal.jsx`, `Dashboard.jsx`, `MonolithMode.jsx`)**:
+   - Direct launch from top action bars in both Monolith and Studio modes.
+   - 1-click trigger inside `JobModal.jsx` header and Tab 4 quick-action grid.
+   - Seamless integration with `FollowUpEmailModal.jsx` to prefill recipient details and log sent communications directly to the CRM timeline.
+
+### Test Coverage
+- `backend/tests/test_network_crm.py`: 5 tests covering contact CRUD, interaction logging and cadence advancement, cadence radar calculation, default seeding, and keyword search.
+- `frontend/src/services/__tests__/recruiterCrmService.test.js`: 13 tests verifying cadence calculations, health styling tokens, metric aggregations, multi-parameter filtering, and interaction types.
+- `frontend/src/components/__tests__/RecruiterRelationshipModal.test.jsx`: 5 component tests verifying modal rendering, tab transitions, search filtering, interaction timeline display, and close handlers.
+- Full regression suite: 178 backend pytest tests and 129 frontend vitest tests pass (100% pass rate, 0 lint errors).
+
+
 
 
 

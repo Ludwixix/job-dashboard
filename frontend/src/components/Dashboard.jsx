@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useJobs } from '../hooks/useJobs';
-import { ApplicationTracker } from './ApplicationTracker';
 import { JobSeeker } from './JobSeeker';
 import { JobModal } from './JobModal';
 import { GeneratorModal } from './GeneratorModal';

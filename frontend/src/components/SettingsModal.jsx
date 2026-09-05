@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Settings, Cpu, KeyRound, Check, CheckCircle2, AlertCircle, 
   ExternalLink, RefreshCw, Eye, EyeOff, ShieldCheck, Sparkles, 
-  Sliders, Server, Zap, Compass, MapPin, Info
+  Sliders, Server, Zap, Compass, MapPin, Info, Search, Plus, Trash2, RotateCcw
 } from 'lucide-react';
 import { 
   PROVIDERS, 
@@ -11,6 +11,8 @@ import {
   saveLlmConfig, 
   testLlmConnection 
 } from '../services/llmConfig';
+import { buildQueriesFromProfile, SCRAPER_BASE_URL } from '../services/jobQueryService';
+import { getProfiles } from '../services/profileService';
 
 export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -37,6 +39,14 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Search Queries tab state
+  const [queries, setQueries] = useState([]);
+  const [isLoadingQueries, setIsLoadingQueries] = useState(false);
+  const [queriesSaveStatus, setQueriesSaveStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
+  const [newQueryTerm, setNewQueryTerm] = useState('');
+  const [newQueryLocation, setNewQueryLocation] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Synchronize state from storage whenever modal opens
   useEffect(() => {
@@ -126,6 +136,75 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
     }, 1200);
   };
 
+  // ── Search Queries tab handlers ─────────────────────────────────────────
+
+  const fetchQueries = useCallback(async () => {
+    setIsLoadingQueries(true);
+    try {
+      const res = await fetch(`${SCRAPER_BASE_URL}/api/search-criteria`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        setQueries(data.queries || []);
+      }
+    } catch { /* server may be unreachable on local dev */ }
+    setIsLoadingQueries(false);
+  }, []);
+
+  // Fetch queries whenever the queries tab becomes active
+  useEffect(() => {
+    if (isOpen && activeTab === 'queries') fetchQueries();
+  }, [isOpen, activeTab, fetchQueries]);
+
+  const saveQueries = async (updated) => {
+    setQueriesSaveStatus('saving');
+    try {
+      const res = await fetch(`${SCRAPER_BASE_URL}/api/search-criteria`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queries: updated }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setQueries(data.queries || updated);
+      setQueriesSaveStatus('saved');
+      setTimeout(() => setQueriesSaveStatus(null), 2000);
+    } catch {
+      setQueriesSaveStatus('error');
+      setTimeout(() => setQueriesSaveStatus(null), 3000);
+    }
+  };
+
+  const handleAddQuery = () => {
+    const term = newQueryTerm.trim();
+    if (!term) return;
+    const location = newQueryLocation.trim() || defaultLocation || 'Melbourne, VIC';
+    const updated = [...queries, { term, location, stream: 'core', weight: 1.0, enabled: true }];
+    setQueries(updated);
+    setNewQueryTerm('');
+    saveQueries(updated);
+  };
+
+  const handleRemoveQuery = (idx) => {
+    const updated = queries.filter((_, i) => i !== idx);
+    setQueries(updated);
+    saveQueries(updated);
+  };
+
+  const handleRegenerateFromProfile = async () => {
+    setIsRegenerating(true);
+    try {
+      // getProfiles() returns [activeProfile]; we just need the first element.
+      const profiles = getProfiles();
+      const profile = profiles[0] || null;
+      if (!profile) { setIsRegenerating(false); return; }
+      const generated = buildQueriesFromProfile(profile);
+      if (!generated.length) { setIsRegenerating(false); return; }
+      await saveQueries(generated);
+    } catch { /* graceful degradation */ }
+    setIsRegenerating(false);
+  };
+
   if (!isOpen) return null;
 
   const currentMeta = PROVIDERS[activeProvider] || PROVIDERS.openrouter;
@@ -197,6 +276,17 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
             >
               <Sliders size={14} className="text-teal-400" />
               2. ATS & PLATFORM PREFERENCES
+            </button>
+            <button
+              onClick={() => setActiveTab('queries')}
+              className={`py-3 px-1 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
+                activeTab === 'queries' 
+                  ? 'border-amber-400 text-amber-300' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Search size={14} className="text-amber-400" />
+              3. SEARCH QUERIES
             </button>
           </div>
 
@@ -526,6 +616,127 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
                     <span>75% (Balanced)</span>
                     <span>95% (Laser Focused)</span>
                   </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ── Search Queries Tab ─────────────────────────────────── */}
+            {activeTab === 'queries' && (
+              <div className="space-y-5">
+
+                {/* Header + Regenerate */}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                      <Search size={15} className="text-amber-400" />
+                      Active Scrape Queries
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-1 font-sans">
+                      These search terms are sent to job boards (Seek, Indeed, Adzuna) on every discovery run.
+                      They update automatically when you save a profile, or click Regenerate below.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRegenerateFromProfile}
+                    disabled={isRegenerating}
+                    className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
+                    title="Replace all queries with ones auto-derived from your profile"
+                  >
+                    {isRegenerating
+                      ? <><RefreshCw size={13} className="animate-spin" /> Generating…</>
+                      : <><RotateCcw size={13} /> Regenerate from Profile</>
+                    }
+                  </button>
+                </div>
+
+                {/* Save status indicator */}
+                {queriesSaveStatus && (
+                  <div className={`flex items-center gap-2 text-xs font-mono font-bold px-3 py-2 rounded-xl border ${
+                    queriesSaveStatus === 'saved'   ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' :
+                    queriesSaveStatus === 'error'   ? 'text-red-300 bg-red-500/10 border-red-500/30' :
+                                                      'text-slate-400 bg-slate-800 border-slate-700'
+                  }`}>
+                    {queriesSaveStatus === 'saving' && <RefreshCw size={12} className="animate-spin" />}
+                    {queriesSaveStatus === 'saved'  && <CheckCircle2 size={12} />}
+                    {queriesSaveStatus === 'error'  && <AlertCircle size={12} />}
+                    {queriesSaveStatus === 'saving' ? 'Saving to server…' :
+                     queriesSaveStatus === 'saved'  ? 'Queries saved — next scrape will use these.' :
+                                                      'Failed to save — server may be offline.'}
+                  </div>
+                )}
+
+                {/* Current query list */}
+                <div className="space-y-2">
+                  {isLoadingQueries ? (
+                    <div className="text-slate-400 text-xs font-mono flex items-center gap-2 py-4">
+                      <RefreshCw size={13} className="animate-spin" /> Loading queries…
+                    </div>
+                  ) : queries.length === 0 ? (
+                    <div className="text-slate-500 text-xs font-mono py-4 text-center border border-dashed border-slate-700 rounded-xl">
+                      No queries configured — add one below or click Regenerate from Profile.
+                    </div>
+                  ) : (
+                    queries.map((q, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800 group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="text-white font-mono text-xs font-bold truncate block">{q.term}</span>
+                          <span className="text-slate-500 text-[10px] font-mono">{q.location}</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0
+                          text-amber-300 bg-amber-500/10 border-amber-500/20">
+                          {q.stream || 'core'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQuery(idx)}
+                          className="shrink-0 w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                          title="Remove query"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add new query */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+                    <Plus size={13} className="text-amber-400" /> Add a Search Term
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newQueryTerm}
+                      onChange={(e) => setNewQueryTerm(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddQuery()}
+                      placeholder="e.g. registered nurse, accountant, legal counsel…"
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      type="text"
+                      value={newQueryLocation}
+                      onChange={(e) => setNewQueryLocation(e.target.value)}
+                      placeholder={defaultLocation || 'Melbourne, VIC'}
+                      className="w-36 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddQuery}
+                      disabled={!newQueryTerm.trim()}
+                      className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all cursor-pointer disabled:opacity-40"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-sans">
+                    Each term is sent verbatim to Seek, Indeed, and Adzuna. Press Enter or click + to add.
+                  </p>
                 </div>
 
               </div>

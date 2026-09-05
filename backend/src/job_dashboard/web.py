@@ -176,26 +176,105 @@ class DashboardApp:
                 break
         return result
 
+    # Lightweight industry → representative job titles map used by the backend
+    # suggestion endpoint. Mirrors the frontend's INDUSTRY_QUERY_MAP so that
+    # GET /api/search-criteria/suggestions returns industry-relevant terms.
+    _INDUSTRY_TITLES: dict[str, list[str]] = {
+        "Technology & IT": [
+            "systems administrator", "support engineer", "helpdesk", "infrastructure engineer",
+            "cloud engineer", "devops engineer", "service desk analyst",
+            "Microsoft 365 Administrator", "Azure Administrator", "SharePoint Administrator",
+            "Intune Administrator", "Endpoint Engineer", "PowerShell Automation Engineer",
+            "ServiceNow Administrator", "Technical Support Engineer", "Infrastructure Consultant",
+        ],
+        "Healthcare & Medical": [
+            "registered nurse", "enrolled nurse", "clinical nurse consultant",
+            "nurse practitioner", "ward manager", "hospital administrator",
+            "allied health professional", "physiotherapist", "occupational therapist",
+            "medical receptionist", "healthcare coordinator", "clinical coordinator",
+            "aged care worker", "disability support worker", "patient services officer",
+        ],
+        "Finance & Accounting": [
+            "financial analyst", "accountant", "senior accountant", "management accountant",
+            "financial controller", "tax accountant", "payroll officer", "bookkeeper",
+            "finance manager", "business analyst", "investment analyst", "compliance officer",
+        ],
+        "Marketing & Sales": [
+            "marketing manager", "digital marketing manager", "SEO specialist",
+            "content strategist", "brand manager", "account manager",
+            "business development manager", "sales manager", "CRM manager",
+        ],
+        "Construction & Trades": [
+            "site manager", "project manager construction", "construction manager",
+            "estimator", "quantity surveyor", "building supervisor", "civil engineer",
+            "structural engineer", "contracts administrator",
+        ],
+        "Education": [
+            "teacher", "primary school teacher", "secondary school teacher",
+            "early childhood educator", "curriculum developer", "education consultant",
+            "instructional designer", "school administrator", "TAFE trainer",
+        ],
+        "Legal": [
+            "solicitor", "lawyer", "legal counsel", "in-house counsel", "paralegal",
+            "legal secretary", "conveyancer", "litigation lawyer", "corporate lawyer",
+        ],
+        "HR & People": [
+            "HR business partner", "HR manager", "human resources officer",
+            "talent acquisition specialist", "recruiter", "learning and development manager",
+            "people and culture manager", "HRIS specialist",
+        ],
+        "Retail & Hospitality": [
+            "retail manager", "store manager", "hospitality manager",
+            "restaurant manager", "hotel manager", "customer experience manager",
+        ],
+        "Engineering": [
+            "mechanical engineer", "electrical engineer", "chemical engineer",
+            "process engineer", "project engineer", "design engineer",
+            "maintenance engineer", "systems engineer", "automation engineer",
+        ],
+        "Logistics & Supply Chain": [
+            "supply chain manager", "logistics coordinator", "warehouse manager",
+            "operations manager logistics", "procurement manager", "inventory manager",
+        ],
+        "Creative & Design": [
+            "graphic designer", "UX designer", "UI designer", "product designer",
+            "creative director", "art director", "video editor", "web designer",
+        ],
+    }
+
     def suggested_search_queries(self):
-        """Return search terms grounded in the candidate's experience and skills."""
+        """Return search terms grounded in the candidate's profile and industry.
+
+        Priority:
+        1. Explicit target titles from the profile (highest relevance).
+        2. Past job titles from experience entries.
+        3. Industry-appropriate titles from ``_INDUSTRY_TITLES``.
+        All terms are deduplicated and capped at 20 suggestions.
+        """
         profile = self.dashboard.profile
         terms = []
-        seen = set()
+        seen: set[str] = set()
+        location = str(profile.get("location") or "Melbourne, VIC").split("(")[0].strip() or "Melbourne, VIC"
 
-        def add(term, stream="core-it"):
+        def add(term: str, stream: str = "core") -> None:
             term = str(term).strip()
-            if term and term.lower() not in seen:
+            if term and term.lower() not in seen and len(terms) < 20:
                 seen.add(term.lower())
-                terms.append(SearchQuery(term, "Melbourne, VIC", stream))
+                terms.append(SearchQuery(term, location, stream))
 
-        for experience in profile.get("experience", []):
+        # 1. Explicit target titles — highest priority
+        for title in (profile.get("targetTitles") or []):
+            add(title)
+
+        # 2. Past experience titles
+        for experience in (profile.get("experience") or []):
             add(experience.get("title", ""))
-        for term in ("Microsoft 365 Administrator", "SharePoint Administrator", "SharePoint Developer", "Azure Administrator", "Entra ID Administrator", "Intune Administrator", "Endpoint Engineer", "PowerShell Automation Engineer", "ServiceNow Administrator", "Technical Support Engineer", "Infrastructure Consultant"):
-            add(term)
-        add("warehouse", "bridge")
-        add("casual work", "bridge")
-        add("data centre technician", "traineeship")
-        add("cabling technician", "traineeship")
+
+        # 3. Industry-appropriate titles
+        industry = str(profile.get("industry") or "Technology & IT")
+        for title in self._INDUSTRY_TITLES.get(industry, self._INDUSTRY_TITLES["Technology & IT"]):
+            add(title)
+
         return [{"term": query.term, "location": query.location, "stream": query.stream} for query in terms]
 
     def _load_generated_documents(self):

@@ -1,35 +1,20 @@
+"""Default search query configuration.
+
+DEFAULT_QUERIES is used only as a last-resort fallback when
+``search_queries.json`` does not yet exist on disk (i.e. the very first
+server boot before a profile has been onboarded).
+
+In normal operation the profile-onboarding pipeline
+(``frontend/src/services/profileOnboardingPipeline.js``) pushes
+profile-derived, industry-aware queries to ``POST /api/search-criteria``
+on every profile save, which persists them to ``search_queries.json``.
+Those persisted queries take full precedence over this fallback.
+
+Keeping this empty means a fresh install never accidentally scrapes
+IT-only results on behalf of a nurse, lawyer, or any other profession
+before the user has completed onboarding.
+"""
+
 from .sources import SearchQuery
 
-DEFAULT_QUERIES = (
-    SearchQuery("systems administrator"),
-    SearchQuery("support engineer"),
-    SearchQuery("helpdesk"),
-    SearchQuery("level 3 support"),
-    SearchQuery("level 2 support"),
-    SearchQuery("level 1 support"),
-    SearchQuery("infrastructure engineer"),
-    SearchQuery("cloud engineer"),
-    SearchQuery("devops engineer"),
-    SearchQuery("service desk analyst"),
-    SearchQuery("microsoft 365"),
-    SearchQuery("azure"),
-    SearchQuery("casual work", stream="bridge"),
-    SearchQuery("warehouse", stream="bridge"),
-    SearchQuery("traineeship", stream="traineeship"),
-    SearchQuery("data centre technician", stream="traineeship"),
-    SearchQuery("cabling technician", stream="traineeship"),
-    # Closely related roles based on the candidate's M365, endpoint, identity,
-    # automation, and service-management experience.
-    SearchQuery("Microsoft 365 Administrator"),
-    SearchQuery("SharePoint Administrator"),
-    SearchQuery("SharePoint Developer"),
-    SearchQuery("Azure Administrator"),
-    SearchQuery("Entra ID Administrator"),
-    SearchQuery("Intune Administrator"),
-    SearchQuery("Endpoint Engineer"),
-    SearchQuery("Identity and Access Administrator"),
-    SearchQuery("PowerShell Automation Engineer"),
-    SearchQuery("ServiceNow Administrator"),
-    SearchQuery("Technical Support Engineer"),
-    SearchQuery("Infrastructure Consultant"),
-)
+DEFAULT_QUERIES: tuple[SearchQuery, ...] = ()

@@ -70,4 +70,30 @@ describe('SettingsModal Component', () => {
       expect(screen.getByText(/Connection Successful!/i)).toBeInTheDocument();
     });
   });
+
+  it('renders Search Queries tab and shows Regenerate button', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        queries: [
+          { term: 'registered nurse', location: 'Melbourne, VIC', stream: 'core' }
+        ]
+      })
+    }));
+
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Click the Search Queries tab
+    const queriesTab = screen.getByText(/SEARCH QUERIES/i);
+    fireEvent.click(queriesTab);
+
+    // Verify search query header and items are rendered
+    await waitFor(() => {
+      expect(screen.getByText(/Active Scrape Queries/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Regenerate from Profile/i })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('registered nurse')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/e\.g\. registered nurse/i)).toBeInTheDocument();
+  });
 });

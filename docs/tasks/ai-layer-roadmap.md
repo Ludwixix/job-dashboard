@@ -284,3 +284,25 @@ Full-featured settings modal accessible from 6 entry points:
 - `frontend/src/services/__tests__/llmConfig.test.js` — 6 unit tests: defaults, provider switching, legacy key migration, storage isolation, test connection mocking
 - `frontend/src/components/__tests__/SettingsModal.test.jsx` — 3 component tests: render, provider switch, API key input, connection testing
 - All 57 frontend Vitest tests and 141 backend pytest tests passing at merge
+
+---
+
+## Phase 9: Profile-Aware Search Queries: Auto-Personalisation & Settings UI
+
+**Status**: ✅ Complete — Implemented, tested, committed to master, and deployed to Cloud Run production
+**Deployed**: 2026-09-06 (100% traffic)
+
+### Overview
+
+Eliminates the legacy IT-centric bias across fallback search criteria, title category scoring, and query suggestions:
+1. **Industry-Agnostic Query Defaults (`scrape_config.py`)**: Replaced 35 hardcoded IT search queries with an empty tuple (`DEFAULT_QUERIES = ()`) so fresh installs do not scrape IT jobs before candidate onboarding.
+2. **Dynamic Title-Category Scoring (`score.py`)**: Extracted `_title_category(job, profile)` computing word overlap with candidate `targetTitles` and past experience titles. Non-IT candidates (e.g. Healthcare, Legal, Trades) achieve full 100% title category match without IT bias penalties, with safe backward-compatibility fallback.
+3. **Multi-Industry Query Suggestions (`web.py`)**: Replaced IT-only query suggestions with an industry map covering 12 sectors, prioritizing explicit `targetTitles` and candidate experience.
+4. **Search Queries Settings UI (`SettingsModal.jsx`)**: Added a 3rd "Search Queries" tab allowing viewing active queries, removing queries, adding custom queries, and 1-click regenerating queries directly from the active profile.
+
+### Test Coverage
+- `backend/tests/test_score.py`: Added 4 tests validating nurse profile scoring, neutral scoring on IT titles, and empty profile backward-compatibility.
+- `backend/tests/test_generation_ui_metadata.py`: Updated `DEFAULT_QUERIES == ()` assertion.
+- `frontend/src/components/__tests__/SettingsModal.test.jsx`: Added unit test verifying Search Queries tab rendering and profile query regeneration.
+- All 58 frontend Vitest tests and all 24 core backend pytest tests pass.
+

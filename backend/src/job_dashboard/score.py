@@ -31,6 +31,12 @@ _PRIMARY_SKILLS = {"sharepoint", "microsoft 365", "exchange", "intune", "azure",
 _SECONDARY_SKILLS = {"linux", "cybersecurity", "data centre", "documentation", "python"}
 _DATA_ROLE_TERMS = ("data engineer", "data warehouse", "data warehousing", "etl", "extract transform load", "data model", "dimensional model", "sql developer")
 _DATA_SPECIFIC_TERMS = ("data warehouse", "data warehousing", "etl", "extract transform load", "dimensional model", "data pipeline", "sql modeling", "data modelling")
+# Fallback IT title terms used only when the profile has no targetTitles/experience configured.
+_IT_TITLE_TERMS = (
+    "sharepoint", "microsoft 365", "m365", "infrastructure",
+    "systems administrator", "powershell", "azure", "cloud",
+)
+
 
 
 @lru_cache(maxsize=128)
@@ -148,6 +154,40 @@ def _skill_cluster(skill: str) -> str:
     return "primary" if skill in _PRIMARY_SKILLS else "secondary"
 
 
+def _title_category(job: Job, profile: Mapping[str, Any]) -> float:
+    """Compute a title-alignment score using the candidate's own target/experience titles.
+
+    Priority:
+    1. If the profile has ``targetTitles`` or ``experience[].title`` entries, match
+       against those using word-level overlap — industry-agnostic and correct for any
+       profession (nurse, lawyer, engineer, …).
+    2. If the profile provides no title hints, fall back to the original IT-specific
+       heuristic so existing IT users are unaffected.
+    """
+    target_titles = [str(t).lower().strip() for t in (profile.get("targetTitles") or []) if t]
+    exp_titles = [
+        str(e.get("title", "")).lower().strip()
+        for e in (profile.get("experience") or [])
+        if e.get("title")
+    ]
+    candidate_titles = set(target_titles + exp_titles)
+
+    job_title_lower = job.title.lower()
+
+    if candidate_titles:
+        job_words = {w for w in re.split(r"\W+", job_title_lower) if len(w) > 3}
+        for ct in candidate_titles:
+            ct_words = {w for w in re.split(r"\W+", ct) if len(w) > 3}
+            if ct_words and ct_words & job_words:
+                return 1.0
+        # Profile is set up but this job's title doesn't match — neutral penalty, not punished
+        return 0.55
+
+    # Fallback: original IT-specific heuristic (backward compatible for IT profiles)
+    return 1.0 if any(term in job_title_lower for term in _IT_TITLE_TERMS) else 0.45
+
+
+
 def explain_score(result: ScoreResult) -> dict[str, Any]:
     """Return a stable, data-derived explanation suitable for API clients."""
     strengths = list(result.strengths)
@@ -199,7 +239,7 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
         company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.IGNORECASE) else 0.7
         growth = 0.9 if re.search(r"trainee|graduate|junior|training", job.text(), re.IGNORECASE) else 0.8 if re.search(r"cloud|azure|devops", job.text(), re.IGNORECASE) else 0.5
         seniority_penalty = _seniority_penalty(job)
-        title_category = 1.0 if any(term in job.title.lower() for term in ("sharepoint", "microsoft 365", "m365", "infrastructure", "systems administrator", "powershell", "azure", "cloud")) else 0.45
+        title_category = _title_category(job, profile)
         recency = 1.0 if getattr(job, "posted", "") else 0.5
         dimensions = {"skill_match": round(skill_match * 100), "title_category_match": round(title_category * 100), "location_fit": round(location * 100), "recency_weight": round(recency * 100), "experience_fit": round(experience * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}
         total = skill_match * 0.6 + title_category * 0.12 + location * 0.08 + experience * 0.08 + company * 0.04 + growth * 0.03 + recency * 0.05 - seniority_penalty

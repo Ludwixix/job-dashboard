@@ -8,6 +8,10 @@ describe('Profile Intelligence & Deduction Engine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
   });
 
   it('correctly deduces seniority, industry, market salary, and clearance from raw resume text', () => {

@@ -141,3 +141,4 @@ def test_score_job_hybrid_graceful_error_resilience():
     empty_job = Job(id="empty", title="", company="")
     result = score_job_hybrid(empty_job, {})
     assert isinstance(result, ScoreResult)
+

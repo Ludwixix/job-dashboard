@@ -230,3 +230,4 @@ def score_job_hybrid(
     except Exception as e:
         logger.warning(f"Hybrid scoring fallback to deterministic result for {job.id}: {e}")
         return base_result
+

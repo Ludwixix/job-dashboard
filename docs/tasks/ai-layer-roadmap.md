@@ -462,5 +462,41 @@ Delivers comprehensive offer evaluation, salary benchmarking, strategic negotiat
 - `frontend/src/components/__tests__/OfferActionHubModal.test.jsx`: 4 tests validating tab transitions, calculation cards, counter-offer generation, and interactive contract clause scanning.
 - Full regression suite: 167 backend pytest tests and 97 frontend vitest tests pass (100% pass rate, 0 lint errors).
 
+---
+
+## Phase 15: Executive Job & Company Intelligence Dossier Generation Engine ("Executive Briefing Suite")
+
+**Status**: ✅ Complete — Implemented, tested, built, and ready for Cloud Run deployment
+**Deployed**: 2026-09-06
+
+### Overview
+
+Delivers comprehensive executive briefing intelligence, organizational profiling, pain point diagnosis, strategic execution roadmapping, reverse interview questioning, and due diligence risk auditing across all 5 industry tracks (Technology, Healthcare, Finance, Trades, Legal):
+1. **Multi-Industry Company Intelligence Engine (`executive_dossier.py`, `dossierService.js`)**:
+   - Enterprise scale classification: ASX 200 / Multinational, Public Sector / Agency, High-Growth Scaleup, and Mid-Market Corporate.
+   - Grounded compliance and regulatory frameworks: ASD Essential 8, ISO 27001, AHPRA, NSQHS, AASB/IFRS, APRA, SafeWork WHS, and Australian Practising Certificate / ACL.
+   - Competitive landscape mapping and peer organization tracking.
+2. **Strategic Pain Points & "Why This Role Was Funded"**:
+   - Synthesizes root-cause business rationale for headcount allocation from job metadata and description text.
+   - Identifies acute organizational bottlenecks (e.g. month-end close latency, clinical handover variance, trade critical path slippage, contract review backlogs, deployment cycle time).
+3. **"First 90 Days" Strategic Execution Blueprint**:
+   - Structured 3-phase execution roadmap:
+     * **Days 1–30: Listen, Audit & Align**: Baseline audits, key stakeholder interviews, operational diagnostic registers.
+     * **Days 31–60: Optimize & Deliver Quick Wins**: Acute friction eradication, process standardization, high-impact quick wins.
+     * **Days 61–90: Scale, Institutionalize & Measure ROI**: Multi-quarter platform/operating roadmap, compliance automation, C-suite ROI presentation.
+4. **High-Stakes C-Suite Reverse Questions & Due Diligence Risk Audit**:
+   - 5 role- and sector-grounded executive questions to ask interview panels with 1-click clipboard copying.
+   - Due diligence risk signals covering turnover history, debt risk assessments, and capital budget runway.
+5. **Interactive Glassmorphic Modal & Full-Stack Integration (`ExecutiveDossierModal.jsx`, `JobModal.jsx`, `ActionHighlights.jsx`, `Dashboard.jsx`)**:
+   - 4-tab modal layout with copy briefing (Markdown), print/PDF formatting, and candidate context grounding.
+   - Direct launch triggers in JobModal header and Tab 4 quick actions, ActionHighlights, and Dashboard modal stack.
+
+### Test Coverage
+- `backend/tests/test_executive_dossier.py`: 6 tests covering enterprise scale detection, technology, healthcare, finance, trades, legal dossiers, and markdown export.
+- `frontend/src/services/__tests__/dossierService.test.js`: 9 unit tests verifying scale detection, sector mapping, 90-day plan generation, and markdown output.
+- `frontend/src/components/__tests__/ExecutiveDossierModal.test.jsx`: 5 component tests verifying tab switching, header metadata, and clipboard actions.
+- Full regression suite: 173 backend pytest tests and 111 frontend vitest tests pass (100% pass rate, 0 lint errors).
+
+
 
 

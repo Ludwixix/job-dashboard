@@ -64,6 +64,7 @@ from .sources import (
 )
 from .semantic_tailoring import analyze_semantic_gap, generate_tailored_cover_letter, generate_linkedin_optimization
 from .offer_analytics import calculate_compensation_benchmark, scan_employment_contract_risks
+from .executive_dossier import generate_executive_dossier, export_dossier_markdown
 from .smart_applications import get_smart_application_tracker
 from datetime import timedelta
 from urllib.error import URLError
@@ -1243,6 +1244,33 @@ def make_handler(app: DashboardApp):
                 fields = {key: job_data.get(key, "") for key in Job.__dataclass_fields__}
                 fields["tags"] = tuple(job_data.get("tags") or ())
                 self.send_json(200, {"success": True, "explanation": explain_score(score_job(Job(**fields), profile))})
+                return
+
+            if path in ("/api/dossier", "/api/executive-dossier") or (path.startswith("/api/jobs/") and path.endswith("/dossier")):
+                job_id = ""
+                if path.startswith("/api/jobs/") and path.endswith("/dossier"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/dossier")
+                else:
+                    job_id = query_params.get("job_id", [""])[0]
+
+                job_data = app.repository.get_job(job_id) if job_id else None
+                if not job_data and job_id:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job_data = j
+                            break
+                if not job_data:
+                    job_data = {
+                        "id": job_id,
+                        "title": query_params.get("title", ["Role"])[0],
+                        "company": query_params.get("company", ["Company"])[0],
+                        "description": query_params.get("description", [""])[0],
+                        "location": query_params.get("location", ["Australia"])[0],
+                    }
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                dossier = generate_executive_dossier(job_data, profile)
+                self.send_json(200, {"success": True, "dossier": dossier})
                 return
 
             if path == "/api/semantic-gap" or (path.startswith("/api/jobs/") and path.endswith("/semantic-gap")):
@@ -2582,6 +2610,28 @@ def make_handler(app: DashboardApp):
                     contract_text = payload.get("contract_text") or payload.get("text") or payload.get("content") or ""
                     risks = scan_employment_contract_risks(contract_text)
                     self.send_json(200, {"success": True, "analysis": risks})
+                    return
+
+                if path in ("/api/dossier/generate", "/api/executive-dossier/generate"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = payload.get("job_id") or payload.get("id") or ""
+                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
+                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    dossier = generate_executive_dossier(job, profile)
+                    self.send_json(200, {"success": True, "dossier": dossier})
+                    return
+
+                if path in ("/api/dossier/export-markdown", "/api/executive-dossier/export-markdown"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    dossier = payload.get("dossier")
+                    if not dossier:
+                        job = payload.get("job") or payload
+                        profile = payload.get("profile") or app.dashboard.profile
+                        dossier = generate_executive_dossier(job, profile)
+                    markdown = export_dossier_markdown(dossier)
+                    self.send_json(200, {"success": True, "markdown": markdown})
                     return
 
                 # Handle POST generation endpoints

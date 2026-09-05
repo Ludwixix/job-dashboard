@@ -1,8 +1,8 @@
 import React from 'react';
-import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles, Scale } from 'lucide-react';
+import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles, Scale, Building2 } from 'lucide-react';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 
-export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onOpenOfferHub, onSelectJob, onJobStatusUpdate }) => {
+export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onOpenOfferHub, onOpenExecutiveDossier, onSelectJob, onJobStatusUpdate }) => {
   const [psychJob, setPsychJob] = React.useState(null);
   // Filter jobs that need action: Interviewing, Offer, or Package Prepared
   const actionJobs = jobs.filter(j => {
@@ -135,6 +135,15 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
                     >
                       <MessageSquare size={14} /> Simulator
                     </button>
+                    {onOpenExecutiveDossier && (
+                      <button
+                        onClick={() => onOpenExecutiveDossier(job)}
+                        className="py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-indigo-500/30"
+                        title="Executive Briefing Dossier: 90-Day Blueprint & Leadership"
+                      >
+                        <Building2 size={14} />
+                      </button>
+                    )}
                   </>
                 ) : isOffer ? (
                   <>
@@ -145,6 +154,15 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
                     >
                       <Sparkles size={14} />
                     </button>
+                    {onOpenExecutiveDossier && (
+                      <button
+                        onClick={() => onOpenExecutiveDossier(job)}
+                        className="py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-indigo-500/30"
+                        title="Executive Briefing Dossier: 90-Day Blueprint & Leadership"
+                      >
+                        <Building2 size={14} />
+                      </button>
+                    )}
                     {onOpenOfferHub && (
                       <button
                         onClick={() => onOpenOfferHub(job)}

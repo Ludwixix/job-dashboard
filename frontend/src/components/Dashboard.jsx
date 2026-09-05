@@ -29,6 +29,7 @@ const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ defaul
 const SettingsModal = lazy(() => import('./SettingsModal').then(m => ({ default: m.SettingsModal })));
 const FollowUpEmailModal = lazy(() => import('./FollowUpEmailModal').then(m => ({ default: m.FollowUpEmailModal })));
 const OfferActionHubModal = lazy(() => import('./OfferActionHubModal').then(m => ({ default: m.OfferActionHubModal })));
+const ExecutiveDossierModal = lazy(() => import('./ExecutiveDossierModal').then(m => ({ default: m.ExecutiveDossierModal })));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -57,6 +58,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForMockInterview, setSelectedForMockInterview] = useState(null);
   const [selectedForOutreach, setSelectedForOutreach] = useState(null);
   const [selectedForOfferHub, setSelectedForOfferHub] = useState(null);
+  const [selectedForDossier, setSelectedForDossier] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
@@ -413,6 +415,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForOfferHub;
   }, [selectedForOfferHub, jobs]);
 
+  const liveSelectedForDossier = useMemo(() => {
+    if (!selectedForDossier) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForDossier.id)) ||
+      `${j.company}_${j.title}` === `${selectedForDossier.company}_${selectedForDossier.title}`
+    );
+    return match || selectedForDossier;
+  }, [selectedForDossier, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -536,6 +547,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
               onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
               onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
+              onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
               profile={activeProfile}
               allJobs={jobs}
@@ -573,6 +585,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               isOpen={Boolean(selectedForOfferHub)}
               onClose={() => setSelectedForOfferHub(null)}
               job={selectedForOfferHub}
+            />
+          </Suspense>
+        )}
+
+        {selectedForDossier && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <ExecutiveDossierModal
+              isOpen={Boolean(selectedForDossier)}
+              onClose={() => setSelectedForDossier(null)}
+              job={selectedForDossier}
+              profile={activeProfile}
             />
           </Suspense>
         )}
@@ -1000,6 +1023,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
                   onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
                   onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
+                  onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
                   onSelectJob={(j) => setSelectedJob(j)}
                   onJobStatusUpdate={(id, status, extra) => updateJobStatus(id, status, extra)}
                 />
@@ -1072,6 +1096,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
               onOpenOutreach={(j) => { setSelectedJob(null); setSelectedForOutreach(j); }}
               onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
+              onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
               job={liveSelectedJob} 
               onClose={() => setSelectedJob(null)} 
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
@@ -1178,6 +1203,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               job={liveSelectedForOfferHub} 
               isOpen={Boolean(liveSelectedForOfferHub)}
               onClose={() => setSelectedForOfferHub(null)} 
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Executive Briefing Dossier Modal */}
+      {liveSelectedForDossier && (
+        <SafeErrorBoundary sectionName="Executive Briefing Dossier" onClose={() => setSelectedForDossier(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <ExecutiveDossierModal
+              job={liveSelectedForDossier}
+              profile={activeProfile}
+              isOpen={Boolean(liveSelectedForDossier)}
+              onClose={() => setSelectedForDossier(null)}
             />
           </Suspense>
         </SafeErrorBoundary>

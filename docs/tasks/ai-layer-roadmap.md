@@ -355,3 +355,38 @@ Completes universal sector parity across candidate scoring, cover letter/resume 
 - `backend/tests/test_score.py`: Added 3 tests verifying non-IT coreSkills primary cluster weighting, career growth scoring across multi-industry keywords, and universal document synthesis.
 - `frontend/src/services/__tests__/dataService.test.js`: Added unit tests verifying `.docx` payload creation, API interaction, and object URL cleanup.
 - Full regression test gauntlet: 152 backend pytest tests and 64 frontend vitest tests pass (100% pass rate).
+
+---
+
+## Phase 12: Full-Stack Universal Multi-Industry Onboarding & Dynamic Discovery Engine
+
+**Status**: ✅ Complete — Implemented, tested, built, and deployed to Cloud Run production
+**Deployed**: 2026-09-06 (100% traffic)
+
+### Overview
+
+Delivers full-stack multi-industry onboarding, dynamic query discovery, and CLI scraper parity:
+1. **Dynamic CLI Scraper Parity (`scrape.py`)**:
+   - Added `-q / --query` repeatable flag, `-l / --location` flag, and `--profile-json` flag to `job_dashboard.scrape`.
+   - Added `resolve_cli_queries` allowing dynamic query resolution from CLI flags, exported profile JSON files, or multi-sector discovery defaults.
+2. **Industry-Agnostic Query Streams (`sources/base.py`, `web.py`)**:
+   - Implemented `detect_query_stream(term: str)` classifying queries into semantic streams (`healthcare`, `finance`, `trades`, `legal`, `technology`, `general`).
+   - Replaced hardcoded `stream="core-it"` in `/api/refresh` and `/api/scrape` with automated sector detection.
+   - When refresh is invoked without explicit queries, automatically resolves candidate `targetTitles` from the active profile in the database.
+3. **Multi-Sector Starter Personas (`profileService.js`)**:
+   - Added 4 pre-configured Australian industry starter templates:
+     * **Healthcare & Medical**: Sarah Jenkins (Registered Nurse / Clinical Care Coordinator, AHPRA, NSQHS, BLS/ALS)
+     * **Finance & Accounting**: Marcus Wong (Senior Financial Accountant, CPA Australia, AASB/IFRS, SAP/Xero)
+     * **Construction & Trades**: David Miller (Site Supervisor / Project Coordinator, White Card, SafeWork WHS, Procore)
+     * **Legal & Compliance**: Jessica Chen (Corporate Legal Counsel, Australian Practising Certificate, ACL, Contracts)
+   - Exported `SECTOR_TEMPLATES` and `loadSectorTemplate(sectorKey)` dispatching update events.
+4. **1-Click Sector Template Switcher in Profile UI (`ProfileModal.jsx`)**:
+   - Added a top starter templates bar in `ProfileModal.jsx` allowing candidates and recruiters to switch industries with 1 click.
+   - Instantly updates candidate identity, re-derives search queries, and syncs across local storage and the backend.
+
+### Test Coverage
+- `backend/tests/test_scrape_cli.py`: 4 tests validating query stream detection, explicit CLI queries, profile JSON resolution, and multi-sector discovery defaults.
+- `frontend/src/services/__tests__/profileTemplates.test.js`: 3 tests validating sector template integrity, property structure, and profile persistence.
+- `frontend/src/components/__tests__/ProfileModal.test.jsx`: Added unit test verifying 1-click starter template loading.
+- Full regression test gauntlet: 156 backend pytest tests and 68 frontend vitest tests pass (100% pass rate).
+

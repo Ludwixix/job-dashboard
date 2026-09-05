@@ -12,7 +12,9 @@ import {
   saveProfile, 
   getActiveProfile,
   deleteProfile, 
-  DEFAULT_PROFILES 
+  DEFAULT_PROFILES,
+  SECTOR_TEMPLATES,
+  loadSectorTemplate
 } from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
 import { PROVIDERS, getLlmConfig, saveLlmConfig, testLlmConnection } from '../services/llmConfig';
@@ -330,6 +332,14 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
     }, 450);
   };
 
+  const handleSelectSector = (sectorKey) => {
+    const loaded = loadSectorTemplate(sectorKey);
+    setFormData(loaded);
+    if (onProfileSaved) {
+      onProfileSaved(loaded);
+    }
+  };
+
   const handleDelete = () => {
     if (window.confirm(`Are you sure you want to reset profile for "${formData.name}"?`)) {
       deleteProfile(formData.id);
@@ -409,6 +419,71 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
             <ShieldCheck size={14} className="text-indigo-400" />
             3. API & ENGINE SETTINGS
           </button>
+        </div>
+
+        {/* Industry Starter Presets Bar */}
+        <div className="px-6 py-2.5 bg-slate-950 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Compass size={14} className="text-teal-400" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">STARTER TEMPLATES:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => handleSelectSector('healthcare')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                formData.industry === 'Healthcare & Medical'
+                  ? 'bg-rose-950/80 border-rose-500 text-rose-300 shadow-xs'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-rose-500/50 hover:text-white'
+              }`}
+              title="Load Registered Nurse & Healthcare Profile"
+            >
+              🏥 Healthcare (Nurse)
+            </button>
+            <button
+              onClick={() => handleSelectSector('finance')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                formData.industry === 'Finance & Accounting'
+                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-xs'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-emerald-500/50 hover:text-white'
+              }`}
+              title="Load Senior Financial Accountant & CPA Profile"
+            >
+              💼 Finance (CPA)
+            </button>
+            <button
+              onClick={() => handleSelectSector('trades')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                formData.industry === 'Construction & Trades'
+                  ? 'bg-amber-950/80 border-amber-500 text-amber-300 shadow-xs'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-amber-500/50 hover:text-white'
+              }`}
+              title="Load Site Supervisor & Construction Profile"
+            >
+              🏗️ Construction / Trades
+            </button>
+            <button
+              onClick={() => handleSelectSector('legal')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                formData.industry === 'Legal'
+                  ? 'bg-purple-950/80 border-purple-500 text-purple-300 shadow-xs'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-purple-500/50 hover:text-white'
+              }`}
+              title="Load Corporate Legal Counsel Profile"
+            >
+              ⚖️ Legal (Counsel)
+            </button>
+            <button
+              onClick={() => handleSelectSector('technology')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                formData.industry === 'Technology & IT'
+                  ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-xs'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:text-white'
+              }`}
+              title="Load Systems & Cloud Infrastructure Engineer Profile"
+            >
+              💻 Tech (Systems Eng)
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}

@@ -62,4 +62,21 @@ describe('Profile Intelligence & Deduction Engine', () => {
       expect(screen.getByDisplayValue('jane@healthcare.org.au')).toBeInTheDocument();
     });
   });
+
+  it('allows 1-click loading of industry starter templates', async () => {
+    const onProfileSaved = vi.fn();
+    render(<ProfileModal isOpen={true} onClose={vi.fn()} onProfileSaved={onProfileSaved} />);
+
+    const nurseButton = screen.getByRole('button', { name: /Healthcare \(Nurse\)/i });
+    expect(nurseButton).toBeInTheDocument();
+
+    fireEvent.click(nurseButton);
+
+    expect(onProfileSaved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Sarah Jenkins',
+        industry: 'Healthcare & Medical',
+      })
+    );
+  });
 });

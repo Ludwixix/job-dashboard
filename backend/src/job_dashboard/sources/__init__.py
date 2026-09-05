@@ -16,6 +16,7 @@ from .base import (
     ScrapePipeline,
     SearchQuery,
     SeekUnavailableError,
+    detect_query_stream,
     _TextExtractor,
     _page_description,
     canonical_posted_date,
@@ -47,6 +48,7 @@ from .seek import (
 
 __all__ = [
     "SearchQuery",
+    "detect_query_stream",
     "JobSource",
     "SeekUnavailableError",
     "ScrapePipeline",

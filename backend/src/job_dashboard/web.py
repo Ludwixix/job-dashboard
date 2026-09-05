@@ -51,6 +51,7 @@ from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .sources import (
     SearchQuery,
+    detect_query_stream,
     ScrapePipeline,
     clean_description,
     deduplicate_jobs,
@@ -2178,11 +2179,11 @@ def make_handler(app: DashboardApp):
                     for item in raw_queries:
                         if isinstance(item, str):
                             term = item.strip()
-                            location, stream, group, weight, exclude_terms, enabled = "Melbourne, VIC", "core-it", "", 1.0, (), True
+                            location, stream, group, weight, exclude_terms, enabled = "Melbourne, VIC", detect_query_stream(term), "", 1.0, (), True
                         elif isinstance(item, dict):
                             term = str(item.get("term") or "").strip()
                             location = str(item.get("location") or "Melbourne, VIC")
-                            stream = str(item.get("stream") or "core-it")
+                            stream = str(item.get("stream") or detect_query_stream(term))
                             group = str(item.get("group") or "")
                             weight = float(item.get("weight", 1.0))
                             exclude_terms = tuple(str(value) for value in (item.get("exclude_terms") or ()))
@@ -2192,7 +2193,16 @@ def make_handler(app: DashboardApp):
                         if term:
                             queries.append(SearchQuery(term, location, stream, group, weight, exclude_terms, enabled))
                     if not queries:
-                        queries = list(app.search_queries)
+                        user_id = resolve_user_id(self)
+                        user_profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                        if user_profile and (user_profile.get("targetTitles") or user_profile.get("target_titles")):
+                            titles = user_profile.get("targetTitles") or user_profile.get("target_titles") or []
+                            loc = str(user_profile.get("location") or "Melbourne, VIC").strip() or "Melbourne, VIC"
+                            for t in titles:
+                                if str(t).strip():
+                                    queries.append(SearchQuery(term=str(t).strip(), location=loc, stream=detect_query_stream(str(t))))
+                        if not queries:
+                            queries = list(app.search_queries)
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:
@@ -2408,17 +2418,29 @@ def make_handler(app: DashboardApp):
                     queries = []
                     for item in raw_queries:
                         if isinstance(item, str):
-                            queries.append(SearchQuery(term=item, location="Melbourne, VIC", stream="core-it"))
+                            queries.append(SearchQuery(term=item, location="Melbourne, VIC", stream=detect_query_stream(item)))
                         elif isinstance(item, dict):
+                            term = str(item.get("term") or "").strip()
                             queries.append(SearchQuery(
-                                item.get("term", ""),
+                                term,
                                 item.get("location", "Melbourne, VIC"),
-                                item.get("stream", "core-it"),
+                                item.get("stream") or detect_query_stream(term),
                                 item.get("group", ""),
                                 float(item.get("weight", 1.0)),
                                 tuple(item.get("exclude_terms", [])),
                                 bool(item.get("enabled", True))
                             ))
+                    if not queries:
+                        user_id = resolve_user_id(self)
+                        user_profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                        if user_profile and (user_profile.get("targetTitles") or user_profile.get("target_titles")):
+                            titles = user_profile.get("targetTitles") or user_profile.get("target_titles") or []
+                            loc = str(user_profile.get("location") or "Melbourne, VIC").strip() or "Melbourne, VIC"
+                            for t in titles:
+                                if str(t).strip():
+                                    queries.append(SearchQuery(term=str(t).strip(), location=loc, stream=detect_query_stream(str(t))))
+                        if not queries:
+                            queries = list(app.search_queries)
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:

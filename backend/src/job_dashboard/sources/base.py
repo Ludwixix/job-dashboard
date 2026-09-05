@@ -21,11 +21,27 @@ logger = get_logger("job_dashboard.sources.base")
 class SearchQuery:
     term: str
     location: str = "Melbourne, VIC"
-    stream: str = "core-it"
+    stream: str = "general"
     group: str = ""
     weight: float = 1.0
     exclude_terms: tuple[str, ...] = ()
     enabled: bool = True
+
+
+def detect_query_stream(term: str) -> str:
+    """Classifies a search query term into its primary industry stream."""
+    lower = str(term or "").lower()
+    if re.search(r"nurs|health|medic|clinic|patient|aged care|doctor|pharmac|hospital|allied health|physio|dental|midwife", lower):
+        return "healthcare"
+    if re.search(r"account|audit|cpa|\bca\b|tax|financ|bookkeep|payroll|banking|treasury|actuar", lower):
+        return "finance"
+    if re.search(r"construct|builder|site supervisor|site manager|carpenter|electrician|plumber|trade|whs|foreman|estimator|civil", lower):
+        return "trades"
+    if re.search(r"legal|lawyer|counsel|paralegal|solicitor|barrister|litigat|compliance", lower):
+        return "legal"
+    if re.search(r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend", lower):
+        return "technology"
+    return "general"
 
 
 class JobSource(Protocol):

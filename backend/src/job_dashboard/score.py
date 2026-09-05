@@ -156,7 +156,7 @@ def explain_score(result: ScoreResult) -> dict[str, Any]:
         strengths.append("Location or work mode aligns with your preferences")
     if result.dimensions.get("experience_fit", 0) < 70:
         gaps.append("Seniority may not align with your current experience")
-    return {
+    explanation: dict[str, Any] = {
         "tier": result.fit,
         "score": result.score,
         "confidence": result.confidence,
@@ -167,6 +167,11 @@ def explain_score(result: ScoreResult) -> dict[str, Any]:
         "dimensions": result.dimensions,
         "relevance": result.relevance,
     }
+    if result.semantic_score is not None:
+        explanation["semantic_score"] = result.semantic_score
+    if result.rule_score is not None:
+        explanation["rule_score"] = result.rule_score
+    return explanation
 
 
 def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
@@ -214,3 +219,10 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
             "company": job.company,
             "error": str(e)
         }) from e
+
+
+def score_job_hybrid(job: Job, profile: Mapping[str, Any], semantic_weight: float = 0.25) -> ScoreResult:
+    """Calculate a hybrid score blending deterministic rules with semantic vector similarity."""
+    from .semantic_scoring import score_job_hybrid as _score_hybrid
+    return _score_hybrid(job, profile, semantic_weight=semantic_weight)
+

@@ -3,7 +3,7 @@
 **Document Reference**: `docs/tasks/ai-layer-roadmap.md`  
 **Evaluation Scope**: Backend scraping architecture (`backend/src/job_dashboard/sources/`) and candidate fit scoring engine (`backend/src/job_dashboard/score.py`).  
 **Author**: Antigravity Autonomous Engineering Agent  
-**Status**: Proposal for Human Review — Zero Dependencies Added  
+**Status**: Phase 1 (Hybrid Semantic Vector Scoring) Implemented & Verified on Master  
 
 ---
 
@@ -173,3 +173,4 @@ If embedding-based semantic matching is introduced, it must utilize concrete, ac
 1. **Do NOT wholesale replace existing scrapers**: The current JobSpy, Adzuna, RemoteOK, and SEEK cache ingestion pipeline is battle-tested, fast, and stable. Replacing it with Crawl4AI would increase latency and maintenance overhead without improving job coverage.
 2. **Do NOT install unverified "Resume2Vec" packages**: Any semantic matching implementation must rely exclusively on verified packages (`google-genai` embeddings or `sentence-transformers`).
 3. **DO implement a two-stage hybrid scoring system**: Augmenting the deterministic rule engine with hosted vector embeddings (`text-embedding-004`) for top-tier candidates will deliver genuine improvements in match nuance without sacrificing explainability or adding container bloat.
+

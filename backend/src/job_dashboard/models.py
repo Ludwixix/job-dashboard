@@ -34,6 +34,8 @@ class ScoreResult:
     experience_level: str = "mid"
     relevance: str = "Strong"
     score_breakdown: dict[str, int] = field(default_factory=dict)
+    semantic_score: float | None = None
+    rule_score: int | None = None
 
 
 @dataclass(frozen=True)

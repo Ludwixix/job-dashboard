@@ -32,6 +32,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from .ai_resume_analyzer import get_resume_analyzer
+from .ats_optimizer import generate_ats_optimized_resume, generate_ats_docx_bytes
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1255,6 +1256,44 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "document": doc})
                 return
 
+            if path == "/api/export-ats-resume":
+                job_id = query_params.get("job_id", [""])[0].strip()
+                format_type = query_params.get("format", ["docx"])[0].lower()
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+
+                job = None
+                if job_id:
+                    job = app.repository.get_job(job_id)
+                    if not job and app.jobs:
+                        job = next((j for j in app.jobs if str(j.get("id")) == str(job_id)), None)
+
+                resume_data = generate_ats_optimized_resume(profile, job)
+
+                if format_type == "json":
+                    self.send_json(200, {"success": True, "resume": resume_data})
+                    return
+
+                if format_type in ("txt", "md"):
+                    text_bytes = resume_data["markdown_text"].encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.txt"')
+                    self.send_header("Content-Length", str(len(text_bytes)))
+                    self.end_headers()
+                    self.wfile.write(text_bytes)
+                    return
+
+                # Default to native OpenXML .docx
+                docx_bytes = generate_ats_docx_bytes(resume_data)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.docx"')
+                self.send_header("Content-Length", str(len(docx_bytes)))
+                self.end_headers()
+                self.wfile.write(docx_bytes)
+                return
+
             if path == "/api/psychology":
                 job_id = query_params.get("job_id", [""])[0]
                 psy = app.repository.get_job_psychology(job_id)
@@ -1595,6 +1634,43 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, app.select_compare_output(comparison_id, payload["model_id"]))
                     return
                 
+                if path == "/api/export-ats-resume":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    user_id = resolve_user_id(self)
+                    profile = body.get("profile") or (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    job = body.get("job") or {}
+                    custom_text = body.get("resume_text")
+                    format_type = str(body.get("format") or "docx").lower()
+
+                    resume_data = generate_ats_optimized_resume(profile, job)
+                    if custom_text:
+                        resume_data["summary"] = custom_text[:500]
+                        resume_data["markdown_text"] = custom_text
+
+                    if format_type == "json":
+                        self.send_json(200, {"success": True, "resume": resume_data})
+                        return
+
+                    if format_type in ("txt", "md"):
+                        text_bytes = resume_data["markdown_text"].encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/plain; charset=utf-8")
+                        self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.txt"')
+                        self.send_header("Content-Length", str(len(text_bytes)))
+                        self.end_headers()
+                        self.wfile.write(text_bytes)
+                        return
+
+                    docx_bytes = generate_ats_docx_bytes(resume_data)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                    self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.docx"')
+                    self.send_header("Content-Length", str(len(docx_bytes)))
+                    self.end_headers()
+                    self.wfile.write(docx_bytes)
+                    return
+
                 if path == "/api/profile":
                     user_id = resolve_user_id(self)
                     if not user_id:

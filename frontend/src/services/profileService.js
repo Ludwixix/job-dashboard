@@ -6,6 +6,7 @@
  */
 
 import { getBackendApiBase } from './apiConfig';
+import { getLlmConfig } from './llmConfig';
 
 export const STORAGE_KEY_PROFILES = 'job_dashboard_profiles';
 export const STORAGE_KEY_ACTIVE_PROFILE_ID = 'job_dashboard_active_profile_id';
@@ -381,8 +382,14 @@ export const parseResumeTextClientSide = (text = '') => {
 /**
  * AI-powered resume parser via OpenRouter
  */
-export const parseResumeWithAI = async (resumeText, apiKey, model = 'z-ai/glm-5.3-flash') => {
-  if (!apiKey) {
+export const parseResumeWithAI = async (resumeText, apiKey, model) => {
+  const config = getLlmConfig();
+  const effectiveKey = (apiKey || config.apiKey || '').trim();
+  const effectiveModel = model || config.model;
+  const endpoint = config.endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+  const provider = config.provider || 'openrouter';
+
+  if (!effectiveKey && config.providerMeta?.requiresKey) {
     return parseResumeTextClientSide(resumeText);
   }
 
@@ -420,31 +427,60 @@ Resume Text:
 ${resumeText.slice(0, 9000)}`;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.trim()}`,
-        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard-6xrdvjlrcq-ts.a.run.app',
-        'X-Title': 'CAREER.AGENT - Deep Profile Engine'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: 'You are a precise talent intelligence parser that outputs strictly valid JSON only.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 3000
-      })
-    });
+    let res;
+    if (provider === 'anthropic') {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': effectiveKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: effectiveModel,
+          max_tokens: 3000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+    } else {
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (effectiveKey) {
+        headers['Authorization'] = `Bearer ${effectiveKey}`;
+      }
+      if (provider === 'openrouter') {
+        headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
+        headers['X-Title'] = 'CAREER.AGENT - Deep Profile Engine';
+      }
+
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: effectiveModel,
+          messages: [
+            { role: 'system', content: 'You are a precise talent intelligence parser that outputs strictly valid JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 3000
+        })
+      });
+    }
 
     if (!res.ok) {
-      throw new Error(`OpenRouter parser API error: ${res.status}`);
+      throw new Error(`Parser API error: ${res.status}`);
     }
 
     const data = await res.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    let content = '';
+    if (provider === 'anthropic') {
+      content = data.content?.[0]?.text || '';
+    } else {
+      content = data.choices?.[0]?.message?.content || '';
+    }
     const cleanJson = content.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleanJson);
 

@@ -26,6 +26,7 @@ const ProfileModal = lazy(() => import('./ProfileModal').then(m => ({ default: m
 const AuthModal = lazy(() => import('./AuthModal').then(m => ({ default: m.AuthModal })));
 const GoogleIntegrationModal = lazy(() => import('./GoogleIntegrationModal').then(m => ({ default: m.GoogleIntegrationModal })));
 const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ default: m.AutoApplyModal })));
+const SettingsModal = lazy(() => import('./SettingsModal').then(m => ({ default: m.SettingsModal })));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -41,7 +42,7 @@ import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../se
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings
 } from 'lucide-react';
 
 
@@ -61,6 +62,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   // Candidate Personalization Profile State
   const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
 
   // Minimalist Monolith Mode vs Full Studio Mode State
@@ -479,6 +481,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           }}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenBatchApply={() => setIsBatchApplyOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         {isBatchApplyOpen && (
@@ -563,6 +566,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               jobs={jobs}
               onSelectJob={(j) => setSelectedJob(j)}
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+          </Suspense>
+        )}
+
+        {isSettingsOpen && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <SettingsModal
+              isOpen={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
             />
           </Suspense>
         )}
@@ -644,7 +657,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               setEditingProfile(p);
               setIsProfileModalOpen(true);
             }}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
+
+          {/* Dashboard Settings & LLM Configuration */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+            title="Configure LLM Provider, Model, and API Credentials"
+          >
+            <Settings size={12} className="text-indigo-400" />
+            <span>SETTINGS</span>
+          </button>
 
           <span className="text-slate-800">|</span>
 
@@ -1122,6 +1146,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               jobs={jobs}
               onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
               onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
+              onOpenSettings={() => setIsSettingsOpen(true)}
             />
           </Suspense>
         </SafeErrorBoundary>
@@ -1218,6 +1243,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   }
                 });
               }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Dashboard Settings & LLM Configuration Modal */}
+      {isSettingsOpen && (
+        <SafeErrorBoundary sectionName="Settings Modal">
+          <Suspense fallback={<ModalSkeleton />}>
+            <SettingsModal
+              isOpen={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
             />
           </Suspense>
         </SafeErrorBoundary>

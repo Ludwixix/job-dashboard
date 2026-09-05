@@ -6,7 +6,8 @@ import {
   Send, 
   Compass, 
   Sliders, 
-  Terminal
+  Terminal,
+  Settings
 } from 'lucide-react';
 
 /**
@@ -20,6 +21,7 @@ export default function AlienMonolithNav({
   onOpenBatchApply,
   onOpenProfileModal,
   onOpenCommandPalette,
+  onOpenSettings,
   onSwitchToStudio,
   readyCount = 0,
   isAutonomousActive = true,
@@ -194,7 +196,7 @@ export default function AlienMonolithNav({
         )}
       </div>
 
-      {/* Bottom Controls: Studio Gateway & Command */}
+      {/* Bottom Controls: Studio Gateway & Command & Settings */}
       <div className="relative z-10 flex flex-row md:flex-col items-center space-x-1.5 sm:space-x-2 md:space-x-0 md:space-y-3 shrink-0 px-1 md:w-full md:px-2">
         {onOpenCommandPalette && (
           <button
@@ -204,6 +206,18 @@ export default function AlienMonolithNav({
             title="Command Interface (⌘K)"
           >
             <Terminal size={13} />
+          </button>
+        )}
+
+        {onOpenSettings && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="w-9 h-9 sm:w-10 sm:h-10 border border-[#231e19] hover:border-[#b87326]/60 bg-[#0d0b09] hover:bg-[#15120e] text-[#706659] hover:text-[#d48b38] flex items-center justify-center transition-all cursor-pointer group"
+            title="Settings & LLM Configuration"
+            aria-label="Settings"
+          >
+            <Settings size={13} className="group-hover:rotate-45 transition-transform duration-300" />
           </button>
         )}
 

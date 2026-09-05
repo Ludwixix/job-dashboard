@@ -40,7 +40,8 @@ export default function MonolithMode({
   onOpenGenerator,
   onOpenBatchApply,
   onOpenProfileModal,
-  onOpenCommandPalette
+  onOpenCommandPalette,
+  onOpenSettings
 }) {
   // Navigation active tab: 'prime' | 'autopilot' | 'radar'
   const [activeTab, setActiveTab] = useState('prime');
@@ -215,6 +216,7 @@ export default function MonolithMode({
         onOpenBatchApply={onOpenBatchApply}
         onOpenProfileModal={onOpenProfileModal}
         onOpenCommandPalette={onOpenCommandPalette}
+        onOpenSettings={onOpenSettings}
         onSwitchToStudio={() => onSwitchMode && onSwitchMode('studio')}
         readyCount={actionDeck.length}
         isAutonomousActive={agentState.isRunning}

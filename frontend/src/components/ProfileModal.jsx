@@ -15,6 +15,7 @@ import {
   DEFAULT_PROFILES 
 } from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
+import { PROVIDERS, getLlmConfig, saveLlmConfig, testLlmConnection } from '../services/llmConfig';
 import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
 import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
 
@@ -49,7 +50,11 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [apiKey, setApiKey] = useState(() => getActiveApiKey());
+  const [llmProvider, setLlmProvider] = useState(() => getLlmConfig().provider || 'openrouter');
+  const [llmModel, setLlmModel] = useState(() => getLlmConfig().model || 'z-ai/glm-5.3-flash');
+  const [apiKey, setApiKey] = useState(() => getLlmConfig().apiKey || '');
+  const [testResult, setTestResult] = useState(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState(() => {
@@ -116,6 +121,11 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
           fullWorkExperienceText: active.fullWorkExperienceText || ''
         });
       }
+      const config = getLlmConfig();
+      setLlmProvider(config.provider || 'openrouter');
+      setLlmModel(config.model || 'z-ai/glm-5.3-flash');
+      setApiKey(config.apiKey || '');
+      setTestResult(null);
       setSaveSuccess(false);
       setParseError('');
     }
@@ -304,7 +314,11 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
       return;
     }
 
-    setActiveApiKey(apiKey);
+    saveLlmConfig({
+      provider: llmProvider,
+      model: llmModel,
+      apiKey: apiKey
+    });
     const saved = saveProfile(formData);
     runProfileOnboardingPipeline(saved).catch(() => {});
     setSaveSuccess(true);
@@ -844,31 +858,140 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
           {/* TAB 3: API SETTINGS */}
           {activeTab === 'api' && (
             <div className="space-y-6 font-mono text-xs max-w-xl mx-auto pt-4">
-              <div className="p-5 rounded-2xl bg-teal-950/20 border border-teal-500/30 space-y-3">
-                <div className="text-teal-300 font-extrabold flex items-center gap-2 text-sm">
-                  <ShieldCheck size={18} className="text-teal-400" />
-                  OPENROUTER API ENGINE INTEGRATION
+              <div className="p-5 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 space-y-4">
+                <div className="text-indigo-300 font-extrabold flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-indigo-400" />
+                    AI ENGINE & PROVIDER SETTINGS
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    Local browser storage
+                  </span>
                 </div>
-                <p className="text-slate-400 leading-relaxed text-[11px]">
-                  Your OpenRouter API key powers the intelligent candidate matching, deep resume characterization, and bespoke document generation. It is stored securely in your browser's local storage and remains completely confidential.
-                </p>
-                <div className="space-y-2 pt-2">
+                
+                {/* Provider Selector */}
+                <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-300">
-                    OPENROUTER API KEY
+                    LLM PROVIDER
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {Object.values(PROVIDERS).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setLlmProvider(p.id);
+                          setLlmModel(p.defaultModel);
+                          const storedKey = localStorage.getItem(`llm_key_${p.id}`) || (p.id === 'openrouter' ? localStorage.getItem('openrouter_api_key') : '') || '';
+                          setApiKey(storedKey);
+                          setTestResult(null);
+                        }}
+                        className={`p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                          llmProvider === p.id
+                            ? 'bg-indigo-900/60 border-indigo-400 text-white shadow-xs'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="font-bold text-[11px] truncate">{p.name}</div>
+                        <div className="text-[9px] text-slate-500 truncate">{p.badge}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Model Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-300">
+                    ACTIVE MODEL
+                  </label>
+                  <select
+                    value={llmModel}
+                    onChange={(e) => setLlmModel(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:border-indigo-500 focus:outline-none transition-colors"
+                  >
+                    {PROVIDERS[llmProvider]?.models?.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* API Key Input */}
+                <div className="space-y-2 pt-1">
+                  <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                    <span>{PROVIDERS[llmProvider]?.name || 'API'} KEY</span>
+                    {PROVIDERS[llmProvider]?.keyUrl && (
+                      <a 
+                        href={PROVIDERS[llmProvider].keyUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 underline font-normal"
+                      >
+                        Get Key ↗
+                      </a>
+                    )}
                   </label>
                   <input
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:border-teal-500 focus:outline-none transition-colors"
-                    placeholder="sk-or-v1-..."
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:border-indigo-500 focus:outline-none transition-colors"
+                    placeholder={PROVIDERS[llmProvider]?.keyPlaceholder || 'Enter API Key...'}
                   />
                   {apiKey && (
-                    <p className="text-teal-400 text-[10px] flex items-center gap-1.5 mt-2">
-                      <CheckCircle2 size={12} /> Key is active and ready
+                    <p className="text-emerald-400 text-[10px] flex items-center gap-1.5">
+                      <CheckCircle2 size={12} /> Key active in local storage
                     </p>
                   )}
                 </div>
+
+                {/* Test Connection Button & Status */}
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsTesting(true);
+                      setTestResult(null);
+                      const res = await testLlmConnection({
+                        provider: llmProvider,
+                        model: llmModel,
+                        apiKey: apiKey
+                      });
+                      setIsTesting(false);
+                      setTestResult(res);
+                    }}
+                    disabled={isTesting || (PROVIDERS[llmProvider]?.requiresKey && !apiKey)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      isTesting || (PROVIDERS[llmProvider]?.requiresKey && !apiKey)
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-300 hover:text-white'
+                    }`}
+                  >
+                    {isTesting ? (
+                      <>
+                        <RefreshCw size={12} className="animate-spin" />
+                        <span>Testing…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={12} className="text-amber-400" />
+                        <span>Test Connection</span>
+                      </>
+                    )}
+                  </button>
+
+                  {testResult && (
+                    <div className={`p-2.5 rounded-xl border text-[11px] ${
+                      testResult.success
+                        ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                        : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                    }`}>
+                      {testResult.message || testResult.error}
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           )}

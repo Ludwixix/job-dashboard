@@ -39,6 +39,16 @@ export const CANDIDATE_PROFILE = {
   certifications: ['AZ-104 (Azure Administrator)', 'ITIL 4 Foundation', 'AZ-900 (Azure Fundamentals)']
 };
 
+import { 
+  getLlmConfig, 
+  saveLlmConfig, 
+  PROVIDERS, 
+  getActiveApiKey as getActiveApiKeyFromConfig, 
+  getActiveModel as getActiveModelFromConfig, 
+  setActiveApiKey as setActiveApiKeyInConfig, 
+  setActiveModel as setActiveModelInConfig 
+} from './llmConfig';
+
 export const AVAILABLE_MODELS = [
   { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet (⭐ Recommended Elite Writer)', description: 'Industry-leading executive voice, nuanced ATS keyword tailoring, and high-impact accomplishment bullets' },
   { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o (High-Precision ATS)', description: 'Top-tier structural precision, strong metric extraction, and flawless formatting' },
@@ -48,28 +58,20 @@ export const AVAILABLE_MODELS = [
   { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Fast Flash Tier)', description: 'Rapid, lightweight generation' }
 ];
 
-// In-memory key state to avoid unnecessary localStorage exposure
-let inMemoryApiKey = '';
-
 export const getActiveApiKey = () => {
-  return inMemoryApiKey || localStorage.getItem('openrouter_api_key') || '';
+  return getActiveApiKeyFromConfig();
 };
 
 export const setActiveApiKey = (key, persist = true) => {
-  inMemoryApiKey = key ? key.trim() : '';
-  if (persist && key) {
-    localStorage.setItem('openrouter_api_key', key.trim());
-  } else {
-    localStorage.removeItem('openrouter_api_key');
-  }
+  setActiveApiKeyInConfig(key, persist);
 };
 
 export const getActiveModel = () => {
-  return localStorage.getItem('openrouter_model') || 'z-ai/glm-5.3-flash';
+  return getActiveModelFromConfig();
 };
 
 export const setActiveModel = (model) => {
-  localStorage.setItem('openrouter_model', model.trim());
+  setActiveModelInConfig(model);
 };
 
 /**
@@ -231,8 +233,12 @@ Core Competencies & Boolean Recruiter Keywords:
  * Falls back seamlessly to grounded client-side generation if offline.
  */
 export const generateApplicationDocs = async (job, onProgress, onLog, candidateProfile) => {
-  const apiKey = getActiveApiKey();
-  const model = getActiveModel() || 'z-ai/glm-5.3-flash';
+  const llmConfig = getLlmConfig();
+  const provider = llmConfig.provider || 'openrouter';
+  const providerMeta = llmConfig.providerMeta || PROVIDERS[provider] || PROVIDERS.openrouter;
+  const apiKey = llmConfig.apiKey;
+  const model = llmConfig.model || providerMeta.defaultModel;
+  const endpoint = llmConfig.endpoint || providerMeta.defaultEndpoint;
   const startTime = Date.now();
   const profile = candidateProfile || getActiveProfile();
 
@@ -242,7 +248,7 @@ export const generateApplicationDocs = async (job, onProgress, onLog, candidateP
     onProgress?.(msg);
   };
 
-  if (!apiKey) {
+  if (!apiKey && providerMeta.requiresKey) {
     log('Dispatching application synthesis to sovereign background pipeline...', 'info');
     try {
       const backendBase = getBackendApiBase();
@@ -278,7 +284,7 @@ export const generateApplicationDocs = async (job, onProgress, onLog, candidateP
     };
   }
 
-  log(`Initializing OpenRouter API stream for ${profile.name} [Model: ${model}]`, 'init');
+  log(`Initializing ${providerMeta.name} API stream for ${profile.name} [Model: ${model}]`, 'init');
   log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
 
   const candidateSummary = [profile.fullWorkExperienceText, profile.workHistorySummary]
@@ -370,27 +376,56 @@ Generate in strict sequence:
 [LinkedIn Headlines & About Index]`;
 
   log('Extracting high-priority ATS keywords and requirements…', 'info');
-  log('Dispatching request to OpenRouter HTTPS CORS gateway…', 'network');
+  log(`Dispatching request to ${providerMeta.name} endpoint…`, 'network');
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://ludwixix.github.io/job-dashboard-react/',
-      'X-Title': 'Job Dashboard Application Studio'
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 16000,
-      stream: true
-    })
-  });
+  let res;
+  if (provider === 'anthropic') {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 4096,
+        stream: true
+      })
+    });
+  } else {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
+      headers['X-Title'] = 'Job Dashboard Application Studio';
+    }
+
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 16000,
+        stream: true
+      })
+    });
+  }
 
   if (!res.ok) {
     let errDetail = `HTTP ${res.status}`;
@@ -398,8 +433,8 @@ Generate in strict sequence:
       const errJson = await res.json();
       if (errJson?.error?.message) errDetail = errJson.error.message;
     } catch {}
-    log(`OpenRouter API Error: ${errDetail}`, 'error');
-    throw new Error(`OpenRouter API Error: ${errDetail}`);
+    log(`${providerMeta.name} API Error: ${errDetail}`, 'error');
+    throw new Error(`${providerMeta.name} API Error: ${errDetail}`);
   }
 
   log('Connected to live model stream. Receiving tokens…', 'success');
@@ -436,6 +471,9 @@ Generate in strict sequence:
         if (delta.reasoning) {
           reasoningContent += delta.reasoning;
         }
+        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+          fullContent += parsed.delta.text;
+        }
 
         if (Date.now() - lastProgressUpdate > 700) {
           lastProgressUpdate = Date.now();
@@ -452,7 +490,7 @@ Generate in strict sequence:
   const finalContent = fullContent || reasoningContent;
   if (!finalContent) {
     log('Received empty content from model.', 'error');
-    throw new Error('OpenRouter returned an empty response. Please check model quota or try again.');
+    throw new Error(`${providerMeta.name} returned an empty response. Please check quota or credentials.`);
   }
 
   log(`Stream complete (${finalContent.length} chars). Splitting ATS Resume, Cover Letter & LinkedIn Assets…`, 'success');
@@ -510,7 +548,7 @@ Generate in strict sequence:
     coverLetter,
     linkedInOptimization,
     diagnostic,
-    model: `${model} (Live OpenRouter API)`,
+    model: `${model} (Live ${providerMeta.name} API)`,
     elapsedMs: Date.now() - startTime
   };
 };

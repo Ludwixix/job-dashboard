@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, ChevronDown, Edit2, Sparkles, MapPin, Briefcase, Mail, Phone, ShieldCheck, DollarSign, Award, RefreshCw } from 'lucide-react';
+import { User, ChevronDown, Edit2, Sparkles, MapPin, Briefcase, Mail, Phone, ShieldCheck, DollarSign, Award, RefreshCw, Settings } from 'lucide-react';
 import { getActiveProfile } from '../services/profileService';
 
-export const ProfileSwitcher = ({ activeProfile, onProfileChange, onOpenProfileModal }) => {
+export const ProfileSwitcher = ({ activeProfile, onProfileChange, onOpenProfileModal, onOpenSettings }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const profile = activeProfile || getActiveProfile();
@@ -124,11 +124,24 @@ export const ProfileSwitcher = ({ activeProfile, onProfileChange, onOpenProfileM
                 setIsOpen(false);
                 if (onOpenProfileModal) onOpenProfileModal(profile);
               }}
-              className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
             >
               <Edit2 size={13} className="text-amber-300" />
               <span>Edit Profile & Update Resume</span>
             </button>
+
+            {onOpenSettings && (
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenSettings();
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700/70 transition-all cursor-pointer"
+              >
+                <Settings size={13} className="text-indigo-400" />
+                <span>Settings & LLM Configuration</span>
+              </button>
+            )}
           </div>
         </div>
       )}

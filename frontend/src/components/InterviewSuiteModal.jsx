@@ -5,6 +5,7 @@ import {
   HelpCircle, Bot, User, Send, Check
 } from 'lucide-react';
 import { getActiveApiKey, getActiveModel, generateInterviewGuide } from '../services/generationService';
+import { getLlmConfig, PROVIDERS } from '../services/llmConfig';
 import { getActiveProfile } from '../services/profileService';
 import { saveUserApplication } from '../services/dataService';
 import { 
@@ -51,9 +52,11 @@ export const InterviewSuiteModal = ({
       return;
     }
 
-    const apiKey = getActiveApiKey();
-    if (!apiKey) {
-      setPsychError('OpenRouter API key is required to decrypt employer psychology. Please configure it in Profile/Settings.');
+    const llmConfig = getLlmConfig();
+    const apiKey = llmConfig.apiKey;
+    const providerMeta = llmConfig.providerMeta || PROVIDERS[llmConfig.provider] || PROVIDERS.openrouter;
+    if (!apiKey && providerMeta.requiresKey) {
+      setPsychError(`${providerMeta.name} API key is required to decrypt employer psychology. Please configure it in Settings.`);
       setPsychLoading(false);
       setIsRefreshingPsych(false);
       return;
@@ -67,7 +70,7 @@ export const InterviewSuiteModal = ({
     setPsychError('');
 
     const fetchPromise = (async () => {
-      const activeModel = getActiveModel() || 'z-ai/glm-5.3-flash';
+      const activeModel = llmConfig.model || providerMeta.defaultModel;
       const candidateProfile = getActiveProfile() || {};
 
       const descriptionSections = [
@@ -86,21 +89,7 @@ export const InterviewSuiteModal = ({
 
       const fullJobText = descriptionSections.join('\n\n') || `${job.title} at ${job.company}`;
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey.trim()}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard-6xrdvjlrcq-ts.a.run.app',
-          'X-Title': 'Job Decoder Matrix - Psychology Engine'
-        },
-        body: JSON.stringify({
-          model: activeModel,
-          response_format: { type: 'json_object' },
-          messages: [
-            {
-              role: 'system',
-              content: `You are an elite executive talent psychologist, organizational diagnostician, and behavioral interview strategist.
+      const systemPrompt = `You are an elite executive talent psychologist, organizational diagnostician, and behavioral interview strategist.
 Your mission is to perform a deep psychoanalytic breakdown of this full job advertisement to uncover the hiring manager's unstated operational pressures, organizational vulnerabilities, covert expectations, and what candidate posture will dominate the interview.
 
 Candidate Context:
@@ -121,35 +110,73 @@ Output a strictly valid JSON object matching this schema:
     "Covert cultural signal or unwritten team dynamic detected in the phrasing",
     "Underlying organizational reality (e.g. legacy refactoring debt, firefighting mode, high-growth chaos)"
   ]
-}`
-            },
-            {
-              role: 'user',
-              content: `Analyze the complete job ad details, covert psychology, and hidden priorities for "${job.title}" at "${job.company}":
+}`;
+
+      const userContent = `Analyze the complete job ad details, covert psychology, and hidden priorities for "${job.title}" at "${job.company}":
 
 === FULL JOB AD DOSSIER & SPECIFICATION ===
-Role Title: ${job.title}
+Title: ${job.title}
 Company: ${job.company}
-Location: ${job.location || 'Australia'}
+Location: ${job.location || 'Melbourne, VIC'}
 Work Arrangement: ${job.remote ? '100% Remote' : 'Hybrid / On-site'}
 Salary / Package: ${job.salary || 'Market Rate'}
 Source: ${job.source || 'Direct Portal / Job Board'}
 ${job.emailSubject ? `Email Subject: ${job.emailSubject}\n` : ''}
 
 === JOB DESCRIPTION & REQUIREMENTS ===
-${fullJobText}`
-            }
-          ],
-          temperature: 0.2
-        })
-      });
+${fullJobText}`;
+
+      let response;
+      if (llmConfig.provider === 'anthropic') {
+        response = await fetch(llmConfig.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey.trim(),
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userContent }],
+            max_tokens: 3000,
+            temperature: 0.2
+          })
+        });
+      } else {
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        if (apiKey) {
+          headers['Authorization'] = `Bearer ${apiKey.trim()}`;
+        }
+        if (llmConfig.provider === 'openrouter') {
+          headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
+          headers['X-Title'] = 'Job Decoder Matrix - Psychology Engine';
+        }
+
+        response = await fetch(llmConfig.endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: activeModel,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userContent }
+            ],
+            temperature: 0.2
+          })
+        });
+      }
 
       const raw = await response.json();
       if (!response.ok) {
         throw new Error(raw.error?.message || `API error (${response.status})`);
       }
 
-      const content = raw.choices?.[0]?.message?.content || '{}';
+      const content = raw.choices?.[0]?.message?.content || raw.content?.[0]?.text || '{}';
       const cleanJson = content.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
       

@@ -10,6 +10,7 @@ import {
   runDocumentQualityAudit, getActiveApiKey, setActiveApiKey,
   getActiveModel, setActiveModel, AVAILABLE_MODELS
 } from '../services/generationService';
+import { PROVIDERS, getLlmConfig, saveLlmConfig } from '../services/llmConfig';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { getActiveProfile } from '../services/profileService';
 
@@ -88,14 +89,17 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
   // Settings modal state
   const [showSettings, setShowSettings]       = useState(false);
-  const [inputKey, setInputKey]               = useState(() => getActiveApiKey());
-  const [selectedModel, setSelectedModel]     = useState(() => getActiveModel());
+  const [activeProvider, setActiveProvider]   = useState(() => getLlmConfig().provider || 'openrouter');
+  const [inputKey, setInputKey]               = useState(() => getLlmConfig().apiKey || '');
+  const [selectedModel, setSelectedModel]     = useState(() => getLlmConfig().model || 'z-ai/glm-5.3-flash');
   const [savedSettingsSuccess, setSavedSettingsSuccess] = useState(false);
 
   useEffect(() => {
-    setInputKey(getActiveApiKey());
-    setSelectedModel(getActiveModel());
-  }, []);
+    const config = getLlmConfig();
+    setActiveProvider(config.provider || 'openrouter');
+    setInputKey(config.apiKey || '');
+    setSelectedModel(config.model || 'z-ai/glm-5.3-flash');
+  }, [showSettings]);
 
   // Debounced auto-save when user edits in the studio
   useEffect(() => {
@@ -131,8 +135,11 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
   };
 
   const handleSaveSettings = () => {
-    setActiveApiKey(inputKey);
-    setActiveModel(selectedModel);
+    saveLlmConfig({
+      provider: activeProvider,
+      model: selectedModel,
+      apiKey: inputKey
+    });
     setSavedSettingsSuccess(true);
     setTimeout(() => {
       setSavedSettingsSuccess(false);
@@ -320,7 +327,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                   </div>
                   <div>
                     <h3 className="text-base font-black text-white">AI Engine & Model Settings</h3>
-                    <p className="text-xs text-slate-400">Direct OpenRouter API key and preferred model configuration.</p>
+                    <p className="text-xs text-slate-400">Configure LLM provider, preferred model, and private credentials.</p>
                   </div>
                 </div>
                 <button
@@ -331,20 +338,64 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 </button>
               </div>
 
-              {/* API Key Input */}
+              {/* Provider Selector */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <KeyRound size={13} className="text-amber-400" /> OpenRouter API Key
+                  <Cpu size={13} className="text-indigo-400" /> LLM Provider
                 </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {Object.values(PROVIDERS).map((p) => {
+                    const isSelected = activeProvider === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveProvider(p.id);
+                          setSelectedModel(p.defaultModel);
+                          const storedKey = localStorage.getItem(`llm_key_${p.id}`) || (p.id === 'openrouter' ? localStorage.getItem('openrouter_api_key') : '') || '';
+                          setInputKey(storedKey);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-indigo-950/80 border-indigo-500 text-white shadow-xs'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="text-xs font-bold truncate">{p.name}</div>
+                        <div className="text-[9px] text-slate-500 truncate">{p.badge}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* API Key Input */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <KeyRound size={13} className="text-amber-400" /> {PROVIDERS[activeProvider]?.name || 'Provider'} API Key
+                  </label>
+                  {PROVIDERS[activeProvider]?.keyUrl && (
+                    <a
+                      href={PROVIDERS[activeProvider].keyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 underline"
+                    >
+                      Get Key ↗
+                    </a>
+                  )}
+                </div>
                 <input
                   type="password"
                   value={inputKey}
                   onChange={(e) => setInputKey(e.target.value)}
-                  placeholder="sk-or-v1-..."
+                  placeholder={PROVIDERS[activeProvider]?.keyPlaceholder || 'Enter API key...'}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
                 />
                 <p className="text-[11px] text-slate-500">
-                  Direct HTTPS browser calls with CORS. Key is saved locally in private localStorage.
+                  Direct HTTPS browser calls. Key is saved locally in private localStorage.
                 </p>
               </div>
 
@@ -354,7 +405,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                   <Cpu size={13} className="text-indigo-400" /> Active LLM Model
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {AVAILABLE_MODELS.map(m => (
+                  {(PROVIDERS[activeProvider]?.models || AVAILABLE_MODELS).map(m => (
                     <div
                       key={m.id}
                       onClick={() => setSelectedModel(m.id)}

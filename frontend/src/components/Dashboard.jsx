@@ -63,9 +63,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
 
-  // Minimalist Monolith + Zen Autopilot vs Full Studio Mode State
+  // Minimalist Monolith Mode vs Full Studio Mode State
   const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('job_dashboard_view_mode') || 'zen';
+    return localStorage.getItem('job_dashboard_view_mode') || 'monolith';
   });
 
   // Fallback banner state when static fallback jobs are loaded
@@ -438,7 +438,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
   const applicationsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
 
-  if (viewMode === 'monolith') {
+  if (viewMode === 'monolith' || viewMode === 'zen') {
     return (
       <SafeErrorBoundary>
         {fallbackBanner && (
@@ -560,36 +560,6 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     );
   }
 
-  if (viewMode === 'zen') {
-    return (
-      <SafeErrorBoundary>
-        <ZenAutopilotDashboard
-          jobs={jobs}
-          profile={activeProfile}
-          applications={applicationsList}
-          onSwitchToStudio={() => setViewMode('studio')}
-          onSwitchToMonolith={() => setViewMode('monolith')}
-          onOpenJobModal={(job) => setSelectedJob(job)}
-          onOpenBatchApply={() => setIsBatchApplyOpen(true)}
-          onOpenProfileModal={() => {
-            setEditingProfile(activeProfile);
-            setIsProfileModalOpen(true);
-          }}
-          onOpenMockInterview={(job) => setSelectedForMockInterview(job)}
-        />
-        {selectedJob && (
-          <JobModal
-            job={selectedJob}
-            onClose={() => setSelectedJob(null)}
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-            profile={activeProfile}
-            allJobs={jobs}
-          />
-        )}
-      </SafeErrorBoundary>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
       {/* Top Live Engine Status Bar */}
@@ -693,18 +663,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           <button
             onClick={() => setViewMode('monolith')}
             className="flex items-center gap-1.5 px-3 py-1 bg-[#1a1612] border border-[#b87326]/50 text-[#d48b38] hover:text-white hover:bg-[#251f18] transition-colors font-bold text-[10px] shadow-xs cursor-pointer tracking-wider"
-            title="Switch to Dune Monolithic Minimalist Mode"
+            title="Switch to Monolith Focus Mode"
           >
             <span>▲ MONOLITH</span>
-          </button>
-
-          <button
-            onClick={() => setViewMode('zen')}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-950/80 border border-teal-500/50 text-teal-300 hover:text-white hover:bg-teal-900 transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
-            title="Switch to Distraction-Free Zen Auto-Pilot Mode"
-          >
-            <Sparkles size={11} className="text-teal-400" />
-            <span>🌿 FOCUS AUTOPILOT</span>
           </button>
 
           <button

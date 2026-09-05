@@ -249,34 +249,15 @@ export default function MonolithMode({
 
             {/* Controls: 3-Way Mode Switcher & Actions */}
             <div className="flex items-center gap-3">
-              {/* 3-Way Mode Switcher */}
+              {/* Mode Switcher */}
               <div className="inline-flex p-1 border border-[#2d2720] bg-[#120f0d] text-[10px] tracking-[0.15em] font-bold">
                 <button
                   type="button"
                   onClick={() => onSwitchMode && onSwitchMode('monolith')}
-                  className={`px-3 py-1 cursor-pointer transition-colors ${
-                    activeTab === 'prime'
-                      ? 'bg-[#2b241c] text-[#d48b38] border border-[#b87326]/40 shadow-xs'
-                      : 'text-[#8c8275] hover:text-[#ede6dc]'
-                  }`}
-                  title="Monolithic Focus"
+                  className="px-3 py-1 bg-[#2b241c] text-[#d48b38] border border-[#b87326]/40 cursor-default shadow-xs"
+                  title="Monolith Focus"
                 >
                   ▲ MONOLITH
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('autopilot');
-                    if (onSwitchMode) onSwitchMode('zen');
-                  }}
-                  className={`px-3 py-1 cursor-pointer transition-colors ${
-                    activeTab === 'autopilot'
-                      ? 'bg-[#2b241c] text-[#d48b38] border border-[#b87326]/40 shadow-xs'
-                      : 'text-[#8c8275] hover:text-[#ede6dc]'
-                  }`}
-                  title="Autonomous Zen Deck"
-                >
-                  🌿 ZEN
                 </button>
                 <button
                   type="button"

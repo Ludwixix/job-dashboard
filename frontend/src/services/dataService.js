@@ -248,14 +248,14 @@ export const evaluateJobCompleteness = (job) => {
     missing.push('Job Title');
   }
 
-  const desc = String(job.description || job.notes || '').trim();
-  if (!desc || (desc.length < 25 && (!url || !title))) {
-    missing.push('Job Description');
-  }
-
   const url = String(job.portalLink || job.link || job.url || '').trim();
   if (!url || !url.startsWith('http')) {
     missing.push('Application Link');
+  }
+
+  const desc = String(job.description || job.notes || '').trim();
+  if (!desc || (desc.length < 25 && (!url || !title))) {
+    missing.push('Job Description');
   }
 
   return {

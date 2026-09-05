@@ -25,15 +25,16 @@ describe('Dashboard Top-Level Integration', () => {
     });
   });
 
-  it('renders Zen Focus Auto-Pilot mode by default and allows switching to Studio', async () => {
+  it('renders Monolith mode by default and allows switching to Studio', async () => {
     render(<Dashboard />);
 
-    // Check Zen Auto-Pilot branding
-    expect(screen.getByText('AUTOPILOT')).toBeInTheDocument();
-    expect(screen.getByText('Open Studio')).toBeInTheDocument();
+    // Check Monolith mode branding
+    await waitFor(() => {
+      expect(screen.getByText(/THE MONOLITH/i)).toBeInTheDocument();
+    });
 
     // Switch to Studio mode
-    const studioBtn = screen.getByText('Open Studio');
+    const studioBtn = screen.getByRole('button', { name: /STUDIO/i });
     fireEvent.click(studioBtn);
 
     await waitFor(() => {
@@ -74,7 +75,7 @@ describe('Dashboard Top-Level Integration', () => {
     });
   });
 
-  it('renders Monolith mode when configured and allows switching to Zen and Studio', async () => {
+  it('renders Monolith mode when configured and allows switching to Studio', async () => {
     window.localStorage.setItem('job_dashboard_view_mode', 'monolith');
     render(<Dashboard />);
 
@@ -82,12 +83,12 @@ describe('Dashboard Top-Level Integration', () => {
       expect(screen.getByText(/THE MONOLITH/i)).toBeInTheDocument();
     });
 
-    // Switch to Zen
-    const zenBtn = screen.getByRole('button', { name: /ZEN/i });
-    fireEvent.click(zenBtn);
+    // Switch to Studio
+    const studioBtn = screen.getByRole('button', { name: /STUDIO/i });
+    fireEvent.click(studioBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('AUTOPILOT')).toBeInTheDocument();
+      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
     });
   });
 });

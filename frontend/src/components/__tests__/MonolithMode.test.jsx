@@ -96,7 +96,7 @@ describe('MonolithMode Component (Dune Minimalist Brutalism)', () => {
     }));
   });
 
-  it('triggers mode switching between Monolith, Zen, and Studio', () => {
+  it('triggers mode switching between Monolith and Studio', () => {
     const onSwitchMode = vi.fn();
     const onOpenJobModal = vi.fn();
     const onOpenGenerator = vi.fn();
@@ -111,12 +111,6 @@ describe('MonolithMode Component (Dune Minimalist Brutalism)', () => {
         onOpenGenerator={onOpenGenerator}
       />
     );
-
-    // Click on Zen mode button
-    const zenButton = screen.getByRole('button', { name: /ZEN/i });
-    expect(zenButton).toBeInTheDocument();
-    fireEvent.click(zenButton);
-    expect(onSwitchMode).toHaveBeenCalledWith('zen');
 
     // Click on Studio mode button
     const studioButton = screen.getByRole('button', { name: /STUDIO/i });

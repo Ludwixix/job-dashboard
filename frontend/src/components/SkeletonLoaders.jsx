@@ -86,3 +86,20 @@ export const DashboardGridSkeleton = () => (
     </div>
   </div>
 );
+
+export const ModalSkeleton = () => (
+  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4 animate-pulse">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="h-6 w-48 bg-slate-800 rounded"></div>
+        <div className="h-6 w-6 bg-slate-800 rounded-full"></div>
+      </div>
+      <div className="space-y-3 py-4">
+        <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
+        <div className="h-4 w-1/2 bg-slate-800 rounded"></div>
+        <div className="h-32 w-full bg-slate-800/60 rounded-xl"></div>
+      </div>
+    </div>
+  </div>
+);
+

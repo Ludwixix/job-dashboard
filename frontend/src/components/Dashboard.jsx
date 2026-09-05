@@ -1,29 +1,31 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useJobs } from '../hooks/useJobs';
 import { JobSeeker } from './JobSeeker';
-import { JobModal } from './JobModal';
-import { GeneratorModal } from './GeneratorModal';
-import { InterviewPrepModal } from './InterviewPrepModal';
-import { MockInterviewModal } from './MockInterviewModal';
 import { MarketIntelligence } from './MarketIntelligence';
 import { ActionHighlights } from './ActionHighlights';
 import { ApplicationPipeline } from './ApplicationPipeline';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
-import { CommandPalette } from './CommandPalette';
 import { CopilotBar } from './CopilotBar';
-import { BatchApplyModal } from './BatchApplyModal';
 import { ProfileSwitcher } from './ProfileSwitcher';
-import { ProfileModal } from './ProfileModal';
-import { AuthModal } from './AuthModal';
-import { GoogleIntegrationModal } from './GoogleIntegrationModal';
-import { AutoApplyModal } from './AutoApplyModal';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
-import { DashboardGridSkeleton } from './SkeletonLoaders';
+import { DashboardGridSkeleton, ModalSkeleton } from './SkeletonLoaders';
 import ZenAutopilotDashboard from './ZenAutopilotDashboard';
 import MonolithMode from './MonolithMode';
 import { CareerOperations } from './CareerOperations';
 import { startAutopilot } from '../services/autopilotAgent';
 
+// Lazy-loaded modal dialogs to eliminate eager bundle bloat
+const JobModal = lazy(() => import('./JobModal').then(m => ({ default: m.JobModal })));
+const GeneratorModal = lazy(() => import('./GeneratorModal').then(m => ({ default: m.GeneratorModal })));
+const InterviewPrepModal = lazy(() => import('./InterviewPrepModal').then(m => ({ default: m.InterviewPrepModal })));
+const MockInterviewModal = lazy(() => import('./MockInterviewModal').then(m => ({ default: m.MockInterviewModal })));
+const CustomJobModal = lazy(() => import('./CustomJobModal').then(m => ({ default: m.CustomJobModal })));
+const CommandPalette = lazy(() => import('./CommandPalette').then(m => ({ default: m.CommandPalette })));
+const BatchApplyModal = lazy(() => import('./BatchApplyModal').then(m => ({ default: m.BatchApplyModal })));
+const ProfileModal = lazy(() => import('./ProfileModal').then(m => ({ default: m.ProfileModal })));
+const AuthModal = lazy(() => import('./AuthModal').then(m => ({ default: m.AuthModal })));
+const GoogleIntegrationModal = lazy(() => import('./GoogleIntegrationModal').then(m => ({ default: m.GoogleIntegrationModal })));
+const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ default: m.AutoApplyModal })));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -32,7 +34,6 @@ import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
 
 import { fetchJobsForProfile } from '../services/dataService';
-import { CustomJobModal } from './CustomJobModal';
 import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
 import { suggestRelatedTitles, buildQueriesFromProfile, triggerProfileScrape } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
@@ -502,58 +503,68 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
         {/* Global Modals in Monolith & Zen Mode */}
         {selectedJob && (
-          <JobModal
-            job={selectedJob}
-            onClose={() => setSelectedJob(null)}
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-            onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
-            onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
-            onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
-            profile={activeProfile}
-            allJobs={jobs}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <JobModal
+              job={selectedJob}
+              onClose={() => setSelectedJob(null)}
+              onOpenGenerator={(j) => setSelectedForGenerator(j)}
+              onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+              onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+              onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
+              profile={activeProfile}
+              allJobs={jobs}
+            />
+          </Suspense>
         )}
 
         {selectedForGenerator && (
-          <GeneratorModal
-            job={selectedForGenerator}
-            profile={activeProfile}
-            isOpen={Boolean(selectedForGenerator)}
-            onClose={() => setSelectedForGenerator(null)}
-            onApplicationCreated={(app) => {
-              updateJobStatus(selectedForGenerator.id || `${selectedForGenerator.company}_${selectedForGenerator.title}`, 'Package Prepared / To Submit', app);
-            }}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <GeneratorModal
+              job={selectedForGenerator}
+              profile={activeProfile}
+              isOpen={Boolean(selectedForGenerator)}
+              onClose={() => setSelectedForGenerator(null)}
+              onApplicationCreated={(app) => {
+                updateJobStatus(selectedForGenerator.id || `${selectedForGenerator.company}_${selectedForGenerator.title}`, 'Package Prepared / To Submit', app);
+              }}
+            />
+          </Suspense>
         )}
 
         {selectedForMockInterview && (
-          <MockInterviewModal
-            job={selectedForMockInterview}
-            profile={activeProfile}
-            onClose={() => setSelectedForMockInterview(null)}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <MockInterviewModal
+              job={selectedForMockInterview}
+              profile={activeProfile}
+              onClose={() => setSelectedForMockInterview(null)}
+            />
+          </Suspense>
         )}
 
         {isProfileModalOpen && (
-          <ProfileModal
-            profile={editingProfile || activeProfile}
-            onClose={() => setIsProfileModalOpen(false)}
-            onSave={(updated) => {
-              setActiveProfile(updated);
-              saveProfile(updated);
-              setIsProfileModalOpen(false);
-            }}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <ProfileModal
+              profile={editingProfile || activeProfile}
+              onClose={() => setIsProfileModalOpen(false)}
+              onSave={(updated) => {
+                setActiveProfile(updated);
+                saveProfile(updated);
+                setIsProfileModalOpen(false);
+              }}
+            />
+          </Suspense>
         )}
 
         {isCommandPaletteOpen && (
-          <CommandPalette
-            isOpen={isCommandPaletteOpen}
-            onClose={() => setIsCommandPaletteOpen(false)}
-            jobs={jobs}
-            onSelectJob={(j) => setSelectedJob(j)}
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <CommandPalette
+              isOpen={isCommandPaletteOpen}
+              onClose={() => setIsCommandPaletteOpen(false)}
+              jobs={jobs}
+              onSelectJob={(j) => setSelectedJob(j)}
+              onOpenGenerator={(j) => setSelectedForGenerator(j)}
+            />
+          </Suspense>
         )}
       </SafeErrorBoundary>
     );
@@ -997,62 +1008,68 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       {/* Job Details Modal */}
       {liveSelectedJob && (
         <SafeErrorBoundary sectionName="Job Detail Modal" onClose={() => setSelectedJob(null)}>
-          <JobModal
-            onOpenMockInterview={(j) => { setSelectedJob(null); setSelectedForMockInterview(j); }}
-            onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
-            job={liveSelectedJob} 
-            onClose={() => setSelectedJob(null)} 
-            onOpenGenerator={(j) => setSelectedForGenerator(j)}
-            onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
-            onJobStatusUpdate={(updated) => {
-              updateJobStatus(updated.id || updated.title, updated.status, updated);
-              setSelectedJob(updated);
-            }}
-            onRejectJob={(id) => {
-              rejectJob(id);
-              setSelectedJob(null);
-            }}
-            onUnrejectJob={(id) => {
-              unrejectJob(id);
-              setSelectedJob(prev => prev ? { ...prev, isRejected: false, status: 'Discovered' } : null);
-            }}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <JobModal
+              onOpenMockInterview={(j) => { setSelectedJob(null); setSelectedForMockInterview(j); }}
+              onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
+              job={liveSelectedJob} 
+              onClose={() => setSelectedJob(null)} 
+              onOpenGenerator={(j) => setSelectedForGenerator(j)}
+              onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
+              onJobStatusUpdate={(updated) => {
+                updateJobStatus(updated.id || updated.title, updated.status, updated);
+                setSelectedJob(updated);
+              }}
+              onRejectJob={(id) => {
+                rejectJob(id);
+                setSelectedJob(null);
+              }}
+              onUnrejectJob={(id) => {
+                unrejectJob(id);
+                setSelectedJob(prev => prev ? { ...prev, isRejected: false, status: 'Discovered' } : null);
+              }}
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
 
       {/* 1-Click Auto-Apply Execution Modal */}
       {selectedAutoApplyJob && (
         <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
-          <AutoApplyModal
-            job={selectedAutoApplyJob}
-            onClose={() => setSelectedAutoApplyJob(null)}
-            onJobStatusUpdate={(updated) => {
-              updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
-              setSelectedAutoApplyJob(updated);
-            }}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <AutoApplyModal
+              job={selectedAutoApplyJob}
+              onClose={() => setSelectedAutoApplyJob(null)}
+              onJobStatusUpdate={(updated) => {
+                updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
+                setSelectedAutoApplyJob(updated);
+              }}
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
 
       {/* Generator Modal */}
       {liveSelectedForGenerator && (
         <SafeErrorBoundary sectionName="Document Generator" onClose={() => setSelectedForGenerator(null)}>
-          <GeneratorModal 
-            job={liveSelectedForGenerator} 
-            onClose={() => setSelectedForGenerator(null)} 
-            onUpdateStatus={(jobId, status, extraData) => {
-              updateJobStatus(jobId, status, extraData);
-            }}
-            onSaveCustomDocs={(jobId, docData) => {
-              updateJobStatus(jobId, 'Package Prepared / To Submit', {
-                hasCustomDocs: true,
-                resumeText: docData.resumeText,
-                coverLetterText: docData.coverLetterText,
-                docsModel: docData.model,
-                docsGeneratedAt: docData.generatedAt || new Date().toISOString()
-              });
-            }}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <GeneratorModal 
+              job={liveSelectedForGenerator} 
+              onClose={() => setSelectedForGenerator(null)} 
+              onUpdateStatus={(jobId, status, extraData) => {
+                updateJobStatus(jobId, status, extraData);
+              }}
+              onSaveCustomDocs={(jobId, docData) => {
+                updateJobStatus(jobId, 'Package Prepared / To Submit', {
+                  hasCustomDocs: true,
+                  resumeText: docData.resumeText,
+                  coverLetterText: docData.coverLetterText,
+                  docsModel: docData.model,
+                  docsGeneratedAt: docData.generatedAt || new Date().toISOString()
+                });
+              }}
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
 
@@ -1061,122 +1078,150 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       {/* Mock Interview Modal */}
       {liveSelectedForMockInterview && (
         <SafeErrorBoundary sectionName="Mock Interview" onClose={() => setSelectedForMockInterview(null)}>
-          <MockInterviewModal 
-            job={liveSelectedForMockInterview} 
-            onClose={() => setSelectedForMockInterview(null)} 
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <MockInterviewModal 
+              job={liveSelectedForMockInterview} 
+              onClose={() => setSelectedForMockInterview(null)} 
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
 
       {liveSelectedForInterviewPrep && (
         <SafeErrorBoundary sectionName="Interview Preparation" onClose={() => setSelectedForInterviewPrep(null)}>
-          <InterviewPrepModal 
-            job={liveSelectedForInterviewPrep} 
-            onClose={() => setSelectedForInterviewPrep(null)} 
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <InterviewPrepModal 
+              job={liveSelectedForInterviewPrep} 
+              onClose={() => setSelectedForInterviewPrep(null)} 
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
 
       {/* Custom Job / External Link Generator Modal */}
-      <CustomJobModal
-        isOpen={isCustomJobModalOpen}
-        onClose={() => setIsCustomJobModalOpen(false)}
-        onJobCreated={(newJob) => {
-          refetch();
-        }}
-        onOpenGenerator={(j) => setSelectedForGenerator(j)}
-      />
+      {isCustomJobModalOpen && (
+        <Suspense fallback={<ModalSkeleton />}>
+          <CustomJobModal
+            isOpen={isCustomJobModalOpen}
+            onClose={() => setIsCustomJobModalOpen(false)}
+            onJobCreated={(newJob) => {
+              refetch();
+            }}
+            onOpenGenerator={(j) => setSelectedForGenerator(j)}
+          />
+        </Suspense>
+      )}
 
       {/* Omni-Command Palette Modal */}
-      <SafeErrorBoundary sectionName="Command Palette">
-        <CommandPalette 
-          isOpen={isCommandPaletteOpen}
-          onClose={() => setIsCommandPaletteOpen(false)}
-          jobs={jobs}
-          onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
-          onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
-        />
-      </SafeErrorBoundary>
+      {isCommandPaletteOpen && (
+        <SafeErrorBoundary sectionName="Command Palette">
+          <Suspense fallback={<ModalSkeleton />}>
+            <CommandPalette 
+              isOpen={isCommandPaletteOpen}
+              onClose={() => setIsCommandPaletteOpen(false)}
+              jobs={jobs}
+              onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
+              onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
 
       {/* Batch Application Dispatcher Modal */}
-      <SafeErrorBoundary sectionName="Batch Apply Dispatcher">
-        <BatchApplyModal 
-          jobs={jobs}
-          isOpen={isBatchApplyOpen}
-          onClose={() => setIsBatchApplyOpen(false)}
-          onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
-          onNavigateToTracker={() => setActiveSection('kanban')}
-          onComplete={(results) => {
-            results.forEach(res => {
-              if (res.success) {
-                updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
-              }
-            });
-          }}
-        />
-      </SafeErrorBoundary>
+      {isBatchApplyOpen && (
+        <SafeErrorBoundary sectionName="Batch Apply Dispatcher">
+          <Suspense fallback={<ModalSkeleton />}>
+            <BatchApplyModal 
+              jobs={jobs}
+              isOpen={isBatchApplyOpen}
+              onClose={() => setIsBatchApplyOpen(false)}
+              onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
+              onNavigateToTracker={() => setActiveSection('kanban')}
+              onComplete={(results) => {
+                results.forEach(res => {
+                  if (res.success) {
+                    updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
+                  }
+                });
+              }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
 
       {/* Candidate Personalization & Resume Upload Modal */}
-      <SafeErrorBoundary sectionName="Profile Manager">
-        <ProfileModal 
-          isOpen={isProfileModalOpen}
-          profile={editingProfile}
-          onClose={() => {
-            setIsProfileModalOpen(false);
-            setEditingProfile(null);
-          }}
-          onProfileSaved={(savedProfile) => {
-            const profileToUse = Array.isArray(savedProfile) ? savedProfile[0] : (savedProfile || getActiveProfile());
-            if (profileToUse) {
-              setActiveProfile(profileToUse);
-              if (profileToUse.suburb || profileToUse.location) {
-                setBaseLocation(profileToUse.suburb || profileToUse.location);
-              }
-              // Full onboarding pipeline: theme, personalised backend search
-              // queries, seeded ranking preferences, and a default saved search —
-              // then trigger discovery once the backend has the new queries.
-              runProfileOnboardingPipeline(profileToUse).finally(() => {
-                triggerDiscoveryScrape(profileToUse);
-              });
-              refetch();
-            }
-          }}
-        />
-      </SafeErrorBoundary>
+      {isProfileModalOpen && (
+        <SafeErrorBoundary sectionName="Profile Manager">
+          <Suspense fallback={<ModalSkeleton />}>
+            <ProfileModal 
+              isOpen={isProfileModalOpen}
+              profile={editingProfile}
+              onClose={() => {
+                setIsProfileModalOpen(false);
+                setEditingProfile(null);
+              }}
+              onProfileSaved={(savedProfile) => {
+                const profileToUse = Array.isArray(savedProfile) ? savedProfile[0] : (savedProfile || getActiveProfile());
+                if (profileToUse) {
+                  setActiveProfile(profileToUse);
+                  if (profileToUse.suburb || profileToUse.location) {
+                    setBaseLocation(profileToUse.suburb || profileToUse.location);
+                  }
+                  // Full onboarding pipeline: theme, personalised backend search
+                  // queries, seeded ranking preferences, and a default saved search —
+                  // then trigger discovery once the backend has the new queries.
+                  runProfileOnboardingPipeline(profileToUse).finally(() => {
+                    triggerDiscoveryScrape(profileToUse);
+                  });
+                  refetch();
+                }
+              }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
 
       {/* Google Authentication & Client Config Modal */}
-      <SafeErrorBoundary sectionName="Settings & Health Sync">
-        <AuthModal 
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          activeProfile={activeProfile}
-          jobs={jobs}
-          onAuthChange={(user) => {
-            setAuthUser(user);
-            if (user) {
-              setIsGoogleIntegrationOpen(true);
-            }
-          }}
-        />
-      </SafeErrorBoundary>
+      {isAuthModalOpen && (
+        <SafeErrorBoundary sectionName="Settings & Health Sync">
+          <Suspense fallback={<ModalSkeleton />}>
+            <AuthModal 
+              isOpen={isAuthModalOpen}
+              onClose={() => setIsAuthModalOpen(false)}
+              activeProfile={activeProfile}
+              jobs={jobs}
+              onAuthChange={(user) => {
+                setAuthUser(user);
+                if (user) {
+                  setIsGoogleIntegrationOpen(true);
+                }
+              }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
 
       {/* Google Sheets Tracker & Gmail Scanner Integration Modal */}
-      <SafeErrorBoundary sectionName="Google Integration Modal">
-        <GoogleIntegrationModal 
-          isOpen={isGoogleIntegrationOpen}
-          onClose={() => setIsGoogleIntegrationOpen(false)}
-          jobs={jobs}
-          activeProfile={activeProfile}
-          onImportGmailJobs={(importedJobs) => {
-            importedJobs.forEach(j => {
-              updateJobStatus(j.id, j.status, j);
-              if (currentUser?.accessToken && currentUser?.spreadsheetId) {
-                upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, j, activeProfile);
-              }
-            });
-          }}
-        />
-      </SafeErrorBoundary>
+      {isGoogleIntegrationOpen && (
+        <SafeErrorBoundary sectionName="Google Integration Modal">
+          <Suspense fallback={<ModalSkeleton />}>
+            <GoogleIntegrationModal 
+              isOpen={isGoogleIntegrationOpen}
+              onClose={() => setIsGoogleIntegrationOpen(false)}
+              jobs={jobs}
+              activeProfile={activeProfile}
+              onImportGmailJobs={(importedJobs) => {
+                importedJobs.forEach(j => {
+                  updateJobStatus(j.id, j.status, j);
+                  if (currentUser?.accessToken && currentUser?.spreadsheetId) {
+                    upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, j, activeProfile);
+                  }
+                });
+              }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
 
 
       {/* Fixed Bottom Status Bar */}

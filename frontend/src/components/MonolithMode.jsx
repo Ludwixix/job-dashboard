@@ -197,7 +197,7 @@ export default function MonolithMode({
   };
 
   return (
-    <div className="min-h-screen bg-[#090807] text-[#ede6dc] font-mono selection:bg-[#c67d34] selection:text-black antialiased relative overflow-hidden flex flex-row">
+    <div className="min-h-screen bg-[#090807] text-[#ede6dc] font-mono selection:bg-[#c67d34] selection:text-black antialiased relative overflow-hidden flex flex-col md:flex-row">
       {/* Background Sand Gradient Atmosphere */}
       <div 
         className="pointer-events-none fixed inset-0 opacity-[0.035] bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:24px_24px]" 
@@ -222,9 +222,9 @@ export default function MonolithMode({
       />
 
       {/* MAIN MONOLITH COMMAND SURFACE */}
-      <div className="flex-1 flex flex-col justify-between min-w-0 overflow-x-hidden">
+      <div className="flex-1 flex flex-col justify-between min-w-0 overflow-x-hidden pb-20 md:pb-0">
         {/* 1. MONOLITHIC HEADER */}
-        <header className="relative z-10 border-b border-[#231e19] bg-[#0d0b09]/95 backdrop-blur-md px-6 lg:px-12 py-5">
+        <header className="relative z-10 border-b border-[#231e19] bg-[#0d0b09]/95 backdrop-blur-md px-4 sm:px-6 lg:px-12 py-3.5 sm:py-5">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Monolith Wordmark & Autonomous Indicator (DUNE MINIMALIST text removed) */}
             <div className="flex items-center gap-4">
@@ -312,10 +312,10 @@ export default function MonolithMode({
         )}
 
         {/* 2. THE MONOLITH COMMAND SURFACE BODY */}
-        <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 py-10 w-full space-y-12 flex-1">
+        <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-10 w-full space-y-8 sm:space-y-12 flex-1">
           {/* TAB 1: PRIME MONOLITH VIEW */}
           {activeTab === 'prime' && (
-            <div className="space-y-12 animate-in fade-in duration-300">
+            <div className="space-y-8 sm:space-y-12 animate-in fade-in duration-300">
               {/* PRIME MONOLITH CARD (THE SINGLE HIGHEST-IMPACT TRAJECTORY) */}
               {primeJob ? (
                 <section className="space-y-3">
@@ -333,7 +333,7 @@ export default function MonolithMode({
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="bg-[#12100d] border border-[#2e271f] hover:border-[#b87326]/60 transition-all duration-500 p-7 lg:p-10 relative overflow-hidden shadow-2xl group"
+                    className="bg-[#12100d] border border-[#2e271f] hover:border-[#b87326]/60 transition-all duration-500 p-5 sm:p-7 lg:p-10 relative overflow-hidden shadow-2xl group"
                   >
                     {/* Corner Architectural Accent */}
                     <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none border-t border-r border-[#b87326]/40" />
@@ -355,7 +355,7 @@ export default function MonolithMode({
                         </div>
 
                         <div>
-                          <h2 className="text-2xl lg:text-4xl font-black tracking-wider uppercase text-[#ede6dc] leading-tight group-hover:text-white transition-colors">
+                          <h2 className="text-xl sm:text-2xl lg:text-4xl font-black tracking-wider uppercase text-[#ede6dc] leading-tight group-hover:text-white transition-colors">
                             {primeJob.title}
                           </h2>
                           <p className="text-base lg:text-xl font-bold tracking-widest text-[#d48b38] mt-1 uppercase">
@@ -408,7 +408,7 @@ export default function MonolithMode({
                       </div>
 
                       {/* Right Side: Heavy Action Buttons */}
-                      <div className="flex flex-col sm:flex-row lg:flex-col gap-3 min-w-[240px] shrink-0">
+                      <div className="flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-auto lg:min-w-[240px] shrink-0">
                         <button
                           type="button"
                           onClick={() => onOpenGenerator && onOpenGenerator(primeJob)}
@@ -687,7 +687,7 @@ export default function MonolithMode({
         </main>
 
         {/* 3. SILENT PULSE TELEMETRY BAR (BOTTOM STATUS) */}
-        <footer className="relative z-10 border-t border-[#231e19] bg-[#0c0a08] px-6 lg:px-12 py-3 text-[10px] tracking-[0.2em] text-[#706659] uppercase">
+        <footer className="relative z-10 border-t border-[#231e19] bg-[#0c0a08] px-4 sm:px-6 lg:px-12 py-3 text-[10px] tracking-[0.2em] text-[#706659] uppercase">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-4 truncate">
               <span className="flex items-center gap-1.5 text-[#d48b38] font-bold shrink-0">

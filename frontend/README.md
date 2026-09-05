@@ -9,7 +9,9 @@ Check out the live production deployment: [https://job-dashboard-6xrdvjlrcq-ts.a
 
 ## ✨ Key Features (V2.0 Commercial Release)
 
-- **Smart Profile Auto-Synthesis**: Resume upload/parsing instantly builds a candidate profile (any industry, not just IT); saving it pushes personalized search queries to the backend and seeds ranking preferences before the next discovery scrape.
+- **The Monolith & Ancient Alien Artifact Navigation**: High-focus, distraction-free Monolith Mode paired with a responsive obsidian stone navigation rail that features organic wave ripples on pointer/touch interactions. Responsively transforms into an ergonomic fixed bottom dock on mobile viewports (`< md`), supporting safe-area insets (`viewport-fit=cover`) and WCAG-compliant touch targets.
+- **Dynamic Multi-Industry Candidate Intelligence**: Agnostic candidate profile engine (`getActiveProfile()`) that dynamically populates offer negotiation drafts (acceptance, counter-offer, contract clarifications, declination), 1-click clipboard payloads, and commute distance radius filters across any sector (Healthcare, Technology, Construction, Legal, Marketing, Finance).
+- **Smart Profile Auto-Synthesis**: Resume upload/parsing instantly builds a candidate profile; saving it pushes personalized search queries to the backend and seeds ranking preferences before the next discovery scrape.
 - **Auto-Apply Engine**: 1-click pipeline that synthesizes tailored PDF Resumes/Cover Letters based on a live-edited "Source of Truth" profile, pre-fills screening data, and robustly dispatches candidates to the correct application portal (SEEK, LinkedIn, Indeed, Adzuna).
 - **Career Operations**: Saved search profiles, application reminders (follow-up/interview/offer), a per-job fit-audit explanation (score, matched/missing skills, strengths, gaps), and live scraper source-health.
 - **Honest Posting Dates**: A job with a missing or unparseable posted date is never shown as "posted today" — age filters and rankings explicitly exclude/deprioritize jobs whose freshness can't be verified (see `src/utils/dateUtils.js`).

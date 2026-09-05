@@ -82,7 +82,7 @@ export default function AlienMonolithNav({
     <nav
       ref={railRef}
       onPointerMove={handlePointerMove}
-      className="alien-monolith-rail group/rail select-none shrink-0 w-16 lg:w-20 min-h-screen z-30 flex flex-col justify-between py-6 items-center relative shadow-2xl transition-all"
+      className="alien-monolith-rail group/rail select-none shrink-0 fixed bottom-0 inset-x-0 h-16 w-full z-40 flex flex-row justify-around items-center px-2 border-t border-[#231e19] bg-[#0d0b09]/95 backdrop-blur-xl md:relative md:w-16 lg:w-20 md:min-h-screen md:z-30 md:flex-col md:justify-between md:py-6 md:px-0 md:border-r md:border-t-0 shadow-2xl transition-all"
       aria-label="Ancient Alien Artifact Navigation"
     >
       {/* Background Interactive Ripples Layer */}
@@ -103,8 +103,8 @@ export default function AlienMonolithNav({
         ))}
       </div>
 
-      {/* Top Runic Brand Apex */}
-      <div className="relative z-10 flex flex-col items-center space-y-4">
+      {/* Top Runic Brand Apex - Hidden on mobile bottom bar, visible on desktop rail */}
+      <div className="hidden md:flex relative z-10 flex-col items-center space-y-4">
         <div 
           className="w-10 h-10 border border-[#b87326]/70 bg-[#16120e] flex items-center justify-center relative cursor-default group shadow-[0_0_15px_rgba(184,115,38,0.25)] hover:border-[#d48b38] transition-all duration-500"
           title="Monolith Core Artifact"
@@ -118,8 +118,8 @@ export default function AlienMonolithNav({
         <div className="w-[1px] h-8 bg-gradient-to-b from-[#d48b38]/60 via-[#b87326]/20 to-transparent" />
       </div>
 
-      {/* Middle Core Navigation Glyphs */}
-      <div className="relative z-10 flex flex-col items-center space-y-5 w-full px-2">
+      {/* Core Navigation Glyphs: Row on mobile, Column on desktop */}
+      <div className="relative z-10 flex flex-row md:flex-col items-center justify-around md:justify-start space-x-1.5 sm:space-x-2 md:space-x-0 md:space-y-5 w-full md:px-2">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const IconComponent = item.icon;
@@ -129,7 +129,7 @@ export default function AlienMonolithNav({
               key={item.id}
               type="button"
               onClick={() => onSelectTab(item.id)}
-              className={`alien-glyph-button w-12 h-12 lg:w-14 lg:h-14 flex flex-col items-center justify-center relative rounded-none transition-all duration-300 cursor-pointer ${
+              className={`alien-glyph-button w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 flex flex-col items-center justify-center relative rounded-none transition-all duration-300 cursor-pointer ${
                 isActive
                   ? 'bg-[#1e1812] border border-[#d48b38] text-[#d48b38] shadow-[0_0_20px_rgba(212,139,56,0.35)]'
                   : 'bg-[#100e0b] border border-[#262019] text-[#8c8275] hover:text-[#ede6dc] hover:border-[#b87326]/50 hover:bg-[#16130f]'
@@ -137,16 +137,16 @@ export default function AlienMonolithNav({
               title={`${item.title} — ${item.subtitle}`}
             >
               {/* Rune Tag */}
-              <span className="text-[9px] tracking-widest font-mono text-[#b87326]/70 mb-0.5">
+              <span className="text-[8px] sm:text-[9px] tracking-widest font-mono text-[#b87326]/70 mb-0.5">
                 {item.glyph}
               </span>
 
               {/* Icon */}
-              <IconComponent size={16} className={isActive ? 'text-[#d48b38] scale-110' : 'text-inherit'} />
+              <IconComponent size={15} className={isActive ? 'text-[#d48b38] scale-110' : 'text-inherit'} />
 
               {/* Counter Badge if available */}
               {item.badge && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#b87326] text-black font-mono font-black text-[9px] flex items-center justify-center border border-[#d48b38]">
+                <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 min-w-[16px] sm:min-w-[18px] h-[16px] sm:h-[18px] px-1 bg-[#b87326] text-black font-mono font-black text-[8px] sm:text-[9px] flex items-center justify-center border border-[#d48b38]">
                   {item.badge}
                 </span>
               )}
@@ -156,27 +156,27 @@ export default function AlienMonolithNav({
                 <span className="absolute bottom-1 right-1 w-1.5 h-1.5 bg-[#d48b38] animate-ping" />
               )}
 
-              {/* Active Golden Edge Notch */}
+              {/* Active Golden Edge Notch (Top on mobile dock, Left on desktop rail) */}
               {isActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#d48b38] shadow-[0_0_8px_#d48b38]" />
+                <div className="absolute top-0 left-0 right-0 h-0.5 md:h-full md:w-1 md:right-auto md:bottom-0 bg-[#d48b38] shadow-[0_0_8px_#d48b38]" />
               )}
             </button>
           );
         })}
 
         {/* Separator Line */}
-        <div className="w-6 h-[1px] bg-[#2a241d]" />
+        <div className="hidden md:block w-6 h-[1px] bg-[#2a241d]" />
 
         {/* Quick Batch Dispatch Action */}
         {onOpenBatchApply && (
           <button
             type="button"
             onClick={onOpenBatchApply}
-            className="alien-glyph-button w-12 h-12 lg:w-14 lg:h-14 flex flex-col items-center justify-center bg-[#130f0b] border border-[#b87326]/40 hover:border-[#d48b38] text-[#d48b38] hover:text-white transition-all cursor-pointer group shadow-xs"
+            className="alien-glyph-button w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 flex flex-col items-center justify-center bg-[#130f0b] border border-[#b87326]/40 hover:border-[#d48b38] text-[#d48b38] hover:text-white transition-all cursor-pointer group shadow-xs"
             title="Batch Dispatch Applications"
           >
-            <span className="text-[9px] font-mono text-[#b87326]/60 mb-0.5">⬡</span>
-            <Send size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            <span className="text-[8px] sm:text-[9px] font-mono text-[#b87326]/60 mb-0.5">⬡</span>
+            <Send size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </button>
         )}
 
@@ -185,25 +185,25 @@ export default function AlienMonolithNav({
           <button
             type="button"
             onClick={onOpenProfileModal}
-            className="alien-glyph-button w-12 h-12 lg:w-14 lg:h-14 flex flex-col items-center justify-center bg-[#100e0b] border border-[#262019] hover:border-[#b87326]/50 text-[#8c8275] hover:text-[#ede6dc] transition-all cursor-pointer"
+            className="alien-glyph-button w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 flex flex-col items-center justify-center bg-[#100e0b] border border-[#262019] hover:border-[#b87326]/50 text-[#8c8275] hover:text-[#ede6dc] transition-all cursor-pointer"
             title="Candidate Matrix & Strategy Profile"
           >
-            <span className="text-[9px] font-mono text-[#8c8275] mb-0.5">⟡</span>
-            <Compass size={15} />
+            <span className="text-[8px] sm:text-[9px] font-mono text-[#8c8275] mb-0.5">⟡</span>
+            <Compass size={14} />
           </button>
         )}
       </div>
 
       {/* Bottom Controls: Studio Gateway & Command */}
-      <div className="relative z-10 flex flex-col items-center space-y-3 w-full px-2">
+      <div className="relative z-10 flex flex-row md:flex-col items-center space-x-1.5 sm:space-x-2 md:space-x-0 md:space-y-3 shrink-0 px-1 md:w-full md:px-2">
         {onOpenCommandPalette && (
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="w-10 h-10 border border-[#231e19] hover:border-[#b87326]/60 bg-[#0d0b09] hover:bg-[#15120e] text-[#706659] hover:text-[#d48b38] flex items-center justify-center transition-all cursor-pointer"
+            className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 border border-[#231e19] hover:border-[#b87326]/60 bg-[#0d0b09] hover:bg-[#15120e] text-[#706659] hover:text-[#d48b38] items-center justify-center transition-all cursor-pointer"
             title="Command Interface (⌘K)"
           >
-            <Terminal size={14} />
+            <Terminal size={13} />
           </button>
         )}
 
@@ -211,7 +211,7 @@ export default function AlienMonolithNav({
           <button
             type="button"
             onClick={onSwitchToStudio}
-            className="w-10 h-10 border border-[#2a231b] hover:border-[#d48b38] bg-[#120f0d] text-[#8c8275] hover:text-white flex items-center justify-center transition-all cursor-pointer group"
+            className="w-9 h-9 sm:w-10 sm:h-10 border border-[#2a231b] hover:border-[#d48b38] bg-[#120f0d] text-[#8c8275] hover:text-white flex items-center justify-center transition-all cursor-pointer group"
             title="Full Workbench"
             aria-label="Full Workbench"
           >

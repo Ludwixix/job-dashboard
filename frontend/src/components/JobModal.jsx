@@ -15,8 +15,10 @@ import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 import { cleanDescriptionText } from '../services/dataService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
+import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, userProfile }) => {
+  const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
   const [prefStatus, setPrefStatus] = useState(() => {
@@ -25,7 +27,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
     return null;
   });
 
-  const baseLocation = localStorage.getItem('userBaseLocation') || 'BALACLAVA VIC 3183';
+  const baseLocation = localStorage.getItem('userBaseLocation') || activeProfile?.location || 'Melbourne VIC';
 
   const isOffer = (job?.status || '').toLowerCase().includes('offer');
   const [activeTab, setActiveTab] = useState(() => isOffer ? 'offer' : 'fit');
@@ -57,43 +59,51 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
     const title = currentJob.title || 'Technical Specialist';
     const company = currentJob.company || 'the organization';
     const salary = currentJob.salary || '$115,000 + Super';
+    const candidateName = activeProfile?.name || 'Candidate';
+    const candidateEmail = activeProfile?.email || '';
+    const candidatePhone = activeProfile?.phone || '';
+    const candidateLocation = activeProfile?.location || 'Melbourne VIC';
+    const candidateExp = activeProfile?.yearsOfExperience || 5;
+    const candidateArchetype = activeProfile?.marketArchetype || activeProfile?.title || 'technical specialization';
+
+    const contactLine = [candidatePhone, candidateEmail].filter(Boolean).join(' | ');
 
     switch (type) {
       case 'accept':
-        return `Subject: Acceptance of Employment Offer - ${title} - Sam Ludwig
+        return `Subject: Acceptance of Employment Offer - ${title} - ${candidateName}
 
 Dear Hiring Team at ${company},
 
-Thank you very much for extending the formal offer of employment for the ${title} position. I am thrilled to accept the offer and excited to contribute to the team's ongoing success and key technical infrastructure initiatives.
+Thank you very much for extending the formal offer of employment for the ${title} position. I am thrilled to accept the offer and excited to contribute to the team's ongoing success and key strategic initiatives.
 
 As discussed, I accept the offered starting remuneration of ${salary} and look forward to commencing on our agreed start date.
 
 Please let me know if there are any preliminary onboarding forms or documentation required prior to my first day.
 
 Warm regards,
-Sam Ludwig
-0405 993 245 | sam.ludwig@gmail.com
-Balaclava VIC 3183`;
+${candidateName}
+${contactLine}
+${candidateLocation}`;
 
       case 'counter':
-        return `Subject: Offer of Employment - ${title} - Sam Ludwig
+        return `Subject: Offer of Employment - ${title} - ${candidateName}
 
 Dear Hiring Manager,
 
-Thank you sincerely for extending the offer for the ${title} role with ${company}. I am very enthusiastic about the position and the opportunity to drive technical reliability and support operations across your environment.
+Thank you sincerely for extending the offer for the ${title} role with ${company}. I am very enthusiastic about the position and the opportunity to drive high-impact results across your environment.
 
-Given my 5+ years of enterprise systems administration experience, track record in hybrid cloud deployments, and current market benchmarks for this seniority level in Melbourne, I would like to propose a base salary adjustment to $125,000 + Super, alongside the provision for 2 fixed WFH days per week.
+Given my ${candidateExp}+ years of experience, proven track record in ${candidateArchetype}, and current market benchmarks for this seniority level, I would like to propose a base salary adjustment to $125,000 + Super, alongside the provision for 2 fixed WFH days per week.
 
 I am confident this adjustment reflects the immediate impact, autonomous problem-solving, and high reliability I will bring to ${company} from Day 1.
 
 Thank you for your consideration, and I look forward to finalizing our agreement.
 
 Warm regards,
-Sam Ludwig
-0405 993 245`;
+${candidateName}
+${candidatePhone}`;
 
       case 'clarify':
-        return `Subject: Inquiry regarding ${title} Offer Details - Sam Ludwig
+        return `Subject: Inquiry regarding ${title} Offer Details - ${candidateName}
 
 Dear Hiring Team,
 
@@ -101,16 +111,16 @@ Thank you again for extending the formal offer for the ${title} role with ${comp
 
 1. Field Travel & Vehicle Allowance: The specific reimbursement structure or vehicle provisioning for offsite client engagements.
 2. Overtime & On-Call Structure: The standard arrangements for after-hours operational escalation.
-3. Superannuation: Confirmation that the quoted package includes or excludes the 11.5% statutory super contribution.
+3. Superannuation: Confirmation that the quoted package includes or excludes the statutory super contribution.
 
 Thank you for your assistance, and I look forward to your guidance so we can execute the agreement.
 
 Warm regards,
-Sam Ludwig
-0405 993 245`;
+${candidateName}
+${candidatePhone}`;
 
       case 'decline':
-        return `Subject: Employment Offer - ${title} - Sam Ludwig
+        return `Subject: Employment Offer - ${title} - ${candidateName}
 
 Dear Hiring Team,
 
@@ -121,8 +131,8 @@ After careful consideration, I have decided to accept another opportunity that a
 I have the utmost respect for ${company} and hope our professional paths cross again in the future.
 
 Best regards,
-Sam Ludwig
-0405 993 245`;
+${candidateName}
+${candidatePhone}`;
 
       default:
         return '';
@@ -870,7 +880,7 @@ Sam Ludwig
                   AI AUDIT RATIONALE &amp; RECOMMENDATION
                 </div>
                 <p className="text-xs text-indigo-900 font-sans font-medium leading-relaxed">
-                  {audit.recommendation || audit.notes || `Target match score of ${job.score || 85}% based on IT Infrastructure profile alignment and Balaclava VIC commute compatibility.`}
+                  {audit.recommendation || audit.notes || `Target match score of ${job.score || 85}% based on ${activeProfile?.industry || 'target'} profile alignment and ${activeProfile?.suburb || 'commute'} compatibility.`}
                 </p>
               </div>
 
@@ -1120,13 +1130,13 @@ Sam Ludwig
                         }
 
                         // 4. Copy candidate profile details & cover letter to clipboard
-                        const candidateText = `Full Name: Sam Ludwig
-Email: sam.ludwig@gmail.com
-Phone: 0405 993 245
-Location: Balaclava VIC 3183
-Work Rights: Australian Citizen (Unrestricted)
-Security Clearance: Baseline / NV1 Ready
-Target Salary: ${job.salary || '$115,000 + Super'}
+                        const candidateText = `Full Name: ${activeProfile?.name || 'Candidate'}
+Email: ${activeProfile?.email || ''}
+Phone: ${activeProfile?.phone || ''}
+Location: ${activeProfile?.location || 'Melbourne VIC'}
+Work Rights: ${activeProfile?.workRights || 'Australian Citizen (Unrestricted)'}
+Security Clearance: ${activeProfile?.clearance || 'Baseline / NV1 Ready'}
+Target Salary: ${job.salary || activeProfile?.targetSalary || '$115,000 + Super'}
 
 --- TAILORED COVER LETTER ---
 ${data.pipeline_result?.cover_text || ''}`;

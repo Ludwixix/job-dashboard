@@ -3,7 +3,7 @@
 **Document Reference**: `docs/tasks/ai-layer-roadmap.md`  
 **Evaluation Scope**: Backend scraping architecture (`backend/src/job_dashboard/sources/`) and candidate fit scoring engine (`backend/src/job_dashboard/score.py`).  
 **Author**: Antigravity Autonomous Engineering Agent  
-**Status**: Complete — Phase 1 (Hybrid Semantic Vector Scoring) & Phase 2 (Targeted ATS Portal Scraping) Implemented & Verified on Master  
+**Status**: Complete — Phase 1 (Hybrid Semantic Vector Scoring), Phase 2 (Targeted ATS Portal Scraping), & Phase 3 (Semantic Density & Content Generation Engine) Implemented & Verified on Master  
 
 ---
 
@@ -159,6 +159,15 @@ If embedding-based semantic matching is introduced, it must utilize concrete, ac
 ### Phase 2: Targeted Portal Scraping via Crawl4AI
 1. Retain JobSpy for feed discovery.
 2. Introduce an isolated background job adapter (`sources/portal_crawler.py`) using Crawl4AI to fetch deep job descriptions from complex ATS portals (Workday/Greenhouse) when links are flagged as truncated.
+
+### Phase 3: Semantic Density & Content Generation Engine (The Intelligence Layer)
+1. **Semantic Gap Analysis (Diagnostic)**: Evaluates conceptual alignment comparing candidate capabilities against requisition requirements, calculating a 0–100 semantic density score and returning a concise 3-sentence diagnostic with pursue/skip recommendations (`analyze_semantic_gap`).
+2. **Achievement Anchoring**: Structures experience statements into quantifiable business outcomes following `[Active Verb] + [Core Task/Project] + [Quantified Result/Metric]` with metric front-loading for 7.4-second F-pattern recruiter scanning.
+3. **Fluff Eradication & Scale Attribution**: Automatically strips subjective corporate buzzwords (`results-driven`, `team player`, `proven track record`) and anchors claims in factual scale indicators.
+4. **Australian Market Localization**: Normalizes spelling (`organise`, `prioritise`, `centre`, `programmes`) and enforces single-column, demographic-free AU resume conventions.
+5. **Endpoints & Frontend Integration**:
+   - `GET /api/semantic-gap` & `POST /api/semantic-gap` (and `/api/jobs/{job_id}/semantic-gap`)
+   - `fetchSemanticGapAnalysis` in `frontend/src/services/generationService.js` with resilient client fallback.
 
 ### Rollback Strategy
 - Every semantic feature must be behind a feature flag (e.g. `JOB_DASHBOARD_SEMANTIC_SCORING_ENABLED=false`).

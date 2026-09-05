@@ -1133,3 +1133,56 @@ ${job.coverLetterText || job.coverLetter || ''}`;
     });
   }
 };
+
+/**
+ * Phase 3: Semantic Gap Analysis & Intelligence Layer Diagnostic
+ * Fetches conceptual capability matching and semantic density score from backend.
+ */
+export const fetchSemanticGapAnalysis = async (job, profile = null) => {
+  const candidateProfile = profile || getActiveProfile() || CANDIDATE_PROFILE;
+  const backendBase = getBackendApiBase();
+
+  try {
+    const url = job?.id 
+      ? `${backendBase}/api/jobs/${encodeURIComponent(job.id)}/semantic-gap`
+      : `${backendBase}/api/semantic-gap`;
+      
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job, profile: candidateProfile })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.diagnostic) {
+        return data.diagnostic;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend semantic gap analysis request failed, using client heuristic:', err);
+  }
+
+  // Resilient client-side fallback
+  const keywords = extractJobKeywords(job?.description || job?.notes || '');
+  const matched = keywords.filter(k => k.matched).map(k => k.group);
+  const missing = keywords.filter(k => !k.matched).map(k => k.group);
+  const densityScore = Math.min(100, Math.max(30, Math.round((matched.length / (keywords.length || 1)) * 100)));
+
+  return {
+    job_id: job?.id || 'job_target',
+    job_title: job?.title || 'Target Role',
+    company: job?.company || 'Target Employer',
+    candidate_name: candidateProfile?.name || 'Candidate',
+    semantic_density_score: densityScore,
+    diagnostic_summary: densityScore >= 75
+      ? `Strong semantic alignment (${densityScore}%) for ${job?.title || 'this role'}. Core competencies verified.`
+      : `Moderate semantic alignment (${densityScore}%). Tailoring recommended for missing capabilities: ${missing.slice(0, 3).join(', ')}.`,
+    recommended_action: densityScore >= 75 ? 'pursue_high_conviction' : 'pursue_with_tailoring',
+    matched_competencies: matched,
+    missing_competencies: missing,
+    anchored_achievements: [],
+    localization: 'en-AU'
+  };
+};
+

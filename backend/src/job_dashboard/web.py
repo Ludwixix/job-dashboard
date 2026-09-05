@@ -50,6 +50,7 @@ from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .smart_applications import get_smart_application_tracker
 from .sources import SearchQuery, ScrapePipeline, clean_description, deduplicate_jobs, ensure_descriptions, is_recent, posted_age
+from .semantic_tailoring import analyze_semantic_gap
 from datetime import timedelta
 from urllib.error import URLError
 
@@ -1127,6 +1128,33 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "explanation": explain_score(score_job(Job(**fields), profile))})
                 return
 
+            if path == "/api/semantic-gap" or (path.startswith("/api/jobs/") and path.endswith("/semantic-gap")):
+                job_id = ""
+                if path.startswith("/api/jobs/") and path.endswith("/semantic-gap"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/semantic-gap")
+                else:
+                    job_id = query_params.get("job_id", [""])[0]
+
+                job_data = app.repository.get_job(job_id) if job_id else None
+                if not job_data and job_id:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job_data = j
+                            break
+                if not job_data:
+                    job_data = {
+                        "id": job_id,
+                        "title": query_params.get("title", ["Role"])[0],
+                        "company": query_params.get("company", ["Company"])[0],
+                        "description": query_params.get("description", [""])[0]
+                    }
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                diagnostic = analyze_semantic_gap(job_data, profile)
+                self.send_json(200, {"success": True, "diagnostic": diagnostic.to_dict()})
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -2139,6 +2167,20 @@ def make_handler(app: DashboardApp):
                         "google_drive_status": "Saved to Google Drive / Applications Folder (PDF)"
                     }
                     self.send_json(200, {"success": True, "pipeline_result": receipt})
+                    return
+
+                if path == "/api/semantic-gap" or (path.startswith("/api/jobs/") and path.endswith("/semantic-gap")):
+                    payload = self.read_json_body() or {}
+                    job_id = ""
+                    if path.startswith("/api/jobs/") and path.endswith("/semantic-gap"):
+                        job_id = path.removeprefix("/api/jobs/").removesuffix("/semantic-gap")
+                    else:
+                        job_id = payload.get("job_id") or ""
+
+                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
+                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    diagnostic = analyze_semantic_gap(job, profile)
+                    self.send_json(200, {"success": True, "diagnostic": diagnostic.to_dict()})
                     return
 
                 # Handle POST generation endpoints

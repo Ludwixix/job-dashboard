@@ -5,7 +5,8 @@
 - `frontend/src/components/MockInterviewModal.jsx` (165 LOC)
 - `frontend/src/components/PsychologyDecoderModal.jsx` (348 LOC)
 
-**Total Current Footprint**: 661 lines of code across 3 separate modals and multiple redundant trigger paths.
+**Status**: Complete — Implemented & Verified in `master` via `frontend/src/components/InterviewSuiteModal.jsx`.
+**Total Current Footprint**: Unified into `InterviewSuiteModal.jsx` with backward-compatible re-exports.
 
 ---
 

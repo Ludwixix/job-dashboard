@@ -16,3 +16,5 @@ export { JobModal } from '../JobModal';
 export { MockInterviewModal } from '../MockInterviewModal';
 export { ProfileModal } from '../ProfileModal';
 export { PsychologyDecoderModal } from '../PsychologyDecoderModal';
+export { InterviewSuiteModal } from '../InterviewSuiteModal';
+export { GoogleWorkspaceModal } from '../GoogleWorkspaceModal';

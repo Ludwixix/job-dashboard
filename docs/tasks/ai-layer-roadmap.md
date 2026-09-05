@@ -3,7 +3,7 @@
 **Document Reference**: `docs/tasks/ai-layer-roadmap.md`  
 **Evaluation Scope**: Backend scraping architecture (`backend/src/job_dashboard/sources/`) and candidate fit scoring engine (`backend/src/job_dashboard/score.py`).  
 **Author**: Antigravity Autonomous Engineering Agent  
-**Status**: Phase 1 (Hybrid Semantic Vector Scoring) Implemented & Verified on Master  
+**Status**: Complete — Phase 1 (Hybrid Semantic Vector Scoring) & Phase 2 (Targeted ATS Portal Scraping) Implemented & Verified on Master  
 
 ---
 

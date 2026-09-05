@@ -8,7 +8,8 @@
 - `frontend/src/components/GoogleIntegrationModal.jsx` (425 LOC)
 - `frontend/src/components/GooglePromptModal.jsx` (229 LOC)
 
-**Total Current Footprint**: 1,947 lines of code across 4 services and 2 large modal components.
+**Status**: Complete — Implemented & Verified in `master` via `frontend/src/components/GoogleWorkspaceModal.jsx`.
+**Total Current Footprint**: Unified into `GoogleWorkspaceModal.jsx` with backward-compatible re-exports.
 
 ---
 

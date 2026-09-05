@@ -45,8 +45,8 @@ def generate_documents(job: Job, profile: Mapping[str, Any]) -> dict[str, str]:
     matched_text = ", ".join(audit.matched_skills[:3]) or "operational coordination and documentation"
     cover = "\n\n".join([
         f"# Cover Letter: {job.title}",
-        f"Dear Hiring Manager,\n\nI am pleased to apply for the {job.title} position with {job.company}. The role's focus on {matched_text} aligns with the operational discipline and client-facing delivery I have developed across enterprise technology environments.",
-        f"In my recent work, I have {evidence_sentence}. This has required clear documentation, careful coordination, sound judgement, and consistent follow-through across competing priorities. I would bring that same structured approach to supporting your team and maintaining a high standard of service.",
-        f"The opportunity to contribute to {job.company} appeals to me because the position combines practical administration with dependable stakeholder support. I would welcome the opportunity to discuss how my experience can contribute to the role. Thank you for considering my application.\n\nKind regards,\n{name}",
+        f"Dear {job.company} Hiring Team,\n\nScaling dependable systems for {job.company} requires consistent operational rigor and proactive problem resolution. The requirements for {job.title} closely mirror the enterprise delivery and infrastructure discipline I have developed across complex environments, particularly in {matched_text}.",
+        f"In my recent work, I have {evidence_sentence}. Delivering this required structured automation, sound engineering judgement, and diligent follow-through across competing business priorities. I bring that same disciplined focus to supporting {job.company}'s technology footprint and maintaining rigorous service standards.",
+        f"I welcome the opportunity to discuss how my technical experience and operational background will directly support {job.company} in the {job.title} role. Thank you for considering my application.\n\nKind regards,\n{name}",
     ])
     return {"resume": "\n".join(resume_lines).strip() + "\n", "cover_letter": cover.strip() + "\n", "application_id": f"{_slug(job.company)}_{_slug(job.title)}"}

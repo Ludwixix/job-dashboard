@@ -690,8 +690,65 @@ export const fetchJobsData = async () => {
 
 
 /**
+ * Fetches the full detailed job description on-demand from the backend resolver.
+ */
+export const fetchDetailedJobDescription = async (job, force = false) => {
+  if (!job) return '';
+  const jobId = job.id || '';
+  const jobUrl = job.portalLink || job.link || job.url || '';
+  
+  // If description is already detailed (>350 chars) and not forced, return it
+  if (!force && job.description && job.description.trim().length >= 350) {
+    return job.description;
+  }
+
+  if (!jobId && !jobUrl) {
+    return job.description || '';
+  }
+
+  try {
+    const apiBase = getApiBase();
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (jobId) params.set('job_id', jobId);
+    if (jobUrl) params.set('url', jobUrl);
+    if (force) params.set('force', 'true');
+
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let targetUrl = `${apiBase}/api/job-description?${params.toString()}`;
+    if (!apiBase && typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null') {
+      targetUrl = `${window.location.origin}/api/job-description?${params.toString()}`;
+    }
+
+    const res = await fetch(targetUrl, {
+      headers,
+    });
+
+    if (!res.ok) {
+      return job.description || '';
+    }
+
+    const data = await res.json();
+    if (data && data.success && data.description) {
+      const cleanDesc = cleanDescriptionText(data.description);
+      job.description = cleanDesc || data.description;
+      return job.description;
+    }
+  } catch (err) {
+    if (typeof process === 'undefined' || !process.env?.VITEST) {
+      console.warn('Failed to fetch detailed job description:', err);
+    }
+  }
+
+  return job.description || '';
+};
+
+/**
  * Backward compatibility alias for profile-targeted job fetching
  */
 export const fetchJobsForProfile = async (profile) => {
   return fetchJobsData();
 };
+

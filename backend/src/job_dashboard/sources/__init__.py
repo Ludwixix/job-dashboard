@@ -37,7 +37,13 @@ from .proxy import ProxyInfo, ProxyRotator, get_configured_proxies, parse_proxy,
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
 from .portal_crawler import enrich_job_description, fetch_portal_description, is_ats_portal_url
 from .remoteok import RemoteOkApiSource, _remoteok_record
-from .seek import SeekApiSource, _seek_record
+from .seek import (
+    SeekApiSource,
+    _seek_record,
+    extract_seek_description_from_html,
+    fetch_seek_job_description,
+    extract_seek_job_id,
+)
 
 __all__ = [
     "SearchQuery",
@@ -68,6 +74,9 @@ __all__ = [
     "is_ats_portal_url",
     "fetch_portal_description",
     "enrich_job_description",
+    "extract_seek_description_from_html",
+    "fetch_seek_job_description",
+    "extract_seek_job_id",
     # Internal utilities preserved for backward-compatibility & test coverage
     "_TextExtractor",
     "_page_description",

@@ -77,11 +77,20 @@ export const DEFAULT_PROFILES = [DEFAULT_USER_PROFILE];
  */
 export const getActiveProfile = () => {
   try {
+    let sessionUser = null;
+    try {
+      const rawSession = localStorage.getItem('job_dashboard_current_user_session') || localStorage.getItem('job_dashboard_google_auth_user');
+      if (rawSession) sessionUser = JSON.parse(rawSession);
+    } catch {}
+
     const rawCandidate = localStorage.getItem(STORAGE_KEY_CANDIDATE_PROFILE);
     if (rawCandidate) {
       const parsed = JSON.parse(rawCandidate);
       if (parsed && typeof parsed === 'object' && parsed.name) {
-        return parsed;
+        // If an authenticated session user exists, verify cached candidate matches
+        if (!sessionUser || parsed.id === sessionUser.id || parsed.id === sessionUser.profileId || (parsed.email && sessionUser.email && parsed.email.toLowerCase() === sessionUser.email.toLowerCase())) {
+          return parsed;
+        }
       }
     }
 
@@ -89,11 +98,16 @@ export const getActiveProfile = () => {
     if (rawProfiles) {
       const parsedList = JSON.parse(rawProfiles);
       if (Array.isArray(parsedList) && parsedList.length > 0) {
-        // Filter out demo/mock profiles like Sarah Chen
-        const userProfile = parsedList.find(p => p.name?.toLowerCase().includes('sam') || p.id === 'sam_ludwig') || parsedList[0];
-        if (userProfile) {
-          localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));
-          return userProfile;
+        let matched = null;
+        if (sessionUser) {
+          matched = parsedList.find(p => p.id === sessionUser.id || p.id === sessionUser.profileId || (p.email && sessionUser.email && p.email.toLowerCase() === sessionUser.email.toLowerCase()));
+        }
+        if (!matched) {
+          matched = parsedList.find(p => p.name?.toLowerCase().includes('sam') || p.id === 'sam_ludwig') || parsedList[0];
+        }
+        if (matched) {
+          localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(matched));
+          return matched;
         }
       }
     }
@@ -124,10 +138,16 @@ export const getAllProfiles = getProfiles;
 export const saveProfile = (updatedProfile) => {
   if (!updatedProfile || typeof updatedProfile !== 'object') return DEFAULT_USER_PROFILE;
 
+  let sessionUserId = null;
+  try {
+    const rawSession = localStorage.getItem('job_dashboard_current_user_session') || localStorage.getItem('job_dashboard_google_auth_user');
+    if (rawSession) sessionUserId = JSON.parse(rawSession)?.id;
+  } catch {}
+
   const profile = {
     ...DEFAULT_USER_PROFILE,
     ...updatedProfile,
-    id: updatedProfile.id || DEFAULT_USER_PROFILE.id
+    id: updatedProfile.id || sessionUserId || DEFAULT_USER_PROFILE.id
   };
 
   try {

@@ -100,6 +100,43 @@ export default defineConfig({
           }));
         });
 
+        // Detailed job description endpoint
+        server.middlewares.use('/api/job-description', (req, res, next) => {
+          if (req.method !== 'GET') { return next(); }
+          const parsedUrl = new URL(req.url, 'http://localhost');
+          const jobId = parsedUrl.searchParams.get('job_id') || '';
+          const jobUrl = parsedUrl.searchParams.get('url') || '';
+
+          const combinedJsonPath = path.resolve(import.meta.dirname, './public/jobs_combined.json');
+          const demoJsonPath = path.resolve(import.meta.dirname, './public/demo_jobs.json');
+          let jobs = [];
+          if (fs.existsSync(combinedJsonPath)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(combinedJsonPath, 'utf8'));
+              jobs = Array.isArray(raw) ? raw : (raw.jobs || []);
+            } catch (e) {}
+          }
+          if (jobs.length === 0 && fs.existsSync(demoJsonPath)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(demoJsonPath, 'utf8'));
+              jobs = Array.isArray(raw) ? raw : (raw.jobs || []);
+            } catch (e) {}
+          }
+
+          const matched = jobs.find(j => (jobId && String(j.id) === String(jobId)) || (jobUrl && (j.portalLink === jobUrl || j.link === jobUrl || j.url === jobUrl)));
+          const description = (matched && matched.description) || (matched && matched.notes) || '';
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            success: true,
+            job_id: jobId,
+            description: description,
+            cached: true,
+            length: description.length,
+          }));
+        });
+
         // User applications tracking endpoint
         server.middlewares.use('/api/applications', (req, res, next) => {
           if (req.method === 'GET') {

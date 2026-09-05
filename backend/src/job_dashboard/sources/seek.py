@@ -327,3 +327,134 @@ _SEEK_EXTRACTOR = """() => {
         };
     }).filter(job => job.title && job.url);
 }"""
+
+
+def extract_seek_job_id(url_or_id: str) -> str | None:
+    """Extract numeric Seek Job ID from URL or raw identifier string."""
+    if not url_or_id or not isinstance(url_or_id, str):
+        return None
+    cleaned = url_or_id.strip()
+    if cleaned.isdigit():
+        return cleaned
+    seek_prefix_match = re.search(r"^seek-(\d+)$", cleaned, re.IGNORECASE)
+    if seek_prefix_match:
+        return seek_prefix_match.group(1)
+    # Check URL patterns e.g. seek.com.au/job/93979774 or au.seek.com/job/93979774
+    url_match = re.search(r"(?:seek\.com\.au|seek\.com)/job/(\d+)", cleaned, re.IGNORECASE)
+    if url_match:
+        return url_match.group(1)
+    # Generic /job/12345678 if 'seek' is in the string
+    if "seek" in cleaned.lower():
+        generic_match = re.search(r"/job/(\d+)", cleaned)
+        if generic_match:
+            return generic_match.group(1)
+    return None
+
+
+def extract_seek_description_from_html(html_content: str) -> str:
+    """Extract complete detailed job description from raw Seek HTML."""
+    if not html_content or not isinstance(html_content, str):
+        return ""
+
+    # Strategy 1: window.SEEK_REDUX_DATA
+    m = re.search(r"window\.SEEK_REDUX_DATA\s*=\s*(.*?);\s*(?:window\.SEEK_|</script>)", html_content, re.DOTALL)
+    if not m:
+        m = re.search(r"window\.SEEK_REDUX_DATA\s*=\s*(.*?);\s*</script>", html_content, re.DOTALL)
+    if m:
+        try:
+            data = json.loads(m.group(1).strip())
+            job_obj = data.get("jobdetails", {}).get("result", {}).get("job", {})
+            content = job_obj.get("content") or job_obj.get("content2")
+            if content and len(content) >= 30:
+                return clean_description(content)
+        except Exception:
+            pass
+
+    # Strategy 2: DOM container data-automation="jobAdDetails"
+    dom_match = re.search(r'data-automation=["\']jobAdDetails["\'][^>]*>(.*?)(?:<div class="[^"]*advertiser|data-automation="jobActions"|data-automation="shareJob"|</div>\s*</div>\s*</div>\s*</section>)', html_content, re.DOTALL | re.IGNORECASE)
+    if not dom_match:
+        dom_match = re.search(r'data-automation=["\']jobAdDetails["\'][^>]*>(.*?)</div>', html_content, re.DOTALL | re.IGNORECASE)
+    if dom_match:
+        cleaned = clean_description(dom_match.group(1))
+        if len(cleaned) >= 30:
+            return cleaned
+
+    # Strategy 3: JSON-LD Schema.org JobPosting
+    ld_matches = re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html_content, re.DOTALL)
+    for raw_ld in ld_matches:
+        try:
+            parsed_ld = json.loads(raw_ld)
+            items = parsed_ld.get("@graph", [parsed_ld]) if isinstance(parsed_ld, dict) else []
+            for item in items:
+                if isinstance(item, dict) and item.get("@type") == "JobPosting":
+                    desc = item.get("description")
+                    if desc and len(desc) >= 30:
+                        return clean_description(desc)
+        except Exception:
+            pass
+
+    return ""
+
+
+def fetch_seek_job_description(
+    url_or_id: str,
+    timeout: float = 8.0,
+    proxy_url: str | None = None,
+    allow_browser_fallback: bool = True
+) -> str:
+    """Fetch and parse the full detailed job description for a Seek listing."""
+    job_id = extract_seek_job_id(url_or_id)
+    target_url = f"https://www.seek.com.au/job/{job_id}" if job_id else url_or_id
+    if not target_url.startswith(("http://", "https://")):
+        return ""
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "Referer": "https://www.seek.com.au/",
+    }
+
+    req = urllib.request.Request(target_url, headers=headers)
+    opener = urllib.request.build_opener()
+    if proxy_url:
+        opener.add_handler(urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+
+    try:
+        with opener.open(req, timeout=timeout) as response:
+            html = response.read().decode("utf-8", errors="replace")
+            desc = extract_seek_description_from_html(html)
+            if desc and len(desc) >= 30:
+                return desc
+    except Exception as err:
+        logger.debug(f"HTTP Seek job description fetch failed for {target_url}: {err}")
+
+    # Fallback to Playwright stealth browser if allowed
+    if allow_browser_fallback:
+        try:
+            from playwright.sync_api import sync_playwright
+            from .browser import create_stealth_browser
+            with sync_playwright() as playwright:
+                browser, context = create_stealth_browser(playwright, headless=True)
+                page = context.new_page()
+                try:
+                    page.goto(target_url, wait_until="domcontentloaded", timeout=int(timeout * 1500))
+                    page.wait_for_timeout(1000)
+                    html = page.content()
+                    desc = extract_seek_description_from_html(html)
+                    if desc and len(desc) >= 30:
+                        return desc
+                finally:
+                    browser.close()
+        except Exception as browser_err:
+            logger.debug(f"Browser Seek description fallback failed: {browser_err}")
+
+    return ""

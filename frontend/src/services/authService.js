@@ -5,15 +5,12 @@
  */
 
 import { DEFAULT_PROFILES, saveProfile, setActiveProfileId } from './profileService';
-import { SCRAPER_BASE_URL } from './jobQueryService';
+import { getBackendApiBase } from './apiConfig';
 
 const LS_SESSION = 'job_dashboard_current_user_session';
 const LS_TOKEN = 'job_dashboard_auth_token';
 
-const getApiBase = () => {
-  const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  return isLocalHost ? '' : (SCRAPER_BASE_URL || '');
-};
+const getApiBase = () => getBackendApiBase();
 
 /**
  * Retrieves the currently active authenticated session (cached)
@@ -71,7 +68,7 @@ export const validateSession = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.user) {
-        const hasProfile = Boolean(data.has_profile && data.profile);
+        const hasProfile = Boolean(data.has_profile && data.profile && Object.keys(data.profile).length > 0);
         const verifiedSession = {
           ...current,
           ...data.user,
@@ -79,8 +76,14 @@ export const validateSession = async () => {
           onboardingCompleted: current.onboardingCompleted !== undefined ? current.onboardingCompleted : hasProfile
         };
         setSession(verifiedSession, token);
+        let activeProfile = null;
         if (hasProfile && data.profile) {
-          saveProfile(data.profile);
+          activeProfile = saveProfile(data.profile);
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth-changed', {
+            detail: { user: verifiedSession, session: verifiedSession, profile: activeProfile }
+          }));
         }
         return verifiedSession;
       }
@@ -115,7 +118,7 @@ export const loginWithEmail = async (email, password) => {
     throw new Error(data.error || 'Invalid credentials');
   }
 
-  const hasProfile = Boolean(data.has_profile && data.profile);
+  const hasProfile = Boolean(data.has_profile && data.profile && Object.keys(data.profile).length > 0);
   const sessionUser = {
     ...data.user,
     authProvider: 'email',
@@ -124,9 +127,19 @@ export const loginWithEmail = async (email, password) => {
   };
 
   setSession(sessionUser, data.token);
+  try {
+    localStorage.setItem('career_agent_site_unlocked', 'true');
+  } catch {}
 
+  let activeProfile = null;
   if (hasProfile && data.profile) {
-    saveProfile(data.profile);
+    activeProfile = saveProfile(data.profile);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth-changed', {
+      detail: { user: sessionUser, session: sessionUser, profile: activeProfile }
+    }));
   }
 
   return sessionUser;
@@ -230,7 +243,12 @@ export const logoutUser = () => {
   localStorage.removeItem(LS_SESSION);
   localStorage.removeItem(LS_TOKEN);
   localStorage.removeItem('job_dashboard_token');
+  localStorage.removeItem('job_dashboard_google_auth_user');
+  localStorage.removeItem('career_agent_site_unlocked');
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('auth-logged-out'));
+    window.dispatchEvent(new CustomEvent('auth-changed', {
+      detail: { user: null, session: null, profile: null }
+    }));
   }
 };

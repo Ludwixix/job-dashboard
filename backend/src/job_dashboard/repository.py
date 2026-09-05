@@ -695,6 +695,28 @@ class JobRepository:
         job["status"] = row[1]
         return job
 
+    def update_job_description(self, job_id: str, description: str) -> bool:
+        """Update a job's description and sync data_json."""
+        if not job_id or not description:
+            return False
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT data_json FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if not row:
+                return False
+            try:
+                data = json.loads(row[0]) if row[0] else {}
+            except Exception:
+                data = {}
+            data["description"] = description
+            with conn:
+                cur = conn.execute(
+                    "UPDATE jobs SET description = ?, data_json = ?, updated_at = ? WHERE id = ?",
+                    (description, json.dumps(data, ensure_ascii=False), now, job_id),
+                )
+                return cur.rowcount > 0
+
+
     def list_saved_searches(self, user_id: str) -> list[dict[str, Any]]:
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row

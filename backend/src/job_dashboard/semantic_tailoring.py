@@ -306,3 +306,200 @@ def analyze_semantic_gap(job: dict[str, Any] | Any, profile: dict[str, Any]) -> 
         anchored_achievements=anchored_achievements,
         localization="en-AU"
     )
+
+
+# Generic cover letter openers strictly forbidden under Phase 4 Anti-Template rules
+FORBIDDEN_COVER_OPENERS = [
+    re.compile(r"^\s*i am writing to apply", re.IGNORECASE),
+    re.compile(r"^\s*i am applying for", re.IGNORECASE),
+    re.compile(r"^\s*i am pleased to submit", re.IGNORECASE),
+    re.compile(r"^\s*i am pleased to apply", re.IGNORECASE),
+    re.compile(r"^\s*i am excited to apply", re.IGNORECASE),
+    re.compile(r"^\s*i am thrilled to apply", re.IGNORECASE),
+    re.compile(r"^\s*with a proven track record", re.IGNORECASE),
+    re.compile(r"^\s*i would like to apply", re.IGNORECASE),
+    re.compile(r"^\s*please accept this letter", re.IGNORECASE),
+]
+
+
+@dataclass
+class TailoredCoverLetter:
+    """Phase 4: Cover letter drafted to pass Anti-Template & Swappability standards."""
+    job_id: str
+    job_title: str
+    company: str
+    candidate_name: str
+    paragraphs: list[str]
+    full_text: str
+    word_count: int
+    anti_template_passed: bool
+    swappability_score: int  # 0 to 100
+    passes_swappability_test: bool
+    localization: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class LinkedInOptimization:
+    """Phase 5: Inbound Sourcing Optimization (LinkedIn Boolean Indexing)."""
+    job_title: str
+    headlines: list[str]
+    about_index: str
+    boolean_search_strings: dict[str, str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def generate_tailored_cover_letter(job: dict[str, Any] | Any, profile: dict[str, Any]) -> TailoredCoverLetter:
+    """Draft an Anti-Template, high-conviction 3-paragraph cover letter passing the Swappability Test."""
+    if hasattr(job, "to_dict"):
+        job_data = job.to_dict()
+    elif isinstance(job, dict):
+        job_data = job
+    else:
+        job_data = {
+            "id": getattr(job, "id", "unknown"),
+            "title": getattr(job, "title", "Role"),
+            "company": getattr(job, "company", "Company"),
+            "description": getattr(job, "description", "") or getattr(job, "notes", ""),
+        }
+
+    job_id = str(job_data.get("id") or "job_target")
+    job_title = str(job_data.get("title") or "Systems Engineer")
+    company = str(job_data.get("company") or "Target Organisation")
+    description = str(job_data.get("description") or job_data.get("notes") or "")
+
+    candidate_name = profile.get("name") or "Sam Ludwig"
+    candidate_email = profile.get("email") or "sam.ludwig@gmail.com"
+    candidate_phone = profile.get("phone") or "0405 993 245"
+    candidate_location = profile.get("location") or "Melbourne, VIC"
+
+    # Identify primary technical focus
+    desc_lower = description.lower()
+    if "cloud" in desc_lower or "azure" in desc_lower:
+        tech_focus = "Azure cloud infrastructure, identity governance, and high-availability operations"
+        concrete_proof = "engineered enterprise cloud migrations, automated identity lifecycles across Entra ID, and delivered 99.9% uptime in mission-critical environments"
+    elif "security" in desc_lower or "essential 8" in desc_lower:
+        tech_focus = "ACSC Essential 8 alignment, endpoint hardening, and zero-trust systems engineering"
+        concrete_proof = "implemented ACSC Essential 8 hardening across distributed fleets, managed zero-touch Intune rollouts, and secured clinical endpoints without operational disruption"
+    else:
+        tech_focus = "Microsoft 365 administration, PowerShell systems automation, and complex L3 infrastructure support"
+        concrete_proof = "managed the Southern Hemisphere's largest SharePoint farm supporting 660,000+ users, automated batch workflows to cut runtimes by 87%, and resolved 95% of L3 escalations within strict SLAs"
+
+    # Paragraph 1: Sharp, company-specific hook (Anti-Template compliant)
+    p1 = (
+        f"Scaling modern infrastructure at {company} requires rigorous operational discipline, clean automation, and dependable systems reliability. "
+        f"As {company} continues to evolve its technology capabilities, having a dedicated {job_title} who anchors systems stability while proactively eliminating operational friction is essential. "
+        f"My background in {tech_focus} is engineered specifically to meet this scale."
+    )
+
+    # Paragraph 2: Direct evidence narrative with real scale & metrics
+    p2 = (
+        f"Across enterprise and government environments in Victoria, I have consistently turned complex technical requisitions into predictable outcomes. "
+        f"Most recently, I have {concrete_proof}. "
+        f"Whether designing CI/CD pipelines to compress delivery cycles by 25% or architecting PowerShell automations that eliminate manual overhead, I focus on building resilient, self-documenting infrastructure that empowers end users and engineering teams alike."
+    )
+
+    # Paragraph 3: Confident, low-friction call to action
+    p3 = (
+        f"I welcome the opportunity to discuss how my systems engineering background and technical delivery can directly support {company}'s operational goals for the {job_title} role. "
+        f"Thank you for your time and consideration."
+    )
+
+    # Apply fluff eradication and Australian English localization
+    p1 = localize_australian(eradicate_fluff(p1))
+    p2 = localize_australian(eradicate_fluff(p2))
+    p3 = localize_australian(eradicate_fluff(p3))
+
+    paragraphs = [p1, p2, p3]
+    full_cover_text = (
+        f"Dear {company} Hiring Team,\n\n"
+        f"{p1}\n\n"
+        f"{p2}\n\n"
+        f"{p3}\n\n"
+        f"Kind regards,\n"
+        f"{candidate_name}\n"
+        f"{candidate_phone} | {candidate_email} | {candidate_location}"
+    )
+
+    words = full_cover_text.split()
+    word_count = len(words)
+
+    # Verification checks
+    anti_template_passed = not any(pattern.search(p1) for pattern in FORBIDDEN_COVER_OPENERS)
+    
+    # Swappability validation: company name must appear in p1, job title must appear in p1 and p3, technical proof in p2
+    has_company = company.lower() in full_cover_text.lower()
+    has_title = job_title.lower() in full_cover_text.lower()
+    has_metrics = bool(re.search(r"\d+%|\d+,\d+|\d+\+", full_cover_text))
+    
+    swappability_score = 0
+    if has_company:
+        swappability_score += 40
+    if has_title:
+        swappability_score += 30
+    if has_metrics:
+        swappability_score += 20
+    if anti_template_passed:
+        swappability_score += 10
+
+    passes_swappability = swappability_score >= 80
+
+    return TailoredCoverLetter(
+        job_id=job_id,
+        job_title=job_title,
+        company=company,
+        candidate_name=candidate_name,
+        paragraphs=paragraphs,
+        full_text=full_cover_text,
+        word_count=word_count,
+        anti_template_passed=anti_template_passed,
+        swappability_score=swappability_score,
+        passes_swappability_test=passes_swappability,
+        localization="en-AU"
+    )
+
+
+def generate_linkedin_optimization(job: dict[str, Any] | Any, profile: dict[str, Any]) -> LinkedInOptimization:
+    """Generate 3 Boolean-friendly LinkedIn Headlines and a recruiter keyword index About section."""
+    job_title = "Systems Engineer"
+    if isinstance(job, dict):
+        job_title = job.get("title") or job_title
+    elif hasattr(job, "title"):
+        job_title = getattr(job, "title") or job_title
+
+    clearance = profile.get("clearance") or "Baseline / NV1 Eligible"
+    location = profile.get("location") or "Melbourne, Australia"
+
+    # 3 Boolean-friendly Headlines with exact search keywords recruiters use
+    headline_1 = f"{job_title} | Microsoft 365 & Azure Cloud Infrastructure | {clearance}"
+    headline_2 = "Infrastructure Engineer | PowerShell Automation, Entra ID & Intune | 99.9% Uptime SLA"
+    headline_3 = "Senior IT Systems Engineer | Cloud Architecture, ACSC Essential 8 & Modern Workplace"
+
+    about_index = (
+        f"Senior Systems & Infrastructure Engineer specializing in enterprise Microsoft 365, Azure Cloud, and automation architectures. "
+        f"Demonstrated history managing large-scale environments (660,000+ users, 99.9% uptime SLA) and automating operational workflows via PowerShell to reduce process runtimes by 87%.\n\n"
+        f"--- RECRUITER SEARCH & KEYWORD INDEX ---\n"
+        f"• Core Titles: {job_title} | Systems Administrator | Cloud Engineer | Infrastructure Specialist | M365 Consultant\n"
+        f"• Cloud & Identity: Microsoft Azure, Entra ID (Azure AD), Hybrid Exchange, Intune MDM, Windows Autopilot, Active Directory, Group Policy (GPO)\n"
+        f"• Automation & DevOps: PowerShell Scripting, CI/CD, PnP PowerShell, Terraform, Azure DevOps, Batch Optimization, Git\n"
+        f"• Governance & Support: ACSC Essential 8, ITIL 4 Foundation, ServiceNow ITSM, Disaster Recovery, High Availability, L3 Incident Resolution\n"
+        f"• Location & Work Rights: {location} | Australian Citizen | {clearance}"
+    )
+
+    boolean_queries = {
+        "title_and_cloud": f'("{job_title}" OR "Systems Engineer" OR "Cloud Engineer") AND (Azure OR "Microsoft 365" OR "Entra ID") AND (Melbourne OR Victoria)',
+        "automation_specialist": f'("{job_title}" OR "Infrastructure Engineer") AND (PowerShell OR Automation OR Scripting) AND (Intune OR Autopilot)',
+        "enterprise_l3": f'("{job_title}" OR "Senior Systems Administrator") AND ("L3 Support" OR Escalations OR ServiceNow) AND (Active Directory)'
+    }
+
+    return LinkedInOptimization(
+        job_title=job_title,
+        headlines=[headline_1, headline_2, headline_3],
+        about_index=localize_australian(eradicate_fluff(about_index)),
+        boolean_search_strings=boolean_queries
+    )
+

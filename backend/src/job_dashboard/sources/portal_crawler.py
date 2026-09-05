@@ -37,6 +37,9 @@ ATS_DOMAIN_PATTERNS = [
 
 # CSS / DOM container selectors known to house the full job description on ATS pages
 JOB_DESCRIPTION_SELECTORS = [
+    # Seek
+    '[data-automation="jobAdDetails"]',
+    '[data-testid="job-details"]',
     # Workday
     '[data-automation-id="jobPostingDescription"]',
     # Greenhouse
@@ -99,6 +102,15 @@ def extract_description_from_html(html: str) -> str:
     """
     if not html:
         return ""
+
+    if "SEEK_REDUX_DATA" in html or "jobAdDetails" in html:
+        try:
+            from .seek import extract_seek_description_from_html
+            seek_desc = extract_seek_description_from_html(html)
+            if seek_desc and len(seek_desc) >= 50:
+                return seek_desc
+        except Exception:
+            pass
 
     # Try BeautifulSoup if available for cleaner selector matching
     try:

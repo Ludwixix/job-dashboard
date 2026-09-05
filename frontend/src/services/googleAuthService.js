@@ -8,13 +8,9 @@ import { setSession } from './authService';
 import { getActiveProfile, saveProfile, saveProfileToBackend, fetchProfileFromBackend, DEFAULT_PROFILES } from './profileService';
 import { scanAndSyncGmailApplications } from './gmailSyncService';
 import { synthesizeUserProfile } from './smartProfileBuilder';
-import { SCRAPER_BASE_URL } from './jobQueryService';
+import { getBackendApiBase } from './apiConfig';
 import { getLocalUserApplications } from './dataService';
 import { findExistingJobTrackerSheet } from './googleSheetService';
-
-
-const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const getApiBase = () => isLocalHost ? '' : (SCRAPER_BASE_URL || '');
 
 const LS_AUTH_USER = 'job_dashboard_google_auth_user';
 const LS_GOOGLE_CLIENT_ID = 'job_dashboard_google_client_id';
@@ -256,9 +252,10 @@ export const loginWithGoogle = async ({
   onStatusUpdate('Creating secure user session in database...');
 
   // Register / log in user via backend API
-  const apiBase = getApiBase();
+  const apiBase = getBackendApiBase();
   let backendSession = null;
   let backendProfile = null;
+  let backendToken = null;
   let hasProfile = false;
   let isNewUser = true;
 
@@ -276,6 +273,7 @@ export const loginWithGoogle = async ({
     if (res.ok) {
       const data = await res.json();
       if (data.token) {
+        backendToken = data.token;
         localStorage.setItem('job_dashboard_auth_token', data.token);
       }
       backendSession = data.user;
@@ -287,8 +285,9 @@ export const loginWithGoogle = async ({
     console.warn('Backend Google user registration deferred:', err);
   }
 
+  const effectiveUserId = backendSession?.id || authUser.id;
   const sessionUser = {
-    id: backendSession?.id || authUser.id,
+    id: effectiveUserId,
     name: authUser.name,
     email: authUser.email,
     picture: authUser.picture,
@@ -298,7 +297,11 @@ export const loginWithGoogle = async ({
     lastActiveAt: new Date().toISOString()
   };
 
-  setSession(sessionUser);
+  const currentToken = backendToken || localStorage.getItem('job_dashboard_auth_token');
+  setSession(sessionUser, currentToken);
+  try {
+    localStorage.setItem('career_agent_site_unlocked', 'true');
+  } catch {}
 
   // Check if they already have a spreadsheet
   onStatusUpdate('Checking for existing Job Tracker spreadsheet...');
@@ -354,7 +357,7 @@ export const loginWithGoogle = async ({
     onStatusUpdate('Restoring your saved candidate profile from cloud database...');
     activeUserProfile = {
       ...backendProfile,
-      id: backendSession?.id || authUser.id,
+      id: effectiveUserId,
       email: authUser.email || backendProfile.email,
       name: authUser.name || backendProfile.name
     };
@@ -367,14 +370,24 @@ export const loginWithGoogle = async ({
       gmailApplications: applications,
       existingProfile: {
         ...baseTemplate,
-        id: backendSession?.id || authUser.id,
+        id: effectiveUserId,
         name: authUser.name || baseTemplate.name,
         email: authUser.email || baseTemplate.email
       }
     });
+    synthesized.id = effectiveUserId;
     activeUserProfile = saveProfile(synthesized);
     // Explicitly persist new profile to backend
     saveProfileToBackend(activeUserProfile).catch(() => {});
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth-changed', {
+      detail: { user: authUser, session: sessionUser, profile: activeUserProfile }
+    }));
+    window.dispatchEvent(new CustomEvent('profile-updated', {
+      detail: activeUserProfile
+    }));
   }
 
   return {

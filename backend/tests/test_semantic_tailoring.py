@@ -5,7 +5,9 @@ from job_dashboard.semantic_tailoring import (
     localize_australian,
     extract_quantified_metric,
     anchor_achievement,
-    analyze_semantic_gap
+    analyze_semantic_gap,
+    generate_tailored_cover_letter,
+    generate_linkedin_optimization
 )
 
 
@@ -85,3 +87,50 @@ def test_analyze_semantic_gap_low_alignment():
     assert diagnostic.semantic_density_score < 60
     assert diagnostic.recommended_action in ["skip_low_alignment", "pursue_with_tailoring"]
     assert "Weak semantic density" in diagnostic.diagnostic_summary or "Moderate conceptual alignment" in diagnostic.diagnostic_summary
+
+
+def test_generate_tailored_cover_letter_passes_anti_template_and_swappability():
+    job = {
+        "id": "job_anz_engineer",
+        "title": "Senior Cloud Systems Engineer",
+        "company": "ANZ Banking Group",
+        "description": "Looking for Azure cloud infrastructure and identity governance specialists."
+    }
+    profile = {
+        "name": "Sam Ludwig",
+        "email": "sam.ludwig@gmail.com",
+        "phone": "0405 993 245",
+        "location": "Melbourne, VIC"
+    }
+    cover = generate_tailored_cover_letter(job, profile)
+    assert cover.anti_template_passed is True
+    assert "i am writing to apply" not in cover.full_text.lower()
+    assert "i am pleased to apply" not in cover.full_text.lower()
+    assert "with a proven track record" not in cover.full_text.lower()
+    assert cover.passes_swappability_test is True
+    assert cover.swappability_score >= 80
+    assert len(cover.paragraphs) == 3
+    assert "ANZ Banking Group" in cover.paragraphs[0]
+    assert "Senior Cloud Systems Engineer" in cover.paragraphs[0]
+    assert cover.localization == "en-AU"
+
+
+def test_generate_linkedin_optimization_produces_boolean_headlines_and_index():
+    job = {
+        "id": "job_infra_lead",
+        "title": "Infrastructure Systems Engineer",
+        "company": "Victoria Government"
+    }
+    profile = {
+        "name": "Sam Ludwig",
+        "clearance": "Baseline Eligible",
+        "location": "Melbourne, VIC"
+    }
+    opt = generate_linkedin_optimization(job, profile)
+    assert len(opt.headlines) == 3
+    assert any("Infrastructure Systems Engineer" in h for h in opt.headlines)
+    assert "RECRUITER SEARCH & KEYWORD INDEX" in opt.about_index
+    assert "title_and_cloud" in opt.boolean_search_strings
+    assert "AND" in opt.boolean_search_strings["title_and_cloud"]
+    assert "OR" in opt.boolean_search_strings["title_and_cloud"]
+

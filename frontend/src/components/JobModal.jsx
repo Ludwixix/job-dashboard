@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
-  ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity
+  ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
+  RefreshCw, Loader2
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -12,7 +13,7 @@ import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApp
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 import { getCommuteDetails } from '../services/commuteService';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
-import { cleanDescriptionText } from '../services/dataService';
+import { cleanDescriptionText, fetchDetailedJobDescription } from '../services/dataService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
@@ -47,6 +48,52 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   }, [baseLocation, job?.location]);
   const [copiedSubject, setCopiedSubject] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [detailedDescription, setDetailedDescription] = useState(() => job?.description || job?.notes || '');
+  const [isEnrichingDescription, setIsEnrichingDescription] = useState(false);
+  const [hasEnriched, setHasEnriched] = useState(false);
+
+  useEffect(() => {
+    setDetailedDescription(job?.description || job?.notes || '');
+    setHasEnriched(false);
+  }, [job]);
+
+  useEffect(() => {
+    const raw = (detailedDescription || '').trim();
+    const shouldEnrich = raw.length <= 350 && (job?.portalLink || job?.link || job?.url || job?.id);
+    if (shouldEnrich && !isEnrichingDescription && !hasEnriched) {
+      setIsEnrichingDescription(true);
+      fetchDetailedJobDescription(job)
+        .then((desc) => {
+          if (desc && desc.trim().length > raw.length) {
+            setDetailedDescription(desc);
+            if (job) job.description = desc;
+          }
+        })
+        .catch((err) => console.warn('Auto enrichment failed:', err))
+        .finally(() => {
+          setIsEnrichingDescription(false);
+          setHasEnriched(true);
+        });
+    }
+  }, [activeTab, job, hasEnriched, isEnrichingDescription, detailedDescription]);
+
+  const handleManualEnrich = async () => {
+    if (isEnrichingDescription) return;
+    setIsEnrichingDescription(true);
+    try {
+      const desc = await fetchDetailedJobDescription(job, true);
+      if (desc) {
+        setDetailedDescription(desc);
+        if (job) job.description = desc;
+      }
+    } catch (err) {
+      console.warn('Manual enrichment failed:', err);
+    } finally {
+      setIsEnrichingDescription(false);
+      setHasEnriched(true);
+    }
+  };
+
   const [isAutoApplying, setIsAutoApplying] = useState(false);
   const [pipelineStage, setPipelineStage] = useState(1);
   const [autoApplyReceipt, setAutoApplyReceipt] = useState(null);
@@ -250,7 +297,9 @@ ${candidatePhone}`;
     );
   };
 
-  const isLongText = (job.description || job.notes || '').length > 350;
+  const currentDescription = detailedDescription || job?.description || job?.notes || '';
+  const isLongText = currentDescription.length > 350;
+
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
@@ -1214,28 +1263,44 @@ ${candidatePhone}`;
               )}
 
               {/* Expandable Formatted Job Description */}
-              {(job.description || job.notes) ? (
+              {currentDescription ? (
                 <div className="space-y-3 font-mono">
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <FileText size={14} className="text-slate-400" /> FULL JOB ADVERTISEMENT TEXT
+                      {isEnrichingDescription && (
+                        <span className="flex items-center gap-1 text-[9px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-sans font-bold animate-pulse">
+                          <Loader2 size={10} className="animate-spin text-indigo-600" /> Enriching ad...
+                        </span>
+                      )}
                     </div>
-                    {isLongText && (
+                    <div className="flex items-center gap-3">
                       <button
-                        onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                        className="text-indigo-600 hover:text-indigo-900 font-extrabold flex items-center gap-1 cursor-pointer"
+                        onClick={handleManualEnrich}
+                        disabled={isEnrichingDescription}
+                        className="text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-md font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                        title="Fetch full ad text from source"
                       >
-                        {isDescriptionExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        {isDescriptionExpanded ? 'COLLAPSE DESCRIPTION' : 'SHOW FULL DESCRIPTION'}
+                        <RefreshCw size={11} className={isEnrichingDescription ? 'animate-spin' : ''} />
+                        {isEnrichingDescription ? 'ENRICHING...' : 'ENRICH / RE-FETCH'}
                       </button>
-                    )}
+                      {isLongText && (
+                        <button
+                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                          className="text-indigo-600 hover:text-indigo-900 font-extrabold flex items-center gap-1 cursor-pointer"
+                        >
+                          {isDescriptionExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          {isDescriptionExpanded ? 'COLLAPSE DESCRIPTION' : 'SHOW FULL DESCRIPTION'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="relative">
                     <div className={`p-5 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs transition-all duration-300 ${
                       !isDescriptionExpanded && isLongText ? 'max-h-[280px] overflow-hidden' : 'max-h-[70vh] overflow-y-auto'
                     }`}>
-                      {renderFormattedDescription(job.description || job.notes)}
+                      {renderFormattedDescription(currentDescription)}
                     </div>
 
                     {!isDescriptionExpanded && isLongText && (
@@ -1247,9 +1312,20 @@ ${candidatePhone}`;
                     )}
                   </div>
                 </div>
+              ) : isEnrichingDescription ? (
+                <div className="p-8 text-center bg-indigo-50/50 rounded-2xl border border-indigo-200 font-mono text-xs text-indigo-700 flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={24} className="animate-spin text-indigo-600" />
+                  <p className="font-bold">FETCHING DETAILED ADVERTISEMENT FROM SOURCE...</p>
+                </div>
               ) : (
-                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 font-mono text-xs text-slate-500">
-                  NO JOB DESCRIPTION AVAILABLE FOR THIS POSITION.
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 font-mono text-xs text-slate-500 space-y-3">
+                  <p>NO JOB DESCRIPTION AVAILABLE FOR THIS POSITION.</p>
+                  <button
+                    onClick={handleManualEnrich}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs inline-flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
+                  >
+                    <RefreshCw size={13} /> FETCH FROM SOURCE
+                  </button>
                 </div>
               )}
             </div>

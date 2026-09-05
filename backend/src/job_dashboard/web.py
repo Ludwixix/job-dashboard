@@ -48,9 +48,20 @@ from .models import Job
 from .score import explain_score, score_job
 from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
+from .sources import (
+    SearchQuery,
+    ScrapePipeline,
+    clean_description,
+    deduplicate_jobs,
+    ensure_descriptions,
+    is_recent,
+    posted_age,
+    extract_seek_job_id,
+    fetch_seek_job_description,
+    fetch_portal_description,
+)
+from .semantic_tailoring import analyze_semantic_gap, generate_tailored_cover_letter, generate_linkedin_optimization
 from .smart_applications import get_smart_application_tracker
-from .sources import SearchQuery, ScrapePipeline, clean_description, deduplicate_jobs, ensure_descriptions, is_recent, posted_age
-from .semantic_tailoring import analyze_semantic_gap
 from datetime import timedelta
 from urllib.error import URLError
 
@@ -940,6 +951,25 @@ class DashboardApp:
         return self.generation_progress[job_id]
 
 
+def _is_valid_profile(p: Any) -> bool:
+    """Return True if p is a non-empty, valid candidate profile dictionary."""
+    if not p or not isinstance(p, dict):
+        return False
+    return bool(
+        p.get("coreSkills")
+        or p.get("targetTitles")
+        or p.get("title")
+        or p.get("industry")
+        or p.get("job_titles")
+        or p.get("skills")
+        or p.get("name")
+        or p.get("email")
+        or p.get("fullWorkExperienceText")
+        or p.get("professional_summary")
+        or len(p) >= 2
+    )
+
+
 def resolve_user_id(handler, query_params=None) -> str | None:
     """
     Resolve the authenticated user ID from Authorization Bearer token,
@@ -1028,16 +1058,19 @@ def make_handler(app: DashboardApp):
                 try:
                     payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
                     user_id = payload.get("sub")
+                    user_email = payload.get("email")
                     user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
+                    if not user_profile and user_email:
+                        user_profile = app.repository.get_user_profile(user_email) or {}
+                    has_profile = _is_valid_profile(user_profile)
                     self.send_json(200, {
                         "success": True,
                         "user": {
                             "id": user_id,
-                            "email": payload.get("email"),
+                            "email": user_email,
                             "name": payload.get("name")
                         },
-                        "profile": user_profile if user_profile else None,
+                        "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
                     })
                 except Exception as e:
@@ -1078,6 +1111,8 @@ def make_handler(app: DashboardApp):
                     self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
                     return
                 prof = app.repository.get_user_profile(user_id)
+                if not prof and query_params and "email" in query_params:
+                    prof = app.repository.get_user_profile(query_params["email"][0])
                 self.send_json(200, {"success": True, "profile": prof})
                 return
 
@@ -1155,6 +1190,60 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "diagnostic": diagnostic.to_dict()})
                 return
 
+            if path == "/api/cover-letter" or (path.startswith("/api/jobs/") and path.endswith("/cover-letter")):
+                job_id = ""
+                if path.startswith("/api/jobs/") and path.endswith("/cover-letter"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/cover-letter")
+                else:
+                    job_id = query_params.get("job_id", [""])[0]
+
+                job_data = app.repository.get_job(job_id) if job_id else None
+                if not job_data and job_id:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job_data = j
+                            break
+                if not job_data:
+                    job_data = {
+                        "id": job_id,
+                        "title": query_params.get("title", ["Systems Engineer"])[0],
+                        "company": query_params.get("company", ["Target Organisation"])[0],
+                        "description": query_params.get("description", [""])[0]
+                    }
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                cover = generate_tailored_cover_letter(job_data, profile)
+                self.send_json(200, {"success": True, "cover_letter": cover.to_dict()})
+                return
+
+            if path == "/api/linkedin-optimization" or (path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization")):
+                job_id = ""
+                if path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/linkedin-optimization")
+                else:
+                    job_id = query_params.get("job_id", [""])[0]
+
+                job_data = app.repository.get_job(job_id) if job_id else None
+                if not job_data and job_id:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job_data = j
+                            break
+                if not job_data:
+                    job_data = {
+                        "id": job_id,
+                        "title": query_params.get("title", ["Systems Engineer"])[0],
+                        "company": query_params.get("company", ["Target Organisation"])[0],
+                        "description": query_params.get("description", [""])[0]
+                    }
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                opt = generate_linkedin_optimization(job_data, profile)
+                self.send_json(200, {"success": True, "linkedin_optimization": opt.to_dict()})
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -1191,6 +1280,77 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "applications": apps})
                 return
 
+
+            if path == "/api/job-description":
+                job_id = query_params.get("job_id", [""])[0].strip()
+                url = query_params.get("url", [""])[0].strip()
+                force = query_params.get("force", ["false"])[0].lower() in ("true", "1")
+                if not job_id and not url:
+                    self.send_json(400, {"success": False, "error": "job_id or url parameter is required"})
+                    return
+
+                existing_job = None
+                if job_id:
+                    existing_job = app.repository.get_job(job_id)
+                if not existing_job and app.jobs:
+                    existing_job = next((j for j in app.jobs if job_id and str(j.get("id")) == str(job_id)), None)
+                    if not existing_job and url:
+                        existing_job = next((j for j in app.jobs if (j.get("url") == url or j.get("portalLink") == url)), None)
+
+                curr_desc = ""
+                if existing_job:
+                    if not url:
+                        url = existing_job.get("url") or existing_job.get("portalLink") or ""
+                    curr_desc = (existing_job.get("description") or "").strip()
+
+                if not force and len(curr_desc) >= 350:
+                    self.send_json(200, {
+                        "success": True,
+                        "job_id": job_id,
+                        "description": curr_desc,
+                        "cached": True,
+                        "length": len(curr_desc),
+                    })
+                    return
+
+                detailed_desc = ""
+                try:
+                    seek_id = extract_seek_job_id(url) or (job_id if str(job_id).isdigit() else "")
+                    if seek_id or ("seek.com.au" in url.lower()):
+                        detailed_desc = fetch_seek_job_description(url or seek_id)
+                    elif url:
+                        detailed_desc = fetch_portal_description(url)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch job description for job_id={job_id}, url={url}: {e}")
+
+                if detailed_desc and len(detailed_desc) > len(curr_desc):
+                    if job_id:
+                        app.repository.update_job_description(job_id, detailed_desc)
+                    if app.jobs:
+                        for j in app.jobs:
+                            if job_id and str(j.get("id")) == str(job_id):
+                                j["description"] = detailed_desc
+                            elif url and (j.get("url") == url or j.get("portalLink") == url):
+                                j["description"] = detailed_desc
+
+                    self.send_json(200, {
+                        "success": True,
+                        "job_id": job_id,
+                        "description": detailed_desc,
+                        "enriched": True,
+                        "length": len(detailed_desc),
+                    })
+                    return
+
+                self.send_json(200, {
+                    "success": True,
+                    "job_id": job_id,
+                    "description": curr_desc,
+                    "enriched": False,
+                    "message": "Detailed description could not be fetched or original description is already sufficient",
+                    "length": len(curr_desc),
+                })
+                return
 
             if path == "/api/verify-job-url":
                 query_params = parse_qs(parsed.query)
@@ -1442,7 +1602,14 @@ def make_handler(app: DashboardApp):
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body["id"] = user_id
                     res = app.repository.upsert_user_profile(user_id, body)
+                    email = str(body.get("email") or "").strip().lower()
+                    if email and email != user_id:
+                        try:
+                            app.repository.upsert_user_profile(email, body)
+                        except Exception:
+                            pass
                     self.send_json(200, {"success": True, "profile": res})
                     return
 
@@ -1635,7 +1802,9 @@ def make_handler(app: DashboardApp):
                     }, JWT_SECRET, algorithm="HS256")
                     
                     user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
+                    if (not user_profile or not _is_valid_profile(user_profile)) and email:
+                        user_profile = app.repository.get_user_profile(email) or user_profile
+                    has_profile = _is_valid_profile(user_profile)
                     self.send_json(200, {
                         "success": True,
                         "token": token,
@@ -1644,7 +1813,7 @@ def make_handler(app: DashboardApp):
                             "email": email,
                             "name": name
                         },
-                        "profile": user_profile if user_profile else None,
+                        "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
                     })
                     return
@@ -1688,7 +1857,9 @@ def make_handler(app: DashboardApp):
                     }, JWT_SECRET, algorithm="HS256")
                     
                     user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
+                    if (not user_profile or not _is_valid_profile(user_profile)) and email:
+                        user_profile = app.repository.get_user_profile(email) or user_profile
+                    has_profile = _is_valid_profile(user_profile)
                     self.send_json(200, {
                         "success": True,
                         "token": token,
@@ -1697,7 +1868,7 @@ def make_handler(app: DashboardApp):
                             "email": email,
                             "name": name
                         },
-                        "profile": user_profile if user_profile else None,
+                        "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
                     })
                     return
@@ -1823,12 +1994,14 @@ def make_handler(app: DashboardApp):
                     token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
                     
                     user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    has_profile = bool(user_profile and (user_profile.get("industry") or user_profile.get("job_titles") or user_profile.get("skills")))
+                    if (not user_profile or not _is_valid_profile(user_profile)) and email:
+                        user_profile = app.repository.get_user_profile(email) or user_profile
+                    has_profile = _is_valid_profile(user_profile)
                     self.send_json(200, {
                         "success": True,
                         "token": token,
                         "user": {"id": user_id, "email": email, "name": name},
-                        "profile": user_profile if user_profile else None,
+                        "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
                     })
                     return
@@ -2181,6 +2354,34 @@ def make_handler(app: DashboardApp):
                     profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
                     diagnostic = analyze_semantic_gap(job, profile)
                     self.send_json(200, {"success": True, "diagnostic": diagnostic.to_dict()})
+                    return
+
+                if path == "/api/cover-letter" or (path.startswith("/api/jobs/") and path.endswith("/cover-letter")):
+                    payload = self.read_json_body() or {}
+                    job_id = ""
+                    if path.startswith("/api/jobs/") and path.endswith("/cover-letter"):
+                        job_id = path.removeprefix("/api/jobs/").removesuffix("/cover-letter")
+                    else:
+                        job_id = payload.get("job_id") or ""
+
+                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
+                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    cover = generate_tailored_cover_letter(job, profile)
+                    self.send_json(200, {"success": True, "cover_letter": cover.to_dict()})
+                    return
+
+                if path == "/api/linkedin-optimization" or (path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization")):
+                    payload = self.read_json_body() or {}
+                    job_id = ""
+                    if path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization"):
+                        job_id = path.removeprefix("/api/jobs/").removesuffix("/linkedin-optimization")
+                    else:
+                        job_id = payload.get("job_id") or ""
+
+                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
+                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    opt = generate_linkedin_optimization(job, profile)
+                    self.send_json(200, {"success": True, "linkedin_optimization": opt.to_dict()})
                     return
 
                 # Handle POST generation endpoints

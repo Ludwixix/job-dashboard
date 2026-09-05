@@ -223,3 +223,64 @@ If embedding-based semantic matching is introduced, it must utilize concrete, ac
 2. **Do NOT install unverified "Resume2Vec" packages**: Any semantic matching implementation must rely exclusively on verified packages (`google-genai` embeddings or `sentence-transformers`).
 3. **DO implement a two-stage hybrid scoring system**: Augmenting the deterministic rule engine with hosted vector embeddings (`text-embedding-004`) for top-tier candidates will deliver genuine improvements in match nuance without sacrificing explainability or adding container bloat.
 
+
+---
+
+## Phase 8: Multi-Provider LLM Settings, Model Picker & API Key Configuration
+
+**Status**: ✅ Complete — Implemented, tested, committed to master, and deployed to Cloud Run production
+**Deployed**: 2026-09-05 (revision `job-dashboard-00095-4dm`, 100% traffic)
+
+### Overview
+
+Full in-browser LLM provider selection and configuration system with **zero secret exposure** — all API keys live exclusively in client-side `localStorage` and are never sent to the backend or logged anywhere.
+
+### Architecture
+
+#### `frontend/src/services/llmConfig.js` (NEW)
+- **`PROVIDERS` registry** with 8 built-in providers:
+  - **OpenRouter** (default): Multi-model unified gateway, Claude/GPT-4o/Gemini 2.5/DeepSeek/200+ models with one key
+  - **OpenAI** (Official API): `https://api.openai.com/v1/chat/completions`
+  - **Google Gemini** (AI Studio, OpenAI-compatible): `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`
+  - **Anthropic Claude** (Direct API): `https://api.anthropic.com/v1/messages`
+  - **DeepSeek** (Direct Official): `https://api.deepseek.com/v1/chat/completions`
+  - **Groq** (LPU Ultra-Speed): `https://api.groq.com/openai/v1/chat/completions`
+  - **Ollama / Local LLM** (Private & Sovereign): `http://localhost:11434/v1/chat/completions`
+  - **Custom OpenAI-Compatible** (Self-Hosted / Proxy): configurable endpoint
+- **Per-provider API key isolation**: Keys are scoped to `llm_api_key_{providerId}` in `localStorage`
+- **Legacy migration**: Reads legacy `openrouter_api_key` / `openrouter_model` keys automatically
+- **`testLlmConnection()`**: Issues a live 1-token prompt and reports latency and model name
+- **`'llm-config-updated'` event**: Dispatched on save for reactive multi-component synchronisation
+
+#### `frontend/src/components/SettingsModal.jsx` (NEW)
+Full-featured settings modal accessible from 6 entry points:
+1. **Dashboard top-bar** `SETTINGS` button (`Dashboard.jsx`)
+2. **ProfileSwitcher** "⚙️ Settings & LLM Configuration" action
+3. **AlienMonolithNav** gear button (bottom dock rail)
+4. **MonolithMode** gear button (bottom dock rail)
+5. **CommandPalette** `Settings: LLM Provider, Model & API Keys` action (⌘K)
+6. **ProfileModal** Tab 3 "API & ENGINE SETTINGS" — modernised multi-provider UI
+
+**Modal features**:
+- Provider card grid (8 providers, checklist selection + active state styling)
+- Provider description + API key docs link
+- Model dropdown (preset model list per provider + custom model ID input)
+- API key input with visibility toggle (show/hide)
+- Custom endpoint override field (Ollama / self-hosted)
+- **Live Test Connection button** — issues 1-token probe, shows latency or error
+- ATS/Location Preferences tab (existing preferences preserved)
+
+#### Updated Consumers
+- **`generationService.js`**: Routes `generateApplicationDocs` to active provider endpoint with Anthropic-specific header format and multi-format SSE stream handling
+- **`profileService.js`**: `parseResumeWithAI` dynamically uses active provider, endpoint, and key
+- **`InterviewSuiteModal.jsx`**: Employer psychology decryption respects active provider, model, endpoint, and key
+
+### Key Engineering Decisions
+- **Google Gemini via OpenAI compatibility endpoint**: No custom SDK required — Bearer auth on `generativelanguage.googleapis.com/v1beta/openai/chat/completions`
+- **Anthropic direct browser access**: Uses `anthropic-dangerous-direct-browser-access: 'true'` header for client-side API calls
+- **Zero Secret Exposure**: No API key ever touches the Flask backend, Cloud Run logs, or git history — isolation enforced at the service layer
+
+### Test Coverage
+- `frontend/src/services/__tests__/llmConfig.test.js` — 6 unit tests: defaults, provider switching, legacy key migration, storage isolation, test connection mocking
+- `frontend/src/components/__tests__/SettingsModal.test.jsx` — 3 component tests: render, provider switch, API key input, connection testing
+- All 57 frontend Vitest tests and 141 backend pytest tests passing at merge

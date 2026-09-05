@@ -50,7 +50,7 @@ The project is structured into robust, decoupled modules:
 When SEEK's public API is unavailable or returns HTTP 403, the backend falls back to the maintained cache only when `JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true`. Produce a new cache from an approved/exported SEEK JSON payload with:
 
 ```bash
-cd job-dashboard-modular
+cd backend
 PYTHONPATH=src python3 -m job_dashboard.seek_cache_ingest \
   --input /path/to/seek-export.json \
   --output data/seek_cache.json \
@@ -65,13 +65,13 @@ The importer writes only listings with a valid HTTP(S) URL, non-empty title/comp
 The backend handles scraping, SQLite persistence, and LLM orchestration.
 
 ```bash
-cd /home/s/.openclaw/workspace/job-dashboard-modular
+cd backend
 # Install dependencies
 python3 -m pip install -e '.[scraping]'
 python3 -m playwright install chromium
 
 # Run tests
-python3 -m pytest
+python3 -m pytest tests/ -v
 
 # Start the local API server
 PYTHONPATH=src python3 -m job_dashboard.run_server
@@ -81,7 +81,7 @@ PYTHONPATH=src python3 -m job_dashboard.run_server
 The frontend communicates with the backend API to render the dashboard.
 
 ```bash
-cd /home/s/.openclaw/workspace/job-dashboard-react
+cd ../frontend
 # Install dependencies
 npm install
 
@@ -91,27 +91,31 @@ npm run dev
 
 ## ☁️ Deployment (Google Cloud Run)
 
-The application has been unified into a single Dockerized container deployed on Google Cloud Run.
+The application has been unified into a single Dockerized container deployed on Google Cloud Run. Use the automated deployment script from the backend directory:
 
-1. Build the frontend and sync static assets:
 ```bash
-cd job-dashboard-react
-VITE_API_BASE_URL="https://job-dashboard-6xrdvjlrcq-ts.a.run.app" npm run build
-rm -rf ../job-dashboard-modular/src/job_dashboard/static/*
-cp -r dist/* ../job-dashboard-modular/src/job_dashboard/static/
+cd backend
+bash deploy-cloudrun.sh acaa-agent
 ```
 
-2. Deploy to Cloud Run (the GCS bucket env var is required for the job index to persist across cold starts/redeploys; the Adzuna and SEEK cache variables below preserve source availability):
+Alternatively, to manually build and deploy:
+1. Build the frontend and sync static assets:
 ```bash
-cd job-dashboard-modular
+cd frontend
+VITE_API_BASE_URL="https://job-dashboard-6xrdvjlrcq-ts.a.run.app" npm run build
+rm -rf ../backend/src/job_dashboard/static/*
+cp -r dist/* ../backend/src/job_dashboard/static/
+```
+
+2. Deploy to Cloud Run:
+```bash
+cd backend
 gcloud run deploy job-dashboard --source . --region australia-southeast1 --project acaa-agent \
-  --memory 2Gi --cpu 2 --timeout 3600 --max-instances 10 --allow-unauthenticated \
+  --memory 2Gi --cpu 2 --timeout 3600 --max-instances 5 --allow-unauthenticated \
   --set-env-vars JOB_DASHBOARD_GCS_DATA_BUCKET=acaa-agent-job-dashboard-data,\
 JOB_DASHBOARD_SEEK_CACHE_PATH=data/seek_cache.json,\
 JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,\
-JOB_DASHBOARD_LINKEDIN_ENABLED=false,\
-JOB_DASHBOARD_ADZUNA_APP_ID=<app_id>,\
-JOB_DASHBOARD_ADZUNA_API_KEY=<api_key> --quiet
+JOB_DASHBOARD_LINKEDIN_ENABLED=false --quiet
 ```
 
 ## ⚙️ Configuration

@@ -10,6 +10,7 @@ import { scanAndSyncGmailApplications } from './gmailSyncService';
 import { synthesizeUserProfile } from './smartProfileBuilder';
 import { SCRAPER_BASE_URL } from './jobQueryService';
 import { getLocalUserApplications } from './dataService';
+import { findExistingJobTrackerSheet } from './googleSheetService';
 
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');

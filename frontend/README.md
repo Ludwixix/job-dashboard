@@ -25,7 +25,7 @@ Check out the live production deployment: [https://job-dashboard-6xrdvjlrcq-ts.a
 ## 🛠️ Architecture
 - **Framework**: React 19, Vite, Tailwind CSS, Lucide Icons
 - **State & UI**: Custom DnD Kit (Kanban), Recharts for data visualization, React Error Boundaries for granular crash recovery.
-- **Backend Sync**: Integrates strictly with the Python `job-dashboard-modular` backend for SQLite WAL persistence and OpenRouter LLM synthesis.
+- **Backend Sync**: Integrates strictly with the Python backend (`backend/`) for SQLite WAL persistence and OpenRouter LLM synthesis.
 
 ### Job data flow
 
@@ -33,7 +33,7 @@ Scrapers run in the backend and write validated listings into the SQLite job ind
 
 ## 💻 Local Setup
 
-This project requires the companion Python backend scraper (`job-dashboard-modular`) for live job fetching, database persistence, and ML scoring.
+This project connects to the companion Python backend in `backend/` for live job fetching, database persistence, and ML scoring.
 
 1. **Install dependencies:**
    ```bash
@@ -52,9 +52,9 @@ This project requires the companion Python backend scraper (`job-dashboard-modul
    ```
 
 4. **Start the Backend:**
-   Navigate to the `job-dashboard-modular` directory and start the local API:
+   Navigate to the `backend/` directory and start the local API:
    ```bash
-   cd ../job-dashboard-modular
+   cd ../backend
    PYTHONPATH=src python3 -m job_dashboard.run_server
    ```
 

@@ -13,7 +13,7 @@ import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApp
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 import { getCommuteDetails } from '../services/commuteService';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
-import { cleanDescriptionText, fetchDetailedJobDescription } from '../services/dataService';
+import { cleanDescriptionText, fetchDetailedJobDescription, downloadAtsDocxResume } from '../services/dataService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
@@ -518,6 +518,13 @@ ${candidatePhone}`;
                   title="Download Tailored Resume PDF"
                 >
                   <Download size={13} /> DOWNLOAD RESUME (PDF)
+                </button>
+                <button
+                  onClick={() => downloadAtsDocxResume(job, activeProfile, job.resumeText)}
+                  className="py-2 px-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  title="Download ATS-Friendly OpenXML Resume (.docx for Workday/Taleo)"
+                >
+                  <FileText size={13} /> DOWNLOAD RESUME (.DOCX)
                 </button>
                 <button
                   onClick={() => downloadCoverLetterPdf(job.coverLetterText, job)}
@@ -1545,12 +1552,22 @@ ${data.pipeline_result?.cover_text || ''}`;
                       <div className="space-y-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
                         <div className="flex items-center justify-between">
                           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">TAILORED RESUME CONTENT SENT</div>
-                          <button
-                            onClick={() => downloadResumePdf(autoApplyReceipt.resume_text, job)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Download size={11} /> DOWNLOAD RESUME (PDF)
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => downloadResumePdf(autoApplyReceipt.resume_text, job)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                              title="Download Resume PDF"
+                            >
+                              <Download size={11} /> PDF
+                            </button>
+                            <button
+                              onClick={() => downloadAtsDocxResume(job, activeProfile, autoApplyReceipt.resume_text)}
+                              className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                              title="Download ATS OpenXML (.docx) for Workday/Taleo"
+                            >
+                              <FileText size={11} /> DOCX
+                            </button>
+                          </div>
                         </div>
                         <pre className="text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto p-2 bg-slate-900 rounded border border-slate-800 leading-relaxed">
                           {autoApplyReceipt.resume_text}

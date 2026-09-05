@@ -752,3 +752,62 @@ export const fetchJobsForProfile = async (profile) => {
   return fetchJobsData();
 };
 
+/**
+ * Triggers ATS-optimized OpenXML (.docx) resume download via backend ATS engine.
+ * Fully compliant with Workday, Taleo, Greenhouse, and Lever single-column parsing.
+ */
+export const downloadAtsDocxResume = async (job = {}, profile = null, customResumeText = '') => {
+  try {
+    const apiBase = getApiBase();
+    const token = getAuthToken();
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let targetUrl = `${apiBase}/api/export-ats-resume`;
+    if (!apiBase && typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null') {
+      targetUrl = `${window.location.origin}/api/export-ats-resume`;
+    }
+
+    const payload = {
+      job: job || {},
+      profile: profile || null,
+      resume_text: customResumeText || job?.resumeText || '',
+      format: 'docx',
+    };
+
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Export failed with status: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const candidateName = profile?.name || 'Candidate';
+    const company = job?.company || 'Target_Company';
+    const cleanName = candidateName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cleanCompany = company.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `ATS_Resume_${cleanName}_${cleanCompany}.docx`;
+
+    if (typeof window !== 'undefined' && window.document) {
+      const url = window.URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
+    return { success: true, filename };
+  } catch (err) {
+    console.error('Failed to download ATS docx resume:', err);
+    throw err;
+  }
+};
+

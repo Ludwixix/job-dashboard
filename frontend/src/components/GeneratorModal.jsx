@@ -13,6 +13,7 @@ import {
 import { PROVIDERS, getLlmConfig, saveLlmConfig } from '../services/llmConfig';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { getActiveProfile } from '../services/profileService';
+import { downloadAtsDocxResume } from '../services/dataService';
 
 const GEMINI_GEM_URL = "https://gemini.google.com/gem/1Bxx-IAsb1aBD0T6rxC6aJB1frzm4Yphz?usp=drive_link";
 
@@ -239,7 +240,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
     setTimeout(() => setCopiedText(false), 2500);
   };
 
-  // ── Direct PDF Downloads ────────────────────────────────────────────────────
+  // ── Direct PDF & ATS DOCX Downloads ────────────────────────────────────────
   const handleDownloadResume = () => {
     if (!resumeText) return;
     if (onSaveCustomDocs) {
@@ -251,6 +252,20 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
       });
     }
     downloadResumePdf(resumeText, job);
+  };
+
+  const handleDownloadAtsDocx = () => {
+    if (!resumeText) return;
+    if (onSaveCustomDocs) {
+      onSaveCustomDocs(job.id, {
+        resumeText,
+        coverLetterText,
+        model: genMeta?.model || 'Application Studio',
+        generatedAt: new Date().toISOString()
+      });
+    }
+    const candidateProfile = getActiveProfile();
+    downloadAtsDocxResume(job, candidateProfile, resumeText);
   };
 
   const handleDownloadCoverLetter = () => {
@@ -553,6 +568,13 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 >
                   <Download size={12} /> DOWNLOAD RESUME (PDF)
                 </button>
+                <button
+                  onClick={handleDownloadAtsDocx}
+                  className="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+                  title="Download ATS OpenXML (.docx) for Workday/Taleo"
+                >
+                  <FileText size={12} /> ATS RESUME (.DOCX)
+                </button>
               </>
             )}
 
@@ -800,6 +822,18 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                     </button>
 
                     <button
+                      onClick={handleDownloadAtsDocx}
+                      className={`px-3.5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                        qualityAudit.isReadyToSubmit
+                          ? 'bg-teal-600 hover:bg-teal-500 text-white shadow-teal-500/25 ring-2 ring-teal-400/50'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      }`}
+                      title="Download Workday / Taleo ATS compliant OpenXML (.docx)"
+                    >
+                      <FileText size={13} /> ATS (.DOCX)
+                    </button>
+
+                    <button
                       onClick={handleDownloadCoverLetter}
                       className={`px-3.5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
                         qualityAudit.isReadyToSubmit
@@ -904,6 +938,13 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md transition-all"
                   >
                     <Download size={12} /> Download Updated PDF
+                  </button>
+                  <button
+                    onClick={handleDownloadAtsDocx}
+                    className="px-3 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md transition-all"
+                    title="Download ATS OpenXML (.docx) for Workday/Taleo"
+                  >
+                    <FileText size={12} /> Download .docx
                   </button>
                   <button
                     onClick={() => setActiveTab('quality')}

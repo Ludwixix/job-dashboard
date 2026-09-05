@@ -150,7 +150,9 @@ def _role_domain(job: Job) -> str:
     return "it"
 
 
-def _skill_cluster(skill: str) -> str:
+def _skill_cluster(skill: str, profile_skills: Mapping[str, Any] | None = None) -> str:
+    if profile_skills and skill in profile_skills:
+        return "primary"
     return "primary" if skill in _PRIMARY_SKILLS else "secondary"
 
 
@@ -226,24 +228,25 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
         )
         missing = tuple(skill for skill in skills if skill not in profile_skills)
         total_weight = sum(
-            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill)]
+            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill, profile_skills)]
             for skill in skills
         )
         matched_weight = sum(
-            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill)] * skills[skill]
+            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill, profile_skills)] * skills[skill]
             for skill in matched
         )
         skill_match = matched_weight / total_weight if total_weight else 0.0
         experience = {"junior": 0.7, "mid": 1.0, "senior": 0.9, "executive": 0.3}[_experience_level(job)]
         location = 1.0 if job.remote or re.search(r"remote|melbourne|vic", job.location, re.IGNORECASE) else 0.5
         company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.IGNORECASE) else 0.7
-        growth = 0.9 if re.search(r"trainee|graduate|junior|training", job.text(), re.IGNORECASE) else 0.8 if re.search(r"cloud|azure|devops", job.text(), re.IGNORECASE) else 0.5
+        growth = 0.9 if re.search(r"trainee|graduate|junior|entry[- ]level", job.text(), re.IGNORECASE) else 0.8 if re.search(r"training|mentorship|development|progression|leadership|upskill|cloud|azure|devops", job.text(), re.IGNORECASE) else 0.5
         seniority_penalty = _seniority_penalty(job)
         title_category = _title_category(job, profile)
         recency = 1.0 if getattr(job, "posted", "") else 0.5
         dimensions = {"skill_match": round(skill_match * 100), "title_category_match": round(title_category * 100), "location_fit": round(location * 100), "recency_weight": round(recency * 100), "experience_fit": round(experience * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}
         total = skill_match * 0.6 + title_category * 0.12 + location * 0.08 + experience * 0.08 + company * 0.04 + growth * 0.03 + recency * 0.05 - seniority_penalty
-        if domain == "data" and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS):
+        is_data_candidate = any("data" in t or "analytics" in t or "sql" in t for t in profile_skills.keys())
+        if domain == "data" and not is_data_candidate and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS):
             total = min(total, 0.5)
         total = max(0.0, min(1.0, total))
         fit = "No skill match" if not matched else "Excellent fit" if total >= 0.85 else "Strong fit" if total >= 0.7 else "Good fit" if total >= 0.55 else "Partial fit"

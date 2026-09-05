@@ -35,7 +35,8 @@ def generate_documents(job: Job, profile: Mapping[str, Any]) -> dict[str, str]:
     summary = profile.get("professional_summary", "").strip()
     # The fallback uses the profile's facts, but its structure is deliberately
     # independent of the Master Resume's source-document layout.
-    resume_lines = [f"# {name}", personal.get('title', 'Infrastructure & M365 Engineer'), contact, links, "", "## Target Role", job.title, "", "## Professional Summary", summary, "", "## Technical Expertise", skills_text, "", "## Professional Experience"]
+    candidate_title = personal.get('title') or profile.get('title') or job.title or 'Professional Specialist'
+    resume_lines = [f"# {name}", candidate_title, contact, links, "", "## Target Role", job.title, "", "## Professional Summary", summary, "", "## Technical Expertise", skills_text, "", "## Professional Experience"]
     for experience in ranked:
         resume_lines.extend([f"### {experience.get('title', '')} | {experience.get('company', '')}", experience.get("period", ""), *[f"- {item}" for item in experience.get("achievements", [])], ""])
     resume_lines.extend(["## Certifications", *[f"- {item}" for item in profile.get("certifications", [])], "", "## Education", *[f"- {item}" for item in profile.get("education", [])], "", "## Additional Information", "Australian citizen · Unrestricted Australian work rights"])
@@ -45,8 +46,8 @@ def generate_documents(job: Job, profile: Mapping[str, Any]) -> dict[str, str]:
     matched_text = ", ".join(audit.matched_skills[:3]) or "operational coordination and documentation"
     cover = "\n\n".join([
         f"# Cover Letter: {job.title}",
-        f"Dear {job.company} Hiring Team,\n\nScaling dependable systems for {job.company} requires consistent operational rigor and proactive problem resolution. The requirements for {job.title} closely mirror the enterprise delivery and infrastructure discipline I have developed across complex environments, particularly in {matched_text}.",
-        f"In my recent work, I have {evidence_sentence}. Delivering this required structured automation, sound engineering judgement, and diligent follow-through across competing business priorities. I bring that same disciplined focus to supporting {job.company}'s technology footprint and maintaining rigorous service standards.",
-        f"I welcome the opportunity to discuss how my technical experience and operational background will directly support {job.company} in the {job.title} role. Thank you for considering my application.\n\nKind regards,\n{name}",
+        f"Dear {job.company} Hiring Team,\n\nDelivering high-impact outcomes for {job.company} requires consistent operational rigor and proactive problem resolution. The requirements for {job.title} closely mirror the professional discipline and domain expertise I have developed across demanding environments, particularly in {matched_text}.",
+        f"In my recent work, I have {evidence_sentence}. Delivering this required structured execution, sound professional judgement, and diligent follow-through across competing business priorities. I bring that same disciplined focus to advancing {job.company}'s organizational mission and maintaining rigorous standards of excellence.",
+        f"I welcome the opportunity to discuss how my practical experience and background will directly support {job.company} in the {job.title} role. Thank you for considering my application.\n\nKind regards,\n{name}",
     ])
     return {"resume": "\n".join(resume_lines).strip() + "\n", "cover_letter": cover.strip() + "\n", "application_id": f"{_slug(job.company)}_{_slug(job.title)}"}

@@ -4,6 +4,7 @@ import { generateApplicationDocs, generateClientSideTailoredDocs } from '../serv
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { getActiveProfile } from '../services/profileService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
+import { downloadAtsDocxResume } from '../services/dataService';
 
 export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator }) => {
   const [mode, setMode] = useState('text'); // 'text' | 'link'
@@ -189,13 +190,20 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
             <div className="flex flex-wrap gap-2 pt-2">
               <button
                 onClick={() => downloadResumePdf(generatedDocs.resume, generatedDocs.job)}
-                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 cursor-pointer"
+                className="flex-1 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
               >
                 <Download size={14} /> Resume PDF
               </button>
               <button
+                onClick={() => downloadAtsDocxResume(generatedDocs.job, getActiveProfile(), generatedDocs.resume)}
+                className="flex-1 py-2.5 px-3 bg-teal-800/80 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-teal-600 cursor-pointer"
+                title="Download ATS OpenXML (.docx)"
+              >
+                <FileText size={14} /> Resume (.docx)
+              </button>
+              <button
                 onClick={() => downloadCoverLetterPdf(generatedDocs.coverLetter, generatedDocs.job)}
-                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 cursor-pointer"
+                className="flex-1 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
               >
                 <Download size={14} /> Cover Letter PDF
               </button>

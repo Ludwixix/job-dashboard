@@ -84,3 +84,77 @@ def test_profile_experience_title_overlap_matches():
     assert _title_category(job, profile) == 1.0
     result = score_job(job, profile)
     assert result.dimensions["title_category_match"] == 100
+
+
+def test_non_it_coreskills_receive_primary_cluster_weight():
+    from job_dashboard.score import _skill_cluster, _profile_skills
+
+    profile = {
+        "coreSkills": ["patient care", "triage", "wound management", "cannulation"],
+    }
+    p_skills = _profile_skills(profile)
+
+    # All candidate coreSkills should receive primary cluster weight (1.0)
+    for skill in ("patient care", "triage", "wound management", "cannulation"):
+        assert _skill_cluster(skill, p_skills) == "primary"
+
+    # Unmatched non-IT skill defaults to secondary
+    assert _skill_cluster("unrelated skill", p_skills) == "secondary"
+
+
+def test_multi_industry_growth_scoring():
+    profile = {
+        "targetTitles": ["Registered Nurse"],
+        "coreSkills": ["patient care"],
+    }
+    job = Job(
+        id="nurse-growth-1",
+        title="Registered Nurse",
+        company="St Vincent's Hospital",
+        location="Melbourne, VIC",
+        description="Exceptional career development with clinical mentorship and structured leadership progression.",
+    )
+
+    result = score_job(job, profile)
+    assert result.dimensions["growth_potential"] == 80
+
+
+def test_universal_documents_generation_non_it():
+    from job_dashboard.documents import generate_documents
+
+    profile = {
+        "personal": {
+            "full_name": "Sarah Jenkins",
+            "title": "Registered Nurse - Acute Care",
+            "email": "sarah@health.vic.gov.au",
+            "phone": "0400 111 222",
+            "location": {"city": "Melbourne"},
+        },
+        "coreSkills": ["patient triage", "medication administration"],
+        "experience": [
+            {
+                "title": "Staff Nurse",
+                "company": "Royal Melbourne Hospital",
+                "period": "2021 - 2024",
+                "achievements": ["managed patient triage in fast-paced emergency ward"],
+            }
+        ],
+    }
+    job = Job(
+        id="job-nurse-docs",
+        title="Clinical Nurse Consultant",
+        company="Alfred Health",
+        location="Melbourne, VIC",
+        description="Clinical nurse role requiring patient triage and emergency care.",
+    )
+
+    docs = generate_documents(job, profile)
+    resume = docs["resume"]
+    cover = docs["cover_letter"]
+
+    assert "Infrastructure & M365 Engineer" not in resume
+    assert "Registered Nurse - Acute Care" in resume
+    assert "technology footprint" not in cover
+    assert "enterprise delivery and infrastructure discipline" not in cover
+    assert "Alfred Health" in cover
+    assert "Sarah Jenkins" in cover

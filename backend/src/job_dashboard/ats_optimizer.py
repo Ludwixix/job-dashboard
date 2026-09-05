@@ -82,14 +82,14 @@ def generate_ats_optimized_resume(profile: dict[str, Any], job: dict[str, Any] |
     linkedin = str(profile.get("linkedin") or "").strip()
     
     # Target Title: Mirror job title directly if available, otherwise candidate headline
-    target_title = str(job.get("title") or profile.get("title") or profile.get("headline") or "Senior Technical Specialist").strip()
+    target_title = str(job.get("title") or profile.get("title") or profile.get("headline") or "Professional Specialist").strip()
     
     # 1. Apex Summary (Top 25% F-pattern fixation zone)
     raw_summary = str(profile.get("summary") or profile.get("about") or "").strip()
     if not raw_summary:
         raw_summary = (
-            f"High-impact {target_title} with proven engineering expertise across enterprise environments. "
-            "Demonstrated track record of delivering resilient, automated infrastructure and optimizing operational uptime."
+            f"High-impact {target_title} with proven expertise and dedication to operational excellence. "
+            "Demonstrated track record of delivering measurable outcomes, collaborative execution, and high standards of service."
         )
     clean_summary = localize_australian(sanitize_adversarial_injections(raw_summary))
     

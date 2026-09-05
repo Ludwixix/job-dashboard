@@ -329,3 +329,29 @@ Replaces legacy hardcoded IT and applicant assumptions across the Auto-Apply and
 - `backend/tests/test_auto_apply.py`: 5 comprehensive tests validating Healthcare, Finance, Construction, and dynamic candidate attachments.
 - `frontend/src/services/__tests__/autoApplyService.test.js`: 4 tests validating sector question resolution and Quick Apply platform classification.
 - Full regression test gauntlet: 149 backend tests and 62 frontend tests pass with 100% success rate.
+
+---
+
+## Phase 11: Universal Multi-Industry Scoring Parity & ATS OpenXML (.docx) Export Suite
+
+**Status**: ✅ Complete — Implemented, tested, built, and deployed to Cloud Run production
+**Deployed**: 2026-09-06 (100% traffic)
+
+### Overview
+
+Completes universal sector parity across candidate scoring, cover letter/resume synthesis, and ATS file exports:
+1. **Universal Core Skill Clustering (`score.py`)**:
+   - Updated `_skill_cluster(skill, profile_skills)`: candidate profile skills across any industry (nursing, clinical care, financial modeling, trial preparation) receive primary (1.0 weight) tier rather than being demoted to secondary (0.45 weight).
+   - Broadened `growth` regex to include general career progression keywords (`training`, `mentorship`, `development`, `progression`, `leadership`, `upskill`) alongside cloud/DevOps terms.
+   - Protected data candidate profiles (`data`, `analytics`, `sql`) from being capped by `_DATA_ROLE_TERMS`.
+2. **Universal Grounded Document Synthesis (`documents.py`, `ats_optimizer.py`)**:
+   - Replaced hardcoded IT fallback titles (`"Infrastructure & M365 Engineer"`) with candidate profile title, target job title, or domain-neutral `"Professional Specialist"`.
+   - Replaced tech-specific cover letter phrasing (`"supporting technology footprint"`, `"structured automation, sound engineering judgement"`) with professional excellence language (`"advancing organizational mission"`, `"structured execution, sound professional judgement"`).
+3. **Frontend ATS OpenXML (.docx) Export Suite (`dataService.js`, `JobModal.jsx`, `GeneratorModal.jsx`, `CustomJobModal.jsx`)**:
+   - Added `downloadAtsDocxResume` calling `/api/export-ats-resume` with `format: 'docx'` and generating single-column ATS Word documents compliant with Workday, Taleo, Greenhouse, and Lever.
+   - Integrated `.docx` download buttons in JobModal top action bar, AutoApply receipt tab, GeneratorModal document action bars and editor, and CustomJobModal application ready card.
+
+### Test Coverage
+- `backend/tests/test_score.py`: Added 3 tests verifying non-IT coreSkills primary cluster weighting, career growth scoring across multi-industry keywords, and universal document synthesis.
+- `frontend/src/services/__tests__/dataService.test.js`: Added unit tests verifying `.docx` payload creation, API interaction, and object URL cleanup.
+- Full regression test gauntlet: 152 backend pytest tests and 64 frontend vitest tests pass (100% pass rate).

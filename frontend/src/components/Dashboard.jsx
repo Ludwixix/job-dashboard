@@ -774,7 +774,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               }`}
             >
               <LayoutGrid size={14} /> 
-              STREAM
+              DISCOVERY STREAM
               {preparedCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40">
                   {preparedCount}
@@ -791,7 +791,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               }`}
             >
               <Zap size={14} className="text-amber-400" /> 
-              ACTION
+              ACTION QUEUE
             </button>
 
             <button
@@ -803,7 +803,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               }`}
             >
               <Sliders size={14} /> 
-              FUNNEL KANBAN
+              APPLICATION KANBAN
             </button>
 
             <button

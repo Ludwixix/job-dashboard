@@ -31,7 +31,12 @@ class OpenRouterDocumentGenerator:
         self.context = load_prompt_context(source_dir, guidelines_dir, examples_dir=examples_dir)
         self.reference_style = """Use the attached reference examples and Shared Voice Guide as the writing and presentation standard. Write in Sam Ludwig's confident, plain-spoken, technically precise voice. Use action-led achievement bullets, accurate metrics, Australian spelling, clean title-case headings, and generous whitespace. Cover letters must be natural business letters without visible section labels or meta commentary."""
         self.model = model or os.environ.get("LLM_MODEL", "deepseek/deepseek-v4-flash-0731")
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key = (
+            api_key
+            or os.environ.get("JOB_DASHBOARD_OPENROUTER_API_KEY", "")
+            or os.environ.get("OPENROUTER_API_KEY", "")
+            or self._config_key()
+        )
 
     def _config_key(self) -> str:
         config_path = Path("/home/s/.openclaw/openclaw.json")

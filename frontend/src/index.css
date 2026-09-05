@@ -146,6 +146,7 @@
 .alien-monolith-rail {
   background: linear-gradient(180deg, #0d0b09 0%, #070605 50%, #0a0907 100%);
   border-right: 1px solid #231e19;
+  position: relative;
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }

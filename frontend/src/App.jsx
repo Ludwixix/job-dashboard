@@ -1,40 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
-import { OnboardingFlow } from './components/OnboardingFlow';
+import SiteGate, { isSiteUnlocked, setSiteUnlocked } from './components/SiteGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getCurrentSession, validateSession, logoutUser } from './services/authService';
 import { Loader2 } from 'lucide-react';
 
 function App() {
   const [session, setSession] = useState(() => getCurrentSession());
+  const [isUnlocked, setIsUnlocked] = useState(() => isSiteUnlocked());
   const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
     const checkAuth = async () => {
       try {
+        if (!isSiteUnlocked()) {
+          if (isMounted) setIsValidating(false);
+          return;
+        }
+
         const local = getCurrentSession();
         if (!local) {
           if (isMounted) setIsValidating(false);
           return;
         }
 
-        // Explicitly validate session; on failure or expiry, clear session safely
         const restored = await validateSession();
-        if (isMounted) {
-          if (restored) {
-            setSession(restored);
-          } else {
-            logoutUser();
-            setSession(null);
-          }
+        if (isMounted && restored) {
+          setSession(restored);
         }
       } catch (e) {
-        console.warn('Session verification failed, logging out expired/invalid session:', e);
-        logoutUser();
-        if (isMounted) {
-          setSession(null);
-        }
+        console.warn('Session check note:', e);
       } finally {
         if (isMounted) setIsValidating(false);
       }
@@ -46,23 +42,22 @@ function App() {
 
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
-        <Loader2 className="animate-spin text-indigo-500 mb-4" size={48} />
-        <p className="text-slate-400 font-mono">Loading Session...</p>
+      <div className="min-h-screen bg-[#070605] flex flex-col items-center justify-center font-mono">
+        <Loader2 className="animate-spin text-[#d48b38] mb-4" size={40} />
+        <p className="text-[#a89d8e] text-xs tracking-widest uppercase">INITIALIZING CAREER.AGENT...</p>
       </div>
     );
   }
 
-  if (!session || !session.onboardingCompleted) {
+  if (!isUnlocked) {
     return (
       <ErrorBoundary>
-        <div className="App">
-          <OnboardingFlow 
-            onComplete={(newSession) => {
-              setSession(newSession);
-            }} 
-          />
-        </div>
+        <SiteGate 
+          onUnlock={(newSession) => {
+            setIsUnlocked(true);
+            setSession(newSession);
+          }} 
+        />
       </ErrorBoundary>
     );
   }
@@ -73,8 +68,10 @@ function App() {
         <Dashboard 
           currentUser={session}
           onSignOut={() => {
+            setSiteUnlocked(false);
             logoutUser();
             setSession(null);
+            setIsUnlocked(false);
           }}
         />
       </div>

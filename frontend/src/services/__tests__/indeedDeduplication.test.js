@@ -21,3 +21,4 @@ describe('cleanJobUrl & Indeed URL Preservation', () => {
     expect(cleanJobUrl(urlWithHash)).toBe('https://www.seek.com.au/job/12345');
   });
 });
+

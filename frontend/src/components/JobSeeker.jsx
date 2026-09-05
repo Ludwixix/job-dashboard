@@ -1112,6 +1112,7 @@ export const JobSeeker = ({
                   onChange={(e) => setMaxDistanceFilter(e.target.value)}
                 >
                   <option value="All">ALL DISTANCES</option>
+                  <option value="5km">&lt; 5 KM (BALACLAVA &amp; NEIGHBORS)</option>
                   <option value="5km">&lt; 5 KM ({(currentProfile?.suburb || 'LOCAL').toUpperCase()} &amp; NEIGHBORS)</option>
                   <option value="10km">&lt; 10 KM (CBD &amp; COMMUTE)</option>
                   <option value="25km">&lt; 25 KM (METRO MELBOURNE)</option>

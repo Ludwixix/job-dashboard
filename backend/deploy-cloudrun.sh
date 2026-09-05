@@ -103,6 +103,19 @@ if [ "$IS_STAGING" = true ]; then
     EXTRA_FLAGS+=("--no-traffic" "--tag=staging")
 fi
 
+# Safely pass OpenRouter key to Cloud Run if available
+ROUTER_KEY="${JOB_DASHBOARD_OPENROUTER_API_KEY:-}"
+if [ -z "$ROUTER_KEY" ] && [ -f "${SCRIPT_DIR}/../OpenRouterAPI.txt" ]; then
+    ROUTER_KEY="$(cat "${SCRIPT_DIR}/../OpenRouterAPI.txt" | tr -d '[:space:]')"
+elif [ -z "$ROUTER_KEY" ] && [ -f "${SCRIPT_DIR}/../../OpenRouterAPI.txt" ]; then
+    ROUTER_KEY="$(cat "${SCRIPT_DIR}/../../OpenRouterAPI.txt" | tr -d '[:space:]')"
+fi
+
+ENV_VARS="HOST=0.0.0.0,ENVIRONMENT=production,JWT_SECRET_KEY=${JWT_SECRET_KEY},JOB_DASHBOARD_DATA_DIR=/app/data,JOB_DASHBOARD_GCS_DATA_BUCKET=${PROJECT_ID}-job-dashboard-data,JOB_DASHBOARD_SEEK_CACHE_PATH=/app/data/seek_cache.json,JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,JOB_DASHBOARD_LINKEDIN_ENABLED=false"
+if [ -n "$ROUTER_KEY" ]; then
+    ENV_VARS="${ENV_VARS},JOB_DASHBOARD_OPENROUTER_API_KEY=${ROUTER_KEY}"
+fi
+
 gcloud run deploy "${SERVICE_NAME}" \
     --image "${IMAGE}" \
     --region "${REGION}" \
@@ -114,7 +127,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --min-instances 0 \
     --max-instances 5 \
     --port 8080 \
-    --set-env-vars="HOST=0.0.0.0,ENVIRONMENT=production,JWT_SECRET_KEY=${JWT_SECRET_KEY},JOB_DASHBOARD_DATA_DIR=/app/data,JOB_DASHBOARD_GCS_DATA_BUCKET=${PROJECT_ID}-job-dashboard-data,JOB_DASHBOARD_SEEK_CACHE_PATH=/app/data/seek_cache.json,JOB_DASHBOARD_SEEK_CACHE_FALLBACK=true,JOB_DASHBOARD_LINKEDIN_ENABLED=false" \
+    --set-env-vars="${ENV_VARS}" \
     --project="${PROJECT_ID}" \
     "${EXTRA_FLAGS[@]}" \
     --quiet

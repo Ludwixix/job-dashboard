@@ -425,4 +425,42 @@ Delivers universal multi-industry parity across the interview preparation, mock 
 - `frontend/src/services/__tests__/interviewAndOutreach.test.js`: 7 tests validating interview guide questions, talking points isolation, and outreach email generation across all 3 modes.
 - Full regression test gauntlet: 162 backend pytest tests and 78 frontend vitest tests pass (100% pass rate, 0 lint errors).
 
+---
+
+## Phase 14: Universal Compensation Benchmarking, Strategic Counter-Offer Engine & Fair Work Contract Risk Analyzer ("Offer Action Hub")
+
+**Status**: ✅ Complete — Implemented, tested, built, and ready for deployment
+**Deployed**: 2026-09-06
+
+### Overview
+
+Delivers comprehensive offer evaluation, salary benchmarking, strategic negotiation, and contract risk auditing across all 5 career tracks (Tech, Healthcare, Finance, Trades, Legal):
+1. **Universal Compensation Benchmarking & Tax Estimator (`offer_analytics.py`, `offerService.js`)**:
+   - Market salary distributions across `junior`, `mid`, `senior`, and `lead` seniority tiers for Technology, Healthcare, Finance, Trades, and Legal.
+   - Statutory Australian Superannuation Guarantee calculation (11.5%).
+   - ATO Stage 3 tax brackets + 2% Medicare levy take-home pay estimator (annual net, monthly net, fortnightly net, effective tax rate).
+   - Dynamic percentile position scoring (P10, P25, Median P50, P75, P90) with visual percentile progress meter and market band comparisons.
+2. **3-Posture Strategic Counter-Offer Engine (`offerService.js`, `OfferActionHubModal.jsx`)**:
+   - `assertive`: High-conviction anchor on top-quartile market distribution, immediate delivery without ramp-up latency, and explicit market compensation citations.
+   - `collaborative`: Balanced win-win partnership framing proposing equitable baseline adjustments and immediate commencement readiness.
+   - `benefits_focused`: Holistic package negotiation emphasizing hybrid/WFH flexibility, annual CPD/education allowance ($3k–$5k), and milestone-based 6-month progression reviews.
+   - 1-click clipboard copy and native pre-filled `mailto:` client generator with subject lines tailored by sector and role.
+3. **Fair Work NES Contract Risk Analyzer (`offer_analytics.py`, `web.py`, `offerService.js`)**:
+   - Automated regex scanner auditing contract clauses against Australian National Employment Standards (NES) and common law principles:
+     * Post-Employment Restraint of Trade / Non-Compete (flagging unreasonable durations >6 months or blanket geographic bounds).
+     * All-Inclusive Salary & Unpaid Overtime (identifying unreasonable additional hours without TOIL or overtime penalties under Fair Work Act s62).
+     * Blanket 24/7 Off-Duty Intellectual Property Assignment (protecting personal projects and inventions created outside work hours).
+     * Notice Period Asymmetry (flagging disparity between employee resignation notice and employer termination notice).
+   - Contract Safety Score (0-100), risk badge rating (`Low Risk`, `Moderate Risk`, `High Risk`), and actionable redline recommendations.
+4. **Offer Action Hub Modal & Dashboard Integration (`OfferActionHubModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`, `ActionHighlights.jsx`)**:
+   - Accessible via prominent `OFFER ACTION HUB` trigger buttons in `JobModal.jsx` (tabs bar and offer view) and `ActionHighlights.jsx`.
+   - Global modal integration in `Dashboard.jsx` with full error boundary and responsive dark glassmorphic UI.
+
+### Test Coverage
+- `backend/tests/test_offer_analytics.py`: 5 tests covering seniority tier detection, sector track detection, ATO Stage 3 tax calculation, multi-industry salary benchmarking, and Fair Work contract clause risk scanner.
+- `frontend/src/services/__tests__/offerService.test.js`: 15 tests verifying tax calculations, compensation evaluation, counter-offer postures, and contract auditing.
+- `frontend/src/components/__tests__/OfferActionHubModal.test.jsx`: 4 tests validating tab transitions, calculation cards, counter-offer generation, and interactive contract clause scanning.
+- Full regression suite: 167 backend pytest tests and 97 frontend vitest tests pass (100% pass rate, 0 lint errors).
+
+
 

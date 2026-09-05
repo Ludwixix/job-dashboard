@@ -63,6 +63,7 @@ from .sources import (
     fetch_portal_description,
 )
 from .semantic_tailoring import analyze_semantic_gap, generate_tailored_cover_letter, generate_linkedin_optimization
+from .offer_analytics import calculate_compensation_benchmark, scan_employment_contract_risks
 from .smart_applications import get_smart_application_tracker
 from datetime import timedelta
 from urllib.error import URLError
@@ -2555,6 +2556,32 @@ def make_handler(app: DashboardApp):
                     profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
                     opt = generate_linkedin_optimization(job, profile)
                     self.send_json(200, {"success": True, "linkedin_optimization": opt.to_dict()})
+                    return
+
+                if path in ("/api/compensation/benchmark", "/api/compensation/analyze"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    salary = float(payload.get("base_salary") or payload.get("salary") or 0.0)
+                    role = payload.get("title") or payload.get("role") or ""
+                    sector = payload.get("sector")
+                    super_inc = bool(payload.get("super_included", False))
+                    location = payload.get("location") or "Melbourne, VIC"
+                    benchmark = calculate_compensation_benchmark(
+                        base_salary=salary,
+                        role_title=role,
+                        sector=sector,
+                        super_included=super_inc,
+                        location=location
+                    )
+                    self.send_json(200, {"success": True, "benchmark": benchmark})
+                    return
+
+                if path in ("/api/contracts/scan-risks", "/api/contracts/audit"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    contract_text = payload.get("contract_text") or payload.get("text") or payload.get("content") or ""
+                    risks = scan_employment_contract_risks(contract_text)
+                    self.send_json(200, {"success": True, "analysis": risks})
                     return
 
                 # Handle POST generation endpoints

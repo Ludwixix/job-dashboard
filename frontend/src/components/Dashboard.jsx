@@ -28,6 +28,7 @@ const GoogleIntegrationModal = lazy(() => import('./GoogleIntegrationModal').the
 const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ default: m.AutoApplyModal })));
 const SettingsModal = lazy(() => import('./SettingsModal').then(m => ({ default: m.SettingsModal })));
 const FollowUpEmailModal = lazy(() => import('./FollowUpEmailModal').then(m => ({ default: m.FollowUpEmailModal })));
+const OfferActionHubModal = lazy(() => import('./OfferActionHubModal').then(m => ({ default: m.OfferActionHubModal })));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -55,6 +56,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
   const [selectedForMockInterview, setSelectedForMockInterview] = useState(null);
   const [selectedForOutreach, setSelectedForOutreach] = useState(null);
+  const [selectedForOfferHub, setSelectedForOfferHub] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
@@ -402,6 +404,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForOutreach;
   }, [selectedForOutreach, jobs]);
 
+  const liveSelectedForOfferHub = useMemo(() => {
+    if (!selectedForOfferHub) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForOfferHub.id)) ||
+      `${j.company}_${j.title}` === `${selectedForOfferHub.company}_${selectedForOfferHub.title}`
+    );
+    return match || selectedForOfferHub;
+  }, [selectedForOfferHub, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -524,6 +535,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
               onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
               onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+              onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
               profile={activeProfile}
               allJobs={jobs}
@@ -551,6 +563,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               job={selectedForMockInterview}
               profile={activeProfile}
               onClose={() => setSelectedForMockInterview(null)}
+            />
+          </Suspense>
+        )}
+
+        {selectedForOfferHub && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <OfferActionHubModal
+              isOpen={Boolean(selectedForOfferHub)}
+              onClose={() => setSelectedForOfferHub(null)}
+              job={selectedForOfferHub}
             />
           </Suspense>
         )}
@@ -977,6 +999,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   jobs={jobs}
                   onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
                   onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+                  onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
                   onSelectJob={(j) => setSelectedJob(j)}
                   onJobStatusUpdate={(id, status, extra) => updateJobStatus(id, status, extra)}
                 />
@@ -1048,6 +1071,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenMockInterview={(j) => { setSelectedJob(null); setSelectedForMockInterview(j); }}
               onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
               onOpenOutreach={(j) => { setSelectedJob(null); setSelectedForOutreach(j); }}
+              onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
               job={liveSelectedJob} 
               onClose={() => setSelectedJob(null)} 
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
@@ -1141,6 +1165,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <FollowUpEmailModal 
               job={liveSelectedForOutreach} 
               onClose={() => setSelectedForOutreach(null)} 
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Offer Action Hub Modal */}
+      {liveSelectedForOfferHub && (
+        <SafeErrorBoundary sectionName="Offer Action Hub" onClose={() => setSelectedForOfferHub(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <OfferActionHubModal 
+              job={liveSelectedForOfferHub} 
+              isOpen={Boolean(liveSelectedForOfferHub)}
+              onClose={() => setSelectedForOfferHub(null)} 
             />
           </Suspense>
         </SafeErrorBoundary>

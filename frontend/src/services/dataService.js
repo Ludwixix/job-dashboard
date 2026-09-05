@@ -3,7 +3,7 @@ import { buildQueriesFromProfile, triggerProfileScrape, SCRAPER_BASE_URL } from 
 
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-const getApiBase = () => {
+export const getApiBase = () => {
   return isLocalHost ? '' : (SCRAPER_BASE_URL || '');
 };
 

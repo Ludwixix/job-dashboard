@@ -5,7 +5,7 @@ import {
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
-  RefreshCw, Loader2
+  RefreshCw, Loader2, Scale
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -489,6 +489,17 @@ ${candidatePhone}`;
             <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-500"} />
             ASSETS & ACTIONS {hasGeneratedApplicationDocs(job) && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
           </button>
+
+          <div className="ml-auto flex items-center gap-2 pb-1.5">
+            <button
+              onClick={() => onOpenOfferHub?.(job)}
+              className="px-3 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+              title="Universal Compensation Benchmarking & Fair Work Contract Risk Scanner"
+            >
+              <Scale size={13} className="text-cyan-400" />
+              <span>OFFER ACTION HUB</span>
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Body */}
@@ -562,6 +573,14 @@ ${candidatePhone}`;
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onOpenOfferHub?.(job)}
+                      className="px-3.5 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
+                      title="Universal Compensation Benchmarking & Fair Work Contract Risk Scanner"
+                    >
+                      <Scale size={13} className="text-slate-950" />
+                      <span>OFFER ACTION HUB</span>
+                    </button>
                     <button
                       onClick={() => setShowPsychology(true)}
                       className="px-3 py-1.5 rounded-xl bg-teal-950/80 hover:bg-teal-900 text-teal-300 border border-teal-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"

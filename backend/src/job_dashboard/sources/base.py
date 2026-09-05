@@ -37,10 +37,10 @@ def detect_query_stream(term: str) -> str:
         return "finance"
     if re.search(r"construct|builder|site supervisor|site manager|carpenter|electrician|plumber|trade|whs|foreman|estimator|civil", lower):
         return "trades"
-    if re.search(r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend", lower):
-        return "technology"
     if re.search(r"legal|lawyer|counsel|paralegal|solicitor|barrister|litigat|compliance", lower):
         return "legal"
+    if re.search(r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend", lower):
+        return "technology"
     return "general"
 
 

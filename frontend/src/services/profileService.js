@@ -71,6 +71,8 @@ SYSTEMS ADMINISTRATOR — Dimension Data (2013 – 2017)
 - Administered multi-site Windows Server, VMware ESXi, and Active Directory environments.`
 };
 
+export const CANDIDATE_PROFILE = DEFAULT_USER_PROFILE;
+
 export const HEALTHCARE_PROFILE = {
   id: 'sarah_jenkins_rn',
   name: 'Sarah Jenkins',

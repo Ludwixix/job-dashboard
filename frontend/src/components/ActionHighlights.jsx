@@ -1,8 +1,8 @@
 import React from 'react';
-import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles, Scale } from 'lucide-react';
 import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 
-export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onSelectJob, onJobStatusUpdate }) => {
+export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onOpenOfferHub, onSelectJob, onJobStatusUpdate }) => {
   const [psychJob, setPsychJob] = React.useState(null);
   // Filter jobs that need action: Interviewing, Offer, or Package Prepared
   const actionJobs = jobs.filter(j => {
@@ -145,6 +145,15 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
                     >
                       <Sparkles size={14} />
                     </button>
+                    {onOpenOfferHub && (
+                      <button
+                        onClick={() => onOpenOfferHub(job)}
+                        className="py-2 px-3 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-cyan-500/30"
+                        title="Open Offer Action Hub (Benchmark & Contract Risks)"
+                      >
+                        <Scale size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={() => onSelectJob(job)}
                       className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"

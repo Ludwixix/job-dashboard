@@ -27,6 +27,7 @@ const AuthModal = lazy(() => import('./AuthModal').then(m => ({ default: m.AuthM
 const GoogleIntegrationModal = lazy(() => import('./GoogleIntegrationModal').then(m => ({ default: m.GoogleIntegrationModal })));
 const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ default: m.AutoApplyModal })));
 const SettingsModal = lazy(() => import('./SettingsModal').then(m => ({ default: m.SettingsModal })));
+const FollowUpEmailModal = lazy(() => import('./FollowUpEmailModal').then(m => ({ default: m.FollowUpEmailModal })));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -53,6 +54,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForGenerator, setSelectedForGenerator] = useState(null);
   const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
   const [selectedForMockInterview, setSelectedForMockInterview] = useState(null);
+  const [selectedForOutreach, setSelectedForOutreach] = useState(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
@@ -390,6 +392,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     );
     return match || selectedForMockInterview;
   }, [selectedForMockInterview, jobs]);
+
+  const liveSelectedForOutreach = useMemo(() => {
+    if (!selectedForOutreach) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForOutreach.id)) ||
+      `${j.company}_${j.title}` === `${selectedForOutreach.company}_${selectedForOutreach.title}`
+    );
+    return match || selectedForOutreach;
+  }, [selectedForOutreach, jobs]);
 
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
@@ -1036,6 +1047,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <JobModal
               onOpenMockInterview={(j) => { setSelectedJob(null); setSelectedForMockInterview(j); }}
               onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
+              onOpenOutreach={(j) => { setSelectedJob(null); setSelectedForOutreach(j); }}
               job={liveSelectedJob} 
               onClose={() => setSelectedJob(null)} 
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
@@ -1117,6 +1129,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <InterviewPrepModal 
               job={liveSelectedForInterviewPrep} 
               onClose={() => setSelectedForInterviewPrep(null)} 
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Outreach & Follow-Up Modal */}
+      {liveSelectedForOutreach && (
+        <SafeErrorBoundary sectionName="Recruiter Outreach & Follow-up" onClose={() => setSelectedForOutreach(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <FollowUpEmailModal 
+              job={liveSelectedForOutreach} 
+              onClose={() => setSelectedForOutreach(null)} 
             />
           </Suspense>
         </SafeErrorBoundary>

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
-  MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck,
+  MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
   RefreshCw, Loader2
@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -1692,7 +1692,8 @@ ${data.pipeline_result?.cover_text || ''}`;
                       <FileUser size={16} className="text-emerald-600" /> GENERATE TAILORED RESUME
                     </div>
                     <p className="text-[11px] font-semibold text-slate-600 mt-1 leading-relaxed">
-                      Explicitly customizes Sam Ludwig's enterprise credentials & M365 experience for {job.company}.
+                      Explicitly customizes {activeProfile?.name ? `${activeProfile.name}'s` : 'candidate'}{' '}
+                      {activeProfile?.industry || 'professional'} credentials for {job.company}.
                     </p>
                   </button>
 
@@ -1706,6 +1707,45 @@ ${data.pipeline_result?.cover_text || ''}`;
                     </div>
                     <p className="text-[11px] font-semibold text-slate-600 mt-1 leading-relaxed">
                       Drafts a high-impact executive cover letter targeting selection criteria for {job.title}.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Interview & Outreach Quick Actions */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 font-mono pt-1">
+                  <button
+                    onClick={() => { onClose(); if (onOpenInterviewPrep) onOpenInterviewPrep(job); }}
+                    className="p-3 rounded-2xl bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-black text-indigo-950 group-hover:text-indigo-700">
+                      <Target size={14} className="text-indigo-600" /> STAR PREP GUIDE
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      Sector-grounded question strategy &amp; talking points.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => { onClose(); if (onOpenMockInterview) onOpenMockInterview(job); }}
+                    className="p-3 rounded-2xl bg-amber-50/80 hover:bg-amber-100/90 border border-amber-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 group-hover:text-amber-700">
+                      <Zap size={14} className="text-amber-600" /> AI MOCK INTERVIEW
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      Live simulated interview with rubric scoring.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => { onClose(); if (onOpenOutreach) onOpenOutreach(job); }}
+                    className="p-3 rounded-2xl bg-teal-50/80 hover:bg-teal-100/90 border border-teal-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-black text-teal-950 group-hover:text-teal-700">
+                      <Mail size={14} className="text-teal-600" /> RECRUITER OUTREACH
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      Follow-up, cold pitch, or post-interview notes.
                     </p>
                   </button>
                 </div>

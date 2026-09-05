@@ -92,10 +92,10 @@ export const InterviewSuiteModal = ({
       const systemPrompt = `You are an elite executive talent psychologist, organizational diagnostician, and behavioral interview strategist.
 Your mission is to perform a deep psychoanalytic breakdown of this full job advertisement to uncover the hiring manager's unstated operational pressures, organizational vulnerabilities, covert expectations, and what candidate posture will dominate the interview.
 
-Candidate Context:
-- Candidate Archetype: ${candidateProfile.marketArchetype || candidateProfile.headline || 'Senior Technical Specialist'}
-- Superpowers: ${(candidateProfile.keyStrengths || []).join('; ') || 'Autonomous systems reliability, enterprise cloud architecture'}
+- Candidate Archetype: ${candidateProfile.marketArchetype || candidateProfile.headline || candidateProfile.title || 'Senior Professional Specialist'}
+- Superpowers: ${(candidateProfile.keyStrengths || []).join('; ') || (candidateProfile.coreSkills || []).slice(0, 5).join('; ') || 'Domain leadership, structured methodology, high reliability'}
 - Seniority: ${candidateProfile.seniorityLevel || 'Senior'}
+- Industry Domain: ${candidateProfile.industry || 'Professional Services'}
 
 Output a strictly valid JSON object matching this schema:
 {
@@ -595,6 +595,15 @@ ${fullJobText}`;
                 </div>
               ) : (
                 <>
+                  {mockSession?.stream && (
+                    <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-400">
+                      <span className="flex items-center gap-1.5 text-amber-400 font-bold uppercase">
+                        <Zap size={13} /> {mockSession.stream} SIMULATION TRACK
+                      </span>
+                      <span className="text-slate-400 font-medium">Question {messages.filter(m => m.role === 'interviewer').length} of {mockSession.total_questions || 5}</span>
+                    </div>
+                  )}
+
                   <div className="space-y-3 min-h-[220px]">
                     {messages.map((m, idx) => (
                       <div key={idx} className={`flex gap-3 ${m.role === 'candidate' ? 'flex-row-reverse' : ''}`}>

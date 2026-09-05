@@ -1,6 +1,7 @@
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { cleanDescriptionText } from './dataService';
 import { getBackendApiBase } from './apiConfig';
+import { getActiveProfile } from './profileService';
 
 /**
  * Validates whether a job record is valid and belongs in the Application Tracker.
@@ -167,27 +168,113 @@ export const getApplicationWorkflow = (job) => {
 };
 
 /**
- * Generates structured follow-up email content and mailto link.
+ * Generates structured follow-up, recruiter cold pitch, or thank-you outreach email.
  */
-export const generateFollowUpEmail = (job) => {
-  const title = job?.title || 'Technical Specialist';
+export const generateFollowUpEmail = (job, options = {}) => {
+  const profile = options.profile || getActiveProfile() || {};
+  const type = options.type || 'followup'; // 'followup' | 'recruiter_pitch' | 'thank_you'
+
+  const title = job?.title || profile?.title || 'Professional Specialist';
   const company = job?.company || 'the Hiring Organization';
-  const subject = `Application Follow-up: ${title} - Sam Ludwig`;
-  
-  const body = `Dear ${company} Hiring Team,
+  const candidateName = profile?.name || 'Candidate';
+  const candidateTitle = profile?.title || 'Professional Specialist';
+  const candidatePhone = profile?.phone || '';
+  const candidateEmail = profile?.email || '';
+  const candidateLocation = profile?.location || 'Melbourne, VIC';
+
+  const textToClassify = `${profile?.industry || ''} ${profile?.title || ''} ${title} ${company} ${job?.description || ''}`.toLowerCase();
+
+  let sector = 'technology';
+  if (/nurs|health|medic|clinic|patient|aged care|hospital|doctor|allied health|physio/i.test(textToClassify)) {
+    sector = 'healthcare';
+  } else if (/account|audit|cpa|\bca\b|tax|financ|bookkeep|payroll|ledger/i.test(textToClassify)) {
+    sector = 'finance';
+  } else if (/construct|builder|site supervisor|site manager|carpenter|trade|whs|foreman/i.test(textToClassify)) {
+    sector = 'trades';
+  } else if (/legal|lawyer|counsel|paralegal|solicitor|barrister|litigat/i.test(textToClassify)) {
+    sector = 'legal';
+  }
+
+  // Sector-tailored value hooks
+  let sectorHook = 'my professional expertise, structured execution, and domain background';
+  let sectorPitch = `I am a qualified professional with extensive experience delivering high-standard outcomes across ${profile?.industry || 'my field'}.`;
+  let sectorThankYou = 'particularly around your strategic direction and operational focus';
+
+  if (sector === 'healthcare') {
+    sectorHook = 'my acute clinical background, AHPRA-registered nursing standards, and patient safety commitment';
+    sectorPitch = 'As an AHPRA-registered healthcare professional with extensive clinical care and NSQHS governance experience, I am eager to contribute immediately to your patient care standards.';
+    sectorThankYou = 'particularly your commitment to compassionate patient care, clinical excellence, and supportive ward culture';
+  } else if (sector === 'finance') {
+    sectorHook = 'my statutory financial reporting background, AASB / IFRS compliance rigor, and ledger reconciliation expertise';
+    sectorPitch = 'As an accounting professional experienced in statutory financial reporting (AASB/IFRS), ERP systems, and internal controls, I can deliver immediate rigor to your finance team.';
+    sectorThankYou = 'particularly your financial reporting roadmap and commercial growth strategy';
+  } else if (sector === 'trades') {
+    sectorHook = 'my active site supervision background, subcontractor coordination, and SafeWork WHS compliance track record';
+    sectorPitch = 'Holding a valid White Card with a proven track record delivering building milestones safely and on schedule, I am well-prepared to oversee site operations.';
+    sectorThankYou = 'particularly regarding your upcoming project delivery pipeline and zero-harm safety standards';
+  } else if (sector === 'legal') {
+    sectorHook = 'my commercial contract negotiation background, regulatory compliance experience, and practical risk mitigation';
+    sectorPitch = 'As an admitted legal practitioner with deep experience in commercial contract drafting, regulatory advisory, and dispute mitigation, I provide commercially pragmatic counsel.';
+    sectorThankYou = 'particularly your proactive approach to balancing commercial deal velocity with sensible risk governance';
+  } else {
+    sectorHook = 'my enterprise systems administration, cloud architecture, and automation background';
+    sectorPitch = 'With a strong track record architecting resilient infrastructure, automating operational toil, and maintaining high SLA availability, I can deliver immediate value.';
+    sectorThankYou = 'particularly your technical automation vision and high-reliability systems standards';
+  }
+
+  const strengthsSnippet = (profile?.keyStrengths || []).slice(0, 2).join(' and ') ||
+    (profile?.coreSkills || []).slice(0, 4).join(', ') ||
+    'delivering reliable, high-impact results';
+
+  let subject = '';
+  let body = '';
+
+  const contactInfo = [candidatePhone, candidateEmail].filter(Boolean).join(' | ');
+  const signature = `Warm regards,\n${candidateName}\n${candidateTitle}${contactInfo ? `\n${contactInfo}` : ''}\n${candidateLocation}`;
+
+  if (type === 'recruiter_pitch') {
+    subject = `Introduction: ${candidateName} for ${title} — ${company}`;
+    body = `Dear ${company} Talent Acquisition Team,
+
+I hope you are having a productive week.
+
+I recently noted the ${title} opening at ${company} and wanted to reach out directly. ${sectorPitch}
+
+Throughout my career, I have focused on driving measurable outcomes, including ${strengthsSnippet}. I admire ${company}'s work and would welcome the opportunity to connect on how my background aligns with your team's immediate priorities.
+
+I have attached my tailored resume for your review. Would you be open to a brief 10-minute introductory discussion this week?
+
+Thank you for your time and consideration.
+
+${signature}`;
+  } else if (type === 'thank_you') {
+    subject = `Thank You: Interview Discussion for ${title} — ${candidateName}`;
+    body = `Dear ${company} Hiring Team,
+
+Thank you very much for your time and the insightful discussion today regarding the ${title} role with ${company}.
+
+I thoroughly enjoyed learning more about your team's current initiatives and upcoming priorities. Our conversation strongly reinforced my enthusiasm for the opportunity, ${sectorThankYou}.
+
+Please let me know if there are any further project references, portfolio examples, or materials I can provide to support the process.
+
+I look forward to the next steps.
+
+${signature}`;
+  } else {
+    // Default: Application follow-up
+    subject = `Application Follow-up: ${title} — ${candidateName}`;
+    body = `Dear ${company} Hiring Team,
 
 I hope this note finds you well.
 
-I am following up on my recent application for the ${title} position with ${company}. I remain very enthusiastic about the role and confident that my enterprise systems administration, Azure/M365 cloud architecture, and technical support background will deliver immediate value to your team.
+I am following up on my recent application for the ${title} position with ${company}. I remain very enthusiastic about the role and confident that ${sectorHook} will deliver immediate value to your team.
 
-Please let me know if there are any further details, project references, or materials I can provide to support my application.
+Please let me know if there are any further details, project references, or documentation I can provide to support my application.
 
 Thank you very much for your time and consideration. I look forward to speaking with you.
 
-Warm regards,
-Sam Ludwig
-0405 993 245 | sam.ludwig@gmail.com
-Balaclava VIC 3183`;
+${signature}`;
+  }
 
   const contactEmail = job?.contactEmail || '';
   const mailtoUrl = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -196,7 +283,9 @@ Balaclava VIC 3183`;
     subject,
     body,
     mailtoUrl,
-    contactEmail
+    contactEmail,
+    type,
+    sector
   };
 };
 

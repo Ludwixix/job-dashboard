@@ -620,56 +620,260 @@ export const fetchDocumentFromBackend = async (jobId, docType = 'resume', userId
 /**
  * Generate Structured Interview Briefing and Study Guide
  */
-export const generateInterviewGuide = async (job, onProgress) => {
+export const generateInterviewGuide = async (job, onProgress, profileOverride = null) => {
   onProgress?.('Analyzing role specifications and candidate metrics...');
+  const candidateProfile = profileOverride || getActiveProfile() || CANDIDATE_PROFILE;
   const atsScore = calculateAtsScore(job.notes || job.description || '');
   const keywords = extractJobKeywords(job.notes || job.description || '');
 
-  const questions = [
-    {
-      type: 'Technical Challenge',
-      question: `How would you architect and automate endpoint compliance for 500+ remote workers using Intune and Autopilot?`,
-      answerStrategy: `Highlight St John of God migration (100+ clinical endpoints with zero downtime) and Capgemini automated PnP PowerShell auditing across 200+ sites. Emphasize SOE compliance and ACSC Essential 8 baseline.`,
-      keyMetric: '100+ endpoints / zero disruption'
-    },
-    {
-      type: 'Incident / SLA Management',
-      question: `Describe a situation where you had to manage a critical production outage under strict SLA pressure.`,
-      answerStrategy: `Use the STAR format detailing the Department of Education VIC SharePoint farm (660,000+ users, 99.9% uptime). Explain root cause analysis (RCA) method that resulted in a permanent 15% reduction in repeat incidents.`,
-      keyMetric: '660k users / 99.9% uptime'
-    },
-    {
-      type: 'Process Automation & Optimization',
-      question: `Give an example of how you used scripting to eliminate repetitive operational toil.`,
-      answerStrategy: `Reference the Knosys migration automation where you authored PowerShell scripts cutting batch processing time by 87% (from 2 hours down to 15 minutes per batch), and the ServiceNow keystroke automation for Australia Post.`,
-      keyMetric: '87% time reduction (2h → 15m)'
-    },
-    {
-      type: 'Stakeholder & Communication',
-      question: `How do you bridge technical engineering requirements with non-technical business or clinical stakeholders?`,
-      answerStrategy: `Discuss liaising between clinical healthcare staff and engineering teams for EMR/PACS compatibility at St John of God, ensuring patient care was never impacted during live enterprise rollouts.`,
-      keyMetric: '100% SOE compliance in live hospital'
-    }
-  ];
+  const jobText = `${job?.title || ''} ${job?.description || ''} ${job?.notes || ''}`.toLowerCase();
+  const profileText = `${candidateProfile?.industry || ''} ${candidateProfile?.title || ''}`.toLowerCase();
+
+  let sector = 'technology';
+  if (/nurs|health|medic|clinic|patient|aged care|hospital|doctor|allied health|physio/i.test(jobText)) {
+    sector = 'healthcare';
+  } else if (/construct|builder|site supervisor|site manager|carpenter|trade|whs|foreman|estimator|civil/i.test(jobText)) {
+    sector = 'trades';
+  } else if (/account|cpa|\bca\b|tax|financ|bookkeep|payroll|ledger|audit|treasury/i.test(jobText)) {
+    sector = 'finance';
+  } else if (/legal|lawyer|counsel|paralegal|solicitor|barrister|litigat/i.test(jobText)) {
+    sector = 'legal';
+  } else if (/nurs|health|medic|clinic|patient|aged care|hospital|doctor|allied health|physio/i.test(profileText)) {
+    sector = 'healthcare';
+  } else if (/construct|builder|site supervisor|site manager|carpenter|trade|whs|foreman|estimator|civil/i.test(profileText)) {
+    sector = 'trades';
+  } else if (/account|cpa|\bca\b|tax|financ|bookkeep|payroll|ledger|audit|treasury/i.test(profileText)) {
+    sector = 'finance';
+  } else if (/legal|lawyer|counsel|paralegal|solicitor|barrister|litigat/i.test(profileText)) {
+    sector = 'legal';
+  }
+
+  const isSectorMatch = candidateProfile?.industry && (
+    (sector === 'healthcare' && /health|nurs|medic/i.test(candidateProfile.industry)) ||
+    (sector === 'finance' && /financ|account/i.test(candidateProfile.industry)) ||
+    (sector === 'trades' && /trade|construct/i.test(candidateProfile.industry)) ||
+    (sector === 'legal' && /legal|law/i.test(candidateProfile.industry)) ||
+    (sector === 'technology' && /tech|it|engineer/i.test(candidateProfile.industry))
+  );
+
+  let questions = [];
+  let talkingPoints = [];
+  let recommendedQuestionsToAsk = [];
+
+  if (sector === 'healthcare') {
+    questions = [
+      {
+        type: 'Clinical Acuity & Rapid Response',
+        question: `Describe a clinical situation where a patient deteriorated rapidly under your care. How did you assess, escalate, and stabilize them?`,
+        answerStrategy: `Use the STAR format detailing rapid MET call activation, structured ISBAR clinical handover to the medical registrar, and immediate airway/breathing/circulation stabilization per AHPRA & NSQHS protocols.`,
+        keyMetric: 'Immediate MET activation / 100% vital stabilization'
+      },
+      {
+        type: 'Medication Safety & Clinical Governance',
+        question: `How do you ensure zero medication administration errors and strict NSQHS compliance during high-turnover shift handovers?`,
+        answerStrategy: `Detail independent 5-rights double verification, meticulous clinical documentation in electronic medical records (EMR), and adherence to NSQHS Standard 4 (Medication Safety).`,
+        keyMetric: 'Zero dispensing errors / 100% NSQHS compliance'
+      },
+      {
+        type: 'Patient & Family Advocacy',
+        question: `How do you handle difficult de-escalation with an anxious patient or distressed family members regarding care planning?`,
+        answerStrategy: `Highlight compassionate active listening, clear plain-language clinical explanation, de-escalation techniques, and collaborative coordination with senior medical staff.`,
+        keyMetric: 'Proven patient advocacy & compassionate resolution'
+      },
+      {
+        type: 'Multidisciplinary Coordination',
+        question: `Give an example of collaborating with allied health, medical officers, and discharge coordinators to navigate a complex patient discharge.`,
+        answerStrategy: `Discuss liaising across multidisciplinary specialists to ensure post-acute community support, comprehensive discharge summaries, and minimizing readmission risk.`,
+        keyMetric: 'On-schedule discharge / zero preventable readmission'
+      }
+    ];
+    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
+      ? candidateProfile.interviewTalkingPoints
+      : [
+          'AHPRA Registered Nurse with comprehensive clinical experience across acute and community settings',
+          'Rigorous adherence to NSQHS National Safety and Quality Health Service Standards',
+          'Proficient in electronic health record (EMR/eMR) clinical documentation and ISBAR handover',
+          'Advanced clinical assessment, patient advocacy, and emergency MET call escalation protocols',
+          'Unrestricted Australian work rights, complete immunisation compliance, and valid WWCC/police check'
+        ];
+    recommendedQuestionsToAsk = [
+      'What is the standard nurse-to-patient staffing ratio across shifts on this ward?',
+      'Which electronic medical record (EMR) platform and clinical handover workflow does the unit currently utilise?',
+      'What continuing professional development and clinical specialization pathways does the organization support?'
+    ];
+  } else if (sector === 'finance') {
+    questions = [
+      {
+        type: 'Statutory Close & AASB / IFRS Compliance',
+        question: `Walk through your methodology for managing a high-pressure month-end or year-end financial close while ensuring strict AASB / IFRS compliance.`,
+        answerStrategy: `Detail balance sheet reconciliations, variance analysis, accruals, and internal audit compliance under Australian Accounting Standards Board (AASB) frameworks.`,
+        keyMetric: '100% on-time month-end close / clean audit opinion'
+      },
+      {
+        type: 'Variance Analysis & Operational Margin',
+        question: `Describe a situation where you identified a significant budget-to-actual expenditure variance and partnered with department heads to resolve it.`,
+        answerStrategy: `Explain conducting deep-dive ledger variance analysis, isolating root causes in operational spend, and establishing corrective forecast models that preserved departmental margins.`,
+        keyMetric: 'Identified 12%+ budget variance / protected margin'
+      },
+      {
+        type: 'ERP Systems & Process Automation',
+        question: `How have you utilized ERP platforms (SAP, Xero, MYOB) or spreadsheet automation to eliminate manual reconciliation errors?`,
+        answerStrategy: `Discuss authoring automated reconciliations, streamlining general ledger postings, and integrating sub-ledger data to cut reporting turnaround cycles.`,
+        keyMetric: 'Cut reconciliation cycle time by 40%+'
+      },
+      {
+        type: 'Executive Financial Communication',
+        question: `How do you present complex financial models and P&L results to non-financial executives to guide commercial strategy?`,
+        answerStrategy: `Highlight converting complex financial statements into high-level dashboard summaries with clear commercial risk-benefit trade-offs.`,
+        keyMetric: 'Executive consensus on strategic annual budget'
+      }
+    ];
+    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
+      ? candidateProfile.interviewTalkingPoints
+      : [
+          'CPA / CA qualified financial specialist with proven track record in end-to-end statutory reporting',
+          'Deep expertise in AASB / IFRS standards, ATO compliance, and Australian Business Activity Statements (BAS)',
+          'Proficient across enterprise ERP systems (SAP, Xero, MYOB) and advanced financial modeling',
+          'Demonstrated capability managing multi-million-dollar ledger reconciliations and clean internal audits'
+        ];
+    recommendedQuestionsToAsk = [
+      'What does the company\'s financial systems and automation roadmap look like over the next 12 months?',
+      'How are budget variance reviews structured between finance and operational business units?',
+      'What are the primary strategic objectives for the finance team heading into the upcoming fiscal year?'
+    ];
+  } else if (sector === 'trades') {
+    questions = [
+      {
+        type: 'WHS Safety & SWMS Hazard Intervention',
+        question: `Describe a situation on an active worksite where you identified a high-risk safety violation or SWMS non-compliance. How did you intervene?`,
+        answerStrategy: `Detail issuing an immediate stop-work directive, reviewing the subcontractor\'s Safe Work Method Statement (SWMS), and conducting a mandatory pre-start safety briefing.`,
+        keyMetric: 'Zero lost-time injuries (LTI) across project lifecycle'
+      },
+      {
+        type: 'Critical Path & Weather Delay Recovery',
+        question: `How do you manage critical path delays caused by inclement weather or material supply chain bottlenecks to maintain handover milestones?`,
+        answerStrategy: `Discuss resequencing concurrent trade packages, adjusting site working hours safely, and communicating milestone adjustments with client project managers.`,
+        keyMetric: 'Recovered 2-week weather delay to achieve on-time handover'
+      },
+      {
+        type: 'Pre-Handover QA & Defect Rectification',
+        question: `Walk through your process for conducting pre-handover quality inspections and enforcing subcontractor defect rectification.`,
+        answerStrategy: `Explain utilizing digital defect tracking platforms (Procore / PlanGrid) to enforce sign-offs and ensure zero outstanding defect notices at Practical Completion.`,
+        keyMetric: '100% defect-free handover at Practical Completion'
+      },
+      {
+        type: 'Cost Tracking & Variation Control',
+        question: `How do you track site expenditure against bill of quantities and verify progress claims to prevent margin erosion?`,
+        answerStrategy: `Describe assessing subcontractor progress claims on-site against actual physical completion and enforcing formal variation approvals before work commences.`,
+        keyMetric: 'Prevented unauthorized variation scope creep'
+      }
+    ];
+    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
+      ? candidateProfile.interviewTalkingPoints
+      : [
+          'Licensed site leader with valid CPCCWHS1001 White Card and comprehensive SafeWork WHS governance',
+          'Proven track record delivering commercial and residential building packages on time and on budget',
+          'Expertise in subcontractor trade sequencing, SWMS reviews, and digital site management platforms',
+          'Zero-harm safety culture with exemplary incident-free track record'
+        ];
+    recommendedQuestionsToAsk = [
+      'What digital project and safety management tools (e.g. Procore, HammerTech) are standardized across your sites?',
+      'How does the company manage subcontractor pre-qualification and quality assurance benchmarks?',
+      'What is the upcoming project pipeline across the next 12 to 24 months?'
+    ];
+  } else if (sector === 'legal') {
+    questions = [
+      {
+        type: 'Contractual Risk & Indemnity Negotiation',
+        question: `When negotiating high-stakes commercial agreements, how do you handle aggressive indemnity and liability cap pushback from counterparties?`,
+        answerStrategy: `Explain risk-based negotiation, structuring mutual liability caps aligned with contract value, and carving out gross negligence and confidentiality breaches.`,
+        keyMetric: 'Mitigated enterprise liability while closing multi-million contract'
+      },
+      {
+        type: 'Regulatory Compliance & Australian Consumer Law',
+        question: `How do you advise commercial marketing and product teams to ensure new offerings strictly comply with Australian Consumer Law (ACL)?`,
+        answerStrategy: `Detail reviewing promotional claims against misleading or deceptive conduct standards (Section 18 ACL) and establishing compliant customer terms.`,
+        keyMetric: '100% compliance record with zero regulatory notices'
+      },
+      {
+        type: 'Commercial Dispute Resolution',
+        question: `Describe a contentious supplier or customer dispute you resolved without resorting to formal litigation.`,
+        answerStrategy: `Detail pre-litigation correspondence, objective contract interpretation, and leading commercial negotiation that preserved business relationships.`,
+        keyMetric: 'Resolved commercial dispute saving $150k+ in legal costs'
+      },
+      {
+        type: 'Executive Risk Advisory',
+        question: `How do you balance legal risk mitigation with commercial imperatives when business leaders are pressing for rapid deal execution?`,
+        answerStrategy: `Discuss presenting executive summaries with red-amber-green risk matrices and commercial alternatives rather than simply saying "no".`,
+        keyMetric: 'Maintained 48-hour contract review SLA for priority deals'
+      }
+    ];
+    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
+      ? candidateProfile.interviewTalkingPoints
+      : [
+          'Admitted Legal Practitioner with current Australian Practising Certificate',
+          'Extensive experience drafting, negotiating, and risk-profiling complex commercial contracts',
+          'Deep knowledge of Australian Consumer Law, Corporations Act, privacy, and regulatory frameworks',
+          'Commercially pragmatic legal partner trusted by executive and commercial leadership'
+        ];
+    recommendedQuestionsToAsk = [
+      'How is the legal function integrated into commercial contract workflows and sales approval gates?',
+      'What contract lifecycle management (CLM) or legal ops software does the in-house team use?',
+      'What is the balance between in-house legal handling versus external counsel panel engagement?'
+    ];
+  } else {
+    // Default Technology & Engineering
+    questions = [
+      {
+        type: 'Technical Challenge & Infrastructure',
+        question: `How would you architect and automate endpoint compliance for distributed or hybrid cloud infrastructure?`,
+        answerStrategy: `Highlight multi-cloud migration and automation experience, emphasizing zero downtime, SOE compliance, and security baseline adherence.`,
+        keyMetric: 'Zero downtime / 100% SOE compliance'
+      },
+      {
+        type: 'Incident / SLA Management',
+        question: `Describe a situation where you had to manage a critical production outage under strict SLA pressure.`,
+        answerStrategy: `Use the STAR format detailing root cause analysis (RCA) and preventative automation that permanently eliminated repeat incidents.`,
+        keyMetric: '99.9% uptime / fast SLA restoration'
+      },
+      {
+        type: 'Process Automation & Optimization',
+        question: `Give an example of how you used scripting or Infrastructure-as-Code to eliminate repetitive operational toil.`,
+        answerStrategy: `Reference authoring modular automation scripts cutting processing times and removing human error from provisioning pipelines.`,
+        keyMetric: '80%+ reduction in manual processing time'
+      },
+      {
+        type: 'Stakeholder & Communication',
+        question: `How do you bridge technical engineering requirements with non-technical business or executive stakeholders?`,
+        answerStrategy: `Discuss translating engineering trade-offs into commercial business impact, ensuring business operations run without disruption.`,
+        keyMetric: 'Seamless stakeholder alignment'
+      }
+    ];
+    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
+      ? candidateProfile.interviewTalkingPoints
+      : [
+          'Enterprise infrastructure specialist with proven experience in hybrid cloud and automated systems',
+          'ACSC Essential 8 & ISO 27001 security compliance operationalization',
+          'Extensive automation track record eliminating repetitive toil through scripting and IaC',
+          'Australian Citizen with security clearance readiness',
+          'Proven ability to maintain 99.9%+ system availability in SLA environments'
+        ];
+    recommendedQuestionsToAsk = [
+      'What does the current IT automation and cloud roadmap look like over the next 12 months?',
+      'How does the team currently measure and enforce security maturity and SLA reliability?',
+      'What are the primary friction points in your current incident response and L3 escalation workflows?'
+    ];
+  }
 
   return {
     jobTitle: job.title,
     company: job.company,
     atsScore,
     keywords,
+    sector,
     questions,
-    talkingPoints: [
-      '660,000+ user SharePoint farm administration (largest in Southern Hemisphere)',
-      'ACSC Essential 8 & ISO 27001 security compliance operationalization',
-      '87% reduction in batch automation processing times via custom PowerShell',
-      'Australian Citizen with NV1/Baseline clearance readiness',
-      'Dual expertise in modern cloud (Azure/M365) and legacy hybrid AD infrastructure'
-    ],
-    recommendedQuestionsToAsk: [
-      'What does the current IT automation roadmap look like over the next 12 months?',
-      'How does the team currently measure and enforce ACSC Essential 8 / security maturity?',
-      'What are the primary friction points in your current incident response and L3 escalation workflows?'
-    ]
+    talkingPoints,
+    recommendedQuestionsToAsk
   };
 };
 

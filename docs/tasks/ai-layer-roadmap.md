@@ -390,3 +390,39 @@ Delivers full-stack multi-industry onboarding, dynamic query discovery, and CLI 
 - `frontend/src/components/__tests__/ProfileModal.test.jsx`: Added unit test verifying 1-click starter template loading.
 - Full regression test gauntlet: 156 backend pytest tests and 68 frontend vitest tests pass (100% pass rate).
 
+---
+
+## Phase 13: Multi-Industry Interview Suite & Automated Cold-Outreach System
+
+**Status**: ✅ Complete — Implemented, tested, built, and ready for deployment
+**Deployed**: 2026-09-06
+
+### Overview
+
+Delivers universal multi-industry parity across the interview preparation, mock simulator, and recruiter outreach lifecycle:
+1. **Multi-Industry Mock Interview Simulator (`interview_simulator.py`)**:
+   - Implemented dynamic industry question banks across 5 core sectors (`healthcare`, `finance`, `trades`, `legal`, `technology`, plus `general` fallback).
+   - Replaced broken cache call with robust in-memory question caching (`self._question_cache`).
+   - Implemented deterministic STAR rubric evaluation scoring situation, action, result, metrics, and sector-grounded proof markers (`AHPRA`, `NSQHS`, `ISBAR`, `AASB`, `IFRS`, `ATO`, `SWMS`, `SafeWork`, `ACL`, `Essential 8`).
+2. **Dynamic Multi-Industry Prep Guides (`generationService.js`)**:
+   - Upgraded `generateInterviewGuide` with sector-grounded scenario questions, answer strategies, target metrics, and smart questions to ask employers.
+   - Guarded candidate profile talking points with `isSectorMatch` to prevent persona cross-contamination when inspecting jobs outside the candidate's primary sector.
+3. **3-Mode Outreach & Communication Suite (`trackerService.js`, `FollowUpEmailModal.jsx`)**:
+   - Engineered three distinct communication modes:
+     * `followup`: Application status follow-up referencing specific value alignment and credentials.
+     * `recruiter_pitch`: Proactive cold recruiter outreach highlighting quantifiable outcomes and requesting an introductory discussion.
+     * `thank_you`: Post-interview gratitude note reinforcing conversation highlights and offering supplementary materials.
+   - Generates dynamic candidate signatures and industry-tailored value hooks.
+   - Interactive UI with top tab switcher, sector indicator, 1-click clipboard copy, and native mailto launch.
+4. **Seamless Action Triggers in Job Modal & Dashboard (`JobModal.jsx`, `Dashboard.jsx`, `InterviewSuiteModal.jsx`)**:
+   - Added `STAR PREP GUIDE`, `AI MOCK INTERVIEW`, and `RECRUITER OUTREACH` quick-action triggers to `JobModal.jsx`.
+   - Wired `FollowUpEmailModal` in `Dashboard.jsx` with active job context and live candidate profile signatures.
+   - Grounded candidate superpowers and archetype display in `InterviewSuiteModal.jsx`.
+
+### Test Coverage
+- `backend/tests/test_interview_simulator.py`: 6 tests validating question bank generation, answer submission, and STAR rubric feedback across Healthcare, Finance, Trades, Legal, and Tech.
+- `frontend/src/components/__tests__/FollowUpEmailModal.test.jsx`: 3 tests verifying mode switching, candidate signature rendering, and clipboard actions.
+- `frontend/src/services/__tests__/interviewAndOutreach.test.js`: 7 tests validating interview guide questions, talking points isolation, and outreach email generation across all 3 modes.
+- Full regression test gauntlet: 162 backend pytest tests and 78 frontend vitest tests pass (100% pass rate, 0 lint errors).
+
+

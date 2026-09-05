@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
-import { Mail, Copy, Check, ExternalLink, X, Send, Clock, Building2 } from 'lucide-react';
+import { Mail, Copy, Check, X, Send, Sparkles, UserCheck, MessageSquareQuote } from 'lucide-react';
 import { generateFollowUpEmail } from '../services/trackerService';
 
-export const FollowUpEmailModal = ({ job, onClose }) => {
-  const emailData = generateFollowUpEmail(job);
+export const FollowUpEmailModal = ({ job, onClose, initialMode = 'followup' }) => {
+  const [activeMode, setActiveMode] = useState(initialMode); // 'followup' | 'recruiter_pitch' | 'thank_you'
+
+  const emailData = generateFollowUpEmail(job, { type: activeMode });
   const [recipient, setRecipient] = useState(emailData.contactEmail || '');
   const [subject, setSubject] = useState(emailData.subject);
   const [body, setBody] = useState(emailData.body);
   const [copied, setCopied] = useState(false);
 
+  const handleModeSwitch = (newMode) => {
+    setActiveMode(newMode);
+    const updated = generateFollowUpEmail(job, { type: newMode });
+    setSubject(updated.subject);
+    setBody(updated.body);
+  };
+
   const handleCopy = () => {
-    const fullText = `To: ${recipient || '[Hiring Team Email]'}\nSubject: ${subject}\n\n${body}`;
+    const fullText = `To: ${recipient || '[Hiring Team / Recruiter]'}\nSubject: ${subject}\n\n${body}`;
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -20,16 +29,21 @@ export const FollowUpEmailModal = ({ job, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 font-sans">
-      <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden text-slate-100">
+      <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden text-slate-100">
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-2xl border border-indigo-400/30">
               <Mail size={20} />
             </div>
             <div>
-              <div className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
-                FOLLOW-UP OUTREACH GENERATOR
+              <div className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                <span>OUTREACH &amp; COMMUNICATION SUITE</span>
+                {emailData.sector && (
+                  <span className="px-1.5 py-0.2 rounded bg-indigo-950/80 border border-indigo-500/40 text-[9px] text-indigo-300">
+                    {emailData.sector.toUpperCase()}
+                  </span>
+                )}
               </div>
               <h3 className="text-base font-black text-white">{job.title}</h3>
               <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
@@ -44,6 +58,45 @@ export const FollowUpEmailModal = ({ job, onClose }) => {
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <X size={18} />
+          </button>
+        </div>
+
+        {/* Outreach Mode Switcher */}
+        <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 pt-2.5 gap-2 font-mono text-xs font-bold overflow-x-auto">
+          <button
+            onClick={() => handleModeSwitch('followup')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeMode === 'followup'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`}
+          >
+            <Mail size={13} />
+            <span>APPLICATION FOLLOW-UP</span>
+          </button>
+
+          <button
+            onClick={() => handleModeSwitch('recruiter_pitch')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeMode === 'recruiter_pitch'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles size={13} />
+            <span>RECRUITER COLD PITCH</span>
+          </button>
+
+          <button
+            onClick={() => handleModeSwitch('thank_you')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeMode === 'thank_you'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`}
+          >
+            <UserCheck size={13} />
+            <span>POST-INTERVIEW THANK YOU</span>
           </button>
         </div>
 
@@ -98,7 +151,7 @@ export const FollowUpEmailModal = ({ job, onClose }) => {
             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer border border-slate-700"
           >
             {copied ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
-            <span>{copied ? 'COPIED TO CLIPBOARD' : 'COPY FULL EMAIL'}</span>
+            <span>{copied ? 'COPIED TO CLIPBOARD' : 'COPY FULL OUTREACH'}</span>
           </button>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">

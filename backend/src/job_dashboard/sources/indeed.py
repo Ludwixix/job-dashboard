@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Mapping
@@ -234,7 +235,13 @@ def _indeed_record(row: Any, query: SearchQuery) -> dict[str, Any]:
     desc = clean_description(row.get("description", ""))
     if not desc:
         desc = f"{title} at {company} in {location}. Full position description and direct application available on Indeed Australia."
+    job_id = str(row.get("id", "") or "").strip()
+    if not job_id and "jk=" in url:
+        match = re.search(r"jk=([a-zA-Z0-9]+)", url)
+        if match:
+            job_id = f"indeed-{match.group(1)}"
     return {
+        "id": job_id,
         "title": title,
         "company": company,
         "location": location,
@@ -275,7 +282,7 @@ _INDEED_EXTRACTOR = """() => {
             company: company,
             location: location,
             description: snippet,
-            url: url ? url.split('?')[0] : '',
+            url: url || '',
             salary: salary,
             posted: rawDate,
             remote: /remote|hybrid/i.test((title + ' ' + location + ' ' + snippet).toLowerCase())

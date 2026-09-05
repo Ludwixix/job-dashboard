@@ -125,6 +125,30 @@ export const isJobAdUrl = (url) => {
 };
 
 /**
+ * Sanitizes job URLs by stripping tracking parameters (UTM, click IDs) while
+ * preserving essential identity parameters such as Indeed's '?jk=' query key.
+ */
+export const cleanJobUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let s = rawUrl.trim().split('#')[0];
+  if (s.includes('?')) {
+    const [base, qs] = s.split('?', 2);
+    const trackingParams = new Set([
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'fbclid', 'gclid', 'msclkid', 'ref', 'source', 'spm', 'from', 'xptdk',
+      'cmpid', 'fromage', 'pub', 'vsk'
+    ]);
+    const kept = qs.split('&').filter(kv => {
+      if (!kv) return false;
+      const paramName = kv.split('=')[0].toLowerCase();
+      return !trackingParams.has(paramName);
+    });
+    s = kept.length > 0 ? `${base}?${kept.join('&')}` : base;
+  }
+  return s.replace(/\/+$/, '');
+};
+
+/**
  * Resolves a direct job ad URL
  */
 export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '') => {
@@ -607,14 +631,14 @@ export const fetchJobsData = async () => {
 
   for (const rawJob of (apiJobsResult.jobs || [])) {
     const job = { ...rawJob };
-    const rawUrl = String(job.portalLink || job.link || job.url || '').split('?')[0].split('#')[0].trim();
+    const cleanUrl = cleanJobUrl(job.portalLink || job.link || job.url || '');
     const normKey = normalizeJobKey(job.company, job.title);
 
     // Skip true duplicates
-    if (rawUrl && seenUrls.has(rawUrl)) continue;
+    if (cleanUrl && seenUrls.has(cleanUrl)) continue;
     if (normKey && normKey !== '__' && seenNormKeys.has(normKey)) continue;
 
-    if (rawUrl) seenUrls.add(rawUrl);
+    if (cleanUrl) seenUrls.add(cleanUrl);
     if (normKey && normKey !== '__') seenNormKeys.add(normKey);
 
     // Check if user has an active application or customization for this job

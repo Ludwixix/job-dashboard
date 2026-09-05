@@ -58,49 +58,119 @@ export const getQuickApplyPlatform = (job) => {
 };
 
 /**
- * Resolves standard pre-employment screening questions using candidate profile
+ * Resolves standard and sector-specific pre-employment screening questions using candidate profile and job context
  */
 export const resolveScreeningQuestions = (job, candidateProfile) => {
-  const profile = candidateProfile || getActiveProfile();
-  
-  return [
+  const profile = candidateProfile || getActiveProfile() || {};
+  const industry = String(profile.industry || job?.industry || job?.stream || '').toLowerCase();
+  const title = String(job?.title || '').toLowerCase();
+
+  const isHealth = industry.includes('health') || industry.includes('medical') ||
+    title.includes('nurse') || title.includes('clinical') || title.includes('hospital') || title.includes('care');
+  const isFinance = industry.includes('finance') || industry.includes('account') ||
+    title.includes('accountant') || title.includes('cpa') || title.includes('audit') || title.includes('payroll');
+  const isConstruction = industry.includes('construction') || industry.includes('trade') ||
+    title.includes('builder') || title.includes('site') || title.includes('carpenter') || title.includes('trades');
+  const isLegal = industry.includes('legal') || industry.includes('law') ||
+    title.includes('solicitor') || title.includes('lawyer') || title.includes('counsel');
+
+  const baseQuestions = [
     {
       category: 'Work Rights & Legal Status',
       question: 'Are you legally entitled / authorized to work in Australia?',
-      answer: profile.workRights || 'Australian Citizen (Unrestricted Full Rights)',
+      answer: profile.workRights || 'Australian Citizen (Unrestricted Full Working Rights)',
       confidence: 100
     },
     {
-      category: 'Security Clearance',
-      question: 'Do you hold or are you eligible for Australian Government Security Clearance?',
-      answer: profile.clearance || 'Baseline / NV1 Ready (Eligible for Immediate Vetting)',
-      confidence: 98
-    },
-    {
       category: 'Location & Commute',
-      question: 'Current residential location & willingness to commute/attend on-site?',
-      answer: `${profile.location || 'Balaclava VIC 3183 / Melbourne'} (Immediate commute access)`,
+      question: 'Current residential location & willingness to commute / attend on-site?',
+      answer: `${profile.location || job?.location || 'Melbourne, VIC'} (Direct commute access within standard transit corridor)`,
       confidence: 99
     },
     {
       category: 'Availability & Notice Period',
       question: 'What is your notice period / earliest available start date?',
-      answer: 'Immediate / <2 Weeks Notice',
+      answer: profile.availability || 'Immediate / <2 Weeks Notice',
       confidence: 100
     },
     {
       category: 'Target Remuneration',
-      question: 'Expected annual salary / hourly contract rate?',
-      answer: job.salary || profile.targetSalary || '$115,000 + Super',
+      question: 'Expected annual salary / remuneration package?',
+      answer: job?.salary || profile.targetSalary || 'Market Competitive Remuneration',
       confidence: 95
-    },
-    {
-      category: 'Core Qualifications & Driver Licence',
-      question: 'Do you hold a valid Australian Driver Licence and clear National Police Check?',
-      answer: 'Yes (Valid Victorian Full Driver Licence & Clean Police Check)',
-      confidence: 100
     }
   ];
+
+  // Sector-specific credentials and screening checks
+  if (isHealth) {
+    baseQuestions.splice(1, 0, {
+      category: 'Professional AHPRA Registration',
+      question: 'Do you hold current unrestricted registration with AHPRA?',
+      answer: profile.ahpraRegistration || 'Yes (Current Unrestricted AHPRA Registration)',
+      confidence: 100
+    });
+    baseQuestions.push({
+      category: 'Clinical Compliance & Immunisations',
+      question: 'Do you hold a current WWCC, National Police Check, and current immunisations/CPR?',
+      answer: 'Yes (Current WWCC, Clean Police Check, Compliant Immunisation Record & CPR)',
+      confidence: 100
+    });
+  } else if (isFinance) {
+    baseQuestions.splice(1, 0, {
+      category: 'Professional Accounting Qualification',
+      question: 'Are you a qualified CPA or CA member in Australia?',
+      answer: profile.accountingQualification || 'Yes (CPA / CA Qualified with Australian Reporting Standards)',
+      confidence: 98
+    });
+    baseQuestions.push({
+      category: 'ERP Systems & Statutory Reporting',
+      question: 'What is your experience with ERP platforms (SAP, Xero, MYOB) and statutory tax/BAS?',
+      answer: 'Proficient in ERP administration, financial reconciliation, and ATO compliance',
+      confidence: 96
+    });
+  } else if (isConstruction) {
+    baseQuestions.splice(1, 0, {
+      category: 'Site Safety & Induction',
+      question: 'Do you hold a current General Construction Induction Card (White Card)?',
+      answer: 'Yes (Valid Australian White Card & Relevant Trade Qualification)',
+      confidence: 100
+    });
+    baseQuestions.push({
+      category: 'Licensing & OHS Compliance',
+      question: 'Do you have a valid Australian Driver Licence and relevant OHS certificates?',
+      answer: 'Yes (Valid Australian Full Driver Licence & SafeWork OHS SWMS compliance)',
+      confidence: 100
+    });
+  } else if (isLegal) {
+    baseQuestions.splice(1, 0, {
+      category: 'Practising Certificate & Admission',
+      question: 'Do you hold a current Australian Practising Certificate?',
+      answer: 'Yes (Current Unrestricted Australian Practising Certificate & Court Admission)',
+      confidence: 100
+    });
+    baseQuestions.push({
+      category: 'Conflict Check & Legal Compliance',
+      question: 'Are you eligible for immediate conflict check clearance?',
+      answer: 'Yes (Clear professional conduct record and conflict check ready)',
+      confidence: 98
+    });
+  } else {
+    // Technology & IT / General
+    baseQuestions.splice(1, 0, {
+      category: 'Security Clearance',
+      question: 'Do you hold or are you eligible for Australian Government Security Clearance?',
+      answer: profile.clearance || 'Baseline / NV1 Ready (Eligible for Immediate Vetting)',
+      confidence: 98
+    });
+    baseQuestions.push({
+      category: 'Core Qualifications & Driver Licence',
+      question: 'Do you hold a valid Australian Driver Licence and clear National Police Check?',
+      answer: 'Yes (Valid Australian Driver Licence & Clean National Police Check)',
+      confidence: 100
+    });
+  }
+
+  return baseQuestions;
 };
 
 /**
@@ -194,15 +264,19 @@ export const executeFastTrackApply = async (
   const screeningMap = resolveScreeningQuestions(job, profile);
   const screeningText = screeningMap.map(q => `• ${q.question} -> ${q.answer}`).join('\n');
 
+  const candidateSalary = job?.salary || profile.targetSalary || 'Market Competitive Remuneration';
+  const clearanceLine = profile.clearance ? `Security Clearance: ${profile.clearance}\n` : '';
+  const ahpraLine = profile.ahpraRegistration ? `AHPRA Registration: ${profile.ahpraRegistration}\n` : '';
+  const cpaLine = profile.accountingQualification ? `Accounting Qualification: ${profile.accountingQualification}\n` : '';
+
   const clipboardPayload = `=== CANDIDATE CONTACT DETAILS ===
-Full Name: ${profile.name}
-Email: ${profile.email}
-Phone: ${profile.phone}
-Location: ${profile.location}
+Full Name: ${profile.name || 'Candidate'}
+Email: ${profile.email || ''}
+Phone: ${profile.phone || ''}
+Location: ${profile.location || job?.location || 'Melbourne, VIC'}
 Work Rights: ${profile.workRights || 'Australian Citizen (Unrestricted)'}
-Security Clearance: ${profile.clearance || 'Baseline / NV1 Ready'}
-Notice Period: Immediate / <2 Weeks
-Expected Salary: ${job.salary || profile.targetSalary || '$115,000 + Super'}
+${clearanceLine}${ahpraLine}${cpaLine}Notice Period: ${profile.availability || 'Immediate / <2 Weeks Notice'}
+Expected Salary: ${candidateSalary}
 
 === PRE-EMPLOYMENT SCREENING ANSWERS ===
 ${screeningText}

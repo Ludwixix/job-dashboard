@@ -306,3 +306,26 @@ Eliminates the legacy IT-centric bias across fallback search criteria, title cat
 - `frontend/src/components/__tests__/SettingsModal.test.jsx`: Added unit test verifying Search Queries tab rendering and profile query regeneration.
 - All 58 frontend Vitest tests and all 24 core backend pytest tests pass.
 
+---
+
+## Phase 10: Industry-Adaptive Auto-Apply & Screening Questionnaire Engine
+
+**Status**: ✅ Complete — Implemented, tested, committed to master, and deployed to Cloud Run production
+**Deployed**: 2026-09-06 (100% traffic)
+
+### Overview
+
+Replaces legacy hardcoded IT and applicant assumptions across the Auto-Apply and pre-employment screening subsystem:
+1. **Multi-Sector Screening Knowledge Base (`auto_apply.py`)**: Added dedicated rule sets for:
+   - **Healthcare & Medical**: AHPRA registration, Working With Children Check (WWCC), NDIS worker screening, healthcare occupational immunisations, CPR/BLS certification, clinical documentation.
+   - **Finance & Accounting**: CPA/CA qualification, ERP systems (SAP, Xero, MYOB), ATO statutory reporting, BAS compliance, AASB/IFRS audit standards.
+   - **Construction & Trades**: White Card (CPCCWHS1001), SafeWork OHS/WHS compliance, trade certificates, working at heights.
+   - **Legal**: Australian Practising Certificate, Supreme Court / High Court admission, conflict check clearance.
+   - **Technology & General**: Security clearance (Baseline/NV1), vendor cloud certifications, police check, work rights.
+2. **Dynamic Identity & Attachment Grounding**: Replaced static candidate names and salary defaults (`$115,000 + Super`) with dynamic profile fields and candidate name slugging (`{safe_name}_Tailored_Resume.pdf`, `{safe_name}_Cover_Letter.pdf`).
+3. **Frontend Sector-Aware Resolution (`autoApplyService.js`)**: Updated `resolveScreeningQuestions()` and clipboard autofill payloads to dynamically present sector-appropriate verification categories.
+
+### Test Coverage
+- `backend/tests/test_auto_apply.py`: 5 comprehensive tests validating Healthcare, Finance, Construction, and dynamic candidate attachments.
+- `frontend/src/services/__tests__/autoApplyService.test.js`: 4 tests validating sector question resolution and Quick Apply platform classification.
+- Full regression test gauntlet: 149 backend tests and 62 frontend tests pass with 100% success rate.

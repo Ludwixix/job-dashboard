@@ -2452,22 +2452,18 @@ def make_handler(app: DashboardApp):
                         return
 
                     # Synchronous auto-apply resolution & dispatch receipt
-                    candidate_name = profile.get("name") or "Sam Ludwig"
-                    candidate_email = profile.get("email") or "sam.ludwig@gmail.com"
-                    candidate_phone = profile.get("phone") or "0405 993 245"
-                    candidate_location = profile.get("location") or "Melbourne, VIC"
+                    candidate_name = (profile.get("name") or "Verified Candidate").strip()
+                    candidate_email = profile.get("email") or "applicant@career-agent.internal"
+                    candidate_phone = profile.get("phone") or "0400 000 000"
+                    candidate_location = profile.get("location") or job.get("location") or "Melbourne, VIC"
                     work_rights = profile.get("workRights") or "Australian Citizen (Unrestricted)"
-                    clearance = profile.get("clearance") or "Baseline / NV1 Ready"
-                    salary = job.get("salary") or profile.get("targetSalary") or "$115,000 + Super"
+                    clearance = profile.get("clearance") or "Standard Australian Vetting Ready"
+                    salary = job.get("salary") or profile.get("targetSalary") or "Market Competitive Remuneration"
 
+                    sample_questions = auto_apply_manager._generate_sector_questions(job, profile)
                     screening_answers = {
-                        q: auto_apply_manager.resolve_screening_answer(q, profile)
-                        for q in [
-                            "Are you legally entitled to work in Australia?",
-                            "Do you have Australian Government Security Clearance (Baseline / NV1)?",
-                            "What is your current notice period / start date availability?",
-                            "Expected annual remuneration"
-                        ]
+                        q: auto_apply_manager.resolve_screening_answer(q, profile, job)
+                        for q in sample_questions
                     }
 
                     receipt = {

@@ -397,12 +397,14 @@ export const OnboardingFlow = ({ onComplete }) => {
       await saveProfileToBackend(profile);
       setLaunchMessage('Seeding recommendation weights & active theme...');
       await runProfileOnboardingPipeline(profile);
+      sessionStorage.setItem('trigger_initial_scrape', 'true');
       setLaunchMessage('Ready! Welcome to your personalized dashboard.');
       setTimeout(() => {
         if (onComplete) onComplete(session, profile);
       }, 350);
     } catch (err) {
       console.error('Error during final onboarding handoff:', err);
+      sessionStorage.setItem('trigger_initial_scrape', 'true');
       const { session, profile } = completeOnboarding(profileData);
       if (onComplete) onComplete(session, profile);
     } finally {

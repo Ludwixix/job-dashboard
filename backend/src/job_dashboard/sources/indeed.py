@@ -135,6 +135,8 @@ class IndeedJobSpySource:
             company = str(item.get("company") or item.get("truncatedCompany") or "").strip()
             location = str(item.get("formattedLocation") or query.location).strip()
             description = clean_description(item.get("snippet") or item.get("jobDescription") or "")
+            if not description:
+                description = f"{title} at {company} in {location}. Full position description and direct application available on Indeed Australia."
             posted = item.get("pubDate") or item.get("formattedRelativeTime") or ""
             if title and url:
                 yield {
@@ -176,8 +178,15 @@ class IndeedJobSpySource:
                 raw_jobs = page.evaluate(_INDEED_EXTRACTOR)
                 for record in raw_jobs:
                     posted_val = record.get("posted") or "today"
+                    b_desc = clean_description(record.get("description", ""))
+                    if not b_desc:
+                        b_title = record.get("title", "")
+                        b_comp = record.get("company", "")
+                        b_loc = record.get("location", "")
+                        b_desc = f"{b_title} at {b_comp} in {b_loc}. Full position description and direct application available on Indeed Australia."
                     yield {
                         **record,
+                        "description": b_desc,
                         "source": "Indeed",
                         "posted": canonical_posted_date(posted_val),
                         "tags": [query.term, "indeed", query.stream],
@@ -219,11 +228,17 @@ def _extract_balanced_json(text: str, start: int) -> str:
 def _indeed_record(row: Any, query: SearchQuery) -> dict[str, Any]:
     url = str(row.get("job_url", "") or "").strip()
     source_name = str(row.get("site", "") or "Indeed").capitalize()
+    title = str(row.get("title", "") or "")
+    company = str(row.get("company", "") or "")
+    location = str(row.get("location", "") or query.location)
+    desc = clean_description(row.get("description", ""))
+    if not desc:
+        desc = f"{title} at {company} in {location}. Full position description and direct application available on Indeed Australia."
     return {
-        "title": str(row.get("title", "") or ""),
-        "company": str(row.get("company", "") or ""),
-        "location": str(row.get("location", "") or query.location),
-        "description": clean_description(row.get("description", "")),
+        "title": title,
+        "company": company,
+        "location": location,
+        "description": desc,
         "url": url,
         "source": source_name,
         "posted": canonical_posted_date(row.get("date_posted", "") or ""),

@@ -61,15 +61,22 @@ export const GooglePromptModal = ({ isOpen, onClose, onAuthenticated }) => {
     setStatusMsg('Configuring Google account & scanning Gmail applications...');
 
     try {
-      const authUser = simulateGoogleWorkspaceAuth({
-        email: emailInput.trim(),
-        name: nameInput.trim()
-      });
+      if (clientIdInput) {
+        setGoogleClientId(clientIdInput);
+      }
 
       const result = await loginWithGoogle({
         autoScanGmail: true,
+        preferredUser: {
+          email: emailInput.trim(),
+          name: nameInput.trim()
+        },
         onStatusUpdate: (status) => setStatusMsg(status)
       });
+
+      if (result.isNewUser) {
+        sessionStorage.setItem('trigger_initial_scrape', 'true');
+      }
 
       if (onAuthenticated) {
         onAuthenticated(result.session, result.profile);

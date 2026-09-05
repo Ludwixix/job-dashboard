@@ -249,7 +249,7 @@ export const evaluateJobCompleteness = (job) => {
   }
 
   const desc = String(job.description || job.notes || '').trim();
-  if (!desc || desc.length < 60) {
+  if (!desc || (desc.length < 25 && (!url || !title))) {
     missing.push('Job Description');
   }
 

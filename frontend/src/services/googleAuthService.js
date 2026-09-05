@@ -5,7 +5,7 @@
  */
 
 import { setSession } from './authService';
-import { getActiveProfile, saveProfile, DEFAULT_PROFILES } from './profileService';
+import { getActiveProfile, saveProfile, saveProfileToBackend, fetchProfileFromBackend, DEFAULT_PROFILES } from './profileService';
 import { scanAndSyncGmailApplications } from './gmailSyncService';
 import { synthesizeUserProfile } from './smartProfileBuilder';
 import { SCRAPER_BASE_URL } from './jobQueryService';
@@ -226,6 +226,7 @@ export const requestGoogleAuthToken = async ({
  */
 export const loginWithGoogle = async ({
   autoScanGmail = true,
+  preferredUser = null,
   onStatusUpdate = () => {}
 } = {}) => {
   const configuredClientId = getGoogleClientId();
@@ -241,11 +242,13 @@ export const loginWithGoogle = async ({
         throw new Error('Google Sign-In was cancelled.');
       }
       console.warn('Direct Google OAuth token request failed, falling back to simulated Google session:', err);
-      authUser = simulateGoogleWorkspaceAuth(getActiveProfile() || DEFAULT_PROFILES[0]);
+      authUser = simulateGoogleWorkspaceAuth(preferredUser || getActiveProfile() || DEFAULT_PROFILES[0]);
     }
+  } else if (preferredUser && preferredUser.email) {
+    authUser = simulateGoogleWorkspaceAuth(preferredUser);
   } else {
     // If no custom GCP Client ID configured, seamlessly create an authentic Google identity session
-    const baseProf = getActiveProfile() || DEFAULT_PROFILES[0];
+    const baseProf = preferredUser || getActiveProfile() || DEFAULT_PROFILES[0];
     authUser = simulateGoogleWorkspaceAuth(baseProf);
   }
 
@@ -254,6 +257,10 @@ export const loginWithGoogle = async ({
   // Register / log in user via backend API
   const apiBase = getApiBase();
   let backendSession = null;
+  let backendProfile = null;
+  let hasProfile = false;
+  let isNewUser = true;
+
   try {
     const res = await fetch(`${apiBase}/api/google-login`, {
       method: 'POST',
@@ -271,6 +278,9 @@ export const loginWithGoogle = async ({
         localStorage.setItem('job_dashboard_auth_token', data.token);
       }
       backendSession = data.user;
+      backendProfile = data.profile;
+      hasProfile = Boolean(data.has_profile && data.profile && Object.keys(data.profile).length > 0);
+      isNewUser = !hasProfile;
     }
   } catch (err) {
     console.warn('Backend Google user registration deferred:', err);
@@ -283,6 +293,7 @@ export const loginWithGoogle = async ({
     picture: authUser.picture,
     authProvider: 'google',
     onboardingCompleted: true,
+    isNewUser,
     lastActiveAt: new Date().toISOString()
   };
 
@@ -316,7 +327,7 @@ export const loginWithGoogle = async ({
     const minsAgo = Math.max(1, Math.round((Date.now() - lastScanTime) / 60000));
     onStatusUpdate(`Existing application tracker active (Last synced ${minsAgo}m ago). Skipping email re-scan.`);
     applications = existingApps;
-  } else if (autoScanGmail) {
+  } else if (autoScanGmail && authUser.accessToken && !authUser.isSimulated) {
     onStatusUpdate('Scanning Gmail inbox for application confirmations & interview invites (Hourly sync)...');
     try {
       const syncResult = await scanAndSyncGmailApplications(authUser.accessToken, getActiveProfile() || DEFAULT_PROFILES[0]);
@@ -336,22 +347,42 @@ export const loginWithGoogle = async ({
     applications = existingApps;
   }
 
-  // Synthesize and auto-build an intelligent candidate profile
-  onStatusUpdate('Synthesizing bespoke candidate profile and ATS skill matrix...');
-  const existingProfile = getActiveProfile() || DEFAULT_PROFILES[0];
-  const updatedProfile = synthesizeUserProfile({
-    googleUser: authUser,
-    gmailApplications: applications,
-    existingProfile
-  });
-  saveProfile(updatedProfile);
+  // Restore existing profile from cloud database or synthesize bespoke profile for new user
+  let activeUserProfile = null;
+  if (hasProfile && backendProfile) {
+    onStatusUpdate('Restoring your saved candidate profile from cloud database...');
+    activeUserProfile = {
+      ...backendProfile,
+      id: backendSession?.id || authUser.id,
+      email: authUser.email || backendProfile.email,
+      name: authUser.name || backendProfile.name
+    };
+    saveProfile(activeUserProfile);
+  } else {
+    onStatusUpdate('Synthesizing bespoke candidate profile and ATS skill matrix...');
+    const baseTemplate = preferredUser || getActiveProfile() || DEFAULT_PROFILES[0];
+    const synthesized = synthesizeUserProfile({
+      googleUser: authUser,
+      gmailApplications: applications,
+      existingProfile: {
+        ...baseTemplate,
+        id: backendSession?.id || authUser.id,
+        name: authUser.name || baseTemplate.name,
+        email: authUser.email || baseTemplate.email
+      }
+    });
+    activeUserProfile = saveProfile(synthesized);
+    // Explicitly persist new profile to backend
+    saveProfileToBackend(activeUserProfile).catch(() => {});
+  }
 
   return {
     user: authUser,
     session: sessionUser,
-    profile: updatedProfile,
+    profile: activeUserProfile,
     applications,
-    scanCount
+    scanCount,
+    isNewUser
   };
 };
 

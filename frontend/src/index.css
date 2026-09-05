@@ -139,3 +139,70 @@
 .pulse-amber {
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
 }
+
+/* ==========================================================================
+   Ancient Alien Technology Monolith Rail & Quantum Resonant Ripple Styles
+   ========================================================================== */
+.alien-monolith-rail {
+  background: linear-gradient(180deg, #0d0b09 0%, #070605 50%, #0a0907 100%);
+  border-right: 1px solid #231e19;
+  position: relative;
+  overflow: hidden;
+}
+
+.alien-monolith-rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent 0%, rgba(212, 139, 56, 0.4) 25%, rgba(184, 115, 38, 0.8) 50%, rgba(212, 139, 56, 0.4) 75%, transparent 100%);
+  box-shadow: 0 0 8px rgba(212, 139, 56, 0.35);
+  pointer-events: none;
+}
+
+/* Fluid Alien Artifact Ripple */
+@keyframes alien-resonance-pulse {
+  0% {
+    transform: scale(0.12);
+    opacity: 0.9;
+  }
+  40% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.alien-ripple-wave {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  border: 1px solid rgba(212, 139, 56, 0.65);
+  background: radial-gradient(circle, rgba(212, 139, 56, 0.22) 0%, rgba(184, 115, 38, 0.08) 50%, transparent 75%);
+  box-shadow: 0 0 18px rgba(212, 139, 56, 0.35), inset 0 0 10px rgba(229, 169, 93, 0.2);
+  animation: alien-resonance-pulse 1.4s cubic-bezier(0.12, 0.8, 0.24, 1) forwards;
+}
+
+.alien-glyph-button {
+  position: relative;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.alien-glyph-button::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid transparent;
+  transition: all 0.35s ease;
+  pointer-events: none;
+}
+
+.alien-glyph-button:hover::after {
+  border-color: rgba(212, 139, 56, 0.4);
+  box-shadow: 0 0 14px rgba(212, 139, 56, 0.25);
+}
+

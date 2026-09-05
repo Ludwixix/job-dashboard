@@ -27,7 +27,7 @@ import { startAutopilot } from '../services/autopilotAgent';
 
 
 import { generateApplicationDocs } from '../services/generationService';
-import { getActiveProfile, saveProfile } from '../services/profileService';
+import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
 import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
@@ -63,7 +63,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
 
-  // Executive Minimalist Zen Auto-Pilot vs Full Studio Mode State
+  // Minimalist Monolith + Zen Autopilot vs Full Studio Mode State
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('job_dashboard_view_mode') || 'zen';
   });
@@ -233,7 +233,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   });
 
   
-  const triggerDiscoveryScrape = useCallback(async (targetProfile) => {
+  const triggerDiscoveryScrape = useCallback(async (targetProfile, options = {}) => {
     if (!targetProfile) return;
     const industry = targetProfile.industry || 'Technology & IT';
     const queries = buildQueriesFromProfile(targetProfile);
@@ -255,7 +255,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     }, 1000);
 
     try {
-      const result = await triggerProfileScrape(targetProfile, { ttl_hours: 12.0 });
+      const ttlHours = options.force ? 0.0 : 12.0;
+      const result = await triggerProfileScrape(targetProfile, { ttl_hours: ttlHours });
       if (!result.success) throw new Error(result.error || 'Refresh failed');
       clearInterval(timer);
       applyIndustryTheme(industry);
@@ -282,6 +283,32 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     }
   }, [refetch]);
 
+  // Load backend profile when currentUser is authenticated
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchProfileFromBackend(currentUser.id)
+        .then((remoteProf) => {
+          if (remoteProf && Object.keys(remoteProf).length > 0) {
+            setActiveProfile((prev) => ({
+              ...(prev || {}),
+              ...remoteProf,
+              email: currentUser.email || remoteProf.email || prev?.email,
+              name: currentUser.name || remoteProf.name || prev?.name
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentUser?.id, currentUser?.email, currentUser?.name]);
+
+  // When a new user logs in or completes onboarding, auto-scrape personalized roles immediately
+  useEffect(() => {
+    const shouldScrape = currentUser?.isNewUser || sessionStorage.getItem('trigger_initial_scrape') === 'true';
+    if (shouldScrape && activeProfile) {
+      sessionStorage.removeItem('trigger_initial_scrape');
+      triggerDiscoveryScrape(activeProfile, { force: true });
+    }
+  }, [currentUser?.isNewUser, activeProfile?.id, triggerDiscoveryScrape]);
 
   // Load the persisted index immediately. Profile queries are kept in sync,
   // but only a deliberate user refresh/profile completion starts live work.
@@ -428,6 +455,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             </button>
           </div>
         )}
+
+        {/* Custom Job / External Link Generator Modal */}
+        <CustomJobModal
+          isOpen={isCustomJobModalOpen}
+          onClose={() => setIsCustomJobModalOpen(false)}
+          onJobCreated={() => {
+            refetch();
+          }}
+          onOpenGenerator={(j) => setSelectedForGenerator(j)}
+        />
+
         <MonolithMode
           jobs={jobs}
           profile={activeProfile}
@@ -463,7 +501,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           />
         )}
 
-        {/* Global Modals in Monolith Mode */}
+        {/* Global Modals in Monolith & Zen Mode */}
         {selectedJob && (
           <JobModal
             job={selectedJob}
@@ -486,6 +524,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             onApplicationCreated={(app) => {
               updateJobStatus(selectedForGenerator.id || `${selectedForGenerator.company}_${selectedForGenerator.title}`, 'Package Prepared / To Submit', app);
             }}
+          />
+        )}
+
+        {selectedForMockInterview && (
+          <MockInterviewModal
+            job={selectedForMockInterview}
+            profile={activeProfile}
+            onClose={() => setSelectedForMockInterview(null)}
           />
         )}
 
@@ -517,30 +563,6 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   if (viewMode === 'zen') {
     return (
       <SafeErrorBoundary>
-        {fallbackBanner && (
-          <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              {fallbackBanner}
-            </span>
-            <button
-              onClick={() => setFallbackBanner(null)}
-              className="text-amber-400 hover:text-white ml-4 text-xs font-bold"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-        {/* Custom Job / External Link Generator Modal */}
-        <CustomJobModal
-          isOpen={isCustomJobModalOpen}
-          onClose={() => setIsCustomJobModalOpen(false)}
-          onJobCreated={(newJob) => {
-            refetch();
-          }}
-          onOpenGenerator={(j) => setSelectedForGenerator(j)}
-        />
-
         <ZenAutopilotDashboard
           jobs={jobs}
           profile={activeProfile}
@@ -555,58 +577,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           }}
           onOpenMockInterview={(job) => setSelectedForMockInterview(job)}
         />
-
-        {isBatchApplyOpen && (
-          <BatchApplyModal 
-            jobs={jobs}
-            isOpen={isBatchApplyOpen}
-            onClose={() => setIsBatchApplyOpen(false)}
-            onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
-            onNavigateToTracker={() => {
-              setViewMode('studio');
-              setActiveSection('kanban');
-            }}
-            onComplete={(results) => {
-              results.forEach(res => {
-                if (res.success) {
-                  updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
-                }
-              });
-            }}
-          />
-        )}
-
-        {/* Global Modals in Zen Mode */}
         {selectedJob && (
           <JobModal
             job={selectedJob}
             onClose={() => setSelectedJob(null)}
             onOpenGenerator={(j) => setSelectedForGenerator(j)}
-            onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
-            onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
-            onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
             profile={activeProfile}
             allJobs={jobs}
-          />
-        )}
-
-        {selectedForMockInterview && (
-          <MockInterviewModal
-            job={selectedForMockInterview}
-            profile={activeProfile}
-            onClose={() => setSelectedForMockInterview(null)}
-          />
-        )}
-
-        {isProfileModalOpen && (
-          <ProfileModal
-            profile={editingProfile || activeProfile}
-            onClose={() => setIsProfileModalOpen(false)}
-            onSave={(updated) => {
-              setActiveProfile(updated);
-              saveProfile(updated);
-              setIsProfileModalOpen(false);
-            }}
           />
         )}
       </SafeErrorBoundary>

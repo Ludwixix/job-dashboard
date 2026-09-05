@@ -50,4 +50,28 @@ describe('GeneratorModal Component', () => {
       })
     );
   });
+
+  it('renders LINKEDIN INBOUND tab when linkedInText is present and allows editing', () => {
+    const jobWithLinkedIn = {
+      ...mockJob,
+      linkedInText: '### BOOLEAN-OPTIMIZED LINKEDIN HEADLINES\nFull Stack Developer | Cloud Specialist'
+    };
+    const handleSaveCustomDocs = vi.fn();
+
+    render(
+      <GeneratorModal 
+        job={jobWithLinkedIn} 
+        onClose={vi.fn()} 
+        onSaveCustomDocs={handleSaveCustomDocs} 
+      />
+    );
+
+    // Switch to LINKEDIN INBOUND tab
+    const linkedInTab = screen.getByRole('button', { name: /LINKEDIN INBOUND/i });
+    expect(linkedInTab).toBeInTheDocument();
+    fireEvent.click(linkedInTab);
+
+    // Verify textarea contains headlines
+    expect(screen.getByDisplayValue(/BOOLEAN-OPTIMIZED LINKEDIN HEADLINES/i)).toBeInTheDocument();
+  });
 });

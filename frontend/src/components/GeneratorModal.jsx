@@ -23,7 +23,20 @@ const scoreColor = (s) => {
 };
 
 // ── Gemini Gem prompt ──────────────────────────────────────────────────────────
-const buildGemPrompt = (job) => `TARGET JOB — Read this first, apply to every word you write:
+const buildGemPrompt = (job) => {
+  const profile = getActiveProfile();
+  const name = profile?.name || 'Sam Ludwig';
+  const phone = profile?.phone || '0405 993 245';
+  const email = profile?.email || 'sam.ludwig@gmail.com';
+  const loc = profile?.location || 'Melbourne VIC 3183';
+  const workRights = profile?.workRights || 'Australian Citizen — Unrestricted Work Rights';
+  const clearance = profile?.clearance || 'Clearance Eligible: Baseline / NV1';
+  const coreSkills = (profile?.coreSkills || []).join(', ');
+  const candidateHistory = [profile?.fullWorkExperienceText, profile?.workHistorySummary]
+    .filter(v => typeof v === 'string' && v.trim())
+    .join('\n\n');
+
+  return `TARGET JOB — Read this first, apply to every word you write:
 Title: ${job.title}
 Company: ${job.company}
 Location: ${job.location || 'Melbourne, VIC'}
@@ -31,26 +44,39 @@ Salary: ${job.salary || 'Not stated'}
 Description / Requirements:
 ${job.notes || job.description || '(No job description provided — infer from title and company.)'}
 
-CANDIDATE: Sam Ludwig
-Contact: 0405 993 245 | sam.ludwig@gmail.com | Melbourne VIC 3183
-LinkedIn: linkedin.com/in/sam-ludwig
-Australian Citizen — Unrestricted Work Rights | Clearance Eligible: Baseline / NV1
+CANDIDATE MASTER PROFILE & VERIFIED CAREER RECORD:
+Name: ${name}
+Contact: ${phone} | ${email} | ${loc}
+Work Rights & Clearance: ${workRights} | ${clearance}
+Core Skills: ${coreSkills}
+Career History & Verified Achievements:
+${candidateHistory || 'Senior Systems and Infrastructure specialist with extensive Australian enterprise record.'}
 
-KEY INSTRUCTIONS (apply all of these):
-1. MIRROR THE JOB TITLE EXACTLY as a professional title on line 2 of the resume — this is the single highest-impact ATS tactic
-2. RESULT-FIRST BULLETS: start every bullet with the metric/outcome, then the action — e.g. "Reduced processing time 87% (2hr→15min) by engineering PowerShell automation" NOT "Engineered automation that reduced time by 87%"
-3. ATS KEYWORDS: extract exact technical terms from the job description above and weave them naturally into the summary, skills, AND experience bullets — not just a list at the bottom
-4. NO CLICHÉS: never use "passionate", "team player", "results-driven", "go-getter", "synergy", "proactive"
-5. COVER LETTER OPENER: must NOT start with "I am writing to apply" — open with a specific, compelling hook referencing the company or role
-6. COVER LETTER: 3 paragraphs, 250-350 words total, Australian English, no address block, no sign-off
-7. USE ONLY VERIFIED FACTS from Sam's career — never invent achievements, dates, or metrics
+ARCHITECTURAL RECRUITMENT DIRECTIVES (5-PHASE FRAMEWORK):
+1. SEMANTIC GAP DIAGNOSTIC: Begin with a brief (max 3 sentences) brutal diagnostic of the candidate's weakest areas against the role requirements.
+2. MECHANICAL PARSING LAYER: Strict single-column flow. Zero markdown tables, grids, sidebars, or floating elements. Place contact details in body text at the very top. Use standard section headers: PROFESSIONAL SUMMARY, SKILLS, WORK EXPERIENCE, EDUCATION, REFEREES. Strict reverse chronology with explicit dates (MM/YYYY to MM/YYYY).
+3. AUSTRALIAN LOCALIZATION: Format for 2-3 pages depth. Append mandatory "REFEREES" section. Strictly exclude personal demographics (no photo, age, marital status). Use Australian English spelling (organisation, prioritise, analyse).
+4. ACHIEVEMENT ANCHORING: Every bullet point in WORK EXPERIENCE must follow: [Active Verb] + [Core Task/Project] + [Quantified Result/Metric]. Eradicate corporate fluff ("results-driven", "team player", "passionate", "detail-oriented") and replace with factual claims of scale (users, uptime, SLA, %, $).
+5. COVER LETTER ANTI-TEMPLATE RULE: Must NOT start with "I am writing to apply for..." or "With a proven track record". Write 3 high-impact paragraphs: Paragraph 1 (Hook on company trajectory/challenge), Paragraph 2 (Proof points proving candidate solved an identical problem with metrics), Paragraph 3 (Confident, low-friction CTA). Must pass the Swappability Test.
+6. LINKEDIN BOOLEAN OPTIMIZATION: 3 Boolean-friendly headlines with exact literal titles, plus a keyword-rich "About" section index grouping synonyms for recruiter Boolean searches.
 
-Now generate: (1) a tailored resume, then the separator ===COVER_LETTER===, then (2) a tailored cover letter.`;
+Generate with delimiters:
+===DIAGNOSTIC===
+[Max 3 sentences diagnostic]
+===RESUME===
+[Single-column ATS tailored resume with Referees]
+===COVER_LETTER===
+[3-paragraph high-impact cover letter passing Swappability Test]
+===LINKEDIN_OPTIMIZATION===
+[3 Boolean headlines + About section search index]`;
+};
 
 export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs }) => {
   const [activeTab, setActiveTab]             = useState(job.hasCustomDocs ? 'quality' : 'overview');
   const [resumeText, setResumeText]           = useState(job.resumeText || '');
   const [coverLetterText, setCoverLetterText] = useState(job.coverLetterText || '');
+  const [linkedInText, setLinkedInText]       = useState(job.linkedInText || '');
+  const [diagnosticText, setDiagnosticText]   = useState('');
   const [isGenerating, setIsGenerating]       = useState(false);
   const [genProgress, setGenProgress]         = useState('');
   const [genError, setGenError]               = useState('');
@@ -73,13 +99,14 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
   // Debounced auto-save when user edits in the studio
   useEffect(() => {
-    if (!resumeText && !coverLetterText) return;
+    if (!resumeText && !coverLetterText && !linkedInText) return;
     setSaveStatus('saving');
     const timer = setTimeout(() => {
       if (onSaveCustomDocs) {
         onSaveCustomDocs(job.id, {
           resumeText,
           coverLetterText,
+          linkedInText,
           model: genMeta?.model || 'Application Studio',
           generatedAt: new Date().toISOString()
         });
@@ -88,13 +115,14 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [resumeText, coverLetterText, job.id, genMeta, onSaveCustomDocs]);
+  }, [resumeText, coverLetterText, linkedInText, job.id, genMeta, onSaveCustomDocs]);
 
   const handleManualSave = () => {
     if (onSaveCustomDocs) {
       onSaveCustomDocs(job.id, {
         resumeText,
         coverLetterText,
+        linkedInText,
         model: genMeta?.model || 'Application Studio',
         generatedAt: new Date().toISOString()
       });
@@ -154,6 +182,8 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
       setResumeText(result.resume || '');
       setCoverLetterText(result.coverLetter || '');
+      setLinkedInText(result.linkedInOptimization || '');
+      setDiagnosticText(result.diagnostic || '');
       setGenMeta({ model: result.model, elapsedMs: result.elapsedMs });
       setGenProgress('');
       
@@ -162,6 +192,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
         onSaveCustomDocs(job.id, {
           resumeText: result.resume || '',
           coverLetterText: result.coverLetter || '',
+          linkedInText: result.linkedInOptimization || '',
           model: result.model,
           generatedAt: new Date().toISOString()
         });
@@ -191,7 +222,10 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
   // ── Copy ───────────────────────────────────────────────────────────────────
   const handleCopy = () => {
-    const text = activeTab === 'resume' ? resumeText : coverLetterText;
+    let text = '';
+    if (activeTab === 'resume') text = resumeText;
+    else if (activeTab === 'cover_letter') text = coverLetterText;
+    else if (activeTab === 'linkedin') text = linkedInText;
     if (!text) return;
     navigator.clipboard.writeText(text).catch(() => {});
     setCopiedText(true);
@@ -437,6 +471,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
               },
               resumeText     && { id: 'resume',       label: 'RESUME',       icon: <FileUser size={13} className="text-emerald-400" /> },
               coverLetterText && { id: 'cover_letter', label: 'COVER LETTER', icon: <FileText size={13} className="text-indigo-400" /> },
+              linkedInText   && { id: 'linkedin',     label: 'LINKEDIN INBOUND', icon: <Cpu size={13} className="text-sky-400" /> },
               matchedKeywords.length && { id: 'ats', label: 'ATS SPECS',  icon: <BarChart3 size={13} className="text-amber-400" /> },
             ].filter(Boolean).map(tab => (
               <button
@@ -486,6 +521,16 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                   <Download size={12} /> DOWNLOAD COVER LETTER (PDF)
                 </button>
               </>
+            )}
+
+            {activeTab === 'linkedin' && (
+              <button
+                onClick={handleCopy}
+                className="px-2.5 py-1 rounded-lg bg-sky-950 border border-sky-600 hover:bg-sky-900 text-sky-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                {copiedText ? 'COPIED' : 'COPY LINKEDIN ASSETS'}
+              </button>
             )}
           </div>
         </div>
@@ -593,6 +638,16 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 </div>
               </div>
 
+              {/* Phase 1 Semantic Gap Diagnostic Banner */}
+              {diagnosticText && (
+                <div className="p-4 bg-purple-950/40 border border-purple-800/50 rounded-2xl text-purple-200 text-xs space-y-1 shadow-lg">
+                  <div className="flex items-center gap-2 text-purple-400 font-extrabold uppercase tracking-wider text-[11px]">
+                    <Cpu size={14} /> Phase 1 Semantic Gap Diagnostic (ATS AI Screening)
+                  </div>
+                  <p className="text-slate-300 leading-relaxed font-sans">{diagnosticText}</p>
+                </div>
+              )}
+
               {/* Live Streaming Telemetry Terminal Feed */}
               {telemetryLogs.length > 0 && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs space-y-2.5 shadow-inner">
@@ -636,6 +691,16 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 </div>
               )}
 
+              {/* Phase 1 Semantic Gap Diagnostic Banner */}
+              {diagnosticText && (
+                <div className="p-4 bg-purple-950/40 border border-purple-800/50 rounded-2xl text-purple-200 text-xs space-y-1 shadow-lg">
+                  <div className="flex items-center gap-2 text-purple-400 font-extrabold uppercase tracking-wider text-[11px]">
+                    <Cpu size={14} /> Phase 1 Semantic Gap Diagnostic (ATS AI Screening)
+                  </div>
+                  <p className="text-slate-300 leading-relaxed font-sans">{diagnosticText}</p>
+                </div>
+              )}
+
               {/* Glowing Quality Banner */}
               <div className={`p-5 rounded-2xl border transition-all ${
                 qualityAudit.isReadyToSubmit 
@@ -664,7 +729,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                       </div>
                       <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">
                         {qualityAudit.isReadyToSubmit 
-                          ? 'This application package satisfies all 7 ATS checks. Download your separate Resume and Cover Letter PDF files below or dispatch auto-apply.' 
+                          ? `This application package satisfies all ${qualityAudit.checks.length} ATS checks. Download your separate Resume and Cover Letter PDF files below or dispatch auto-apply.` 
                           : 'Review the checks below to ensure maximum interview conversion before submitting.'}
                       </p>
                     </div>
@@ -712,7 +777,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
               {/* Checklist Breakdown */}
               <div className="space-y-2.5">
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>7-Point Pre-Submission Double-Check List</span>
+                  <span>{qualityAudit.checks.length}-Point Pre-Submission Double-Check List</span>
                   <span className="text-[11px] text-slate-500 font-mono">
                     {qualityAudit.checks.filter(c => c.passed).length} of {qualityAudit.checks.length} Passed
                   </span>
@@ -855,6 +920,44 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
             </div>
           )}
 
+          {/* LINKEDIN INBOUND OPTIMIZATION TAB */}
+          {activeTab === 'linkedin' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-800 gap-2">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                    Boolean Inbound Sourcing Optimization (Phase 5)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Engineered to trigger recruiter Boolean searches (AND, OR, exact title matching) in LinkedIn Recruiter & Sales Navigator.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleManualSave}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                  >
+                    💾 Save Changes
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md self-start sm:self-auto"
+                  >
+                    {copiedText ? <Check size={12} className="text-emerald-300" /> : <Copy size={12} />}
+                    {copiedText ? 'COPIED TO CLIPBOARD' : 'COPY ALL LINKEDIN ASSETS'}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={linkedInText}
+                onChange={(e) => setLinkedInText(e.target.value)}
+                rows={18}
+                placeholder="LinkedIn Boolean Headlines & About Section Recruiter Index..."
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-sky-500 leading-relaxed resize-y"
+              />
+            </div>
+          )}
 
           {/* ATS ANALYSIS tab */}
           {activeTab === 'ats' && (

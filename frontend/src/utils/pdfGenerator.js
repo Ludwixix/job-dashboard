@@ -68,13 +68,21 @@ export const downloadResumePdf = (resumeText, job, candidateProfile, filename) =
       cleanHeaderTest === 'PROFESSIONAL SUMMARY' ||
       cleanHeaderTest === 'EXECUTIVE SUMMARY' ||
       cleanHeaderTest === 'CORE SKILLS' ||
+      cleanHeaderTest === 'SKILLS' ||
       cleanHeaderTest === 'TECHNICAL COMPETENCIES' ||
       cleanHeaderTest === 'CORE TECHNICAL COMPETENCIES' ||
+      cleanHeaderTest === 'CORE TECHNICAL EXPERTISE' ||
       cleanHeaderTest === 'PROFESSIONAL EXPERIENCE' ||
       cleanHeaderTest === 'EMPLOYMENT HISTORY' ||
       cleanHeaderTest === 'WORK EXPERIENCE' ||
+      cleanHeaderTest === 'EDUCATION' ||
       cleanHeaderTest === 'EDUCATION & CERTIFICATIONS' ||
       cleanHeaderTest === 'EDUCATION AND CERTIFICATIONS' ||
+      cleanHeaderTest === 'KEY CERTIFICATIONS & EDUCATION' ||
+      cleanHeaderTest === 'CERTIFICATIONS & EDUCATION' ||
+      cleanHeaderTest === 'REFEREES' ||
+      cleanHeaderTest === 'REFERENCES' ||
+      cleanHeaderTest === 'NOTABLE TECHNICAL PROJECTS' ||
       cleanHeaderTest === 'KEY HIGHLIGHTS & METRICS' ||
       cleanHeaderTest === 'ADDITIONAL INFORMATION';
 
@@ -145,7 +153,7 @@ export const downloadResumePdf = (resumeText, job, candidateProfile, filename) =
     }
 
     // 6. Contact Header Line (Melbourne, VIC | 0405 993 245 | ...)
-    if (line.includes('0405 993 245') || line.includes('sam.ludwig@gmail.com') || (line.includes('|') && line.length < 120 && line.includes('Australian Citizen'))) {
+    if ((profile?.phone && line.includes(profile.phone)) || (profile?.email && line.includes(profile.email)) || line.includes('0405 993 245') || line.includes('sam.ludwig@gmail.com') || (line.includes('|') && line.length < 130 && (line.includes('Citizen') || line.includes('Clearance') || line.includes('Work Rights')))) {
       checkPageBreak(6);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
@@ -273,12 +281,12 @@ export const downloadCoverLetterPdf = (coverLetterText, job, candidateProfile, f
       doc.text('Yours sincerely,', margin, y);
       y += 5.5;
       doc.setFont('helvetica', 'bold');
-      doc.text('Sam Ludwig', margin, y);
+      doc.text(profile?.name || 'Candidate', margin, y);
       y += 4;
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(71, 85, 105);
-      doc.text('Senior IT Systems & Workplace Infrastructure Specialist', margin, y);
+      doc.text(profile?.title || 'Senior Systems & Infrastructure Specialist', margin, y);
       return;
     }
 

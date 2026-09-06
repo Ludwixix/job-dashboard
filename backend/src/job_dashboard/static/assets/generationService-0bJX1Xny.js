@@ -1,4 +1,4 @@
-import{o as e}from"./jobQueryService-BSYglRko.js";import{_ as t,a as n,f as r,h as i,m as a,p as o}from"./profileService-DbomswPf.js";var s=`
+import{n as e}from"./apiConfig-CGoSnEFZ.js";import{_ as t,a as n,f as r,h as i,m as a,p as o}from"./profileService-CIVyp0oN.js";var s=`
 SAM LUDWIG — Senior IT Infrastructure & M365 Engineer
 Location: Melbourne, VIC | Phone: 0405 993 245 | Email: sam.ludwig@gmail.com
 Australian Citizen | Clearance Eligible: Baseline / NV1 | LinkedIn: linkedin.com/in/sam-ludwig

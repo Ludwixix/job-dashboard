@@ -31,11 +31,16 @@ import {
 } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
 import { SCRAPER_BASE_URL, buildQueriesFromProfile } from '../services/jobQueryService';
+import { RoleFilterBar } from './RoleFilterBar';
 import {
-  ROLE_ARCHETYPES,
   getProfileAutoRoles,
   getRoleArchetypeCounts, 
-  classifyJobRole
+  classifyJobRole,
+  loadSavedRoleSelections,
+  saveRoleSelections,
+  getCustomRoles,
+  addCustomRole,
+  removeCustomRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
 import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
@@ -264,31 +269,117 @@ export const JobSeeker = ({
     return unsubmittedJobs.filter(j => j.isComplete === false);
   }, [unsubmittedJobs]);
 
+  // Manage user-created custom target roles per profile
+  const [customRoles, setCustomRoles] = useState(() => {
+    return getCustomRoles(currentProfile?.id);
+  });
+
+  useEffect(() => {
+    setCustomRoles(getCustomRoles(currentProfile?.id));
+  }, [currentProfile?.id]);
+
   // Aggregate job counts per role archetype across complete unsubmitted jobs
   const roleArchetypeCounts = useMemo(() => {
-    return getRoleArchetypeCounts(completeJobs, currentProfile);
-  }, [completeJobs, currentProfile]);
+    return getRoleArchetypeCounts(completeJobs, currentProfile, customRoles);
+  }, [completeJobs, currentProfile, customRoles]);
 
   const profileAutoRoles = useMemo(() => {
-    return getProfileAutoRoles(currentProfile);
-  }, [currentProfile]);
+    return getProfileAutoRoles(currentProfile, customRoles);
+  }, [currentProfile, customRoles]);
 
-  // Start with every available role enabled. The previous profile-only
-  // default could hide valid Indeed/SEEK listings whose title did not match
-  // an inferred archetype, making the source filters appear empty despite
-  // API results.
-  const [selectedRoleIds, setSelectedRoleIds] = useState(() =>
-    roleArchetypeCounts.map(role => role.id)
-  );
+  // Refined default: on page load/refresh, load user's saved selection or
+  // default to profile-targeted roles instead of showing everything.
+  const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
+    const saved = loadSavedRoleSelections(currentProfile?.id);
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
+    }
+    const auto = getProfileAutoRoles(currentProfile, getCustomRoles(currentProfile?.id));
+    return auto && auto.length > 0 ? auto : [];
+  });
 
-  const [isRoleSelectorOpen, setIsRoleSelectorOpen] = useState(true);
-
-  // Update selected roles whenever active profile changes
+  // When active profile switches, restore profile-targeted roles or saved preference
   useEffect(() => {
     if (currentProfile) {
-      setSelectedRoleIds(roleArchetypeCounts.map(role => role.id));
+      const saved = loadSavedRoleSelections(currentProfile.id);
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        setSelectedRoleIds(saved);
+      } else {
+        const auto = getProfileAutoRoles(currentProfile, customRoles);
+        setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
+      }
     }
-  }, [currentProfile?.id, currentProfile?.industry, JSON.stringify(currentProfile?.targetTitles || []), roleArchetypeCounts.length]);
+  }, [currentProfile?.id]);
+
+  const handleSelectRole = (roleId) => {
+    setSelectedRoleIds(prev => {
+      let updated;
+      if (prev.includes(roleId)) {
+        updated = prev.filter(id => id !== roleId);
+      } else {
+        updated = [...prev, roleId];
+      }
+      saveRoleSelections(currentProfile?.id, updated);
+      return updated;
+    });
+    setCurrentPage(1);
+  };
+
+  const handleSelectAllRoles = () => {
+    const allIds = roleArchetypeCounts.map(r => r.id);
+    setSelectedRoleIds(allIds);
+    saveRoleSelections(currentProfile?.id, allIds);
+    setCurrentPage(1);
+  };
+
+  const handleClearRoles = () => {
+    setSelectedRoleIds([]);
+    saveRoleSelections(currentProfile?.id, []);
+    setCurrentPage(1);
+  };
+
+  const handleResetToProfile = () => {
+    const auto = getProfileAutoRoles(currentProfile, customRoles);
+    setSelectedRoleIds(auto);
+    saveRoleSelections(currentProfile?.id, auto);
+    setCurrentPage(1);
+  };
+
+  const handleSelectDomain = (domainRoleIds, shouldSelect) => {
+    setSelectedRoleIds(prev => {
+      let updated;
+      if (shouldSelect) {
+        updated = Array.from(new Set([...prev, ...domainRoleIds]));
+      } else {
+        updated = prev.filter(id => !domainRoleIds.includes(id));
+      }
+      saveRoleSelections(currentProfile?.id, updated);
+      return updated;
+    });
+    setCurrentPage(1);
+  };
+
+  const handleAddCustomRole = (newRoleData) => {
+    const created = addCustomRole(currentProfile?.id, newRoleData);
+    setCustomRoles(prev => [...prev, created]);
+    setSelectedRoleIds(prev => {
+      const updated = [...prev, created.id];
+      saveRoleSelections(currentProfile?.id, updated);
+      return updated;
+    });
+    setCurrentPage(1);
+  };
+
+  const handleRemoveCustomRole = (roleId) => {
+    const remaining = removeCustomRole(currentProfile?.id, roleId);
+    setCustomRoles(remaining);
+    setSelectedRoleIds(prev => {
+      const updated = prev.filter(id => id !== roleId);
+      saveRoleSelections(currentProfile?.id, updated);
+      return updated;
+    });
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     const handlePrefChange = (e) => {
@@ -487,9 +578,13 @@ export const JobSeeker = ({
 
       // Multi-Role Archetype Filter
       let matchesRole = true;
-      if (selectedRoleIds.length > 0 && selectedRoleIds.length < roleArchetypeCounts.length) {
-        const jobRole = classifyJobRole(job);
-        matchesRole = selectedRoleIds.includes(jobRole.id);
+      if (roleArchetypeCounts.length > 0) {
+        if (selectedRoleIds.length === 0) {
+          matchesRole = false;
+        } else if (selectedRoleIds.length < roleArchetypeCounts.length) {
+          const jobRole = classifyJobRole(job, customRoles);
+          matchesRole = selectedRoleIds.includes(jobRole.id);
+        }
       }
 
       return matchesSearch && matchesSource && matchesStream && matchesRole && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
@@ -519,7 +614,7 @@ export const JobSeeker = ({
       }
       return 0;
     });
-  }, [completeJobs, missingDataJobs, unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
+  }, [completeJobs, missingDataJobs, unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, customRoles, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
 
 
   // Paginated Sliced Jobs
@@ -895,124 +990,22 @@ export const JobSeeker = ({
             </div>
           )}
 
-          {/* Role Intelligence & Multi-Role Selector Bar */}
-          <div className="bg-[#1e1e2e] p-4 rounded-2xl border border-[#313244] shadow-md space-y-3 font-mono">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/40">
-                  <Bot size={16} />
-                </div>
-                <div>
-                  <div className="text-xs font-black text-white flex items-center gap-2">
-                    ROLE INTELLIGENCE &amp; PROFILE TARGETING
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-500/40 font-bold">
-                      {selectedRoleIds.length} OF {roleArchetypeCounts.length} ROLES ACTIVE
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    Auto-generated for {currentProfile?.name} • Select roles to customize which positions appear in the matrix
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedRoleIds(profileAutoRoles);
-                    setCurrentPage(1);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/40 text-[10px] font-black transition-all cursor-pointer flex items-center gap-1"
-                  title="Auto-select only the roles that match your active candidate profile"
-                >
-                  <Sparkles size={11} className="text-indigo-300" />
-                  <span>🎯 PROFILE MATCH ({profileAutoRoles.length})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedRoleIds(roleArchetypeCounts.map(r => r.id));
-                    setCurrentPage(1);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 transition-all cursor-pointer"
-                >
-                  SELECT ALL ({unsubmittedJobs.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedRoleIds([]);
-                    setCurrentPage(1);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] font-bold border border-slate-700 transition-all cursor-pointer"
-                >
-                  CLEAR
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsRoleSelectorOpen(!isRoleSelectorOpen)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 transition-all cursor-pointer"
-                >
-                  {isRoleSelectorOpen ? 'COLLAPSE' : 'EXPAND'}
-                </button>
-              </div>
-            </div>
-
-            {/* Role Chips with Live Job Counts */}
-            {isRoleSelectorOpen && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 pt-2 border-t border-[#313244]/60 max-h-64 overflow-y-auto pr-1">
-                {roleArchetypeCounts.map(role => {
-                  const isSelected = selectedRoleIds.includes(role.id);
-                  const isProfileMatch = role.isRecommended;
-
-                  return (
-                    <div
-                      key={role.id}
-                      onClick={() => {
-                        setSelectedRoleIds(prev => 
-                          prev.includes(role.id) ? prev.filter(id => id !== role.id) : [...prev, role.id]
-                        );
-                        setCurrentPage(1);
-                      }}
-                      className={`p-2 rounded-xl border text-xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-purple-950/40 border-purple-500/60 text-purple-100 shadow-sm ring-1 ring-purple-500/30'
-                          : 'bg-[#181825] border-[#313244] text-slate-400 hover:border-slate-600 hover:text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-black shrink-0 ${
-                          isSelected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-500 border border-slate-700'
-                        }`}>
-                          {isSelected ? '✓' : ''}
-                        </div>
-                        <div className="truncate">
-                          <div className="font-bold text-[11px] truncate flex items-center gap-1">
-                            <span>{role.title}</span>
-                            {isProfileMatch && (
-                              <span className="text-[8px] px-1 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-500/40 font-bold shrink-0">
-                                ⭐ FIT
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[9px] text-slate-500">{role.category}</div>
-                        </div>
-                      </div>
-
-                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
-                        isSelected 
-                          ? 'bg-purple-600/30 text-purple-200 border border-purple-400/40' 
-                          : 'bg-slate-900 text-slate-500 border border-slate-800'
-                      }`}>
-                        {role.count}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {/* Role Targeting & Intelligent Multi-Sector Filter Bar */}
+          <RoleFilterBar
+            roleArchetypeCounts={roleArchetypeCounts}
+            selectedRoleIds={selectedRoleIds}
+            onSelectRole={handleSelectRole}
+            onSelectAll={handleSelectAllRoles}
+            onClearRoles={handleClearRoles}
+            onResetToProfile={handleResetToProfile}
+            onSelectDomain={handleSelectDomain}
+            currentProfile={currentProfile}
+            profileAutoRoles={profileAutoRoles}
+            customRoles={customRoles}
+            onAddCustomRole={handleAddCustomRole}
+            onRemoveCustomRole={handleRemoveCustomRole}
+            totalJobsCount={unsubmittedJobs.length}
+          />
 
           {/* VS Code Theme Refinement Console */}
           <div className="bg-[#1e1e2e] p-5 rounded-2xl border border-[#313244] shadow-md space-y-4 font-mono">

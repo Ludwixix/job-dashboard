@@ -9,7 +9,8 @@ import {
   Terminal,
   Settings,
   Sparkles,
-  Layers
+  Layers,
+  Award
 } from 'lucide-react';
 
 /**
@@ -24,6 +25,9 @@ export default function AlienMonolithNav({
   onOpenCommandPalette,
   onOpenSettings,
   onSwitchToStudio,
+  onOpenWorkforceAustralia,
+  showWorkforceAustralia = false,
+
   readyCount = 0,
   isAutonomousActive = true,
   isScanningRadar = false
@@ -107,6 +111,19 @@ export default function AlienMonolithNav({
 
         {/* Separator Line */}
         <div className="hidden md:block w-6 h-[1px] bg-slate-800 my-1" />
+        {/* Workforce Australia PBAS Hub (when enabled in Settings) */}
+        {showWorkforceAustralia && onOpenWorkforceAustralia && (
+          <button
+            type="button"
+            onClick={onOpenWorkforceAustralia}
+            className="w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 flex items-center justify-center rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 hover:text-amber-300 border border-amber-500/30 hover:border-amber-500/60 transition-all cursor-pointer shadow-xs"
+            title="Workforce Australia PBAS Evidence Hub"
+            aria-label="Workforce Australia PBAS Evidence Hub"
+          >
+            <Award size={16} />
+          </button>
+        )}
+
 
         {/* Quick Batch Dispatch Action */}
         {onOpenBatchApply && (

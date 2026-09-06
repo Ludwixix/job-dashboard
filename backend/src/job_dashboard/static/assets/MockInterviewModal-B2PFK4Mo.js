@@ -1,1 +1,0 @@
-import"./rolldown-runtime-hePW80VL.js";import{i as e,r as t}from"./vendor-framer-Bat9FBW0.js";import{L as n}from"./index-BWr2YbKF.js";e();var r=t(),i=e=>(0,r.jsx)(n,{...e,initialTab:`simulator`});export{i as MockInterviewModal};

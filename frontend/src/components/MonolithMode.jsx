@@ -17,6 +17,8 @@ import {
   Check,
   Copy,
   RefreshCw,
+  Award,
+
   Send,
   Users,
   TrendingUp,
@@ -43,6 +45,9 @@ export default function MonolithMode({
   onOpenCommandPalette,
   onOpenSettings,
   onOpenRecruiterCrm,
+  onOpenWorkforceAustralia,
+  showWorkforceAustralia = false,
+
   onOpenFunnelIntel,
   onOpenCareerCompass,
   overdueTouchpointCount = 0
@@ -240,6 +245,9 @@ export default function MonolithMode({
         onOpenCommandPalette={onOpenCommandPalette}
         onOpenSettings={onOpenSettings}
         onSwitchToStudio={() => onSwitchMode && onSwitchMode('studio')}
+        onOpenWorkforceAustralia={onOpenWorkforceAustralia}
+        showWorkforceAustralia={showWorkforceAustralia}
+
         readyCount={actionDeck.length}
         isAutonomousActive={agentState.isRunning}
         isScanningRadar={isScanningGmail}
@@ -335,6 +343,19 @@ export default function MonolithMode({
                   <span>CRM</span>
                   {overdueTouchpointCount > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black">
+              {/* Workforce Australia PBAS Hub (When Enabled) */}
+              {showWorkforceAustralia && onOpenWorkforceAustralia && (
+                <button
+                  type="button"
+                  onClick={onOpenWorkforceAustralia}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 hover:border-amber-500/60 bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 hover:text-white text-[11px] font-bold tracking-wide transition-all cursor-pointer shadow-xs"
+                  title="Workforce Australia Mutual Obligations & PBAS Evidence Hub"
+                >
+                  <Award size={13} className="text-amber-400" />
+                  <span>PBAS HUB</span>
+                </button>
+              )}
+
                       {overdueTouchpointCount}
                     </span>
                   )}

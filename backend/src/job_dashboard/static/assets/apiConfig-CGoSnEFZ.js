@@ -1,0 +1,1 @@
+var e=()=>`https://job-dashboard-6xrdvjlrcq-ts.a.run.app`,t=e();export{e as n,t};

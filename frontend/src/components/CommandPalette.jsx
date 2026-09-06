@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Sparkles, Briefcase, ArrowRight, Sliders, Settings } from 'lucide-react';
+import { Search, Sparkles, Briefcase, ArrowRight, Sliders, Settings, Award } from 'lucide-react';
 
-export const CommandPalette = ({ isOpen, onClose, jobs = [], onSelectJob, onNavigateView, onOpenSettings }) => {
+export const CommandPalette = ({ 
+  isOpen, 
+  onClose, 
+  jobs = [], 
+  onSelectJob, 
+  onNavigateView, 
+  onOpenSettings,
+  onOpenWorkforceAustralia,
+  showWorkforceAustralia = false
+}) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
@@ -16,12 +25,17 @@ export const CommandPalette = ({ isOpen, onClose, jobs = [], onSelectJob, onNavi
 
   // Filter commands & jobs
   const cleanQ = query.toLowerCase().trim();
-
   const staticActions = [
     { id: 'view_stream', label: 'View: Live Stream & All Jobs', icon: <Briefcase size={14} className="text-indigo-400" />, action: () => onNavigateView('stream') },
     { id: 'view_kanban', label: 'View: Application Pipeline (Kanban)', icon: <Sliders size={14} className="text-emerald-400" />, action: () => onNavigateView('kanban') },
     { id: 'view_market', label: 'View: Market Intelligence & Skill Gap Analysis', icon: <Sparkles size={14} className="text-amber-400" />, action: () => onNavigateView('market') },
     { id: 'settings', label: 'Settings: LLM Provider, Model & API Keys', icon: <Settings size={14} className="text-purple-400" />, action: () => onOpenSettings?.() },
+    ...(showWorkforceAustralia && onOpenWorkforceAustralia ? [{
+      id: 'workforce_australia',
+      label: 'Workforce Australia: PBAS Points, Evidence & Fast-Entry',
+      icon: <Award size={14} className="text-amber-400" />,
+      action: () => onOpenWorkforceAustralia()
+    }] : []),
   ];
 
   const matchedActions = staticActions.filter(a => a.label.toLowerCase().includes(cleanQ));

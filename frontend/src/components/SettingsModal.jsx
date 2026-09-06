@@ -14,6 +14,11 @@ import {
 import { buildQueriesFromProfile, SCRAPER_BASE_URL } from '../services/jobQueryService';
 import { getProfiles } from '../services/profileService';
 
+import { 
+  getWorkforceSettings, 
+  saveWorkforceSettings 
+} from '../services/workforceAustraliaService';
+
 export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [activeProvider, setActiveProvider] = useState('openrouter');
@@ -34,6 +39,13 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   const [matchThreshold, setMatchThreshold] = useState(() => {
     return parseInt(localStorage.getItem('pref_match_threshold') || '75', 10);
   });
+
+  // Workforce Australia settings state (Default: disabled)
+  const [workforceEnabled, setWorkforceEnabled] = useState(false);
+  const [workforceTarget, setWorkforceTarget] = useState(100);
+  const [workforceCycleDay, setWorkforceCycleDay] = useState(1);
+  const [workforceJsid, setWorkforceJsid] = useState('');
+  const [workforceProvider, setWorkforceProvider] = useState('');
 
   // Test Connection state
   const [isTesting, setIsTesting] = useState(false);
@@ -65,6 +77,13 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
       setAuEnglish(localStorage.getItem('pref_au_english') !== 'false');
       setDefaultLocation(localStorage.getItem('job_dashboard_base_location') || 'Melbourne, VIC');
       setMatchThreshold(parseInt(localStorage.getItem('pref_match_threshold') || '75', 10));
+      const wf = getWorkforceSettings();
+      setWorkforceEnabled(wf.enabled);
+      setWorkforceTarget(wf.pointsTarget);
+      setWorkforceCycleDay(wf.cycleStartDay);
+      setWorkforceJsid(wf.jobseekerId);
+      setWorkforceProvider(wf.providerName);
+
       setTestResult(null);
       setSaveSuccess(false);
     }
@@ -128,6 +147,20 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
     localStorage.setItem('pref_au_english', auEnglish ? 'true' : 'false');
     localStorage.setItem('job_dashboard_base_location', defaultLocation.trim());
     localStorage.setItem('pref_match_threshold', String(matchThreshold));
+    saveWorkforceSettings({
+      enabled: workforceEnabled,
+      pointsTarget: workforceTarget,
+      cycleStartDay: workforceCycleDay,
+      jobseekerId: workforceJsid,
+      providerName: workforceProvider
+    });
+    // Dispatch custom event to notify listeners (e.g. Nav, Dashboard)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('workforce-settings-updated', {
+        detail: { enabled: workforceEnabled }
+      }));
+    }
+
 
     setSaveSuccess(true);
     setTimeout(() => {
@@ -616,6 +649,91 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
                     <span>75% (Balanced)</span>
                     <span>95% (Laser Focused)</span>
                   </div>
+                </div>
+
+                {/* Workforce Australia Mutual Obligations & PBAS Reporting */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-xs block">Workforce Australia PBAS Reporting</span>
+                        <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Mutual Obligations
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-sans mt-0.5">
+                        Track monthly points requirements (5 pts per application, 20 pts per interview), quick-copy data for the myGov portal, and generate compliance PDF evidence reports.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      data-testid="workforce-australia-toggle"
+                      checked={workforceEnabled}
+                      onChange={(e) => setWorkforceEnabled(e.target.checked)}
+                      className="w-5 h-5 accent-amber-500 rounded cursor-pointer shrink-0 ml-3"
+                    />
+                  </div>
+
+                  {workforceEnabled && (
+                    <div className="pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                          Monthly Points Target
+                        </label>
+                        <input
+                          type="number"
+                          min="20"
+                          max="200"
+                          step="5"
+                          value={workforceTarget}
+                          onChange={(e) => setWorkforceTarget(Math.max(10, parseInt(e.target.value || '100', 10)))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-0.5 block">Default: 100 points/month</span>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                          Cycle Cut-Off / Start Day
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={workforceCycleDay}
+                          onChange={(e) => setWorkforceCycleDay(Math.max(1, Math.min(28, parseInt(e.target.value || '1', 10))))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-0.5 block">1 = Calendar month; or provider cut-off day</span>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                          Jobseeker ID (JSID) <span className="text-slate-500 font-normal">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={workforceJsid}
+                          onChange={(e) => setWorkforceJsid(e.target.value)}
+                          placeholder="e.g. JS123456789"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                          Provider / Agency Name <span className="text-slate-500 font-normal">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={workforceProvider}
+                          onChange={(e) => setWorkforceProvider(e.target.value)}
+                          placeholder="e.g. APM, matchworks, Max"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>

@@ -33,6 +33,9 @@ const ExecutiveDossierModal = lazy(() => import('./ExecutiveDossierModal').then(
 const RecruiterRelationshipModal = lazy(() => import('./RecruiterRelationshipModal').then(m => ({ default: m.RecruiterRelationshipModal })));
 const FunnelIntelligenceModal = lazy(() => import('./FunnelIntelligenceModal'));
 const CareerMatrixModal = lazy(() => import('./CareerMatrixModal'));
+const WorkforceAustraliaModal = lazy(() => import('./WorkforceAustraliaModal'));
+import { getWorkforceSettings } from '../services/workforceAustraliaService';
+
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -68,6 +71,23 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isFunnelModalOpen, setIsFunnelModalOpen] = useState(false);
   const [isCareerModalOpen, setIsCareerModalOpen] = useState(false);
   const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
+  const [isWorkforceModalOpen, setIsWorkforceModalOpen] = useState(false);
+  const [isWorkforceEnabled, setIsWorkforceEnabled] = useState(() => getWorkforceSettings().enabled);
+
+  useEffect(() => {
+    const handleSettingsUpdate = (e) => {
+      if (e?.detail?.enabled !== undefined) {
+        setIsWorkforceEnabled(Boolean(e.detail.enabled));
+      } else {
+        setIsWorkforceEnabled(getWorkforceSettings().enabled);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('workforce-settings-updated', handleSettingsUpdate);
+      return () => window.removeEventListener('workforce-settings-updated', handleSettingsUpdate);
+    }
+  }, []);
+
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
   const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
@@ -531,6 +551,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           }}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenBatchApply={() => setIsBatchApplyOpen(true)}
+          onOpenWorkforceAustralia={() => setIsWorkforceModalOpen(true)}
+          showWorkforceAustralia={isWorkforceEnabled}
+
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenRecruiterCrm={() => setIsRecruiterCrmOpen(true)}
           onOpenFunnelIntel={() => setIsFunnelModalOpen(true)}
@@ -720,6 +743,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onSelectJob={(j) => setSelectedJob(j)}
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
               onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenWorkforceAustralia={() => setIsWorkforceModalOpen(true)}
+              showWorkforceAustralia={isWorkforceEnabled}
             />
           </Suspense>
         )}
@@ -729,6 +754,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <SettingsModal
               isOpen={isSettingsOpen}
               onClose={() => setIsSettingsOpen(false)}
+            />
+          </Suspense>
+        )}
+
+        {isWorkforceModalOpen && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <WorkforceAustraliaModal
+              isOpen={isWorkforceModalOpen}
+              onClose={() => setIsWorkforceModalOpen(false)}
+              jobs={jobs}
             />
           </Suspense>
         )}
@@ -1442,6 +1477,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
+              onOpenWorkforceAustralia={() => { setIsWorkforceModalOpen(true); setIsCommandPaletteOpen(false); }}
+              showWorkforceAustralia={isWorkforceEnabled}
+
           </Suspense>
         </SafeErrorBoundary>
       )}
@@ -1541,6 +1579,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </Suspense>
         </SafeErrorBoundary>
       )}
+      {/* Workforce Australia PBAS Reporting Hub Modal */}
+      {isWorkforceModalOpen && (
+        <SafeErrorBoundary sectionName="Workforce Australia Modal">
+          <Suspense fallback={<ModalSkeleton />}>
+            <WorkforceAustraliaModal
+              isOpen={isWorkforceModalOpen}
+              onClose={() => setIsWorkforceModalOpen(false)}
+              jobs={jobs}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
 
       {/* Dashboard Settings & LLM Configuration Modal */}
       {isSettingsOpen && (

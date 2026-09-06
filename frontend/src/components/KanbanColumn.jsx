@@ -2,8 +2,9 @@ import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Building2, MapPin, Clock, Sparkles } from 'lucide-react';
+import { Building2, MapPin, Clock } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
+import { Badge } from './ui/Badge';
 
 const KanbanCard = ({ job, onSelectJob }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
@@ -44,15 +45,17 @@ const KanbanCard = ({ job, onSelectJob }) => {
           onSelectJob(job);
         }
       }}
-      className={`p-4 rounded-xl bg-slate-800 border ${needsFollowUp ? 'border-amber-500/50 ring-1 ring-amber-500/30' : 'border-slate-700'} shadow-sm cursor-pointer hover:border-indigo-500/60 hover:bg-slate-750 transition-all group ${isDragging ? 'ring-2 ring-indigo-500' : ''}`}
+      className={`p-4 rounded-xl bg-slate-800/90 border ${needsFollowUp ? 'border-amber-500/60 ring-1 ring-amber-500/30' : 'border-slate-700/80'} shadow-sm cursor-pointer hover:border-indigo-500/60 hover:bg-slate-750 transition-all group select-none active:scale-[0.99] ${isDragging ? 'ring-2 ring-indigo-500 shadow-xl' : ''}`}
     >
       <div className="flex justify-between items-start mb-1.5 gap-2">
         <h4 className="text-sm font-bold text-slate-100 leading-tight group-hover:text-indigo-300 transition-colors">{job.title}</h4>
       </div>
       
       {needsFollowUp && (
-        <div className="inline-block mt-0.5 mb-2 px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-mono font-bold uppercase">
-          Follow-Up Due ({daysAgo}d)
+        <div className="mb-2">
+          <Badge variant="amber" size="xs">
+            Follow-Up Due ({daysAgo}d)
+          </Badge>
         </div>
       )}
 
@@ -63,11 +66,11 @@ const KanbanCard = ({ job, onSelectJob }) => {
         </div>
         <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
           <div className="flex items-center gap-1 truncate max-w-[60%]">
-            <MapPin size={10} className="text-slate-500" />
+            <MapPin size={11} className="text-slate-400" />
             <span className="truncate">{job.location || 'Melbourne, VIC'}</span>
           </div>
           <div className="flex items-center gap-1 whitespace-nowrap">
-            <Clock size={10} className="text-slate-500" />
+            <Clock size={11} className="text-slate-400" />
             <span>{daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}</span>
           </div>
         </div>
@@ -76,7 +79,7 @@ const KanbanCard = ({ job, onSelectJob }) => {
   );
 };
 
-export const KanbanColumn = ({ stage, jobs = [], onSelectJob }) => {
+export const KanbanColumn = ({ stage, jobs = [], onSelectJob, className = '' }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
     data: { type: 'column', stage: stage.id }
@@ -101,7 +104,7 @@ export const KanbanColumn = ({ stage, jobs = [], onSelectJob }) => {
   return (
     <div 
       ref={setNodeRef}
-      className={`flex-1 min-w-[280px] sm:min-w-[320px] max-w-[350px] flex flex-col h-full rounded-2xl border ${colors[stage.color]} ${isOver ? 'ring-2 ring-indigo-500/50 bg-slate-850' : ''} transition-all snap-center shrink-0 shadow-lg`}
+      className={`w-full md:w-auto flex-1 min-w-0 md:min-w-[280px] sm:min-w-[320px] max-w-full md:max-w-[350px] flex-col h-full rounded-2xl border ${colors[stage.color]} ${isOver ? 'ring-2 ring-indigo-500/50 bg-slate-850' : ''} transition-all snap-center shrink-0 shadow-lg ${className}`}
     >
       <div className="p-3.5 border-b border-slate-800/60 flex items-center justify-between sticky top-0 bg-inherit z-10 rounded-t-2xl">
         <h3 className="font-bold text-xs tracking-wider uppercase font-mono">{stage.title}</h3>

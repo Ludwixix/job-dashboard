@@ -324,7 +324,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -544,7 +544,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
-                  activeTab === tab.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                  activeTab === tab.id ? 'bg-slate-700 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                 }`}
               >
                 {tab.icon} {tab.label}

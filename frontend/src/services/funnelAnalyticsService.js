@@ -348,3 +348,4 @@ export async function fetchFunnelAnalytics(jobs = [], sector = 'technology') {
   }
   return computeClientFunnelAnalytics(jobs, sector);
 }
+

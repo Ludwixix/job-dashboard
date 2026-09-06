@@ -32,6 +32,7 @@ const OfferActionHubModal = lazy(() => import('./OfferActionHubModal').then(m =>
 const ExecutiveDossierModal = lazy(() => import('./ExecutiveDossierModal').then(m => ({ default: m.ExecutiveDossierModal })));
 const RecruiterRelationshipModal = lazy(() => import('./RecruiterRelationshipModal').then(m => ({ default: m.RecruiterRelationshipModal })));
 const FunnelIntelligenceModal = lazy(() => import('./FunnelIntelligenceModal'));
+const CareerMatrixModal = lazy(() => import('./CareerMatrixModal'));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -48,7 +49,7 @@ import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../se
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass
 } from 'lucide-react';
 
 
@@ -65,6 +66,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
   const [isFunnelModalOpen, setIsFunnelModalOpen] = useState(false);
+  const [isCareerModalOpen, setIsCareerModalOpen] = useState(false);
   const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
@@ -532,6 +534,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenRecruiterCrm={() => setIsRecruiterCrmOpen(true)}
           onOpenFunnelIntel={() => setIsFunnelModalOpen(true)}
+          onOpenCareerCompass={() => setIsCareerModalOpen(true)}
           overdueTouchpointCount={overdueTouchpointCount}
         />
 
@@ -683,6 +686,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </Suspense>
         )}
 
+        {isCareerModalOpen && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <CareerMatrixModal
+              isOpen={isCareerModalOpen}
+              onClose={() => setIsCareerModalOpen(false)}
+              profile={activeProfile}
+              currentSector={activeProfile?.industry || 'technology'}
+            />
+          </Suspense>
+        )}
+
         {isProfileModalOpen && (
           <Suspense fallback={<ModalSkeleton />}>
             <ProfileModal
@@ -824,6 +838,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <span>FUNNEL INTEL</span>
           </button>
 
+          {/* Strategic Career Roadmap & Trajectory Compass */}
+          <button
+            onClick={() => setIsCareerModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+            title="Career Vector Matrix: Seniority Roadmap, Skill Deltas & Salary Lift"
+          >
+            <Compass size={12} className="text-indigo-400" />
+            <span>CAREER COMPASS</span>
+          </button>
+
           {/* Dashboard Settings & LLM Configuration */}
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -962,7 +986,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </div>
 
           {/* 5-Way Tab View Switcher */}
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 overflow-x-auto">
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 max-w-full overflow-x-auto scrollbar-none shrink-0">
             <button
               onClick={() => setActiveSection('seeker')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
@@ -1373,6 +1397,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 setIsFunnelModalOpen(false);
                 setIsRecruiterCrmOpen(true);
               }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Strategic Career Roadmap & Trajectory Compass Modal */}
+      {isCareerModalOpen && (
+        <SafeErrorBoundary sectionName="Career Vector Matrix" onClose={() => setIsCareerModalOpen(false)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <CareerMatrixModal
+              isOpen={isCareerModalOpen}
+              onClose={() => setIsCareerModalOpen(false)}
+              profile={activeProfile}
+              currentSector={activeProfile?.industry || 'technology'}
             />
           </Suspense>
         </SafeErrorBoundary>

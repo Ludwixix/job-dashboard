@@ -46,6 +46,7 @@ export default function MonolithMode({
   onOpenSettings,
   onOpenRecruiterCrm,
   onOpenFunnelIntel,
+  onOpenCareerCompass,
   overdueTouchpointCount = 0
 }) {
   // Navigation active tab: 'prime' | 'autopilot' | 'radar'
@@ -320,6 +321,19 @@ export default function MonolithMode({
                 </button>
               )}
 
+              {/* Strategic Career Roadmap & Trajectory Compass */}
+              {onOpenCareerCompass && (
+                <button
+                  type="button"
+                  onClick={onOpenCareerCompass}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-800/60 hover:border-indigo-500 bg-[#110e24] text-indigo-300 hover:text-white text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  title="Career Vector Matrix: Seniority Roadmap & Salary Lift"
+                >
+                  <Compass size={11} className="text-indigo-400" />
+                  <span>CAREER COMPASS</span>
+                </button>
+              )}
+
               {/* Profile Action */}
               <button
                 type="button"
@@ -471,7 +485,7 @@ export default function MonolithMode({
               ) : (
                 <div className="p-12 text-center border border-[#27211a] bg-[#120f0d] space-y-3">
                   <p className="text-sm tracking-[0.2em] text-[#a89d8e]">NO RECENT VECTORS DETECTED</p>
-                  <p className="text-xs text-[#706659]">Background engine is assimilating new listings. All systems nominal.</p>
+                  <p className="text-xs text-[#a89d8e]">Background engine is assimilating new listings. All systems nominal.</p>
                 </div>
               )}
 
@@ -483,7 +497,7 @@ export default function MonolithMode({
                       <Compass size={13} className="text-[#d48b38]" />
                       SECONDARY MONOLITHS // FILTERED ESSENCE
                     </span>
-                    <span className="text-[10px] text-[#706659]">
+                    <span className="text-[10px] text-[#a89d8e]">
                       {secondarySlabs.length} OF {activeJobs.length} VERIFIED
                     </span>
                   </div>
@@ -599,7 +613,7 @@ export default function MonolithMode({
                           {job.company}
                         </p>
                       </div>
-                      <span className="text-[9px] font-mono text-[#706659] border border-[#262019] px-2 py-0.5">
+                      <span className="text-[10px] font-mono text-[#a89d8e] border border-[#262019] px-2 py-0.5">
                         {formatJobPostedAge(job.date)}
                       </span>
                     </div>
@@ -632,7 +646,7 @@ export default function MonolithMode({
                         <button
                           type="button"
                           onClick={() => handleMarkApplied(job)}
-                          className="text-[10px] tracking-wider text-[#706659] hover:text-emerald-400 p-1 cursor-pointer"
+                          className="text-[10px] tracking-wider text-[#a89d8e] hover:text-emerald-400 p-1 cursor-pointer"
                           title="Mark as Applied"
                         >
                           <CheckCircle2 size={15} />
@@ -712,7 +726,7 @@ export default function MonolithMode({
                       </div>
                     ))
                   ) : (
-                    <div className="space-y-1 text-[#706659]">
+                    <div className="space-y-1 text-[#a89d8e]">
                       <p>[SYSTEM] All autonomous agents synchronized with live gateway.</p>
                       <p>[SYSTEM] Listening for new recruiter responses on Gmail thread tracker.</p>
                       <p>[SYSTEM] Auto-screening 6,106 opportunities against active candidate profile.</p>
@@ -725,7 +739,7 @@ export default function MonolithMode({
         </main>
 
         {/* 3. SILENT PULSE TELEMETRY BAR (BOTTOM STATUS) */}
-        <footer className="relative z-10 border-t border-[#231e19] bg-[#0c0a08] px-4 sm:px-6 lg:px-12 py-3 text-[10px] tracking-[0.2em] text-[#706659] uppercase">
+        <footer className="relative z-10 border-t border-[#231e19] bg-[#0c0a08] px-4 sm:px-6 lg:px-12 py-3 text-[10px] tracking-[0.2em] text-[#a89d8e] uppercase">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-4 truncate">
               <span className="flex items-center gap-1.5 text-[#d48b38] font-bold shrink-0">

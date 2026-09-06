@@ -377,7 +377,7 @@ ${fullJobText}`;
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-slate-950/90 border-b border-slate-800 px-5 flex items-center gap-2 shrink-0 font-mono text-xs">
+        <div className="bg-slate-950/90 border-b border-slate-800 px-3 sm:px-5 flex items-center gap-2 shrink-0 font-mono text-xs overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('psychology')}
             className={`py-3 px-4 font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${

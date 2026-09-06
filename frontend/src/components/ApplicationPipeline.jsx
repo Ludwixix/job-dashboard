@@ -53,6 +53,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
   const [viewMode, setViewMode] = useURLState('view', 'kanban'); // 'kanban' or 'table'
   const [searchQuery, setSearchQuery] = useURLState('q', '');
   const [statusFilter, setStatusFilter] = useURLState('status', 'All');
+  const [mobileActiveStage, setMobileActiveStage] = useState('Applied');
   
   const [importData, setImportData] = useState(null);
   const fileInputRef = React.useRef(null);
@@ -227,6 +228,28 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
         ) : (
           viewMode === 'kanban' ? (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+              {/* Mobile Stage Selector */}
+              <div className="md:hidden flex overflow-x-auto gap-1.5 pb-2 mb-2 scrollbar-none font-mono text-xs">
+                {PIPELINE_STAGES.map(stage => {
+                  const count = activeJobs.filter(j => getJobStage(j, starredSet) === stage.id).length;
+                  const isActive = mobileActiveStage === stage.id;
+                  return (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => setMobileActiveStage(stage.id)}
+                      className={`px-3 py-1.5 rounded-lg font-bold shrink-0 transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                      }`}
+                    >
+                      {stage.title} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="flex gap-4 overflow-x-auto h-full pb-4 items-start snap-x snap-mandatory">
                 {PIPELINE_STAGES.map(stage => (
                   <KanbanColumn 
@@ -234,6 +257,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
                     stage={stage} 
                     jobs={activeJobs.filter(j => getJobStage(j, starredSet) === stage.id)} 
                     onSelectJob={(job) => setSelectedJob(job)}
+                    className={mobileActiveStage === stage.id ? 'flex' : 'hidden md:flex'}
                   />
                 ))}
               </div>

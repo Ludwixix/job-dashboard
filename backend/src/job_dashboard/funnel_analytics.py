@@ -431,3 +431,4 @@ def compute_funnel_analytics(
         "recommendations": recommendations,
         "timestamp": now.isoformat(),
     }
+

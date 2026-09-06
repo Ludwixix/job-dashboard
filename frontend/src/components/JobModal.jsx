@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();

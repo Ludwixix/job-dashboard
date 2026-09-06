@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+@theme {
+  --color-void: #070a13;
+  --color-canvas: #0b1120;
+  --color-surface: #0f172a;
+  --color-elevated: #1e293b;
+  --color-overlay: #334155;
+  --color-border-subtle: #1e293b;
+  --color-border-strong: #334155;
+
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-text-dim: #64748b;
+
+  --color-accent-bronze: #d48b38;
+  --color-accent-bronze-dark: #b87326;
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --z-modal-base: 50;
+  --z-modal-nested: 60;
+  --z-command: 70;
+  --z-toast: 80;
+  --z-fatal: 90;
+}
+
 @layer base {
   :root {
     --industry-accent: #0d9488;
@@ -10,6 +37,18 @@
     --industry-subtle: rgba(13, 148, 136, 0.04);
     --industry-badge-bg: rgba(19, 78, 74, 0.5);
     --industry-badge-text: #5eead4;
+
+    /* Canonical Tokens */
+    --bg-void: #070a13;
+    --bg-canvas: #0b1120;
+    --bg-surface: #0f172a;
+    --bg-elevated: #1e293b;
+    --bg-overlay: #334155;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #e2e8f0;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
   }
 
   body {

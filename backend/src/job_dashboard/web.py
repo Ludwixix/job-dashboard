@@ -68,6 +68,7 @@ from .executive_dossier import generate_executive_dossier, export_dossier_markdo
 from .smart_applications import get_smart_application_tracker
 from .network_crm import NetworkCRMManager, NetworkContact
 from .funnel_analytics import compute_funnel_analytics, AU_SECTOR_BENCHMARKS
+from .career_matrix import generate_career_roadmap, SECTOR_CAREER_TRACKS, AU_CERTIFICATION_REGISTRY
 from datetime import timedelta
 from urllib.error import URLError
 
@@ -1285,6 +1286,15 @@ def make_handler(app: DashboardApp):
                 jobs_list = [j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs]
                 analytics = compute_funnel_analytics(jobs_list, sector=sector)
                 self.send_json(200, {"success": True, "analytics": analytics})
+                return
+
+            if path == "/api/career/roadmap":
+                sector = query_params.get("sector", [None])[0]
+                target_level = query_params.get("target_level", [None])[0]
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                roadmap = generate_career_roadmap(profile, target_level=target_level, sector=sector)
+                self.send_json(200, {"success": True, "roadmap": roadmap})
                 return
 
             if path == "/api/network/cadence":
@@ -2698,6 +2708,20 @@ def make_handler(app: DashboardApp):
                         jobs_list = [j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs]
                     analytics = compute_funnel_analytics(jobs_list, sector=sector)
                     self.send_json(200, {"success": True, "analytics": analytics})
+                    return
+
+                # Phase 18: Career Matrix POST Endpoint
+                if path == "/api/career/roadmap":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    sector = payload.get("sector") or query_params.get("sector", [None])[0]
+                    target_level = payload.get("target_level") or query_params.get("target_level", [None])[0]
+                    profile = payload.get("profile")
+                    if not profile:
+                        user_id = resolve_user_id(self, query_params)
+                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    roadmap = generate_career_roadmap(profile, target_level=target_level, sector=sector)
+                    self.send_json(200, {"success": True, "roadmap": roadmap})
                     return
 
                 # Phase 16: Network CRM POST Endpoints

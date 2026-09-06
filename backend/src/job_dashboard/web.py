@@ -1856,6 +1856,16 @@ def make_handler(app: DashboardApp):
                             app.repository.upsert_user_profile(email, body)
                         except Exception:
                             pass
+                    for prefix in ("user_", "prof_"):
+                        if user_id.startswith(prefix):
+                            clean_id = user_id[len(prefix):]
+                            try:
+                                app.repository.upsert_user_profile(clean_id, body)
+                            except Exception:
+                                pass
+                    from .config import settings
+                    if settings.gcs_data_bucket:
+                        threading.Thread(target=backup_to_gcs, args=(settings.gcs_data_bucket, app.data_dir), daemon=True).start()
                     self.send_json(200, {"success": True, "profile": res})
                     return
 
@@ -1867,6 +1877,9 @@ def make_handler(app: DashboardApp):
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
                     res = app.repository.upsert_user_preferences(user_id, body)
+                    from .config import settings
+                    if settings.gcs_data_bucket:
+                        threading.Thread(target=backup_to_gcs, args=(settings.gcs_data_bucket, app.data_dir), daemon=True).start()
                     self.send_json(200, {"success": True, "preferences": res})
                     return
 

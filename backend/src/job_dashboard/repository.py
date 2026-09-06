@@ -814,16 +814,42 @@ class JobRepository:
     # USER PROFILES & RESUME INTELLIGENCE VAULT
     # ==========================================
     def get_user_profile(self, user_id: str) -> dict[str, Any]:
-        """Fetch custom candidate profile from backend database."""
+        """Fetch custom candidate profile from backend database with multi-index fallback."""
         if not user_id:
             return {}
         with get_db_connection(self.path) as conn:
+            # 1. Exact match
             row = conn.execute("SELECT profile_data_json FROM user_profiles WHERE user_id = ?", (user_id,)).fetchone()
             if row and row[0]:
                 try:
                     return json.loads(row[0])
                 except Exception:
                     pass
+            # 2. Case-insensitive match
+            row = conn.execute("SELECT profile_data_json FROM user_profiles WHERE LOWER(user_id) = LOWER(?)", (user_id,)).fetchone()
+            if row and row[0]:
+                try:
+                    return json.loads(row[0])
+                except Exception:
+                    pass
+            # 3. Strip common prefixes like user_ or prof_
+            for prefix in ("user_", "prof_"):
+                if user_id.startswith(prefix):
+                    clean_id = user_id[len(prefix):]
+                    row = conn.execute("SELECT profile_data_json FROM user_profiles WHERE user_id = ? OR LOWER(user_id) = LOWER(?)", (clean_id, clean_id)).fetchone()
+                    if row and row[0]:
+                        try:
+                            return json.loads(row[0])
+                        except Exception:
+                            pass
+            # 4. Search by email inside profile_data_json
+            if "@" in user_id:
+                row = conn.execute("SELECT profile_data_json FROM user_profiles WHERE profile_data_json LIKE ? ORDER BY updated_at DESC LIMIT 1", (f'%"{user_id}"%',)).fetchone()
+                if row and row[0]:
+                    try:
+                        return json.loads(row[0])
+                    except Exception:
+                        pass
         return {}
 
     def upsert_user_profile(self, user_id: str, profile_data: dict[str, Any]) -> dict[str, Any]:

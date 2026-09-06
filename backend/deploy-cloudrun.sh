@@ -90,11 +90,13 @@ echo "▶ Deploying to Cloud Run (${REGION})…"
 
 # Ensure persistent JWT_SECRET_KEY across Cloud Run revisions
 if [ -z "${JWT_SECRET_KEY}" ]; then
-    EXISTING_JWT_KEY=$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format="value(spec.template.spec.containers[0].env[JWT_SECRET_KEY])" 2>/dev/null || true)
+    EXISTING_JWT_KEY=$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format=json 2>/dev/null | python3 -c "import sys, json; data=json.load(sys.stdin); envs={e['name']: e.get('value','') for e in data.get('spec',{}).get('template',{}).get('spec',{}).get('containers',[])[0].get('env',[])}; print(envs.get('JWT_SECRET_KEY',''))" 2>/dev/null || true)
     if [ -n "${EXISTING_JWT_KEY}" ]; then
         JWT_SECRET_KEY="${EXISTING_JWT_KEY}"
+        echo "✓ Retained existing persistent JWT_SECRET_KEY from active Cloud Run service"
     else
         JWT_SECRET_KEY=$(openssl rand -hex 32)
+        echo "✓ Generated new persistent JWT_SECRET_KEY for initial deployment"
     fi
 fi
 

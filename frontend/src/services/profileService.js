@@ -468,11 +468,18 @@ export const saveProfileToBackend = async (profile) => {
 /**
  * Fetches user profile from backend SQLite database with local storage fallback.
  */
-export const fetchProfileFromBackend = async (userId) => {
+export const fetchProfileFromBackend = async (userId, userEmail) => {
   const resolvedUserId = userId || getActiveProfile()?.id;
   if (!resolvedUserId) {
     console.warn('fetchProfileFromBackend called without userId; using local profile');
     return getActiveProfile();
+  }
+  let emailParam = userEmail;
+  if (!emailParam) {
+    try {
+      const rawSession = localStorage.getItem('job_dashboard_current_user_session') || localStorage.getItem('job_dashboard_google_auth_user');
+      if (rawSession) emailParam = JSON.parse(rawSession)?.email;
+    } catch {}
   }
   const apiBase = getBackendApiBase();
   const token = typeof localStorage !== 'undefined'
@@ -486,8 +493,11 @@ export const fetchProfileFromBackend = async (userId) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  const query = new URLSearchParams({ user_id: resolvedUserId });
+  if (emailParam) query.append('email', emailParam);
+
   try {
-    const res = await fetch(`${apiBase}/api/profile?user_id=${encodeURIComponent(resolvedUserId)}`, {
+    const res = await fetch(`${apiBase}/api/profile?${query.toString()}`, {
       headers
     });
     if (res.ok) {

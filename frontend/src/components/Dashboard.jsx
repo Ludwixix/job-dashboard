@@ -331,7 +331,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   // Load backend profile when currentUser is authenticated
   useEffect(() => {
     if (currentUser?.id) {
-      fetchProfileFromBackend(currentUser.id)
+      fetchProfileFromBackend(currentUser.id, currentUser.email)
         .then((remoteProf) => {
           if (remoteProf && Object.keys(remoteProf).length > 0) {
             setActiveProfile((prev) => ({

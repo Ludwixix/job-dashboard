@@ -46,7 +46,8 @@ export default function SiteGate({ onUnlock = () => {} }) {
         setSiteUnlocked(true);
         // Ensure standard authenticated session exists
         const sessionUser = {
-          id: 'user_sam_ludwig',
+          id: 'sam_ludwig',
+          profileId: 'sam_ludwig',
           name: 'Sam Ludwig',
           email: 'sam.ludwig@gmail.com',
           authProvider: 'passcode',

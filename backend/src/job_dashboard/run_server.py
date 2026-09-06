@@ -72,7 +72,8 @@ def main():
     # survive cold starts and redeploys instead of resetting every time.
     if settings.gcs_data_bucket:
         from .gcs_backup import restore_from_gcs
-        restore_from_gcs(settings.gcs_data_bucket, args.data_dir)
+        is_cloud_prod = bool(os.getenv("K_SERVICE") or os.getenv("ENVIRONMENT") == "production")
+        restore_from_gcs(settings.gcs_data_bucket, args.data_dir, force=is_cloud_prod)
     else:
         startup_logger.warning("JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts")
 

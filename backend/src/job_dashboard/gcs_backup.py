@@ -47,8 +47,8 @@ def _get_client():
         return None
 
 
-def restore_from_gcs(bucket_name: str | None, data_dir: Path) -> int:
-    """Download the last known-good index into data_dir if missing locally. Returns files restored."""
+def restore_from_gcs(bucket_name: str | None, data_dir: Path, force: bool = False) -> int:
+    """Download the last known-good index into data_dir if missing locally (or unconditionally if force=True). Returns files restored."""
     if not bucket_name:
         return 0
     client = _get_client()
@@ -61,7 +61,7 @@ def restore_from_gcs(bucket_name: str | None, data_dir: Path) -> int:
         # Restore each database independently: the job index may be present
         # in the image while health history exists only in GCS.
         for filename in BACKUP_FILENAMES:
-            if (data_dir / filename).exists():
+            if not force and (data_dir / filename).exists():
                 continue
             if filename.endswith("-wal") or filename.endswith("-shm"):
                 base = filename.removesuffix("-wal").removesuffix("-shm")
@@ -72,8 +72,9 @@ def restore_from_gcs(bucket_name: str | None, data_dir: Path) -> int:
                 data_dir.mkdir(parents=True, exist_ok=True)
                 blob.download_to_filename(str(data_dir / filename))
                 restored += 1
+                logger.info(f"Restored {filename} from gs://{bucket_name}/{filename}")
         if restored:
-            logger.info(f"Restored {restored} data file(s) from gs://{bucket_name}")
+            logger.info(f"Successfully restored {restored} persistent data file(s) from gs://{bucket_name}")
     except Exception as error:
         logger.warning(f"GCS restore failed, starting with a fresh/baked-in index: {error}")
     return restored

@@ -64,3 +64,15 @@ def test_gcs_backup_uploads_health_database(tmp_path, monkeypatch):
 
     assert uploaded == 1
     assert objects["health.sqlite3"] == b"health-db"
+
+
+def test_gcs_backup_force_restores_when_flag_set(tmp_path, monkeypatch):
+    objects = {"health.sqlite3": b"health-db", "jobs.sqlite3": b"cloud-persistent-jobs"}
+    monkeypatch.setattr(gcs_backup, "_get_client", lambda: FakeClient(objects))
+    (tmp_path / "jobs.sqlite3").write_bytes(b"baked-in-stale-jobs")
+
+    restored = gcs_backup.restore_from_gcs("bucket", tmp_path, force=True)
+
+    assert restored == 2
+    assert (tmp_path / "jobs.sqlite3").read_bytes() == b"cloud-persistent-jobs"
+    assert (tmp_path / "health.sqlite3").read_bytes() == b"health-db"

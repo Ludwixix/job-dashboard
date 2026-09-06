@@ -41,6 +41,8 @@ def detect_query_stream(term: str) -> str:
         return "technology"
     if re.search(r"legal|lawyer|counsel|paralegal|solicitor|barrister|litigat|compliance", lower):
         return "legal"
+    if re.search(r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend", lower):
+        return "technology"
     return "general"
 
 

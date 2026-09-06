@@ -31,6 +31,7 @@ const FollowUpEmailModal = lazy(() => import('./FollowUpEmailModal').then(m => (
 const OfferActionHubModal = lazy(() => import('./OfferActionHubModal').then(m => ({ default: m.OfferActionHubModal })));
 const ExecutiveDossierModal = lazy(() => import('./ExecutiveDossierModal').then(m => ({ default: m.ExecutiveDossierModal })));
 const RecruiterRelationshipModal = lazy(() => import('./RecruiterRelationshipModal').then(m => ({ default: m.RecruiterRelationshipModal })));
+const FunnelIntelligenceModal = lazy(() => import('./FunnelIntelligenceModal'));
 
 import { generateApplicationDocs } from '../services/generationService';
 import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
@@ -63,6 +64,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForDossier, setSelectedForDossier] = useState(null);
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
+  const [isFunnelModalOpen, setIsFunnelModalOpen] = useState(false);
   const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
@@ -529,6 +531,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           onOpenBatchApply={() => setIsBatchApplyOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenRecruiterCrm={() => setIsRecruiterCrmOpen(true)}
+          onOpenFunnelIntel={() => setIsFunnelModalOpen(true)}
           overdueTouchpointCount={overdueTouchpointCount}
         />
 
@@ -564,6 +567,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
               onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
+              onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
               profile={activeProfile}
               allJobs={jobs}
@@ -655,6 +659,25 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   contactEmail: recruiterInfo.recipientEmail,
                   company: recruiterInfo.company || selectedForRecruiterCrm?.company || '',
                 });
+              }}
+            />
+          </Suspense>
+        )}
+
+        {isFunnelModalOpen && (
+          <Suspense fallback={<ModalSkeleton />}>
+            <FunnelIntelligenceModal
+              isOpen={isFunnelModalOpen}
+              onClose={() => setIsFunnelModalOpen(false)}
+              jobs={jobs}
+              currentSector={activeProfile?.industry || 'technology'}
+              onSelectJob={(j) => {
+                setIsFunnelModalOpen(false);
+                setSelectedJob(j);
+              }}
+              onOpenRecruiterCrm={() => {
+                setIsFunnelModalOpen(false);
+                setIsRecruiterCrmOpen(true);
               }}
             />
           </Suspense>
@@ -789,6 +812,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 {overdueTouchpointCount}
               </span>
             )}
+          </button>
+
+          {/* Funnel & Pipeline Velocity Intelligence */}
+          <button
+            onClick={() => setIsFunnelModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+            title="Talent Funnel Intelligence: Stage Conversion, Velocity & SLA Lag Alerts"
+          >
+            <TrendingUp size={12} className="text-cyan-400" />
+            <span>FUNNEL INTEL</span>
           </button>
 
           {/* Dashboard Settings & LLM Configuration */}
@@ -1173,6 +1206,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
               onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
+              onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
               job={liveSelectedJob} 
               onClose={() => setSelectedJob(null)} 
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
@@ -1316,6 +1350,28 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   contactEmail: recruiterInfo.recipientEmail,
                   company: recruiterInfo.company || selectedForRecruiterCrm?.company || '',
                 });
+              }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Funnel & Pipeline Velocity Intelligence Modal */}
+      {isFunnelModalOpen && (
+        <SafeErrorBoundary sectionName="Talent Funnel Intelligence" onClose={() => setIsFunnelModalOpen(false)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <FunnelIntelligenceModal
+              isOpen={isFunnelModalOpen}
+              onClose={() => setIsFunnelModalOpen(false)}
+              jobs={jobs}
+              currentSector={activeProfile?.industry || 'technology'}
+              onSelectJob={(j) => {
+                setIsFunnelModalOpen(false);
+                setSelectedJob(j);
+              }}
+              onOpenRecruiterCrm={() => {
+                setIsFunnelModalOpen(false);
+                setIsRecruiterCrmOpen(true);
               }}
             />
           </Suspense>

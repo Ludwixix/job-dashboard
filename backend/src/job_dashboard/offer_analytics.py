@@ -325,3 +325,4 @@ def scan_employment_contract_risks(contract_text: str) -> Dict[str, Any]:
         "flags": flags,
         "summary": f"Detected {len(flags)} clause item(s) requiring candidate attention before signing.",
     }
+

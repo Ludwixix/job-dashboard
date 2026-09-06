@@ -126,3 +126,4 @@ def test_scan_employment_contract_risks():
     for flag in risky_result["flags"]:
         assert len(flag["fair_work_guidance"]) > 10
         assert len(flag["recommended_counter"]) > 10
+

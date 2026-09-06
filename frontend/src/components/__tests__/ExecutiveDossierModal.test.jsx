@@ -74,3 +74,4 @@ describe('ExecutiveDossierModal Component', () => {
     expect(writeTextMock).toHaveBeenCalled();
   });
 });
+

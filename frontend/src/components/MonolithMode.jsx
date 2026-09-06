@@ -23,7 +23,8 @@ import {
   Mail,
   Sliders,
   Send,
-  Users
+  Users,
+  TrendingUp
 } from 'lucide-react';
 import AlienMonolithNav from './AlienMonolithNav';
 import { formatJobPostedAge, getJobAgeInDays } from '../utils/dateUtils';
@@ -44,6 +45,7 @@ export default function MonolithMode({
   onOpenCommandPalette,
   onOpenSettings,
   onOpenRecruiterCrm,
+  onOpenFunnelIntel,
   overdueTouchpointCount = 0
 }) {
   // Navigation active tab: 'prime' | 'autopilot' | 'radar'
@@ -302,6 +304,19 @@ export default function MonolithMode({
                       {overdueTouchpointCount}
                     </span>
                   )}
+                </button>
+              )}
+
+              {/* Funnel & Pipeline Velocity Intelligence */}
+              {onOpenFunnelIntel && (
+                <button
+                  type="button"
+                  onClick={onOpenFunnelIntel}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-cyan-800/60 hover:border-cyan-500 bg-[#0d1c21] text-cyan-300 hover:text-white text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  title="Talent Funnel Intelligence: Stage Conversion & Velocity"
+                >
+                  <TrendingUp size={11} className="text-cyan-400" />
+                  <span>FUNNEL INTEL</span>
                 </button>
               )}
 

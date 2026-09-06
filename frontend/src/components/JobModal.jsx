@@ -5,7 +5,7 @@ import {
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
-  RefreshCw, Loader2, Scale, Building2, Users
+  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -491,6 +491,16 @@ ${candidatePhone}`;
           </button>
 
           <div className="ml-auto flex items-center gap-2 pb-1.5">
+            {onOpenFunnelIntel && (
+              <button
+                onClick={() => onOpenFunnelIntel(job)}
+                className="px-3 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                title="Talent Funnel Intelligence: Stage Conversion, Pipeline Velocity & Lag Radar"
+              >
+                <TrendingUp size={13} className="text-cyan-400" />
+                <span>FUNNEL INTEL</span>
+              </button>
+            )}
             <button
               onClick={() => onOpenRecruiterCrm?.(job)}
               className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"

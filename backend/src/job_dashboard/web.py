@@ -67,6 +67,7 @@ from .offer_analytics import calculate_compensation_benchmark, scan_employment_c
 from .executive_dossier import generate_executive_dossier, export_dossier_markdown
 from .smart_applications import get_smart_application_tracker
 from .network_crm import NetworkCRMManager, NetworkContact
+from .funnel_analytics import compute_funnel_analytics, AU_SECTOR_BENCHMARKS
 from datetime import timedelta
 from urllib.error import URLError
 
@@ -1274,6 +1275,16 @@ def make_handler(app: DashboardApp):
                 profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
                 dossier = generate_executive_dossier(job_data, profile)
                 self.send_json(200, {"success": True, "dossier": dossier})
+                return
+
+            if path == "/api/analytics/funnel":
+                sector = query_params.get("sector", ["technology"])[0]
+                user_id = resolve_user_id(self, query_params)
+                # Gather available jobs from dashboard / repository
+                raw_jobs = getattr(app.dashboard, "jobs", []) or []
+                jobs_list = [j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs]
+                analytics = compute_funnel_analytics(jobs_list, sector=sector)
+                self.send_json(200, {"success": True, "analytics": analytics})
                 return
 
             if path == "/api/network/cadence":
@@ -2672,6 +2683,21 @@ def make_handler(app: DashboardApp):
                         dossier = generate_executive_dossier(job, profile)
                     markdown = export_dossier_markdown(dossier)
                     self.send_json(200, {"success": True, "markdown": markdown})
+                    return
+
+                # Phase 17: Funnel Analytics POST Endpoint
+                if path == "/api/analytics/funnel":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    sector = payload.get("sector") or query_params.get("sector", ["technology"])[0]
+                    client_jobs = payload.get("jobs")
+                    if client_jobs is not None and isinstance(client_jobs, list):
+                        jobs_list = client_jobs
+                    else:
+                        raw_jobs = getattr(app.dashboard, "jobs", []) or []
+                        jobs_list = [j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs]
+                    analytics = compute_funnel_analytics(jobs_list, sector=sector)
+                    self.send_json(200, {"success": True, "analytics": analytics})
                     return
 
                 # Phase 16: Network CRM POST Endpoints

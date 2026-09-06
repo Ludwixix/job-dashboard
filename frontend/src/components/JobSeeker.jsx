@@ -9,7 +9,7 @@ import {
   ChevronFirst, ChevronLast, ArrowDown, Wrench, Briefcase,
   ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
-  Train, Car, Bike
+  Train, Car, Bike, MoreVertical
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -273,6 +273,14 @@ export const JobSeeker = ({
   const [customRoles, setCustomRoles] = useState(() => {
     return getCustomRoles(currentProfile?.id);
   });
+
+  const [openKebabJobId, setOpenKebabJobId] = useState(null);
+
+  useEffect(() => {
+    const handleDocClick = () => setOpenKebabJobId(null);
+    window.addEventListener('click', handleDocClick);
+    return () => window.removeEventListener('click', handleDocClick);
+  }, []);
 
   useEffect(() => {
     setCustomRoles(getCustomRoles(currentProfile?.id));
@@ -1372,8 +1380,8 @@ export const JobSeeker = ({
                           : 'bg-white border border-slate-200/90 shadow-2xs hover:border-indigo-400 hover:shadow-md'
                       }`}
                     >
-                      {/* Top Gradient Line */}
-                      <div className={`absolute top-0 left-0 right-0 h-1.5 ${
+                      {/* Top Gradient Accent Line */}
+                      <div className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl ${
                         hasCustomDocs
                           ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500'
                           : isTopFit
@@ -1381,420 +1389,345 @@ export const JobSeeker = ({
                           : 'bg-gradient-to-r from-indigo-500 to-purple-500'
                       }`} />
 
-                      {/* Top Standout Badges & Actions */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-
-                        {isGeneratingThisJob ? (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider shadow-sm animate-pulse">
-                            <RefreshCw size={12} className="animate-spin text-slate-950" />
-                            ⚡ AI SYNTHESIZING ASSETS...
-                          </div>
-                        ) : hasCustomDocs ? (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs">
-                            <CheckCircle2 size={12} className="text-slate-950" />
-                            ✨ TAILORED ASSETS READY (PDFs)
-                          </div>
-                        ) : isTopFit ? (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
-                            <Flame size={12} className="text-amber-900 fill-amber-900" />
-                            🏆 TOP FIT OPPORTUNITY
-                          </div>
-                        ) : null}
-
-                        {/* Direct Platform Quick Apply Compatibility Badge */}
-                        {isQuickApplyEligible(job) && (
-                          <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border shadow-2xs ${
-                            (job.source || '').toLowerCase().includes('linkedin') || (job.link || '').toLowerCase().includes('linkedin')
-                              ? 'bg-sky-950 text-sky-300 border-sky-500/50'
-                              : (job.source || '').toLowerCase().includes('seek') || (job.link || '').toLowerCase().includes('seek')
-                              ? 'bg-rose-950 text-rose-300 border-rose-500/50'
-                              : 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
-                          }`}>
-                            <Zap size={10} className="text-amber-400 fill-amber-400 animate-pulse" />
-                            <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
-                          </div>
-                        )}
-                        </div>
-                        <button
-                          onClick={(e) => toggleStar(job.id || `${job.company}_${job.title}`, e)}
-                          className={`p-1.5 rounded-full transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'}`}
-                          title={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "Remove from Saved" : "Save Job"}
-                        >
-                          <Star size={18} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-500" : ""} />
-                        </button>
-                      </div>
-
-                      {/* Card Header & Scores */}
-                      <div className="space-y-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-black border ${
-                            isTopFit 
-                              ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-2xs'
-                              : (job.score || 0) >= 80
-                              ? 'bg-indigo-100 text-indigo-950 border-indigo-300'
-                              : 'bg-slate-100 text-slate-900 border-slate-300'
-                          }`}>
-                            <Award size={13} className={isTopFit ? "text-slate-950" : "text-indigo-700"} />
-                            {job.score || 85}% MATCH
-                          </span>
-
-                          <div className="flex items-center gap-1.5">
-                            {/* Promote / Demote Controls */}
-                            <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-2xs">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handlePromote(job);
-                                }}
-                                className={`p-1 rounded-md text-[10px] font-mono font-black flex items-center gap-1 transition-all cursor-pointer ${
-                                  isJobPromoted(job)
-                                    ? 'bg-emerald-500 text-slate-950 shadow-xs ring-1 ring-emerald-400 font-black'
-                                    : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50'
-                                }`}
-                                title="Show More Like This"
-                              >
-                                <ThumbsUp size={11} className={isJobPromoted(job) ? "fill-slate-950" : ""} />
-                                <span className="hidden sm:inline text-[9px]">MORE</span>
-                              </button>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDemote(job);
-                                }}
-                                className={`p-1 rounded-md text-[10px] font-mono font-black flex items-center gap-1 transition-all cursor-pointer ${
-                                  isJobDemoted(job)
-                                    ? 'bg-rose-500 text-white shadow-xs ring-1 ring-rose-400 font-black'
-                                    : 'text-slate-600 hover:text-rose-700 hover:bg-rose-50'
-                                }`}
-                                title="Show Less Like This"
-                              >
-                                <ThumbsDown size={11} className={isJobDemoted(job) ? "fill-white" : ""} />
-                                <span className="hidden sm:inline text-[9px]">LESS</span>
-                              </button>
+                      {/* Top Header: Badges + Star + Kebab Action Menu */}
+                      <div className="flex items-start justify-between gap-2 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                          {isGeneratingThisJob ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider shadow-sm animate-pulse">
+                              <RefreshCw size={12} className="animate-spin text-slate-950" />
+                              ⚡ SYNTHESIZING...
                             </div>
-
-
-                            {job.isRejected ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onUnrejectJob) onUnrejectJob(job.id || `${job.company}_${job.title}`);
-                                }}
-                                className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/40 hover:bg-purple-600 hover:text-white transition-all cursor-pointer text-[10px] font-mono font-bold flex items-center gap-1"
-                                title="Un-reject and restore this job"
-                              >
-                                <RotateCcw size={11} /> RESTORE
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onRejectJob) onRejectJob(job.id || `${job.company}_${job.title}`);
-                                }}
-                                className="px-2 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition-all cursor-pointer text-[10px] font-mono font-bold flex items-center gap-1"
-                                title="Reject and remove this job"
-                              >
-                                🚫 REJECT
-                              </button>
-                            )}
-
-                            {job.source && (
-                              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                                {job.source}
-                              </span>
-                            )}
-                          </div>
-
-                        </div>
-
-                        {/* Title, Company & Top Direct Job Link */}
-                        <div className="flex items-start justify-between gap-3 pt-1">
-                          <div className="flex-1 min-w-0">
-                            {(() => {
-                              const jobUrl = job.portalLink || job.link || job.url;
-                              return (
-                                <>
-                                  {jobUrl ? (
-                                    <a
-                                      href={jobUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="font-black text-lg text-slate-900 hover:text-indigo-600 transition-colors leading-snug cursor-pointer inline-flex items-center gap-1.5"
-                                      title="Open original job posting in a new tab"
-                                    >
-                                      <span>{job.title}</span>
-                                      <ExternalLink size={14} className="text-slate-400 hover:text-indigo-600" />
-                                    </a>
-                                  ) : (
-                                    <h3 className="font-black text-lg text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">
-                                      {job.title}
-                                    </h3>
-                                  )}
-
-                                  <p className="text-xs font-bold text-slate-600 mt-1 flex items-center gap-1.5">
-                                    <Building2 size={13} className="text-indigo-500 shrink-0" />
-                                    {jobUrl ? (
-                                      <a
-                                        href={jobUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="font-extrabold text-slate-800 hover:text-indigo-600 hover:underline cursor-pointer"
-                                        title="Open original job posting in a new tab"
-                                      >
-                                        {job.company}
-                                      </a>
-                                    ) : (
-                                      <span className="font-extrabold text-slate-800">{job.company}</span>
-                                    )}
-                                  </p>
-                                </>
-                              );
-                            })()}
-                          </div>
-
-                          {(job.portalLink || job.link || job.url) && (
-                            <a
-                              href={job.portalLink || job.link || job.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs"
-                              title="Open original job posting"
-                            >
-                              <span>OPEN JOB</span>
-                              <ExternalLink size={13} />
-                            </a>
-                          )}
-                        </div>
-
-                        {/* Salary, Employment Type & Work Arrangement Information */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          {job.salary && (
-                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-300">
-                              <DollarSign size={13} className="text-emerald-600" />
-                              <span>{job.salary}</span>
+                          ) : hasCustomDocs ? (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs">
+                              <CheckCircle2 size={12} className="text-slate-950" />
+                              ✨ READY (PDFs)
                             </div>
-                          )}
-                          {job.employmentType && (
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                              <Briefcase size={10} className="text-indigo-600" />
-                              <span>{job.employmentType}</span>
+                          ) : isTopFit ? (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
+                              <Flame size={12} className="text-amber-900 fill-amber-900" />
+                              🏆 TOP FIT
                             </div>
-                          )}
-                          {job.workArrangement && (
-                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                              job.workArrangement === 'Remote' 
-                                ? 'bg-purple-50 text-purple-800 border-purple-200'
-                                : job.workArrangement === 'Hybrid'
-                                ? 'bg-blue-50 text-blue-800 border-blue-200'
-                                : 'bg-slate-50 text-slate-700 border-slate-200'
+                          ) : null}
+
+                          {isQuickApplyEligible(job) && (
+                            <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border shadow-2xs ${
+                              (job.source || '').toLowerCase().includes('linkedin') || (job.link || '').toLowerCase().includes('linkedin')
+                                ? 'bg-sky-950 text-sky-300 border-sky-500/50'
+                                : (job.source || '').toLowerCase().includes('seek') || (job.link || '').toLowerCase().includes('seek')
+                                ? 'bg-rose-950 text-rose-300 border-rose-500/50'
+                                : 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
                             }`}>
-                              <Building2 size={10} />
-                              <span>{job.workArrangement}</span>
+                              <Zap size={10} className="text-amber-400 fill-amber-400 animate-pulse" />
+                              <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
                             </div>
                           )}
                         </div>
 
-                        {/* Key Responsibilities & Highlights Preview */}
-                        {job.keyResponsibilities && job.keyResponsibilities.length > 0 && (
-                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-700 space-y-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Key Deliverables:</span>
-                            <ul className="space-y-0.5">
-                              {job.keyResponsibilities.slice(0, 2).map((r, i) => (
-                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-700 line-clamp-1">
-                                  <span className="text-indigo-600 font-black">•</span>
-                                  <span className="truncate">{r}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* Incomplete Job Ad Warning Box (For Missing Data Stream) */}
-                        {job.isComplete === false && (
-                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-[11px] text-rose-900 space-y-1 font-mono">
-                            <div className="font-bold flex items-center gap-1 text-rose-700 text-[10px] uppercase">
-                              <AlertCircle size={12} /> Incomplete Job Ad Metadata:
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {job.missingFields?.map((f, i) => (
-                                <span key={i} className="px-1.5 py-0.5 rounded bg-rose-200 text-rose-900 text-[9px] font-bold">
-                                  Missing {f}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Matched Skill Tags on Card */}
-                        {(job.matchedSkills || []).length > 0 && (
-                          <div className="flex flex-wrap gap-1 font-mono pt-1">
-                            {job.matchedSkills.slice(0, 4).map((skill, idx) => (
-                              <span key={idx} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
-                                ✓ {skill}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-600 pt-1 border-t border-slate-100">
-                          <div className="flex items-center gap-1.5 truncate pr-2">
-                            <MapPin size={13} className="text-indigo-600 shrink-0" />
-                            <span className="truncate">{job.location}</span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0 text-slate-900 font-extrabold text-xs px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-md">
-                            <Clock size={12} className="text-indigo-600" />
-                            {formatJobPostedAge(job.date)}
-                          </div>
-                        </div>
-
-                        {/* Google Maps Commute Intelligence Pill */}
-                        {(() => {
-                          const commute = getCommuteDetails(baseLocation, job.location);
-                          if (commute.isRemote) {
-                            return (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-[10px] text-emerald-300 font-mono font-bold">
-                                <Sparkles size={11} className="text-emerald-400" />
-                                <span>100% REMOTE • 0 MIN COMMUTE</span>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="p-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-bold px-1">
-                                <span className="flex items-center gap-1 text-indigo-400">
-                                  <Navigation size={10} />
-                                  {commute.distanceKm}KM COMMUTE:
-                                </span>
-                                <span className={commute.car.tolls.hasTolls ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
-                                  {commute.car.tolls.hasTolls ? `Tolls: ${commute.car.tolls.estimatedCost}` : 'Toll-Free'}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-1 text-[9px] text-center">
-                                <span className="p-1 rounded bg-slate-900 border border-slate-800 text-indigo-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
-                                  <Train size={9} /> {commute.transit.durationMin}m Train
-                                </span>
-                                <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5" title={`Off-peak: ${commute.car.offPeakMin}m | Peak: ${commute.car.peakMin}m`}>
-                                  <Car size={9} /> {commute.car.peakMin}m Peak
-                                </span>
-                                <span className="p-1 rounded bg-slate-900 border border-slate-800 text-emerald-300 flex items-center justify-center gap-0.5" title={`Bike trail: ${commute.bike.bikePaths}`}>
-                                  <Bike size={9} /> {commute.bike.durationMin}m Bike
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      {/* Direct PDF Quick-Download Bar for Generated Docs */}
-                      {hasCustomDocs && (
-                        <div className="pt-2 border-t border-emerald-200/80 flex items-center gap-2 font-mono">
+                        {/* Top Right Cluster: Star + Kebab Menu */}
+                        <div className="flex items-center gap-1 shrink-0 relative">
                           <button
+                            type="button"
+                            onClick={(e) => toggleStar(job.id || `${job.company}_${job.title}`, e)}
+                            className={`p-1.5 rounded-full transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'}`}
+                            title={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "Remove from Saved" : "Save Job"}
+                          >
+                            <Star size={17} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-500" : ""} />
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadResumePdf(job.resumeText, job, currentProfile);
+                              const cId = job.id || `${job.company}_${job.title}`;
+                              setOpenKebabJobId(prev => prev === cId ? null : cId);
                             }}
-                            className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
-                            title="Download Tailored Resume PDF"
+                            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                            title="More Actions"
                           >
-                            <Download size={11} /> RESUME (PDF)
+                            <MoreVertical size={17} />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
-                            }}
-                            className="flex-1 py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
-                            title="Download Tailored Cover Letter PDF"
-                          >
-                            <Download size={11} /> COVER LTR
-                          </button>
-                        </div>
-                      )}
-                      {/* Psychology & Behavioral Subtext Decoder Pill Button */}
-                      <div className="pt-2 border-t border-slate-100">
-                        {(() => {
-                          const cached = getCachedPsychology(job);
-                          const hasPsychology = !!cached;
-                          return (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPsychologyJob({ ...job, psychologyInsights: cached });
-                              }}
-                              className={`w-full py-1.5 px-2.5 rounded-xl text-[10px] font-bold flex items-center justify-between transition-all cursor-pointer border ${
-                                hasPsychology
-                                  ? 'bg-teal-950/70 hover:bg-teal-900/90 text-teal-300 border-teal-500/40 shadow-2xs'
-                                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-teal-300 border-slate-700/60 hover:border-teal-500/40'
-                              }`}
-                              title={hasPsychology ? "View decoded employer psychology & hidden priorities" : "Decode employer psychology, covert pain points & candidate edge"}
+
+                          {/* Kebab Popover Menu */}
+                          {openKebabJobId === (job.id || `${job.company}_${job.title}`) && (
+                            <div 
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-full mt-1 w-60 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200"
                             >
-                              <div className="flex items-center gap-1.5 truncate">
-                                <Sparkles size={12} className={hasPsychology ? "text-teal-400 shrink-0" : "text-slate-400 shrink-0"} />
-                                <span className="truncate">{hasPsychology ? "PSYCHOLOGY DECODED" : "DECODE PSYCHOLOGY"}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenKebabJobId(null);
+                                  setSelectedAutoApplyJob(job);
+                                }}
+                                className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+                              >
+                                <Zap size={14} className="text-amber-400 shrink-0" />
+                                <span>Launch Auto-Apply</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenKebabJobId(null);
+                                  setPsychologyJob({ ...job, psychologyInsights: getCachedPsychology(job) });
+                                }}
+                                className="w-full px-3 py-2 rounded-xl hover:bg-teal-950 text-slate-200 hover:text-teal-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+                              >
+                                <Sparkles size={14} className="text-teal-400 shrink-0" />
+                                <span>{getCachedPsychology(job) ? 'View Psychology' : 'Decode Psychology'}</span>
+                              </button>
+
+                              {hasCustomDocs && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenKebabJobId(null);
+                                      downloadResumePdf(job.resumeText, job, currentProfile);
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950 text-slate-200 hover:text-emerald-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                                  >
+                                    <Download size={14} className="text-emerald-400 shrink-0" />
+                                    <span>Download Resume (PDF)</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenKebabJobId(null);
+                                      downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                                  >
+                                    <Download size={14} className="text-indigo-400 shrink-0" />
+                                    <span>Download Cover (PDF)</span>
+                                  </button>
+                                </>
+                              )}
+
+                              <div className="pt-1 border-t border-slate-800 space-y-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenKebabJobId(null);
+                                    handlePromote(job);
+                                  }}
+                                  className={`w-full px-3 py-1.5 rounded-xl flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
+                                    isJobPromoted(job) ? 'bg-emerald-950 text-emerald-300 font-bold' : 'hover:bg-slate-800 text-slate-300'
+                                  }`}
+                                >
+                                  <ThumbsUp size={13} className={isJobPromoted(job) ? 'text-emerald-400 fill-emerald-400' : 'text-slate-400'} />
+                                  <span>More Like This</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenKebabJobId(null);
+                                    handleDemote(job);
+                                  }}
+                                  className={`w-full px-3 py-1.5 rounded-xl flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
+                                    isJobDemoted(job) ? 'bg-rose-950 text-rose-300 font-bold' : 'hover:bg-slate-800 text-slate-300'
+                                  }`}
+                                >
+                                  <ThumbsDown size={13} className={isJobDemoted(job) ? 'text-rose-400 fill-rose-400' : 'text-slate-400'} />
+                                  <span>Less Like This</span>
+                                </button>
                               </div>
-                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-black shrink-0 ${
-                                hasPsychology ? "bg-teal-500/20 text-teal-300 border border-teal-500/30" : "bg-slate-800 text-slate-400"
-                              }`}>
-                                {hasPsychology ? "RETAINED" : "UNFAIR EDGE"}
-                              </span>
-                            </button>
+
+                              {(job.portalLink || job.link || job.url) && (
+                                <a
+                                  href={job.portalLink || job.link || job.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={() => setOpenKebabJobId(null)}
+                                  className="w-full px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2.5 transition-colors text-left cursor-pointer border-t border-slate-800"
+                                >
+                                  <ExternalLink size={13} className="text-slate-400 shrink-0" />
+                                  <span>Open Original Listing</span>
+                                </a>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenKebabJobId(null);
+                                  if (job.isRejected) {
+                                    if (onUnrejectJob) onUnrejectJob(job.id || `${job.company}_${job.title}`);
+                                  } else {
+                                    if (onRejectJob) onRejectJob(job.id || `${job.company}_${job.title}`);
+                                  }
+                                }}
+                                className="w-full px-3 py-2 rounded-xl hover:bg-rose-950/60 text-rose-300 flex items-center gap-2.5 transition-colors text-left border-t border-slate-800 cursor-pointer"
+                              >
+                                <Trash2 size={13} className="text-rose-400 shrink-0" />
+                                <span>{job.isRejected ? 'Restore Job' : 'Dismiss / Reject'}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Score & Source Bar */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-mono text-xs">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-black border ${
+                          isTopFit 
+                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-2xs'
+                            : (job.score || 0) >= 80
+                            ? 'bg-indigo-100 text-indigo-950 border-indigo-300'
+                            : 'bg-slate-100 text-slate-900 border-slate-300'
+                        }`}>
+                          <Award size={13} className={isTopFit ? "text-slate-950" : "text-indigo-700"} />
+                          {job.score || 85}% MATCH
+                        </span>
+
+                        <div className="flex items-center gap-2 text-slate-500">
+                          {job.source && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                              {job.source}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                            <Clock size={11} /> {formatJobPostedAge(job.date)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Title & Company */}
+                      <div className="space-y-1">
+                        {(() => {
+                          const jobUrl = job.portalLink || job.link || job.url;
+                          return (
+                            <>
+                              {jobUrl ? (
+                                <a
+                                  href={jobUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-black text-lg text-slate-900 hover:text-indigo-600 transition-colors leading-snug cursor-pointer inline-flex items-center gap-1.5"
+                                  title="Open original job posting in a new tab"
+                                >
+                                  <span>{job.title}</span>
+                                  <ExternalLink size={14} className="text-slate-400 hover:text-indigo-600 shrink-0" />
+                                </a>
+                              ) : (
+                                <h3 className="font-black text-lg text-slate-900 leading-snug">
+                                  {job.title}
+                                </h3>
+                              )}
+
+                              <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                                <Building2 size={13} className="text-indigo-500 shrink-0" />
+                                <span>{job.company}</span>
+                                <span className="text-slate-400">•</span>
+                                <MapPin size={12} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{job.location || 'Australia'}</span>
+                              </p>
+                            </>
                           );
                         })()}
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
-                        {/* Auto-Apply Launcher Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedAutoApplyJob(job);
-                          }}
-                          className="py-2 px-2.5 rounded-xl font-bold text-xs bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-500/40 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                          title={`Launch Auto-Apply for ${getQuickApplyPlatform(job)}`}
-                        >
-                          <Zap size={12} className="text-amber-400 animate-pulse" />
-                          <span>AUTO-APPLY</span>
-                        </button>
+                      {/* Salary & Work Arrangement Chips */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {job.salary && (
+                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-300">
+                            <DollarSign size={12} className="text-emerald-600" />
+                            <span>{job.salary}</span>
+                          </div>
+                        )}
+                        {job.workArrangement && (
+                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                            job.workArrangement === 'Remote' 
+                              ? 'bg-purple-50 text-purple-800 border-purple-200'
+                              : job.workArrangement === 'Hybrid'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : 'bg-slate-50 text-slate-700 border-slate-200'
+                          }`}>
+                            <Building2 size={10} />
+                            <span>{job.workArrangement}</span>
+                          </div>
+                        )}
+                        {job.employmentType && (
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                            <Briefcase size={10} className="text-indigo-600" />
+                            <span>{job.employmentType}</span>
+                          </div>
+                        )}
+                      </div>
 
+                      {/* Commute Summary Pill */}
+                      {(() => {
+                        const commute = getCommuteDetails(baseLocation, job.location);
+                        if (commute.isRemote) {
+                          return (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-[10px] text-emerald-300 font-mono font-bold">
+                              <Sparkles size={11} className="text-emerald-400" />
+                              <span>100% REMOTE • 0 MIN COMMUTE</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="p-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono space-y-1">
+                            <div className="flex items-center justify-between text-slate-300 font-bold px-1">
+                              <span className="flex items-center gap-1 text-indigo-400">
+                                <Navigation size={10} />
+                                {commute.distanceKm}KM COMMUTE:
+                              </span>
+                              <span className={commute.car.tolls.hasTolls ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
+                                {commute.car.tolls.hasTolls ? `Tolls: ${commute.car.tolls.estimatedCost}` : 'Toll-Free'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-[9px] text-center">
+                              <span className="p-1 rounded bg-slate-900 border border-slate-800 text-indigo-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
+                                <Train size={9} /> {commute.transit.durationMin}m Train
+                              </span>
+                              <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5">
+                                <Car size={9} /> {commute.car.peakMin}m Peak
+                              </span>
+                              <span className="p-1 rounded bg-slate-900 border border-slate-800 text-emerald-300 flex items-center justify-center gap-0.5">
+                                <Bike size={9} /> {commute.bike.durationMin}m Bike
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Streamlined Action Ribbon */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
                         {hasCustomDocs ? (
                           <>
                             <button
+                              type="button"
                               onClick={(e) => { 
                                 e.stopPropagation(); 
                                 dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
                               }}
-                              className="flex-1 py-2 px-2.5 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
+                              className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20 active:scale-95"
                               title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
                             >
-                              <CheckCircle2 size={12} className="text-emerald-200" /> 
+                              <CheckCircle2 size={13} className="text-emerald-200" /> 
                               <span>APPLY</span>
                             </button>
                             <button
+                              type="button"
                               onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
-                              className="py-2 px-2 rounded-xl font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
-                              title="Open in AI Studio to edit or customize"
+                              className="py-2 px-2.5 rounded-xl font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
+                              title="Open in AI Studio to customize"
                             >
-                              <Sparkles size={12} className="text-emerald-700" />
+                              <Sparkles size={13} className="text-emerald-700" />
                             </button>
                           </>
                         ) : isGeneratingThisJob ? (
                           <button
                             disabled
-                            className="flex-1 py-2 px-2 rounded-xl font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 shadow-inner cursor-not-allowed font-mono animate-pulse"
-                            title="Application synthesis in progress..."
+                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 shadow-inner cursor-not-allowed font-mono animate-pulse"
                           >
                             <RefreshCw size={12} className="animate-spin text-slate-950" />
                             <span>SYNTHESIZING…</span>
                           </button>
                         ) : (
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (onDispatchAsyncApplication) {
@@ -1803,8 +1736,8 @@ export const JobSeeker = ({
                                 setSelectedForGenerator(job);
                               }
                             }}
-                            className="flex-1 py-2 px-2 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1 cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-500 shadow-md hover:shadow-indigo-500/20 tracking-wide uppercase"
-                            title="Dispatch 1-Click Background Application Generation & Google Drive Sync"
+                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-500 shadow-md hover:shadow-indigo-500/20 tracking-wide uppercase active:scale-95"
+                            title="Generate Tailored Resume & Cover Letter"
                           >
                             <Sparkles size={12} className="text-amber-300" />
                             <span>PREP DOCS</span>
@@ -1812,11 +1745,12 @@ export const JobSeeker = ({
                         )}
 
                         <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
-                          className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1 cursor-pointer"
+                          className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                           title="View Full Details"
                         >
-                          <Eye size={12} className="text-slate-600" />
+                          <Eye size={13} className="text-slate-600" />
                           <span>DETAILS</span>
                         </button>
                       </div>

@@ -328,7 +328,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative"
+        className="bg-slate-900 rounded-2xl shadow-2xl max-w-6xl xl:max-w-7xl w-[96vw] overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Settings Overlay ── */}

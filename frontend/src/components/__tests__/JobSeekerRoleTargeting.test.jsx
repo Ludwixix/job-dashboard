@@ -25,7 +25,8 @@ describe('JobSeeker Default Role Targeting', () => {
       salary: '$140,000 - $160,000',
       description: 'AWS Azure Infrastructure',
       isComplete: true,
-      score: 90
+      score: 90,
+      portalLink: 'https://example.com/jobs/cloud-engineer'
     },
     {
       id: 'job_nurse_2',
@@ -96,4 +97,41 @@ describe('JobSeeker Default Role Targeting', () => {
     expect(screen.getByText('Registered Nurse - Acute Care')).toBeDefined();
     expect(screen.getByText('Corporate Tax Accountant CPA')).toBeDefined();
   });
+
+  it('renders streamlined action ribbon and toggles kebab dropdown menu for auxiliary actions', () => {
+    render(
+      <JobSeeker
+        jobs={mockJobs}
+        onUpdateJob={vi.fn()}
+        onGenerateDocs={vi.fn()}
+        currentProfile={itProfile}
+      />
+    );
+
+    // Primary action ribbon buttons exist
+    expect(screen.getByText('PREP DOCS')).toBeDefined();
+    expect(screen.getByText('DETAILS')).toBeDefined();
+
+    // Kebab trigger button exists
+    const kebabBtn = screen.getByTitle('More Actions');
+    expect(kebabBtn).toBeDefined();
+
+    // Popover options should not be visible initially
+    expect(screen.queryByText('Launch Auto-Apply')).toBeNull();
+    expect(screen.queryByText('More Like This')).toBeNull();
+
+    // Click kebab button to open popover
+    fireEvent.click(kebabBtn);
+
+    // Now auxiliary actions in the popover are revealed
+    expect(screen.getByText('Launch Auto-Apply')).toBeDefined();
+    expect(screen.getByText('More Like This')).toBeDefined();
+    expect(screen.getByText('Less Like This')).toBeDefined();
+    expect(screen.getByText('Open Original Listing')).toBeDefined();
+
+    // Clicking anywhere outside closes the popover
+    fireEvent.click(document.body);
+    expect(screen.queryByText('Launch Auto-Apply')).toBeNull();
+  });
 });
+

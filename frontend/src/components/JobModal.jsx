@@ -51,6 +51,7 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   const [detailedDescription, setDetailedDescription] = useState(() => job?.description || job?.notes || '');
   const [isEnrichingDescription, setIsEnrichingDescription] = useState(false);
   const [hasEnriched, setHasEnriched] = useState(false);
+  const [isIntelMenuOpen, setIsIntelMenuOpen] = useState(false);
 
   useEffect(() => {
     setDetailedDescription(job?.description || job?.notes || '');
@@ -302,9 +303,9 @@ ${candidatePhone}`;
 
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 lg:p-6 animate-in fade-in zoom-in-95 duration-200">
       <div 
-        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border-2 border-indigo-500/30 transform transition-all font-sans text-slate-900 max-h-[90vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl max-w-6xl xl:max-w-7xl w-[96vw] overflow-hidden border-2 border-indigo-500/30 transform transition-all font-sans text-slate-900 max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sleek Dark Header */}
@@ -490,41 +491,74 @@ ${candidatePhone}`;
             ASSETS & ACTIONS {hasGeneratedApplicationDocs(job) && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
           </button>
 
-          <div className="ml-auto flex items-center gap-2 pb-1.5">
-            {onOpenFunnelIntel && (
-              <button
-                onClick={() => onOpenFunnelIntel(job)}
-                className="px-3 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-                title="Talent Funnel Intelligence: Stage Conversion, Pipeline Velocity & Lag Radar"
-              >
-                <TrendingUp size={13} className="text-cyan-400" />
-                <span>FUNNEL INTEL</span>
-              </button>
+          {/* Intelligence Tools Dropdown Menu */}
+          <div className="relative ml-auto pb-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsIntelMenuOpen(prev => !prev)}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95"
+              title="Open Strategic Intelligence & Governance Tools"
+            >
+              <Cpu size={13} className="text-cyan-400" />
+              <span>INTELLIGENCE TOOLS</span>
+              <ChevronDown size={13} className={`text-slate-400 transition-transform ${isIntelMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isIntelMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setIsIntelMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 w-64 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-40 space-y-1 animate-in fade-in slide-in-from-top-1 duration-150 font-mono">
+                  {onOpenFunnelIntel && (
+                    <button
+                      onClick={() => { setIsIntelMenuOpen(false); onOpenFunnelIntel(job); }}
+                      className="w-full px-3 py-2 rounded-xl hover:bg-cyan-950/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    >
+                      <TrendingUp size={14} className="text-cyan-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">Funnel Intelligence</div>
+                        <div className="text-[10px] text-slate-400 font-sans">Pipeline velocity &amp; lag radar</div>
+                      </div>
+                    </button>
+                  )}
+                  {onOpenRecruiterCrm && (
+                    <button
+                      onClick={() => { setIsIntelMenuOpen(false); onOpenRecruiterCrm(job); }}
+                      className="w-full px-3 py-2 rounded-xl hover:bg-purple-950/60 text-slate-200 hover:text-purple-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    >
+                      <Users size={14} className="text-purple-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">Recruiter CRM</div>
+                        <div className="text-[10px] text-slate-400 font-sans">Agency &amp; hiring contacts</div>
+                      </div>
+                    </button>
+                  )}
+                  {onOpenExecutiveDossier && (
+                    <button
+                      onClick={() => { setIsIntelMenuOpen(false); onOpenExecutiveDossier(job); }}
+                      className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950/60 text-slate-200 hover:text-indigo-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    >
+                      <Building2 size={14} className="text-indigo-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">Executive Dossier</div>
+                        <div className="text-[10px] text-slate-400 font-sans">90-Day briefing blueprint</div>
+                      </div>
+                    </button>
+                  )}
+                  {onOpenOfferHub && (
+                    <button
+                      onClick={() => { setIsIntelMenuOpen(false); onOpenOfferHub(job); }}
+                      className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950/60 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    >
+                      <Scale size={14} className="text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">Offer Action Hub</div>
+                        <div className="text-[10px] text-slate-400 font-sans">Fair Work &amp; contract review</div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-            <button
-              onClick={() => onOpenRecruiterCrm?.(job)}
-              className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-              title="Recruiter & Talent CRM: Link or view agency and hiring contacts for this role"
-            >
-              <Users size={13} className="text-purple-400" />
-              <span>RECRUITER CRM</span>
-            </button>
-            <button
-              onClick={() => onOpenExecutiveDossier?.(job)}
-              className="px-3 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-              title="Executive Briefing Dossier: 90-Day Blueprint, Leadership Alignment & Pain Point Diagnosis"
-            >
-              <Building2 size={13} className="text-indigo-400" />
-              <span>EXECUTIVE DOSSIER</span>
-            </button>
-            <button
-              onClick={() => onOpenOfferHub?.(job)}
-              className="px-3 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-              title="Universal Compensation Benchmarking & Fair Work Contract Risk Scanner"
-            >
-              <Scale size={13} className="text-cyan-400" />
-              <span>OFFER ACTION HUB</span>
-            </button>
           </div>
         </div>
 
@@ -835,7 +869,9 @@ ${candidatePhone}`;
 
           {/* TAB 1: FIT & AI AUDIT */}
           {activeTab === 'fit' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
+              {/* Left Column: Core Diagnostics & ATS Verification */}
+              <div className="lg:col-span-7 space-y-6">
               {/* Match Score Radar Card */}
               <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-indigo-950 text-white border border-slate-800 space-y-4 shadow-md">
                 <div className="flex items-center justify-between">
@@ -987,6 +1023,20 @@ ${candidatePhone}`;
                 </div>
               </div>
 
+              {/* AI Audit Evaluation Box */}
+              <div className="p-5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono font-extrabold text-indigo-950 uppercase tracking-wider">
+                  <ShieldCheck size={18} className="text-indigo-600" />
+                  AI AUDIT RATIONALE &amp; RECOMMENDATION
+                </div>
+                <p className="text-xs text-indigo-900 font-sans font-medium leading-relaxed">
+                  {audit.recommendation || audit.notes || `Target match score of ${job.score || 85}% based on ${activeProfile?.industry || 'target'} profile alignment and ${baseLocation.split(' ')[0] || 'Melbourne'} commute compatibility.`}
+                </p>
+              </div>
+            </div>
+
+            {/* Right Column: Recruiter Triage, Commute & Skills */}
+            <div className="lg:col-span-5 space-y-6">
               {/* 7.4-SECOND RECRUITER TRIAGE SIMULATOR (LADDERS EYE-TRACKING STUDY) */}
               <div className="p-5 rounded-2xl bg-gradient-to-br from-[#12100e] via-[#1a1510] to-[#241a12] border border-[#b87326]/40 text-[#f5eee6] space-y-4 shadow-md font-mono">
                 <div className="flex items-center justify-between">
@@ -1193,17 +1243,6 @@ ${candidatePhone}`;
                 </div>
               )}
 
-              {/* AI Audit Evaluation Box */}
-              <div className="p-5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-mono font-extrabold text-indigo-950 uppercase tracking-wider">
-                  <ShieldCheck size={18} className="text-indigo-600" />
-                  AI AUDIT RATIONALE &amp; RECOMMENDATION
-                </div>
-                <p className="text-xs text-indigo-900 font-sans font-medium leading-relaxed">
-                  {audit.recommendation || audit.notes || `Target match score of ${job.score || 85}% based on ${activeProfile?.industry || 'target'} profile alignment and ${baseLocation.split(' ')[0] || 'Melbourne'} commute compatibility.`}
-                </p>
-              </div>
-
               {/* Matched Skill Tags */}
               {matchedTerms.length > 0 && (
                 <div className="space-y-2 font-mono">
@@ -1220,7 +1259,8 @@ ${candidatePhone}`;
                 </div>
               )}
             </div>
-          )}
+          </div>
+        )}
 
           {/* TAB 2: JOB DESCRIPTION (Expandable) */}
           {activeTab === 'description' && (

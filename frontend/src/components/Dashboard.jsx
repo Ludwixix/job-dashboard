@@ -9,8 +9,8 @@ import { CopilotBar } from './CopilotBar';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { DashboardGridSkeleton, ModalSkeleton } from './SkeletonLoaders';
-import ZenAutopilotDashboard from './ZenAutopilotDashboard';
-import MonolithMode from './MonolithMode';
+import PrimeTargetSpotlight from './PrimeTargetSpotlight';
+import CyberpunkAmbientMode from './CyberpunkAmbientMode';
 import { CareerOperations } from './CareerOperations';
 import { startAutopilot } from '../services/autopilotAgent';
 
@@ -108,9 +108,10 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
 
-  // Minimalist Monolith Mode vs Full Studio Mode State
+  // Single Dashboard Mode vs Minimalist Cyberpunk Ambient Flow Mode
   const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('job_dashboard_view_mode') || 'monolith';
+    const saved = localStorage.getItem('job_dashboard_view_mode');
+    return saved === 'ambient' ? 'ambient' : 'dashboard';
   });
 
   // Fallback banner state when static fallback jobs are loaded
@@ -143,8 +144,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     fetchPreferencesFromBackend()
       .then((prefs) => {
         const saved = prefs?.viewMode;
-        if (!cancelled && (saved === 'zen' || saved === 'studio' || saved === 'monolith')) {
-          setViewMode(saved);
+        if (!cancelled && saved === 'ambient') {
+          setViewMode('ambient');
         }
       })
       .catch(() => {});
@@ -510,78 +511,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
   const applicationsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
 
-  if (viewMode === 'monolith' || viewMode === 'zen') {
+  if (viewMode === 'ambient') {
     return (
       <SafeErrorBoundary>
-        {fallbackBanner && (
-          <div className="bg-[#b87326]/15 border-b border-[#b87326]/30 text-[#d48b38] px-4 py-2 text-xs font-mono flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-[#d48b38] animate-pulse" />
-              {fallbackBanner}
-            </span>
-            <button
-              onClick={() => setFallbackBanner(null)}
-              className="text-[#d48b38] hover:text-white ml-4 text-xs font-bold cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Custom Job / External Link Generator Modal */}
-        <CustomJobModal
-          isOpen={isCustomJobModalOpen}
-          onClose={() => setIsCustomJobModalOpen(false)}
-          onJobCreated={() => {
-            refetch();
-          }}
-          onOpenGenerator={(j) => setSelectedForGenerator(j)}
-        />
-
-        <MonolithMode
+        <CyberpunkAmbientMode
           jobs={jobs}
           profile={activeProfile}
           applications={applicationsList}
-          onSwitchMode={(mode) => setViewMode(mode)}
+          onReturnToDashboard={() => setViewMode('dashboard')}
           onOpenJobModal={(job) => setSelectedJob(job)}
           onOpenGenerator={(job) => setSelectedForGenerator(job)}
-          onOpenProfileModal={() => {
-            setEditingProfile(activeProfile);
-            setIsProfileModalOpen(true);
-          }}
-          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-          onOpenBatchApply={() => setIsBatchApplyOpen(true)}
-          onOpenWorkforceAustralia={() => setIsWorkforceModalOpen(true)}
-          showWorkforceAustralia={isWorkforceEnabled}
-
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenRecruiterCrm={() => setIsRecruiterCrmOpen(true)}
-          onOpenFunnelIntel={() => setIsFunnelModalOpen(true)}
-          onOpenCareerCompass={() => setIsCareerModalOpen(true)}
-          overdueTouchpointCount={overdueTouchpointCount}
         />
 
-        {isBatchApplyOpen && (
-          <BatchApplyModal 
-            jobs={jobs}
-            isOpen={isBatchApplyOpen}
-            onClose={() => setIsBatchApplyOpen(false)}
-            onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
-            onNavigateToTracker={() => {
-              setViewMode('studio');
-              setActiveSection('kanban');
-            }}
-            onComplete={(results) => {
-              results.forEach(res => {
-                if (res.success) {
-                  updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
-                }
-              });
-            }}
-          />
-        )}
-
-        {/* Global Modals in Monolith & Zen Mode */}
         {selectedJob && (
           <Suspense fallback={<ModalSkeleton />}>
             <JobModal
@@ -611,159 +552,6 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onApplicationCreated={(app) => {
                 updateJobStatus(selectedForGenerator.id || `${selectedForGenerator.company}_${selectedForGenerator.title}`, 'Package Prepared / To Submit', app);
               }}
-            />
-          </Suspense>
-        )}
-
-        {selectedForMockInterview && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <MockInterviewModal
-              job={selectedForMockInterview}
-              isOpen={Boolean(selectedForMockInterview)}
-              onClose={() => setSelectedForMockInterview(null)}
-              profile={activeProfile}
-            />
-          </Suspense>
-        )}
-
-        {selectedForInterviewPrep && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <InterviewPrepModal
-              job={selectedForInterviewPrep}
-              isOpen={Boolean(selectedForInterviewPrep)}
-              onClose={() => setSelectedForInterviewPrep(null)}
-              profile={activeProfile}
-            />
-          </Suspense>
-        )}
-
-        {selectedForOutreach && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <FollowUpEmailModal
-              job={selectedForOutreach}
-              isOpen={Boolean(selectedForOutreach)}
-              onClose={() => setSelectedForOutreach(null)}
-              prefillRecruiter={selectedForOutreach.contactEmail ? { recipientEmail: selectedForOutreach.contactEmail, company: selectedForOutreach.company } : null}
-            />
-          </Suspense>
-        )}
-
-        {selectedForOfferHub && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <OfferActionHubModal
-              isOpen={Boolean(selectedForOfferHub)}
-              onClose={() => setSelectedForOfferHub(null)}
-              job={selectedForOfferHub}
-            />
-          </Suspense>
-        )}
-
-        {selectedForDossier && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <ExecutiveDossierModal
-              isOpen={Boolean(selectedForDossier)}
-              onClose={() => setSelectedForDossier(null)}
-              job={selectedForDossier}
-              profile={activeProfile}
-            />
-          </Suspense>
-        )}
-
-        {isRecruiterCrmOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <RecruiterRelationshipModal
-              isOpen={isRecruiterCrmOpen}
-              onClose={() => {
-                setIsRecruiterCrmOpen(false);
-                setSelectedForRecruiterCrm(null);
-              }}
-              activeJob={selectedForRecruiterCrm}
-              onOpenFollowUpEmail={(recruiterInfo) => {
-                setIsRecruiterCrmOpen(false);
-                setSelectedForOutreach({
-                  ...(selectedForRecruiterCrm || {}),
-                  contactEmail: recruiterInfo.recipientEmail,
-                  company: recruiterInfo.company || selectedForRecruiterCrm?.company || '',
-                });
-              }}
-            />
-          </Suspense>
-        )}
-
-        {isFunnelModalOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <FunnelIntelligenceModal
-              isOpen={isFunnelModalOpen}
-              onClose={() => setIsFunnelModalOpen(false)}
-              jobs={jobs}
-              currentSector={activeProfile?.industry || 'technology'}
-              onSelectJob={(j) => {
-                setIsFunnelModalOpen(false);
-                setSelectedJob(j);
-              }}
-              onOpenRecruiterCrm={() => {
-                setIsFunnelModalOpen(false);
-                setIsRecruiterCrmOpen(true);
-              }}
-            />
-          </Suspense>
-        )}
-
-        {isCareerModalOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <CareerMatrixModal
-              isOpen={isCareerModalOpen}
-              onClose={() => setIsCareerModalOpen(false)}
-              profile={activeProfile}
-              currentSector={activeProfile?.industry || 'technology'}
-            />
-          </Suspense>
-        )}
-
-        {isProfileModalOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <ProfileModal
-              profile={editingProfile || activeProfile}
-              onClose={() => setIsProfileModalOpen(false)}
-              onSave={(updated) => {
-                setActiveProfile(updated);
-                saveProfile(updated);
-                setIsProfileModalOpen(false);
-              }}
-            />
-          </Suspense>
-        )}
-
-        {isCommandPaletteOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <CommandPalette
-              isOpen={isCommandPaletteOpen}
-              onClose={() => setIsCommandPaletteOpen(false)}
-              jobs={jobs}
-              onSelectJob={(j) => setSelectedJob(j)}
-              onOpenGenerator={(j) => setSelectedForGenerator(j)}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              onOpenWorkforceAustralia={() => setIsWorkforceModalOpen(true)}
-              showWorkforceAustralia={isWorkforceEnabled}
-            />
-          </Suspense>
-        )}
-
-        {isSettingsOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <SettingsModal
-              isOpen={isSettingsOpen}
-              onClose={() => setIsSettingsOpen(false)}
-            />
-          </Suspense>
-        )}
-
-        {isWorkforceModalOpen && (
-          <Suspense fallback={<ModalSkeleton />}>
-            <WorkforceAustraliaModal
-              isOpen={isWorkforceModalOpen}
-              onClose={() => setIsWorkforceModalOpen(false)}
-              jobs={jobs}
             />
           </Suspense>
         )}
@@ -918,11 +706,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           )}
 
           <button
-            onClick={() => setViewMode('monolith')}
-            className="flex items-center gap-1.5 px-3 py-1 bg-[#1a1612] border border-[#b87326]/50 text-[#d48b38] hover:text-white hover:bg-[#251f18] transition-colors font-bold text-[10px] shadow-xs cursor-pointer tracking-wider"
-            title="Switch to Monolith Focus Mode"
+            onClick={() => setViewMode('ambient')}
+            className="flex items-center gap-1.5 px-3 py-1 bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-colors font-bold text-[10px] rounded-xl shadow-xs cursor-pointer tracking-wider backdrop-blur-md"
+            title="Switch to Cyberpunk Ambient Flow Mode (Realtime Metrics & Dystopian Soundscape)"
           >
-            <span>▲ MONOLITH</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span>AMBIENT FLOW</span>
           </button>
 
           <button
@@ -1157,6 +946,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           <>
             {activeSection === 'seeker' && (
               <SafeErrorBoundary sectionName="Job Feed & Discoveries">
+                <PrimeTargetSpotlight
+                  jobs={jobs}
+                  profile={activeProfile}
+                  applications={applicationsList}
+                  onOpenJobModal={(job) => setSelectedJob(job)}
+                  onOpenGenerator={(job) => setSelectedForGenerator(job)}
+                  onJobStatusUpdate={(jobId, status, updatedJob) => updateJobStatus(jobId, status, updatedJob)}
+                />
                 <JobSeeker 
                   jobs={jobs} 
                   activeProfile={activeProfile}

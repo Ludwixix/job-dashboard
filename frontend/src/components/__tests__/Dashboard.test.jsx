@@ -3,6 +3,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Dashboard } from '../Dashboard';
 
+// Mock Web Audio and Canvas
+beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+    fillRect: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    arc: vi.fn(),
+    stroke: vi.fn(),
+    fill: vi.fn(),
+    clearRect: vi.fn()
+  });
+});
+
 describe('Dashboard Top-Level Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -25,25 +39,43 @@ describe('Dashboard Top-Level Integration', () => {
     });
   });
 
-  it('renders Monolith mode by default and allows switching to Studio', async () => {
+  it('renders single unified dashboard by default with integrated Prime Target & Telemetry', async () => {
     render(<Dashboard />);
 
-    // Check Monolith mode branding
     await waitFor(() => {
-      expect(screen.getByText(/THE MONOLITH/i)).toBeInTheDocument();
+      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
     });
 
-    // Switch to Studio mode
-    const studioBtn = screen.getByRole('button', { name: /STUDIO/i });
-    fireEvent.click(studioBtn);
+    // Integrated Prime Target & Autopilot Telemetry is present
+    expect(screen.getByText(/PRIME TARGET & AUTOPILOT TELEMETRY/i)).toBeInTheDocument();
+  });
+
+  it('switches into Cyberpunk Ambient mode when AMBIENT FLOW button is clicked and returns to dashboard', async () => {
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+    });
+
+    // Click Ambient Flow button
+    const ambientBtn = screen.getByRole('button', { name: /AMBIENT FLOW/i });
+    fireEvent.click(ambientBtn);
+
+    // Verify Cyberpunk Ambient Mode is active
+    await waitFor(() => {
+      expect(screen.getByText(/CYBERPUNK AMBIENT \/\/ REALTIME FLOWS/i)).toBeInTheDocument();
+    });
+
+    // Return to main dashboard
+    const returnBtn = screen.getByTitle(/Return to Main Dashboard/i);
+    fireEvent.click(returnBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
     });
   });
 
-  it('navigates sections in Studio mode and handles modal triggers cleanly', async () => {
-    window.localStorage.setItem('job_dashboard_view_mode', 'studio');
+  it('navigates sections in Dashboard mode and handles modal triggers cleanly', async () => {
     render(<Dashboard />);
 
     await waitFor(() => {
@@ -72,23 +104,6 @@ describe('Dashboard Top-Level Integration', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Conversion Pipeline/i)).toBeInTheDocument();
-    });
-  });
-
-  it('renders Monolith mode when configured and allows switching to Studio', async () => {
-    window.localStorage.setItem('job_dashboard_view_mode', 'monolith');
-    render(<Dashboard />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/THE MONOLITH/i)).toBeInTheDocument();
-    });
-
-    // Switch to Studio
-    const studioBtn = screen.getByRole('button', { name: /STUDIO/i });
-    fireEvent.click(studioBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
     });
   });
 });

@@ -180,16 +180,18 @@
 }
 
 /* ==========================================================================
-   Ancient Alien Technology Monolith Rail & Quantum Resonant Ripple Styles
+   Clean Modern Obsidian SaaS Rail & Linear-Style Glassmorphism
    ========================================================================== */
+.obsidian-saas-rail,
 .alien-monolith-rail {
-  background: linear-gradient(180deg, #0d0b09 0%, #070605 50%, #0a0907 100%);
-  border-right: 1px solid #231e19;
+  background: linear-gradient(180deg, #090d16 0%, #06090f 50%, #080c14 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   position: relative;
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.obsidian-saas-rail::before,
 .alien-monolith-rail::before {
   content: '';
   position: absolute;
@@ -197,18 +199,20 @@
   right: 0;
   bottom: 0;
   width: 1px;
-  background: linear-gradient(180deg, transparent 0%, rgba(212, 139, 56, 0.4) 25%, rgba(184, 115, 38, 0.8) 50%, rgba(212, 139, 56, 0.4) 75%, transparent 100%);
-  box-shadow: 0 0 8px rgba(212, 139, 56, 0.35);
+  background: linear-gradient(180deg, transparent 0%, rgba(99, 102, 241, 0.3) 25%, rgba(6, 182, 212, 0.5) 50%, rgba(99, 102, 241, 0.3) 75%, transparent 100%);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.25);
   pointer-events: none;
 }
 
 @media (max-width: 767px) {
+  .obsidian-saas-rail,
   .alien-monolith-rail {
     border-right: none;
-    border-top: 1px solid #231e19;
-    background: linear-gradient(90deg, #0d0b09 0%, #070605 50%, #0a0907 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(90deg, #090d16 0%, #06090f 50%, #080c14 100%);
   }
 
+  .obsidian-saas-rail::before,
   .alien-monolith-rail::before {
     top: 0;
     left: 0;
@@ -216,51 +220,38 @@
     bottom: auto;
     width: 100%;
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(212, 139, 56, 0.4) 25%, rgba(184, 115, 38, 0.8) 50%, rgba(212, 139, 56, 0.4) 75%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(99, 102, 241, 0.3) 25%, rgba(6, 182, 212, 0.5) 50%, rgba(99, 102, 241, 0.3) 75%, transparent 100%);
   }
 }
 
-/* Fluid Alien Artifact Ripple */
-@keyframes alien-resonance-pulse {
-  0% {
-    transform: scale(0.12);
-    opacity: 0.9;
-  }
-  40% {
-    opacity: 0.55;
-  }
-  100% {
-    transform: scale(2.8);
-    opacity: 0;
-  }
-}
-
-.alien-ripple-wave {
-  position: absolute;
-  border-radius: 9999px;
-  pointer-events: none;
-  border: 1px solid rgba(212, 139, 56, 0.65);
-  background: radial-gradient(circle, rgba(212, 139, 56, 0.22) 0%, rgba(184, 115, 38, 0.08) 50%, transparent 75%);
-  box-shadow: 0 0 18px rgba(212, 139, 56, 0.35), inset 0 0 10px rgba(229, 169, 93, 0.2);
-  animation: alien-resonance-pulse 1.4s cubic-bezier(0.12, 0.8, 0.24, 1) forwards;
-}
-
+.saas-nav-button,
 .alien-glyph-button {
   position: relative;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 12px;
 }
 
-.alien-glyph-button::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border: 1px solid transparent;
-  transition: all 0.35s ease;
-  pointer-events: none;
+.saas-nav-button:hover,
+.alien-glyph-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
 }
 
-.alien-glyph-button:hover::after {
-  border-color: rgba(212, 139, 56, 0.4);
-  box-shadow: 0 0 14px rgba(212, 139, 56, 0.25);
+/* Linear-Style Hairline Card Surface */
+.saas-card {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.saas-card:hover {
+  background: rgba(22, 33, 58, 0.85);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.5), 0 0 15px -3px rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
+}
+
 

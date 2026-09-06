@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Sparkles, 
   MapPin, 
   DollarSign, 
   ArrowUpRight, 
-  ShieldCheck, 
   Activity, 
   Target,
   FileText,
@@ -15,16 +13,14 @@ import {
   Terminal,
   ChevronRight,
   BrainCircuit,
-  Eye,
   CheckCircle2,
   Check,
   Copy,
   RefreshCw,
-  Mail,
-  Sliders,
   Send,
   Users,
-  TrendingUp
+  TrendingUp,
+  Layers
 } from 'lucide-react';
 import AlienMonolithNav from './AlienMonolithNav';
 import { formatJobPostedAge, getJobAgeInDays } from '../utils/dateUtils';
@@ -32,6 +28,7 @@ import { subscribeAutopilot, triggerAutonomousGmailScan } from '../services/auto
 import { fetchDocumentFromBackend } from '../services/generationService';
 import { fetchPsychologyFromBackend } from '../services/psychologyService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
+import { Button, Badge } from './ui';
 
 export default function MonolithMode({
   jobs = [],
@@ -52,7 +49,7 @@ export default function MonolithMode({
   // Navigation active tab: 'prime' | 'autopilot' | 'radar'
   const [activeTab, setActiveTab] = useState('prime');
 
-  // Autonomous Agent Telemetry State (from Zen Mode)
+  // Autonomous Agent Telemetry State
   const [agentState, setAgentState] = useState({
     isRunning: true,
     activeTask: 'monitoring',
@@ -204,18 +201,18 @@ export default function MonolithMode({
   };
 
   return (
-    <div className="min-h-screen bg-[#090807] text-[#ede6dc] font-mono selection:bg-[#c67d34] selection:text-black antialiased relative overflow-hidden flex flex-col md:flex-row">
-      {/* Background Sand Gradient Atmosphere */}
+    <div className="min-h-screen bg-[#090d16] text-slate-100 font-sans selection:bg-indigo-600 selection:text-white antialiased relative overflow-hidden flex flex-col md:flex-row">
+      {/* Background Subtle Gradient Atmosphere */}
       <div 
-        className="pointer-events-none fixed inset-0 opacity-[0.035] bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:24px_24px]" 
+        className="pointer-events-none fixed inset-0 opacity-[0.03] bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px]" 
         aria-hidden="true" 
       />
       <div 
-        className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-gradient-to-b from-[#c67d34]/[0.04] to-transparent blur-3xl"
+        className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-gradient-to-b from-indigo-500/[0.05] via-cyan-500/[0.02] to-transparent blur-3xl"
         aria-hidden="true"
       />
 
-      {/* LEFT-HAND MENU: ANCIENT ALIEN TECHNOLOGY MONOLITH RAIL WITH RIPPLES */}
+      {/* LEFT-HAND MENU: CLEAN MODERN OBSIDIAN SAAS RAIL */}
       <AlienMonolithNav
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab)}
@@ -229,51 +226,51 @@ export default function MonolithMode({
         isScanningRadar={isScanningGmail}
       />
 
-      {/* MAIN MONOLITH COMMAND SURFACE */}
+      {/* MAIN COMMAND SURFACE */}
       <div className="flex-1 flex flex-col justify-between min-w-0 overflow-x-hidden pb-20 md:pb-0">
-        {/* 1. MONOLITHIC HEADER */}
-        <header className="relative z-10 border-b border-[#231e19] bg-[#0d0b09]/95 backdrop-blur-md px-4 sm:px-6 lg:px-12 py-3.5 sm:py-5">
+        {/* 1. OBSIDIAN EXECUTIVE HEADER */}
+        <header className="relative z-10 border-b border-slate-800/80 bg-[#090d16]/95 backdrop-blur-md px-4 sm:px-6 lg:px-12 py-3.5 sm:py-5">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Monolith Wordmark & Autonomous Indicator (DUNE MINIMALIST text removed) */}
+            {/* Wordmark & Autonomous Indicator */}
             <div className="flex items-center gap-4">
-              <div className="w-9 h-9 rounded-none border border-[#b87326]/60 bg-[#171410] flex items-center justify-center shadow-lg">
-                <span className="text-base text-[#d48b38] font-black">▲</span>
+              <div className="w-10 h-10 rounded-xl border border-indigo-500/30 bg-indigo-950/40 flex items-center justify-center shadow-lg shadow-indigo-950/40">
+                <Layers size={18} className="text-indigo-400" />
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-sm lg:text-base font-black tracking-[0.3em] uppercase text-[#ede6dc]">
+                  <h1 className="text-sm lg:text-base font-black tracking-[0.25em] uppercase text-white">
                     THE MONOLITH
                   </h1>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#b87326]/40 text-[#d48b38] bg-[#b87326]/10 text-[9px] tracking-[0.15em] font-extrabold uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#d48b38] animate-pulse" />
-                    AUTONOMOUS ENGINE ACTIVE
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-[9px] tracking-wider font-bold uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    AUTONOMOUS ACTIVE
                   </span>
                 </div>
-                <p className="text-[10px] tracking-[0.2em] text-[#9c9183] mt-0.5 uppercase">
-                  PURE EFFICIENCY &amp; CALM // {totalAssimilated.toLocaleString()} SIGNALS ASSIMILATED
+                <p className="text-[10px] tracking-widest text-slate-400 mt-0.5 uppercase">
+                  EXECUTIVE FOCUS // {totalAssimilated.toLocaleString()} SIGNALS ASSIMILATED
                 </p>
               </div>
             </div>
 
-            {/* Controls: 3-Way Mode Switcher & Actions */}
-            <div className="flex items-center gap-3">
+            {/* Controls: Mode Switcher & Actions */}
+            <div className="flex flex-wrap items-center gap-2.5">
               {/* Mode Switcher */}
-              <div className="inline-flex p-1 border border-[#2d2720] bg-[#120f0d] text-[10px] tracking-[0.15em] font-bold">
+              <div className="inline-flex p-1 rounded-xl border border-slate-800 bg-slate-900/80 text-[11px] font-semibold">
                 <button
                   type="button"
                   onClick={() => onSwitchMode && onSwitchMode('monolith')}
-                  className="px-3 py-1 bg-[#2b241c] text-[#d48b38] border border-[#b87326]/40 cursor-default shadow-xs"
+                  className="px-3 py-1 bg-indigo-600/20 text-indigo-300 rounded-lg border border-indigo-500/30 cursor-default shadow-xs"
                   title="Monolith Focus"
                 >
-                  ▲ MONOLITH
+                  FOCUS
                 </button>
                 <button
                   type="button"
                   onClick={() => onSwitchMode && onSwitchMode('studio')}
-                  className="px-3 py-1 text-[#8c8275] hover:text-[#ede6dc] transition-colors cursor-pointer"
+                  className="px-3 py-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
                   title="Switch to Full Studio Mode"
                 >
-                  🎛️ STUDIO
+                  STUDIO
                 </button>
               </div>
 
@@ -282,10 +279,10 @@ export default function MonolithMode({
                 <button
                   type="button"
                   onClick={onOpenBatchApply}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#b87326]/60 hover:border-[#d48b38] bg-[#1a1612] text-[#d48b38] hover:text-[#ede6dc] text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-500/40 hover:border-indigo-500 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 hover:text-white text-[11px] font-bold tracking-wide transition-all cursor-pointer shadow-xs"
                   title="Dispatch 1-Click Batch Automated Applications"
                 >
-                  <Zap size={11} className="text-[#d48b38]" />
+                  <Zap size={13} className="text-indigo-400" />
                   <span>BATCH DISPATCH</span>
                 </button>
               )}
@@ -295,13 +292,13 @@ export default function MonolithMode({
                 <button
                   type="button"
                   onClick={onOpenRecruiterCrm}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-purple-800/60 hover:border-purple-500 bg-[#160d21] text-purple-300 hover:text-white text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-purple-500/30 hover:border-purple-500/60 bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 hover:text-white text-[11px] font-bold tracking-wide transition-all cursor-pointer shadow-xs"
                   title="Recruiter & Talent Network CRM"
                 >
-                  <Users size={11} className="text-purple-400" />
-                  <span>RECRUITER CRM</span>
+                  <Users size={13} className="text-purple-400" />
+                  <span>CRM</span>
                   {overdueTouchpointCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black">
+                    <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black">
                       {overdueTouchpointCount}
                     </span>
                   )}
@@ -313,11 +310,11 @@ export default function MonolithMode({
                 <button
                   type="button"
                   onClick={onOpenFunnelIntel}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-cyan-800/60 hover:border-cyan-500 bg-[#0d1c21] text-cyan-300 hover:text-white text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyan-500/30 hover:border-cyan-500/60 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-300 hover:text-white text-[11px] font-bold tracking-wide transition-all cursor-pointer shadow-xs"
                   title="Talent Funnel Intelligence: Stage Conversion & Velocity"
                 >
-                  <TrendingUp size={11} className="text-cyan-400" />
-                  <span>FUNNEL INTEL</span>
+                  <TrendingUp size={13} className="text-cyan-400" />
+                  <span>FUNNEL</span>
                 </button>
               )}
 
@@ -326,11 +323,11 @@ export default function MonolithMode({
                 <button
                   type="button"
                   onClick={onOpenCareerCompass}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-800/60 hover:border-indigo-500 bg-[#110e24] text-indigo-300 hover:text-white text-[10px] tracking-[0.15em] font-black transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/30 hover:border-blue-500/60 bg-blue-950/30 hover:bg-blue-900/40 text-blue-300 hover:text-white text-[11px] font-bold tracking-wide transition-all cursor-pointer shadow-xs"
                   title="Career Vector Matrix: Seniority Roadmap & Salary Lift"
                 >
-                  <Compass size={11} className="text-indigo-400" />
-                  <span>CAREER COMPASS</span>
+                  <Compass size={13} className="text-blue-400" />
+                  <span>COMPASS</span>
                 </button>
               )}
 
@@ -338,10 +335,10 @@ export default function MonolithMode({
               <button
                 type="button"
                 onClick={onOpenProfileModal}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#2d2720] hover:border-[#b87326]/50 bg-[#120f0d] hover:bg-[#1a1612] text-[#c4b9aa] hover:text-white text-[10px] tracking-[0.15em] font-bold transition-all cursor-pointer"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] font-medium transition-all cursor-pointer"
               >
-                <Compass size={12} className="text-[#d48b38]" />
-                <span>{profile?.name ? profile.name.toUpperCase() : 'PROFILE'}</span>
+                <Compass size={13} className="text-slate-400" />
+                <span>{profile?.name ? profile.name : 'Profile'}</span>
               </button>
             </div>
           </div>
@@ -349,155 +346,154 @@ export default function MonolithMode({
 
         {/* Global Notification Banner */}
         {notificationMsg && (
-          <div className="bg-[#171410] border-b border-[#b87326]/40 text-[#d48b38] px-6 py-2.5 text-xs tracking-wider flex items-center justify-between font-mono animate-in fade-in duration-200">
+          <div className="bg-slate-900/90 border-b border-indigo-500/30 text-indigo-300 px-6 py-2.5 text-xs tracking-wide flex items-center justify-between font-sans animate-in fade-in duration-200">
             <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d48b38] animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
               {notificationMsg}
             </span>
             <button
               onClick={() => setNotificationMsg(null)}
-              className="text-[#8c8275] hover:text-white text-xs font-bold cursor-pointer"
+              className="text-slate-400 hover:text-white text-xs font-bold cursor-pointer"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* 2. THE MONOLITH COMMAND SURFACE BODY */}
+        {/* 2. MAIN COMMAND SURFACE BODY */}
         <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-10 w-full space-y-8 sm:space-y-12 flex-1">
-          {/* TAB 1: PRIME MONOLITH VIEW */}
+          {/* TAB 1: PRIME FOCUS VIEW */}
           {activeTab === 'prime' && (
             <div className="space-y-8 sm:space-y-12 animate-in fade-in duration-300">
-              {/* PRIME MONOLITH CARD (THE SINGLE HIGHEST-IMPACT TRAJECTORY) */}
+              {/* PRIME TRAJECTORY CARD */}
               {primeJob ? (
                 <section className="space-y-3">
-                  <div className="flex items-center justify-between text-[11px] tracking-[0.25em] text-[#8c8275] uppercase">
-                    <span className="flex items-center gap-2 font-bold">
-                      <Target size={13} className="text-[#d48b38]" />
+                  <div className="flex items-center justify-between text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                    <span className="flex items-center gap-2">
+                      <Target size={14} className="text-indigo-400" />
                       PRIME TRAJECTORY // HIGHEST STRATEGIC CONVERGENCE
                     </span>
-                    <span className="text-[#d48b38] font-black">
+                    <Badge variant="indigo" size="sm">
                       RANK #01
-                    </span>
+                    </Badge>
                   </div>
 
                   <motion.div 
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="bg-[#12100d] border border-[#2e271f] hover:border-[#b87326]/60 transition-all duration-500 p-5 sm:p-7 lg:p-10 relative overflow-hidden shadow-2xl group"
+                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    className="saas-card rounded-2xl p-6 sm:p-8 lg:p-10 relative overflow-hidden group"
                   >
-                    {/* Corner Architectural Accent */}
-                    <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none border-t border-r border-[#b87326]/40" />
-
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                      {/* Left Side: Massive Monolithic Details */}
+                      {/* Left Side: Details */}
                       <div className="space-y-4 max-w-3xl">
-                        <div className="flex flex-wrap items-center gap-3 text-[10px] tracking-[0.2em] uppercase font-bold">
-                          <span className="px-2 py-0.5 bg-[#b87326]/20 border border-[#b87326]/40 text-[#d48b38]">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <Badge variant="indigo">
                             {primeJob.stream || 'CORE ENTERPRISE SYSTEMS'}
-                          </span>
-                          <span className="px-2 py-0.5 bg-[#1a1713] border border-[#332b22] text-[#a89d8e]">
+                          </Badge>
+                          <Badge variant="emerald">
                             {primeJob.score || 95}% ALIGNMENT
-                          </span>
-                          <span className="text-[#8c8275] flex items-center gap-1">
-                            <Clock size={11} className="text-[#b87326]" />
+                          </Badge>
+                          <span className="text-xs text-slate-400 flex items-center gap-1.5 ml-1">
+                            <Clock size={12} className="text-slate-400" />
                             {formatJobPostedAge(primeJob.date)}
                           </span>
                         </div>
 
                         <div>
-                          <h2 className="text-xl sm:text-2xl lg:text-4xl font-black tracking-wider uppercase text-[#ede6dc] leading-tight group-hover:text-white transition-colors">
+                          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white leading-tight group-hover:text-indigo-200 transition-colors">
                             {primeJob.title}
                           </h2>
-                          <p className="text-base lg:text-xl font-bold tracking-widest text-[#d48b38] mt-1 uppercase">
+                          <p className="text-base lg:text-lg font-semibold text-indigo-400 mt-1">
                             {primeJob.company}
                           </p>
                         </div>
 
-                        <p className="text-xs lg:text-sm text-[#a89d8e] leading-relaxed line-clamp-3 font-sans font-medium">
+                        <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
                           {primeJob.description || 'Deep architectural alignment with your target skill vector. Commute constraints, compensation thresholds, and semantic keywords verified nominal.'}
                         </p>
 
-                        <div className="flex flex-wrap items-center gap-6 text-xs text-[#c4b9aa] pt-2 border-t border-[#231e19]">
-                          <span className="flex items-center gap-1.5 tracking-wider">
-                            <MapPin size={13} className="text-[#d48b38]" />
+                        <div className="flex flex-wrap items-center gap-6 text-xs text-slate-300 pt-3 border-t border-slate-800/80">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <MapPin size={14} className="text-indigo-400" />
                             {primeJob.location || 'Melbourne VIC'}
                           </span>
-                          <span className="flex items-center gap-1.5 tracking-wider font-bold text-[#ede6dc]">
-                            <DollarSign size={13} className="text-[#d48b38]" />
+                          <span className="flex items-center gap-1.5 font-semibold text-white">
+                            <DollarSign size={14} className="text-emerald-400" />
                             {primeJob.salary || 'Competitive Sovereign Comp'}
                           </span>
                         </div>
 
-                        {/* Fast Zen Automation Actions */}
-                        <div className="flex flex-wrap items-center gap-3 pt-2">
+                        {/* Fast Automation Actions */}
+                        <div className="flex flex-wrap items-center gap-2.5 pt-2">
                           <button
                             type="button"
                             onClick={() => handleQuickPreviewDocs(primeJob)}
-                            className="text-[10px] tracking-[0.15em] font-bold text-[#d48b38] hover:text-white flex items-center gap-1.5 border border-[#2e271f] hover:border-[#b87326]/50 bg-[#171410] px-3 py-1.5 transition-colors cursor-pointer"
+                            className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 hover:bg-slate-800 px-3 py-1.5 transition-all cursor-pointer"
                           >
-                            <FileText size={12} className="text-[#d48b38]" />
+                            <FileText size={13} className="text-indigo-400" />
                             <span>TAILORED DOCS</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleQuickPreviewPsych(primeJob)}
-                            className="text-[10px] tracking-[0.15em] font-bold text-[#a89d8e] hover:text-white flex items-center gap-1.5 border border-[#2e271f] hover:border-[#b87326]/50 bg-[#171410] px-3 py-1.5 transition-colors cursor-pointer"
+                            className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 hover:bg-slate-800 px-3 py-1.5 transition-all cursor-pointer"
                           >
-                            <BrainCircuit size={12} className="text-[#b87326]" />
+                            <BrainCircuit size={13} className="text-purple-400" />
                             <span>FIT AUDIT</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleMarkApplied(primeJob)}
-                            className="text-[10px] tracking-[0.15em] font-bold text-[#8c8275] hover:text-emerald-400 flex items-center gap-1.5 border border-[#2e271f] hover:border-emerald-700/50 bg-[#171410] px-3 py-1.5 transition-colors cursor-pointer"
+                            className="text-xs font-semibold text-slate-400 hover:text-emerald-400 flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 hover:bg-slate-800 px-3 py-1.5 transition-all cursor-pointer"
                           >
-                            <CheckCircle2 size={12} />
+                            <CheckCircle2 size={13} className="text-emerald-400" />
                             <span>MARK APPLIED</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Right Side: Heavy Action Buttons */}
+                      {/* Right Side: Primary Actions */}
                       <div className="flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-auto lg:min-w-[240px] shrink-0">
-                        <button
-                          type="button"
+                        <Button
+                          variant="primary"
+                          size="lg"
                           onClick={() => onOpenGenerator && onOpenGenerator(primeJob)}
-                          className="w-full py-4 px-6 bg-[#b87326] hover:bg-[#d48b38] text-black font-black text-xs tracking-[0.25em] uppercase transition-all duration-300 shadow-xl flex items-center justify-center gap-2 cursor-pointer border border-[#d48b38]"
+                          className="w-full flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
                         >
                           <span>PREPARE APPLICATION</span>
-                          <ArrowUpRight size={16} className="shrink-0 stroke-[3]" />
-                        </button>
+                          <ArrowUpRight size={16} />
+                        </Button>
 
-                        <button
-                          type="button"
+                        <Button
+                          variant="secondary"
+                          size="lg"
                           onClick={() => onOpenJobModal && onOpenJobModal(primeJob)}
-                          className="w-full py-3.5 px-6 bg-[#171411] hover:bg-[#211d18] text-[#c4b9aa] hover:text-white font-bold text-xs tracking-[0.2em] uppercase transition-all duration-300 border border-[#2e271f] hover:border-[#b87326]/50 flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full flex items-center justify-center gap-2"
                         >
-                          <span>INSPECT INTELLIGENCE</span>
-                          <ChevronRight size={14} className="text-[#8c8275]" />
-                        </button>
+                          <span>INSPECT DETAILS</span>
+                          <ChevronRight size={15} />
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
                 </section>
               ) : (
-                <div className="p-12 text-center border border-[#27211a] bg-[#120f0d] space-y-3">
-                  <p className="text-sm tracking-[0.2em] text-[#a89d8e]">NO RECENT VECTORS DETECTED</p>
-                  <p className="text-xs text-[#a89d8e]">Background engine is assimilating new listings. All systems nominal.</p>
+                <div className="p-12 text-center rounded-2xl border border-slate-800 bg-slate-900/60 space-y-3">
+                  <p className="text-sm font-semibold tracking-wider text-slate-400">NO RECENT TARGETS DETECTED</p>
+                  <p className="text-xs text-slate-400">Background engine is assimilating new listings. All systems nominal.</p>
                 </div>
               )}
 
-              {/* 3. CURATED SECONDARY MONOLITH SLABS */}
+              {/* 3. CURATED SECONDARY TARGET CARDS */}
               {secondarySlabs.length > 0 && (
                 <section className="space-y-4">
-                  <div className="flex items-center justify-between text-[11px] tracking-[0.25em] text-[#8c8275] uppercase">
-                    <span className="flex items-center gap-2 font-bold">
-                      <Compass size={13} className="text-[#d48b38]" />
-                      SECONDARY MONOLITHS // FILTERED ESSENCE
+                  <div className="flex items-center justify-between text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                    <span className="flex items-center gap-2">
+                      <Compass size={14} className="text-cyan-400" />
+                      SECONDARY TARGETS // FILTERED ESSENCE
                     </span>
-                    <span className="text-[10px] text-[#a89d8e]">
+                    <span className="text-xs text-slate-400">
                       {secondarySlabs.length} OF {activeJobs.length} VERIFIED
                     </span>
                   </div>
@@ -508,31 +504,36 @@ export default function MonolithMode({
                         key={job.id || `${job.company}_${job.title}_${idx}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: idx * 0.08 }}
+                        transition={{ duration: 0.4, delay: idx * 0.05 }}
                         onClick={() => onOpenJobModal && onOpenJobModal(job)}
-                        className="bg-[#12100d] border border-[#27211a] hover:border-[#b87326]/60 p-6 space-y-4 transition-all duration-400 cursor-pointer group relative shadow-lg"
+                        className="saas-card rounded-xl p-6 space-y-4 cursor-pointer group relative"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <span className="text-[9px] tracking-[0.25em] text-[#d48b38] uppercase font-bold">
-                              VECTOR #{String(idx + 2).padStart(2, '0')} · {job.score || 85}% FIT
-                            </span>
-                            <h3 className="text-base font-black tracking-wide uppercase text-[#ede6dc] group-hover:text-white transition-colors leading-snug line-clamp-1">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="indigo" size="sm">
+                                #{String(idx + 2).padStart(2, '0')}
+                              </Badge>
+                              <Badge variant="emerald" size="sm">
+                                {job.score || 85}% FIT
+                              </Badge>
+                            </div>
+                            <h3 className="text-base font-bold text-white group-hover:text-indigo-200 transition-colors leading-snug line-clamp-1">
                               {job.title}
                             </h3>
-                            <p className="text-xs tracking-wider font-bold text-[#a89d8e] uppercase line-clamp-1">
+                            <p className="text-xs font-semibold text-slate-300 line-clamp-1">
                               {job.company}
                             </p>
                           </div>
 
-                          <span className="text-[9px] tracking-wider text-[#8c8275] border border-[#2e271f] px-1.5 py-0.5 shrink-0">
+                          <span className="text-xs text-slate-400 rounded-md border border-slate-800 bg-slate-900/60 px-2 py-0.5 shrink-0">
                             {formatJobPostedAge(job.date)}
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between text-xs pt-3 border-t border-[#1f1b16] text-[#8c8275]">
-                          <span className="truncate max-w-[160px] text-[11px]">
-                            <MapPin size={11} className="inline mr-1 text-[#b87326]" />
+                        <div className="flex items-center justify-between text-xs pt-3 border-t border-slate-800/80 text-slate-400">
+                          <span className="truncate max-w-[160px] flex items-center gap-1">
+                            <MapPin size={12} className="shrink-0 text-slate-400" />
                             {job.location}
                           </span>
                           <div className="flex items-center gap-2">
@@ -542,10 +543,10 @@ export default function MonolithMode({
                                 e.stopPropagation();
                                 handleQuickPreviewDocs(job);
                               }}
-                              className="text-[10px] tracking-wider text-[#8c8275] hover:text-[#d48b38] p-1 cursor-pointer"
+                              className="text-slate-400 hover:text-indigo-400 p-1 rounded-md transition-colors cursor-pointer"
                               title="Preview Tailored Documents"
                             >
-                              <FileText size={13} />
+                              <FileText size={14} />
                             </button>
                             <button
                               type="button"
@@ -553,7 +554,7 @@ export default function MonolithMode({
                                 e.stopPropagation();
                                 onOpenGenerator && onOpenGenerator(job);
                               }}
-                              className="text-[10px] tracking-[0.2em] font-black uppercase text-[#d48b38] hover:text-white flex items-center gap-1 border border-[#b87326]/30 bg-[#b87326]/10 hover:bg-[#b87326]/20 px-2.5 py-1 transition-colors"
+                              className="text-xs font-bold text-indigo-300 hover:text-white flex items-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-600/10 hover:bg-indigo-600/20 px-2.5 py-1 transition-colors cursor-pointer"
                             >
                               <span>PREP</span>
                               <ArrowUpRight size={12} />
@@ -568,28 +569,29 @@ export default function MonolithMode({
             </div>
           )}
 
-          {/* TAB 2: AUTONOMOUS ACTION DECK (ZEN AUTOMATION IN MONOLITH THEME) */}
+          {/* TAB 2: AUTONOMOUS ACTION DECK */}
           {activeTab === 'autopilot' && (
             <div className="space-y-8 animate-in fade-in duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#231e19] pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
-                  <h2 className="text-lg font-black tracking-[0.2em] text-[#ede6dc] uppercase flex items-center gap-2">
-                    <Zap size={16} className="text-[#d48b38]" />
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Zap size={18} className="text-indigo-400" />
                     AUTONOMOUS ACTION DECK
                   </h2>
-                  <p className="text-xs text-[#8c8275] tracking-wider mt-1">
-                    Prepared packages ready for immediate 1-click execution or review.
+                  <p className="text-xs text-slate-400 mt-1">
+                    Prepared application packages ready for 1-click execution or review.
                   </p>
                 </div>
                 {onOpenBatchApply && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={onOpenBatchApply}
-                    className="py-2 px-4 bg-[#b87326] hover:bg-[#d48b38] text-black font-black text-[11px] tracking-[0.2em] uppercase transition-all shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                    className="flex items-center gap-2 self-start sm:self-auto"
                   >
                     <Send size={13} />
                     <span>DISPATCH ALL READY</span>
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -597,47 +599,50 @@ export default function MonolithMode({
                 {actionDeck.map((job, idx) => (
                   <div
                     key={job.id || `${job.company}_${job.title}_${idx}`}
-                    className="bg-[#12100d] border border-[#28221b] hover:border-[#b87326]/60 p-6 space-y-4 transition-all duration-300 relative shadow-xl group"
+                    className="saas-card rounded-xl p-6 space-y-4 relative group"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2 text-[9px] tracking-widest text-[#d48b38] uppercase font-bold">
-                          <span>READY TARGET #{String(idx + 1).padStart(2, '0')}</span>
-                          <span>•</span>
-                          <span>{job.score || 88}% MATCH</span>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="indigo" size="sm">
+                            TARGET #{String(idx + 1).padStart(2, '0')}
+                          </Badge>
+                          <Badge variant="emerald" size="sm">
+                            {job.score || 88}% MATCH
+                          </Badge>
                         </div>
-                        <h3 className="text-base font-black tracking-wide text-[#ede6dc] group-hover:text-white uppercase mt-1 line-clamp-1">
+                        <h3 className="text-base font-bold text-white group-hover:text-indigo-200 mt-1 line-clamp-1">
                           {job.title}
                         </h3>
-                        <p className="text-xs text-[#a89d8e] font-bold uppercase tracking-wider">
+                        <p className="text-xs text-slate-300 font-semibold">
                           {job.company}
                         </p>
                       </div>
-                      <span className="text-[10px] font-mono text-[#a89d8e] border border-[#262019] px-2 py-0.5">
+                      <span className="text-xs text-slate-400 rounded-md border border-slate-800 bg-slate-900/60 px-2 py-0.5">
                         {formatJobPostedAge(job.date)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-[#8c8275] font-sans line-clamp-2">
+                    <p className="text-xs text-slate-300 line-clamp-2">
                       {job.description || 'Target opportunity verified by background autonomous engine. Custom resume and cover letter synthesized.'}
                     </p>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#1f1b16]">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => handleQuickPreviewDocs(job)}
-                          className="text-[10px] tracking-wider font-bold text-[#d48b38] hover:text-white flex items-center gap-1 border border-[#2e271f] bg-[#16130f] px-2.5 py-1 transition-colors cursor-pointer"
+                          className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1 rounded-md border border-slate-700/80 bg-slate-800/60 px-2.5 py-1 transition-colors cursor-pointer"
                         >
-                          <FileText size={11} />
-                          <span>PREVIEW DOCS</span>
+                          <FileText size={12} className="text-indigo-400" />
+                          <span>DOCS</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleQuickPreviewPsych(job)}
-                          className="text-[10px] tracking-wider font-bold text-[#8c8275] hover:text-[#ede6dc] flex items-center gap-1 border border-[#2e271f] bg-[#16130f] px-2.5 py-1 transition-colors cursor-pointer"
+                          className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1 rounded-md border border-slate-700/80 bg-slate-800/60 px-2.5 py-1 transition-colors cursor-pointer"
                         >
-                          <BrainCircuit size={11} />
+                          <BrainCircuit size={12} className="text-purple-400" />
                           <span>AUDIT</span>
                         </button>
                       </div>
@@ -646,18 +651,18 @@ export default function MonolithMode({
                         <button
                           type="button"
                           onClick={() => handleMarkApplied(job)}
-                          className="text-[10px] tracking-wider text-[#a89d8e] hover:text-emerald-400 p-1 cursor-pointer"
+                          className="text-slate-400 hover:text-emerald-400 p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
                           title="Mark as Applied"
                         >
-                          <CheckCircle2 size={15} />
+                          <CheckCircle2 size={16} />
                         </button>
                         <button
                           type="button"
                           onClick={() => onOpenGenerator && onOpenGenerator(job)}
-                          className="text-[10px] tracking-[0.2em] font-black uppercase text-[#d48b38] hover:text-black hover:bg-[#d48b38] flex items-center gap-1 border border-[#b87326]/50 bg-[#b87326]/10 px-3 py-1.5 transition-all cursor-pointer"
+                          className="text-xs font-bold text-indigo-300 hover:text-white flex items-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-600/10 hover:bg-indigo-600/20 px-3 py-1.5 transition-all cursor-pointer"
                         >
                           <span>DISPATCH</span>
-                          <ArrowUpRight size={12} />
+                          <ArrowUpRight size={13} />
                         </button>
                       </div>
                     </div>
@@ -667,16 +672,16 @@ export default function MonolithMode({
             </div>
           )}
 
-          {/* TAB 3: ALIEN RADAR & TELEMETRY STREAM */}
+          {/* TAB 3: RADAR & TELEMETRY STREAM */}
           {activeTab === 'radar' && (
             <div className="space-y-8 animate-in fade-in duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#231e19] pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
-                  <h2 className="text-lg font-black tracking-[0.2em] text-[#ede6dc] uppercase flex items-center gap-2">
-                    <Activity size={16} className="text-[#d48b38]" />
-                    ALIEN RADAR &amp; TELEMETRY MATRIX
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Activity size={18} className="text-indigo-400" />
+                    RADAR &amp; TELEMETRY MATRIX
                   </h2>
-                  <p className="text-xs text-[#8c8275] tracking-wider mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     Continuous autonomous background observation, recruiter synchronization &amp; signal assimilation.
                   </p>
                 </div>
@@ -684,7 +689,7 @@ export default function MonolithMode({
                   type="button"
                   onClick={handleTriggerGmailScan}
                   disabled={isScanningGmail}
-                  className="py-2 px-4 bg-[#1a1612] hover:bg-[#262019] text-[#d48b38] border border-[#b87326]/60 font-bold text-[11px] tracking-[0.15em] uppercase transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="py-2 px-4 bg-slate-800/80 hover:bg-slate-800 text-indigo-300 border border-slate-700 rounded-xl font-semibold text-xs transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw size={13} className={isScanningGmail ? 'animate-spin' : ''} />
                   <span>{isScanningGmail ? 'RADAR ACTIVE...' : 'TRIGGER GMAIL RADAR'}</span>
@@ -693,40 +698,40 @@ export default function MonolithMode({
 
               {/* Autopilot Counters */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-[#12100d] border border-[#27211a] p-5 space-y-1">
-                  <span className="text-[10px] tracking-widest text-[#8c8275] uppercase font-bold">Resumes Synthesized</span>
-                  <p className="text-2xl font-black text-[#d48b38]">{agentState.stats.resumesSynthesized || actionDeck.length}</p>
+                <div className="saas-card rounded-xl p-5 space-y-1">
+                  <span className="text-xs font-medium text-slate-400 uppercase">Resumes Synthesized</span>
+                  <p className="text-2xl font-bold text-white">{agentState.stats.resumesSynthesized || actionDeck.length}</p>
                 </div>
-                <div className="bg-[#12100d] border border-[#27211a] p-5 space-y-1">
-                  <span className="text-[10px] tracking-widest text-[#8c8275] uppercase font-bold">Cover Letters</span>
-                  <p className="text-2xl font-black text-[#d48b38]">{agentState.stats.coverLettersSynthesized || actionDeck.length}</p>
+                <div className="saas-card rounded-xl p-5 space-y-1">
+                  <span className="text-xs font-medium text-slate-400 uppercase">Cover Letters</span>
+                  <p className="text-2xl font-bold text-white">{agentState.stats.coverLettersSynthesized || actionDeck.length}</p>
                 </div>
-                <div className="bg-[#12100d] border border-[#27211a] p-5 space-y-1">
-                  <span className="text-[10px] tracking-widest text-[#8c8275] uppercase font-bold">Psychology Audits</span>
-                  <p className="text-2xl font-black text-[#d48b38]">{agentState.stats.psychProfilesBaked || Math.round(actionDeck.length * 0.8)}</p>
+                <div className="saas-card rounded-xl p-5 space-y-1">
+                  <span className="text-xs font-medium text-slate-400 uppercase">Psychology Audits</span>
+                  <p className="text-2xl font-bold text-white">{agentState.stats.psychProfilesBaked || Math.round(actionDeck.length * 0.8)}</p>
                 </div>
-                <div className="bg-[#12100d] border border-[#27211a] p-5 space-y-1">
-                  <span className="text-[10px] tracking-widest text-[#8c8275] uppercase font-bold">Applications Tracked</span>
-                  <p className="text-2xl font-black text-emerald-400">{applications.length}</p>
+                <div className="saas-card rounded-xl p-5 space-y-1">
+                  <span className="text-xs font-medium text-slate-400 uppercase">Applications Tracked</span>
+                  <p className="text-2xl font-bold text-emerald-400">{applications.length}</p>
                 </div>
               </div>
 
               {/* Activity Log Stream */}
-              <div className="bg-[#100e0b] border border-[#231e19] p-6 space-y-4">
-                <h3 className="text-xs font-bold tracking-[0.2em] text-[#c4b9aa] uppercase flex items-center gap-2">
-                  <Terminal size={14} className="text-[#d48b38]" />
+              <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-6 space-y-4">
+                <h3 className="text-xs font-semibold text-slate-300 uppercase flex items-center gap-2">
+                  <Terminal size={14} className="text-indigo-400" />
                   <span>AUTONOMOUS ENGINE LOG STREAM</span>
                 </h3>
-                <div className="space-y-2 max-h-72 overflow-y-auto font-mono text-xs text-[#8c8275]">
+                <div className="space-y-2 max-h-72 overflow-y-auto font-mono text-xs text-slate-400">
                   {agentState.activityLog && agentState.activityLog.length > 0 ? (
                     agentState.activityLog.map((log, i) => (
-                      <div key={i} className="flex items-start gap-2 py-1 border-b border-[#181410]">
-                        <span className="text-[#b87326] shrink-0">[{log.time || 'NOW'}]</span>
-                        <span className="text-[#c4b9aa]">{log.msg}</span>
+                      <div key={i} className="flex items-start gap-2 py-1 border-b border-slate-900">
+                        <span className="text-indigo-400 shrink-0">[{log.time || 'NOW'}]</span>
+                        <span className="text-slate-300">{log.msg}</span>
                       </div>
                     ))
                   ) : (
-                    <div className="space-y-1 text-[#a89d8e]">
+                    <div className="space-y-1 text-slate-400">
                       <p>[SYSTEM] All autonomous agents synchronized with live gateway.</p>
                       <p>[SYSTEM] Listening for new recruiter responses on Gmail thread tracker.</p>
                       <p>[SYSTEM] Auto-screening 6,106 opportunities against active candidate profile.</p>
@@ -738,31 +743,31 @@ export default function MonolithMode({
           )}
         </main>
 
-        {/* 3. SILENT PULSE TELEMETRY BAR (BOTTOM STATUS) */}
-        <footer className="relative z-10 border-t border-[#231e19] bg-[#0c0a08] px-4 sm:px-6 lg:px-12 py-3 text-[10px] tracking-[0.2em] text-[#a89d8e] uppercase">
+        {/* 3. STATUS TELEMETRY FOOTER */}
+        <footer className="relative z-10 border-t border-slate-800/80 bg-[#080c14] px-4 sm:px-6 lg:px-12 py-3 text-xs text-slate-400">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-4 truncate">
-              <span className="flex items-center gap-1.5 text-[#d48b38] font-bold shrink-0">
+              <span className="flex items-center gap-1.5 text-emerald-400 font-semibold shrink-0">
                 <Activity size={12} className="animate-pulse" />
                 <span>SYSTEM NOMINAL</span>
               </span>
-              <span className="text-[#332b22]">/</span>
-              <span className="text-[#a89d8e] truncate">
+              <span className="text-slate-700">/</span>
+              <span className="text-slate-300 truncate">
                 {totalAssimilated.toLocaleString()} SIGNALS ASSIMILATED
               </span>
-              <span className="text-[#332b22] hidden md:inline">/</span>
-              <span className="text-[#8c8275] hidden md:inline">
+              <span className="text-slate-700 hidden md:inline">/</span>
+              <span className="text-slate-400 hidden md:inline">
                 AUTONOMOUS SCREENING &amp; SCORING ACTIVE
               </span>
             </div>
 
-            <div className="flex items-center gap-4 text-[#8c8275] shrink-0">
+            <div className="flex items-center gap-4 text-slate-400 shrink-0">
               <span>APPLICATIONS DEPLOYED: {applications.length}</span>
-              <span className="text-[#332b22]">/</span>
+              <span className="text-slate-700">/</span>
               <button
                 type="button"
                 onClick={onOpenCommandPalette}
-                className="text-[#c4b9aa] hover:text-[#d48b38] transition-colors cursor-pointer"
+                className="text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 COMMAND [⌘K]
               </button>
@@ -771,23 +776,23 @@ export default function MonolithMode({
         </footer>
       </div>
 
-      {/* QUICK DOCUMENT & PSYCHOLOGY MODAL (MONOLITH STONE STYLING) */}
+      {/* QUICK DOCUMENT & PSYCHOLOGY MODAL */}
       <AnimatePresence>
         {activeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-            <div className="bg-[#12100d] border border-[#b87326]/50 max-w-2xl w-full p-6 space-y-6 shadow-2xl relative font-mono">
-              <div className="flex items-start justify-between border-b border-[#262019] pb-3">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+            <div className="bg-slate-900 border border-slate-700/80 max-w-2xl w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
+              <div className="flex items-start justify-between border-b border-slate-800 pb-3">
                 <div>
-                  <span className="text-[9px] tracking-widest text-[#d48b38] uppercase font-bold">
+                  <span className="text-xs font-bold text-indigo-400 uppercase">
                     {activeModal.type === 'doc' ? 'AUTONOMOUS DOCUMENT ARTIFACT' : 'PSYCHOLOGY & CULTURE DECODER'}
                   </span>
-                  <h3 className="text-base font-black text-[#ede6dc] uppercase mt-0.5">
+                  <h3 className="text-base font-bold text-white mt-0.5">
                     {activeModal.job.title} — {activeModal.job.company}
                   </h3>
                 </div>
                 <button
                   onClick={() => setActiveModal(null)}
-                  className="text-[#8c8275] hover:text-white text-base cursor-pointer p-1"
+                  className="text-slate-400 hover:text-white text-base cursor-pointer p-1"
                 >
                   ✕
                 </button>
@@ -796,8 +801,8 @@ export default function MonolithMode({
               {activeModal.type === 'doc' ? (
                 <div className="space-y-4 text-xs">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] text-[#a89d8e]">
-                      <span className="font-bold text-[#d48b38]">TAILORED RESUME</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-semibold text-indigo-300">TAILORED RESUME</span>
                       <button
                         type="button"
                         onClick={() => handleCopyText(activeModal.resume, 'resume')}
@@ -807,14 +812,14 @@ export default function MonolithMode({
                         <span>{copiedKey === 'resume' ? 'COPIED' : 'COPY'}</span>
                       </button>
                     </div>
-                    <pre className="p-3 bg-[#0d0b09] border border-[#231e19] text-[#c4b9aa] whitespace-pre-wrap font-sans text-xs max-h-40 overflow-y-auto">
+                    <pre className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 whitespace-pre-wrap font-sans text-xs max-h-40 overflow-y-auto">
                       {activeModal.resume}
                     </pre>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] text-[#a89d8e]">
-                      <span className="font-bold text-[#d48b38]">BESPOKE COVER LETTER</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-semibold text-indigo-300">BESPOKE COVER LETTER</span>
                       <button
                         type="button"
                         onClick={() => handleCopyText(activeModal.coverLetter, 'cover')}
@@ -824,15 +829,15 @@ export default function MonolithMode({
                         <span>{copiedKey === 'cover' ? 'COPIED' : 'COPY'}</span>
                       </button>
                     </div>
-                    <pre className="p-3 bg-[#0d0b09] border border-[#231e19] text-[#c4b9aa] whitespace-pre-wrap font-sans text-xs max-h-40 overflow-y-auto">
+                    <pre className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 whitespace-pre-wrap font-sans text-xs max-h-40 overflow-y-auto">
                       {activeModal.coverLetter}
                     </pre>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3 text-xs">
-                  <span className="font-bold text-[#d48b38]">ORGANIZATIONAL PSYCHOLOGY</span>
-                  <div className="p-4 bg-[#0d0b09] border border-[#231e19] text-[#c4b9aa] font-sans leading-relaxed">
+                  <span className="font-semibold text-indigo-300">ORGANIZATIONAL PSYCHOLOGY</span>
+                  <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 font-sans leading-relaxed">
                     {typeof activeModal.insights?.companyCulture === 'string'
                       ? activeModal.insights.companyCulture
                       : JSON.stringify(activeModal.insights, null, 2)}
@@ -840,17 +845,16 @@ export default function MonolithMode({
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#231e19]">
-                <button
-                  type="button"
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <Button
+                  variant="primary"
                   onClick={() => {
                     setActiveModal(null);
                     if (onOpenGenerator) onOpenGenerator(activeModal.job);
                   }}
-                  className="py-2.5 px-5 bg-[#b87326] hover:bg-[#d48b38] text-black font-black text-xs tracking-wider uppercase transition-colors cursor-pointer"
                 >
                   OPEN IN GENERATOR
-                </button>
+                </Button>
               </div>
             </div>
           </div>

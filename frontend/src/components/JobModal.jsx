@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
@@ -52,6 +52,27 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
   const [isEnrichingDescription, setIsEnrichingDescription] = useState(false);
   const [hasEnriched, setHasEnriched] = useState(false);
   const [isIntelMenuOpen, setIsIntelMenuOpen] = useState(false);
+  const intelMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!isIntelMenuOpen) return;
+    const handleOutsideClick = (e) => {
+      if (intelMenuRef.current && !intelMenuRef.current.contains(e.target)) {
+        setIsIntelMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsIntelMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isIntelMenuOpen]);
 
   useEffect(() => {
     setDetailedDescription(job?.description || job?.notes || '');
@@ -440,124 +461,137 @@ ${candidatePhone}`;
         </div>
 
         {/* Modal Sub-Navigation Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-100/80 px-6 pt-2 font-mono text-xs font-bold gap-2 overflow-x-auto">
-          {isOffer && (
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100/80 px-6 pt-2 font-mono text-xs font-bold gap-2 relative z-30 overflow-visible">
+          {/* Left: Scrollable Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 min-w-0">
+            {isOffer && (
+              <button
+                onClick={() => setActiveTab('offer')}
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  activeTab === 'offer'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                    : 'text-amber-300 bg-amber-950/60 hover:bg-amber-900 border border-amber-500/40'
+                }`}
+              >
+                <Sparkles size={15} className={activeTab === 'offer' ? "text-slate-950 fill-slate-950" : "text-amber-400 fill-amber-400"} />
+                🎉 OFFER & ACTION PLAN
+              </button>
+            )}
+
             <button
-              onClick={() => setActiveTab('offer')}
-              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'offer'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-md'
-                  : 'text-amber-300 bg-amber-950/60 hover:bg-amber-900 border border-amber-500/40'
+              onClick={() => setActiveTab('fit')}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'fit'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
               }`}
             >
-              <Sparkles size={15} className={activeTab === 'offer' ? "text-slate-950 fill-slate-950" : "text-amber-400 fill-amber-400"} />
-              🎉 OFFER & ACTION PLAN
+              <Award size={15} className={activeTab === 'fit' ? "text-emerald-400" : "text-slate-500"} />
+              FIT & AI AUDIT
             </button>
-          )}
 
-          <button
-            onClick={() => setActiveTab('fit')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'fit'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-            }`}
-          >
-            <Award size={15} className={activeTab === 'fit' ? "text-emerald-400" : "text-slate-500"} />
-            FIT & AI AUDIT
-          </button>
+            <button
+              onClick={() => setActiveTab('description')}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'description'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+              }`}
+            >
+              <FileText size={15} className={activeTab === 'description' ? "text-indigo-400" : "text-slate-500"} />
+              JOB DESCRIPTION
+            </button>
 
-          <button
-            onClick={() => setActiveTab('description')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'description'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-            }`}
-          >
-            <FileText size={15} className={activeTab === 'description' ? "text-indigo-400" : "text-slate-500"} />
-            JOB DESCRIPTION
-          </button>
+            <button
+              onClick={() => setActiveTab('assets')}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'assets'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+              }`}
+            >
+              <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-500"} />
+              ASSETS & ACTIONS {hasGeneratedApplicationDocs(job) && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
+            </button>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('assets')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'assets'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-            }`}
-          >
-            <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-500"} />
-            ASSETS & ACTIONS {hasGeneratedApplicationDocs(job) && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
-          </button>
-
-          {/* Intelligence Tools Dropdown Menu */}
-          <div className="relative ml-auto pb-1.5 shrink-0">
+          {/* Right: Intelligence Tools Dropdown Menu */}
+          <div className="relative shrink-0 pb-1.5" ref={intelMenuRef}>
             <button
               type="button"
               onClick={() => setIsIntelMenuOpen(prev => !prev)}
               className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95"
               title="Open Strategic Intelligence & Governance Tools"
+              aria-haspopup="true"
+              aria-expanded={isIntelMenuOpen}
             >
               <Cpu size={13} className="text-cyan-400" />
               <span>INTELLIGENCE TOOLS</span>
-              <ChevronDown size={13} className={`text-slate-400 transition-transform ${isIntelMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${isIntelMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isIntelMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setIsIntelMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 w-64 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-40 space-y-1 animate-in fade-in slide-in-from-top-1 duration-150 font-mono">
-                  {onOpenFunnelIntel && (
-                    <button
-                      onClick={() => { setIsIntelMenuOpen(false); onOpenFunnelIntel(job); }}
-                      className="w-full px-3 py-2 rounded-xl hover:bg-cyan-950/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
-                    >
-                      <TrendingUp size={14} className="text-cyan-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">Funnel Intelligence</div>
-                        <div className="text-[10px] text-slate-400 font-sans">Pipeline velocity &amp; lag radar</div>
-                      </div>
-                    </button>
-                  )}
-                  {onOpenRecruiterCrm && (
-                    <button
-                      onClick={() => { setIsIntelMenuOpen(false); onOpenRecruiterCrm(job); }}
-                      className="w-full px-3 py-2 rounded-xl hover:bg-purple-950/60 text-slate-200 hover:text-purple-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
-                    >
-                      <Users size={14} className="text-purple-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">Recruiter CRM</div>
-                        <div className="text-[10px] text-slate-400 font-sans">Agency &amp; hiring contacts</div>
-                      </div>
-                    </button>
-                  )}
-                  {onOpenExecutiveDossier && (
-                    <button
-                      onClick={() => { setIsIntelMenuOpen(false); onOpenExecutiveDossier(job); }}
-                      className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950/60 text-slate-200 hover:text-indigo-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
-                    >
-                      <Building2 size={14} className="text-indigo-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">Executive Dossier</div>
-                        <div className="text-[10px] text-slate-400 font-sans">90-Day briefing blueprint</div>
-                      </div>
-                    </button>
-                  )}
-                  {onOpenOfferHub && (
-                    <button
-                      onClick={() => { setIsIntelMenuOpen(false); onOpenOfferHub(job); }}
-                      className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950/60 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
-                    >
-                      <Scale size={14} className="text-emerald-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">Offer Action Hub</div>
-                        <div className="text-[10px] text-slate-400 font-sans">Fair Work &amp; contract review</div>
-                      </div>
-                    </button>
-                  )}
-                </div>
-              </>
+              <div 
+                className="absolute right-0 top-full mt-1.5 w-64 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-50 space-y-1 animate-in fade-in slide-in-from-top-1 duration-150 font-mono"
+                role="menu"
+              >
+                {onOpenFunnelIntel && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenFunnelIntel(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-cyan-950/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <TrendingUp size={14} className="text-cyan-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Funnel Intelligence</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Pipeline velocity &amp; lag radar</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenRecruiterCrm && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenRecruiterCrm(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-purple-950/60 text-slate-200 hover:text-purple-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Users size={14} className="text-purple-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Recruiter CRM</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Agency &amp; hiring contacts</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenExecutiveDossier && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenExecutiveDossier(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950/60 text-slate-200 hover:text-indigo-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Building2 size={14} className="text-indigo-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Executive Dossier</div>
+                      <div className="text-[10px] text-slate-400 font-sans">90-Day briefing blueprint</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenOfferHub && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenOfferHub(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950/60 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Scale size={14} className="text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Offer Action Hub</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Fair Work &amp; contract review</div>
+                    </div>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

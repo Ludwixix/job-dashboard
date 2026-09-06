@@ -46,4 +46,67 @@ describe('JobModal Component', () => {
 
     expect(screen.getByText(/Employer Psychology Decoder/i)).toBeInTheDocument();
   });
+
+  it('toggles Intelligence Tools dropdown and calls respective tool callbacks', () => {
+    const onOpenFunnelIntel = vi.fn();
+    const onOpenRecruiterCrm = vi.fn();
+    const onOpenExecutiveDossier = vi.fn();
+    const onOpenOfferHub = vi.fn();
+
+    render(
+      <JobModal
+        job={mockJob}
+        onClose={vi.fn()}
+        onOpenFunnelIntel={onOpenFunnelIntel}
+        onOpenRecruiterCrm={onOpenRecruiterCrm}
+        onOpenExecutiveDossier={onOpenExecutiveDossier}
+        onOpenOfferHub={onOpenOfferHub}
+      />
+    );
+
+    // Initial state: menu closed
+    expect(screen.queryByText('Funnel Intelligence')).not.toBeInTheDocument();
+
+    // Click Intelligence Tools button
+    const intelBtn = screen.getByRole('button', { name: /INTELLIGENCE TOOLS/i });
+    fireEvent.click(intelBtn);
+
+    // Dropdown open: all 4 items visible
+    expect(screen.getByText('Funnel Intelligence')).toBeInTheDocument();
+    expect(screen.getByText('Recruiter CRM')).toBeInTheDocument();
+    expect(screen.getByText('Executive Dossier')).toBeInTheDocument();
+    expect(screen.getByText('Offer Action Hub')).toBeInTheDocument();
+
+    // Click Funnel Intelligence
+    fireEvent.click(screen.getByText('Funnel Intelligence'));
+    expect(onOpenFunnelIntel).toHaveBeenCalledWith(mockJob);
+
+    // Menu should be closed after selection
+    expect(screen.queryByText('Funnel Intelligence')).not.toBeInTheDocument();
+  });
+
+  it('closes Intelligence Tools dropdown on outside click and Escape key', () => {
+    render(
+      <JobModal
+        job={mockJob}
+        onClose={vi.fn()}
+        onOpenFunnelIntel={vi.fn()}
+      />
+    );
+
+    const intelBtn = screen.getByRole('button', { name: /INTELLIGENCE TOOLS/i });
+    fireEvent.click(intelBtn);
+    expect(screen.getByText('Funnel Intelligence')).toBeInTheDocument();
+
+    // Press Escape
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByText('Funnel Intelligence')).not.toBeInTheDocument();
+
+    // Open again and click outside
+    fireEvent.click(intelBtn);
+    expect(screen.getByText('Funnel Intelligence')).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByText('Funnel Intelligence')).not.toBeInTheDocument();
+  });
 });

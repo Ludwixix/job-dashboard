@@ -28,6 +28,7 @@ import { subscribeAutopilot, triggerAutonomousGmailScan } from '../services/auto
 import { fetchDocumentFromBackend } from '../services/generationService';
 import { fetchPsychologyFromBackend } from '../services/psychologyService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
+import { getIndustryTheme, applyIndustryTheme } from '../services/industryThemeService';
 import { Button, Badge } from './ui';
 
 export default function MonolithMode({
@@ -78,6 +79,17 @@ export default function MonolithMode({
     });
     return () => unsubscribe();
   }, []);
+
+  // Derive and smoothly apply subtle industry color theme based on target profile
+  const currentIndustryTheme = useMemo(() => {
+    return getIndustryTheme(profile?.industry);
+  }, [profile?.industry]);
+
+  useEffect(() => {
+    if (profile?.industry) {
+      applyIndustryTheme(profile.industry);
+    }
+  }, [profile?.industry]);
 
   // Filter active unsubmitted jobs
   const activeJobs = useMemo(() => {
@@ -202,13 +214,20 @@ export default function MonolithMode({
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 font-sans selection:bg-indigo-600 selection:text-white antialiased relative overflow-hidden flex flex-col md:flex-row">
-      {/* Background Subtle Gradient Atmosphere */}
+      {/* Dynamic Industry Subtle Gradient Atmosphere */}
       <div 
-        className="pointer-events-none fixed inset-0 opacity-[0.03] bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px]" 
+        className="pointer-events-none fixed inset-0 opacity-[0.035] transition-opacity duration-700" 
+        style={{
+          backgroundImage: `radial-gradient(${currentIndustryTheme.accent} 1px, transparent 1px)`,
+          backgroundSize: '24px 24px'
+        }}
         aria-hidden="true" 
       />
       <div 
-        className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-gradient-to-b from-indigo-500/[0.05] via-cyan-500/[0.02] to-transparent blur-3xl"
+        className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[450px] blur-3xl transition-all duration-1000"
+        style={{
+          background: `radial-gradient(ellipse 85% 55% at 50% 0%, ${currentIndustryTheme.glow} 0%, ${currentIndustryTheme.subtle} 50%, transparent 80%)`
+        }}
         aria-hidden="true"
       />
 
@@ -231,23 +250,40 @@ export default function MonolithMode({
         {/* 1. OBSIDIAN EXECUTIVE HEADER */}
         <header className="relative z-10 border-b border-slate-800/80 bg-[#090d16]/95 backdrop-blur-md px-4 sm:px-6 lg:px-12 py-3.5 sm:py-5">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Wordmark & Autonomous Indicator */}
+            {/* Wordmark & Industry Indicator */}
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl border border-indigo-500/30 bg-indigo-950/40 flex items-center justify-center shadow-lg shadow-indigo-950/40">
-                <Layers size={18} className="text-indigo-400" />
+              <div 
+                className="w-10 h-10 rounded-xl border flex items-center justify-center shadow-lg transition-all duration-700"
+                style={{
+                  backgroundColor: currentIndustryTheme.badgeBg,
+                  borderColor: currentIndustryTheme.border,
+                  boxShadow: `0 0 16px ${currentIndustryTheme.glow}`
+                }}
+              >
+                <Layers size={18} style={{ color: currentIndustryTheme.light }} />
               </div>
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <h1 className="text-sm lg:text-base font-black tracking-[0.25em] uppercase text-white">
                     THE MONOLITH
                   </h1>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-[9px] tracking-wider font-bold uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    AUTONOMOUS ACTIVE
+                  <span 
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] tracking-wider font-bold uppercase transition-all duration-700 shadow-xs"
+                    style={{
+                      backgroundColor: currentIndustryTheme.badgeBg,
+                      color: currentIndustryTheme.badgeText,
+                      borderColor: currentIndustryTheme.border
+                    }}
+                  >
+                    <span 
+                      className="w-1.5 h-1.5 rounded-full animate-pulse" 
+                      style={{ backgroundColor: currentIndustryTheme.accent }}
+                    />
+                    {currentIndustryTheme.name}
                   </span>
                 </div>
                 <p className="text-[10px] tracking-widest text-slate-400 mt-0.5 uppercase">
-                  EXECUTIVE FOCUS // {totalAssimilated.toLocaleString()} SIGNALS ASSIMILATED
+                  {currentIndustryTheme.tag} // {totalAssimilated.toLocaleString()} SIGNALS ASSIMILATED
                 </p>
               </div>
             </div>
@@ -370,27 +406,45 @@ export default function MonolithMode({
                 <section className="space-y-3">
                   <div className="flex items-center justify-between text-xs font-semibold tracking-wider text-slate-400 uppercase">
                     <span className="flex items-center gap-2">
-                      <Target size={14} className="text-indigo-400" />
+                      <Target size={14} style={{ color: currentIndustryTheme.light }} />
                       PRIME TRAJECTORY // HIGHEST STRATEGIC CONVERGENCE
                     </span>
-                    <Badge variant="indigo" size="sm">
+                    <span 
+                      className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-xs"
+                      style={{
+                        backgroundColor: currentIndustryTheme.badgeBg,
+                        color: currentIndustryTheme.badgeText,
+                        borderColor: currentIndustryTheme.border
+                      }}
+                    >
                       RANK #01
-                    </Badge>
+                    </span>
                   </div>
 
                   <motion.div 
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                    className="saas-card rounded-2xl p-6 sm:p-8 lg:p-10 relative overflow-hidden group"
+                    className="saas-card rounded-2xl p-6 sm:p-8 lg:p-10 relative overflow-hidden group transition-all duration-700"
+                    style={{
+                      borderColor: currentIndustryTheme.border,
+                      boxShadow: `0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 24px -4px ${currentIndustryTheme.glow}`
+                    }}
                   >
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                       {/* Left Side: Details */}
                       <div className="space-y-4 max-w-3xl">
                         <div className="flex flex-wrap items-center gap-2.5">
-                          <Badge variant="indigo">
-                            {primeJob.stream || 'CORE ENTERPRISE SYSTEMS'}
-                          </Badge>
+                          <span 
+                            className="px-2.5 py-0.5 rounded-md text-xs font-semibold border shadow-xs"
+                            style={{
+                              backgroundColor: currentIndustryTheme.badgeBg,
+                              color: currentIndustryTheme.badgeText,
+                              borderColor: currentIndustryTheme.border
+                            }}
+                          >
+                            {primeJob.stream || currentIndustryTheme.name}
+                          </span>
                           <Badge variant="emerald">
                             {primeJob.score || 95}% ALIGNMENT
                           </Badge>

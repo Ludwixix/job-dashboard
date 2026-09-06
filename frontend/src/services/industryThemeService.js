@@ -187,5 +187,15 @@ export const applyIndustryTheme = (industryName) => {
   root.style.setProperty('--industry-subtle', theme.subtle);
   root.style.setProperty('--industry-badge-bg', theme.badgeBg);
   root.style.setProperty('--industry-badge-text', theme.badgeText);
+  root.style.setProperty('--industry-tag', theme.tag);
+  root.style.setProperty('--industry-name', theme.name);
   root.setAttribute('data-industry', theme.name);
+
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('industryThemeChange', { detail: theme }));
+    } catch {
+      // Ignore if CustomEvent not supported in test environment
+    }
+  }
 };

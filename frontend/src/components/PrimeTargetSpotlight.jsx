@@ -152,9 +152,9 @@ export default function PrimeTargetSpotlight({
   if (!primeJob) return null;
 
   return (
-    <div className="mb-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 shadow-xl overflow-hidden font-sans">
+    <div className="mb-3.5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 shadow-xl overflow-hidden font-sans">
       {/* Header Bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/80 bg-slate-950/60 font-mono text-xs">
+      <div className="flex items-center justify-between px-3.5 sm:px-4 py-2.5 border-b border-slate-800/80 bg-slate-950/60 font-mono text-xs">
         <div className="flex items-center gap-2.5">
           <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30">
             <Target size={14} />
@@ -196,9 +196,9 @@ export default function PrimeTargetSpotlight({
       </div>
 
       {isExpanded && (
-        <div className="p-5 space-y-5">
+        <div className="p-3.5 sm:p-4 space-y-3">
           {/* Main Prime Target Slab */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
             {/* Left Hero Opportunity Card (7 cols) */}
             <div className="lg:col-span-7 bg-slate-800/40 rounded-xl p-4 border border-slate-700/60 relative overflow-hidden group hover:border-indigo-500/50 transition-all">
               <div className="flex items-start justify-between gap-4 mb-2">

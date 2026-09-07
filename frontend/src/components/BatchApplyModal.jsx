@@ -143,7 +143,7 @@ export const BatchApplyModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md font-mono p-4">
-      <div className="w-full max-w-2xl bg-[#14141e] border-2 border-emerald-500/50 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-4xl 2xl:max-w-5xl bg-[#14141e] border-2 border-emerald-500/50 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[95vh]">
         
         {/* Header */}
         <div className="p-5 border-b border-[#2a2b3d] flex items-center justify-between bg-[#191926]">

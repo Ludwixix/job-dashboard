@@ -359,7 +359,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
-        className="bg-slate-900 rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative text-slate-100"
+        className="bg-slate-900 rounded-3xl shadow-2xl max-w-5xl 2xl:max-w-6xl w-full overflow-hidden border border-slate-700/60 flex flex-col max-h-[95vh] relative text-slate-100"
       >
         {/* Header Strip */}
         <div className="relative bg-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 font-mono">

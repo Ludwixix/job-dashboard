@@ -906,7 +906,7 @@ export const JobSeeker = ({
 
 
       {/* 2-Column Workspace Layout (Left Sidebar + Right Main Grid) */}
-      <div className="flex flex-col lg:flex-row items-start gap-6" ref={gridTopRef}>
+      <div className="flex flex-col lg:flex-row items-start gap-3.5" ref={gridTopRef}>
         {/* Left Column Sidebar */}
         {showSidebar && (
           <TopMatchesSidebar 
@@ -918,9 +918,9 @@ export const JobSeeker = ({
         )}
 
         {/* Right Main Content */}
-        <div className="flex-1 space-y-6 w-full">
+        <div className="flex-1 space-y-3.5 w-full">
           {/* Stream Quick Tabs Container */}
-          <div className="bg-slate-900 p-3 rounded-2xl border-2 border-slate-800 shadow-md font-mono flex flex-wrap items-center gap-2">
+          <div className="bg-slate-900 p-2.5 sm:p-3 rounded-2xl border-2 border-slate-800 shadow-md font-mono flex flex-wrap items-center gap-2">
             {STREAM_TAB_DEFINITIONS.map(tab => {
               const TabIcon = tab.icon;
               const isActive = activeStreamTab === tab.id;
@@ -1016,7 +1016,7 @@ export const JobSeeker = ({
           />
 
           {/* VS Code Theme Refinement Console */}
-          <div className="bg-[#1e1e2e] p-5 rounded-2xl border border-[#313244] shadow-md space-y-4 font-mono">
+          <div className="bg-[#1e1e2e] p-3.5 sm:p-4 rounded-2xl border border-[#313244] shadow-md space-y-3 font-mono">
 
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
               {/* Main Keyword Search */}
@@ -1354,7 +1354,7 @@ export const JobSeeker = ({
                   <p className="text-sm max-w-md text-center">Try adjusting your filters, selecting a different tab, or running the scraper to find new opportunities.</p>
                 </motion.div>
               ) : (
-                <div className={`grid gap-5 ${showSidebar ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6'}`}>
+                <div className={`grid gap-3 sm:gap-3.5 ${showSidebar ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8'}`}>
                   {paginatedJobs.map(job => {
                     const isGeneratingThisJob = Boolean(
                       asyncGeneratingIds?.has?.(job.id) || 
@@ -1370,7 +1370,7 @@ export const JobSeeker = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         onClick={() => onSelectJob(job)}
-                      className={`rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between space-y-4 group cursor-pointer relative overflow-hidden card-hover-lift ${
+                      className={`rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col justify-between space-y-2.5 group cursor-pointer relative overflow-hidden card-hover-lift ${
                         hasCustomDocs
                           ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 border-2 border-emerald-500 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-500/30'
                           : isGeneratingThisJob

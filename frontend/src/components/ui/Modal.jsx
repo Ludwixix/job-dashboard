@@ -5,10 +5,10 @@ const SIZES = {
   sm: 'max-w-md',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
-  '2xl': 'max-w-5xl',
-  '4xl': 'max-w-6xl',
-  full: 'max-w-[95vw]'
+  xl: 'max-w-4xl 2xl:max-w-5xl 3xl:max-w-6xl',
+  '2xl': 'max-w-5xl 2xl:max-w-6xl 3xl:max-w-7xl',
+  '4xl': 'max-w-6xl 2xl:max-w-7xl 3xl:max-w-[92vw]',
+  full: 'w-[98vw] max-w-[98vw]'
 };
 
 export const Modal = ({
@@ -48,7 +48,7 @@ export const Modal = ({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndexClass} overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-150`}
+      className={`fixed inset-0 ${zIndexClass} overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150`}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose?.();
@@ -59,7 +59,7 @@ export const Modal = ({
     >
       <div
         ref={modalRef}
-        className={`bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl flex flex-col w-full max-h-[92vh] overflow-hidden ${sizeClass} ${className}`}
+        className={`bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl flex flex-col w-full max-h-[95vh] overflow-hidden ${sizeClass} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

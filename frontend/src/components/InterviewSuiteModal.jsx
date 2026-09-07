@@ -349,7 +349,7 @@ ${fullJobText}`;
       onClick={onClose}
     >
       <div 
-        className="bg-slate-900 border border-slate-700/70 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[92vh] text-slate-100" 
+        className="bg-slate-900 border border-slate-700/70 rounded-3xl w-full max-w-5xl 2xl:max-w-6xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[95vh] text-slate-100"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

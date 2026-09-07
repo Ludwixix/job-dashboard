@@ -243,7 +243,7 @@ export default function CyberpunkAmbientMode({
       />
 
       {/* Foreground Ambient HUD Overlay */}
-      <div className="relative z-10 flex flex-col h-full justify-between p-6 sm:p-8 pointer-events-auto">
+      <div className="relative z-10 flex flex-col h-full justify-between p-3.5 sm:p-6 pointer-events-auto">
         
         {/* Top Minimalist Header HUD */}
         <div className="flex items-center justify-between gap-4 font-mono text-xs">
@@ -389,7 +389,7 @@ export default function CyberpunkAmbientMode({
         )}
 
         {/* Center Holographic Telemetry HUD */}
-        <div className="max-w-4xl mx-auto w-full my-auto space-y-6">
+        <div className="w-full px-2 sm:px-6 xl:px-10 my-auto space-y-4">
           {/* Main Key Metric Meters */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-cyan-500/30 backdrop-blur-md shadow-xl">
@@ -442,8 +442,8 @@ export default function CyberpunkAmbientMode({
               <span className="text-slate-500 text-[11px]">Click opportunity for telemetry details</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {flowJobs.slice(0, 3).map((job) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+              {flowJobs.slice(0, 6).map((job) => (
                 <div
                   key={job.id || `${job.company}_${job.title}`}
                   onClick={() => onOpenJobModal && onOpenJobModal(job)}

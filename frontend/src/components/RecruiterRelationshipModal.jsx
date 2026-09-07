@@ -208,7 +208,7 @@ export function RecruiterRelationshipModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-700/60 bg-slate-900/95 shadow-2xl shadow-indigo-950/40 text-slate-100 overflow-hidden font-sans">
+      <div className="relative w-full max-w-6xl 2xl:max-w-7xl max-h-[95vh] flex flex-col rounded-2xl border border-slate-700/60 bg-slate-900/95 shadow-2xl shadow-indigo-950/40 text-slate-100 overflow-hidden font-sans">
         
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">

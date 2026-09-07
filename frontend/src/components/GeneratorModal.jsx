@@ -324,11 +324,11 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
   return (
     <div
-      className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-3 lg:p-4 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 rounded-2xl shadow-2xl max-w-6xl xl:max-w-7xl w-[96vw] overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative"
+        className="bg-slate-900 rounded-2xl shadow-2xl w-[98vw] max-w-[98vw] overflow-hidden border border-slate-700/60 flex flex-col max-h-[96vh] relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Settings Overlay ── */}
@@ -609,7 +609,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
         </div>
 
         {/* ── Content ── */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
 
           {/* GENERATE tab */}
           {activeTab === 'overview' && (

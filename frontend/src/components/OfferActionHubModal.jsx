@@ -130,7 +130,7 @@ export function OfferActionHubModal({ isOpen, onClose, job }) {
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl shadow-cyan-950/40 overflow-hidden"
+        className="relative w-full max-w-5xl 2xl:max-w-7xl max-h-[95vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl shadow-cyan-950/40 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Top Header */}

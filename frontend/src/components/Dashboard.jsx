@@ -784,7 +784,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
       {/* Technocratic Header & Top Navigation */}
       <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 shadow-xl font-mono">
-        <div className="w-full max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="w-full px-3 sm:px-5 lg:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md border border-indigo-400/40">
               <Terminal size={20} />
@@ -890,8 +890,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  
       {/* Dynamic Industry Theme & Live Profile Scrape Banner */}
       {(profileScrapeStatus || (showSuggestions && suggestedTitles.length > 0)) && (
-        <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-4 sm:px-6 lg:px-8 xl:px-10 py-3 animate-in slide-in-from-top-2 duration-300 font-mono text-xs shadow-lg">
-          <div className="max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-3 sm:px-5 lg:px-6 py-2.5 animate-in slide-in-from-top-2 duration-300 font-mono text-xs shadow-lg">
+          <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider industry-accent-badge shadow-xs">
                 <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: currentIndustryTheme.accent }} />
@@ -930,7 +930,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
       {/* Main Workspace Dashboard Container */}
 
-      <main className="w-full max-w-[98vw] 2xl:max-w-[2560px] 3xl:max-w-[3400px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 space-y-6 flex-1">
+      <main className="w-full px-2 sm:px-4 lg:px-6 py-2.5 space-y-3.5 flex-1">
         {/* Proactive Agent Copilot Intelligence Bar */}
         <CopilotBar 
           jobs={jobs} 

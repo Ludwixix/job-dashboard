@@ -104,7 +104,7 @@ export const KanbanColumn = ({ stage, jobs = [], onSelectJob, className = '' }) 
   return (
     <div 
       ref={setNodeRef}
-      className={`w-full md:w-auto flex-1 min-w-0 md:min-w-[280px] sm:min-w-[320px] max-w-full md:max-w-[350px] flex-col h-full rounded-2xl border ${colors[stage.color]} ${isOver ? 'ring-2 ring-indigo-500/50 bg-slate-850' : ''} transition-all snap-center shrink-0 shadow-lg ${className}`}
+      className={`w-full md:w-auto flex-1 min-w-[260px] md:min-w-[280px] xl:min-w-[300px] max-w-full flex-col h-full rounded-2xl border ${colors[stage.color]} ${isOver ? 'ring-2 ring-indigo-500/50 bg-slate-850' : ''} transition-all snap-center lg:shrink xl:flex-1 shadow-lg ${className}`}
     >
       <div className="p-3.5 border-b border-slate-800/60 flex items-center justify-between sticky top-0 bg-inherit z-10 rounded-t-2xl">
         <h3 className="font-bold text-xs tracking-wider uppercase font-mono">{stage.title}</h3>

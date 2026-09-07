@@ -72,7 +72,7 @@ export const ExecutiveDossierModal = ({ isOpen, onClose, job, profile }) => {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5 overflow-y-auto bg-slate-950/85 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-5xl rounded-2xl bg-slate-900/95 border border-slate-700/60 shadow-2xl shadow-cyan-950/40 text-slate-100 flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="relative w-full max-w-6xl 2xl:max-w-7xl rounded-2xl bg-slate-900/95 border border-slate-700/60 shadow-2xl shadow-cyan-950/40 text-slate-100 flex flex-col max-h-[95vh] overflow-hidden">
         
         {/* Top Header Bar */}
         <div className="flex items-start justify-between p-5 border-b border-slate-800 bg-slate-950/60 relative">

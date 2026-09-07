@@ -246,7 +246,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto"
         onClick={onClose}
       >
         <motion.div
@@ -255,13 +255,13 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
           exit={{ opacity: 0, scale: 0.96, y: 15 }}
           transition={{ duration: 0.2 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-3xl bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[90vh]"
+          className="w-full max-w-5xl 2xl:max-w-6xl bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-4 flex flex-col max-h-[94vh]"
         >
           {/* Top Accent Strip */}
           <div className="h-1 bg-gradient-to-r from-teal-400 via-indigo-500 to-purple-500" />
 
           {/* Modal Header */}
-          <div className="p-5 sm:p-6 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between shrink-0">
+          <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
                 <Settings size={20} />

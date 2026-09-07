@@ -209,7 +209,7 @@ ${job.coverLetterText || job.coverLetter || ''}`;
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="bg-slate-900 border border-indigo-500/40 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-white font-sans"
+          className="bg-slate-900 border border-indigo-500/40 rounded-3xl w-full max-w-5xl 2xl:max-w-6xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] text-white font-sans"
         >
         
         {/* Header */}

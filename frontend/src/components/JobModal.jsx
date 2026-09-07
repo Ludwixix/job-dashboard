@@ -324,13 +324,13 @@ ${candidatePhone}`;
 
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 lg:p-6 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-3 lg:p-4 animate-in fade-in zoom-in-95 duration-200">
       <div 
-        className="bg-white rounded-2xl shadow-2xl max-w-6xl xl:max-w-7xl w-[96vw] overflow-hidden border-2 border-indigo-500/30 transform transition-all font-sans text-slate-900 max-h-[92vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[98vw] 3xl:max-w-[96vw] overflow-hidden border-2 border-indigo-500/30 transform transition-all font-sans text-slate-900 max-h-[96vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sleek Dark Header */}
-        <div className="bg-slate-900 px-6 py-5 border-b border-slate-800 flex items-start justify-between text-white shrink-0 relative overflow-hidden">
+        <div className="bg-slate-900 px-4 sm:px-6 py-3.5 border-b border-slate-800 flex items-start justify-between text-white shrink-0 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400" />
           
           <div>
@@ -597,7 +597,7 @@ ${candidatePhone}`;
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-6 space-y-6 overflow-y-auto flex-1 font-sans">
+        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 font-sans">
           {/* Prominent Custom Documents Ready Banner */}
           {hasGeneratedApplicationDocs(job) && (
             <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white border-2 border-emerald-500 shadow-md font-mono space-y-3 animate-in fade-in duration-300">

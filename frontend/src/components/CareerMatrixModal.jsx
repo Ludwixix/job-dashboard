@@ -94,7 +94,7 @@ export default function CareerMatrixModal({
       aria-modal="true"
       aria-labelledby="career-modal-title"
     >
-      <div className="bg-slate-900 border border-slate-700/70 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-slate-900 border border-slate-700/70 rounded-2xl max-w-5xl 2xl:max-w-7xl w-full max-h-[95vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80">
           <div className="flex items-center gap-3">

@@ -250,7 +250,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
                 })}
               </div>
 
-              <div className="flex gap-4 overflow-x-auto h-full pb-4 items-start snap-x snap-mandatory">
+              <div className="flex gap-3.5 overflow-x-auto xl:overflow-x-visible h-full pb-4 items-start snap-x xl:snap-none snap-mandatory">
                 {PIPELINE_STAGES.map(stage => (
                   <KanbanColumn 
                     key={stage.id} 

@@ -45,29 +45,41 @@ class JobRepository:
         return get_db_connection(self.path)
 
     def _check_and_recover_db(self):
-        """Run PRAGMA integrity_check; delete and recreate if malformed."""
+        """Run PRAGMA integrity_check on a direct connection (bypassing the pool).
+
+        If the DB is malformed, close all pool connections, delete the file, and
+        let _init_schema recreate a fresh empty database.
+        """
         import os
+        db_path = self.path
+        corrupt = False
+        # Open a *direct* connection — not via the pool — so we can fully close it
         try:
-            with get_db_connection(self.path) as conn:
+            conn = sqlite3.connect(db_path, check_same_thread=False, timeout=5.0)
+            try:
                 result = conn.execute("PRAGMA integrity_check").fetchone()
                 if result and result[0] != "ok":
                     logger.error(
-                        f"DB integrity check failed ({result[0]}) at {self.path}. "
-                        "Deleting corrupt database — a fresh empty DB will be created."
+                        f"DB integrity check failed: '{result[0]}' at {db_path}. "
+                        "Will delete and recreate."
                     )
-                    conn.close()
+                    corrupt = True
+            finally:
+                conn.close()
         except Exception as exc:
-            logger.error(f"DB integrity check raised {exc} at {self.path}. Deleting and recreating.")
-        else:
-            # No exception and result is ok — nothing to do
-            if result and result[0] == "ok":
-                return
-        # If we reach here the DB is malformed or unreadable — nuke it
-        try:
-            os.remove(self.path)
-            logger.info(f"Deleted corrupt DB at {self.path}. Fresh schema will be created.")
-        except FileNotFoundError:
-            pass
+            logger.error(f"DB integrity check raised {exc!r} at {db_path}. Will delete and recreate.")
+            corrupt = True
+
+        if corrupt:
+            # Flush the pool so no cached connections point to the corrupt file
+            from .db_pool import get_connection_pool
+            pool = get_connection_pool(db_path)
+            pool.cleanup(log_cleanup=False)
+            try:
+                os.remove(db_path)
+                logger.info(f"Deleted corrupt DB at {db_path}. Fresh schema will be created.")
+            except FileNotFoundError:
+                pass
 
     def _init_schema(self):
         """Initialize database schema, auto-recovering from corruption."""

@@ -1,0 +1,28 @@
+# .gcloudignore — files excluded from gcloud builds submit context
+# See: https://cloud.google.com/sdk/gcloud/reference/topic/gcloudignore
+
+# Exclude SQLite databases and WAL journals from the build tarball.
+# They are large and can arrive corrupt if WAL files are missing.
+# The app creates a fresh empty DB on first startup via _init_schema().
+data/*.sqlite3
+data/*.sqlite3-wal
+data/*.sqlite3-shm
+
+# Large data files not needed by the container image
+data/jobs.json
+data/seek_cache.json
+data/*.json
+
+# Local dev / test artefacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
+
+# Git metadata
+.git/
+.gitignore

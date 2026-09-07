@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import { useToast } from './ToastContext';
 import { useJobs } from '../hooks/useJobs';
 import { JobSeeker } from './JobSeeker';
 import { MarketIntelligence } from './MarketIntelligence';
@@ -58,6 +59,8 @@ import {
 
 export const Dashboard = ({ currentUser, onSignOut }) => {
   const { jobs, loading, error, refetch, updateJobStatus, rejectJob, unrejectJob } = useJobs();
+  const { addToast } = useToast();
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
   const [activeSection, setActiveSection] = useState('seeker'); // 'seeker', 'kanban', 'market', 'tracker'
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedForGenerator, setSelectedForGenerator] = useState(null);
@@ -73,6 +76,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
   const [isWorkforceModalOpen, setIsWorkforceModalOpen] = useState(false);
   const [isWorkforceEnabled, setIsWorkforceEnabled] = useState(() => getWorkforceSettings().enabled);
+
+  // Helper: announce dynamic changes to screen readers
+  const announce = useCallback((msg) => {
+    setLiveAnnouncement('');
+    setTimeout(() => setLiveAnnouncement(msg), 50);
+  }, []);
 
   useEffect(() => {
     const handleSettingsUpdate = (e) => {
@@ -216,10 +225,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         setTimeout(() => {
           setBackgroundNotifications(prev => prev.filter(n => n.id !== notif.id));
         }, 6000);
+        addToast(`Package ready: ${job.title} @ ${job.company}`, 'success');
+        announce(`Application package generated for ${job.title} at ${job.company}`);
       }
     } catch (err) {
       console.error('Async application error:', err);
-      alert(`Synthesis failed: ${err.message}`);
+      addToast(`Synthesis failed: ${err.message}`, 'error');
     } finally {
 
       setAsyncGeneratingIds(prev => {
@@ -561,16 +572,29 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
-      {/* Top Live Engine Status Bar */}
+      {/* Screen-reader live announcement region */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {liveAnnouncement}
+      </div>
 
+      {/* Top Live Engine Status Bar */}
       {fallbackBanner && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between">
+        <div
+          role="alert"
+          className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between"
+        >
           <span className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" aria-hidden="true" />
             {fallbackBanner}
           </span>
           <button
             onClick={() => setFallbackBanner(null)}
+            aria-label="Dismiss status banner"
             className="text-amber-400 hover:text-white ml-4 text-xs font-bold"
           >
             ✕
@@ -810,81 +834,101 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </div>
 
           {/* 5-Way Tab View Switcher */}
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 max-w-full overflow-x-auto scrollbar-none shrink-0">
-            <button
-              onClick={() => setActiveSection('seeker')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'seeker' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <LayoutGrid size={14} /> 
-              DISCOVERY STREAM
-              {preparedCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40">
-                  {preparedCount}
-                </span>
-              )}
-            </button>
+          <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 max-w-full overflow-x-auto scrollbar-none shrink-0">
+            <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1.5">
+              <button
+                role="tab"
+                aria-selected={activeSection === 'seeker'}
+                aria-controls="panel-seeker"
+                onClick={() => setActiveSection('seeker')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'seeker' 
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <LayoutGrid size={14} aria-hidden="true" /> 
+                DISCOVERY STREAM
+                {preparedCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40" aria-label={`${preparedCount} prepared`}>
+                    {preparedCount}
+                  </span>
+                )}
+              </button>
 
-            <button
-              onClick={() => setActiveSection('highlights')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'highlights' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Zap size={14} className="text-amber-400" /> 
-              ACTION QUEUE
-            </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'highlights'}
+                aria-controls="panel-highlights"
+                onClick={() => setActiveSection('highlights')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'highlights' 
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Zap size={14} className="text-amber-400" aria-hidden="true" /> 
+                ACTION QUEUE
+              </button>
 
-            <button
-              onClick={() => setActiveSection('kanban')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'kanban' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Sliders size={14} /> 
-              APPLICATION KANBAN
-            </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'kanban'}
+                aria-controls="panel-kanban"
+                onClick={() => setActiveSection('kanban')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'kanban' 
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Sliders size={14} aria-hidden="true" /> 
+                APPLICATION KANBAN
+              </button>
 
-            <button
-              onClick={() => setActiveSection('market')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'market' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <TrendingUp size={14} /> 
-              MARKET INTEL
-            </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'market'}
+                aria-controls="panel-market"
+                onClick={() => setActiveSection('market')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'market' 
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <TrendingUp size={14} aria-hidden="true" /> 
+                MARKET INTEL
+              </button>
 
-            <button
-              onClick={() => setActiveSection('analytics')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'analytics' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Target size={14} /> 
-              ANALYTICS
-            </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'analytics'}
+                aria-controls="panel-analytics"
+                onClick={() => setActiveSection('analytics')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'analytics' 
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Target size={14} aria-hidden="true" /> 
+                ANALYTICS
+              </button>
 
-            <button
-              onClick={() => setActiveSection('operations')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                activeSection === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <CalendarClock size={14} /> OPERATIONS
-            </button>
-          </div>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'operations'}
+                aria-controls="panel-operations"
+                onClick={() => setActiveSection('operations')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <CalendarClock size={14} aria-hidden="true" /> OPERATIONS
+              </button>
+            </div>
+          </nav>
         </div>
       </header>
  
@@ -1070,14 +1114,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onJobStatusUpdate={(updated) => {
                 updateJobStatus(updated.id || updated.title, updated.status, updated);
                 setSelectedJob(updated);
+                addToast(`Status updated: ${updated.status}`, 'success');
+                announce(`Job status updated to ${updated.status}`);
               }}
               onRejectJob={(id) => {
                 rejectJob(id);
                 setSelectedJob(null);
+                addToast('Job hidden from board', 'info');
               }}
               onUnrejectJob={(id) => {
                 unrejectJob(id);
                 setSelectedJob(prev => prev ? { ...prev, isRejected: false, status: 'Discovered' } : null);
+                addToast('Job restored to board', 'success');
               }}
             />
           </Suspense>

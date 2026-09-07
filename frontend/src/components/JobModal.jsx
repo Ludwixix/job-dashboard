@@ -364,14 +364,14 @@ ${candidatePhone}`;
                       href={jobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group/company inline-flex items-center gap-2 text-2xl font-black text-white hover:text-indigo-400 transition-colors leading-snug cursor-pointer"
-                      title="Open original job posting in a new tab"
+                      aria-label={`${job.company} — open job posting (new tab)`}
+                      className="group/company inline-flex items-center gap-2 type-heading text-xl text-white hover:text-indigo-400 transition-colors cursor-pointer"
                     >
                       <span>{job.company}</span>
-                      <ExternalLink size={18} className="text-slate-500 group-hover/company:text-indigo-400 transition-colors" />
+                      <ExternalLink size={16} className="text-slate-500 group-hover/company:text-indigo-400 transition-colors shrink-0" aria-hidden="true" />
                     </a>
                   ) : (
-                    <h2 className="text-2xl font-black text-white leading-snug">{job.company}</h2>
+                    <h2 className="type-heading text-xl text-white">{job.company}</h2>
                   )}
 
                   {jobUrl ? (
@@ -379,15 +379,15 @@ ${candidatePhone}`;
                       href={jobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group/title flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-indigo-300 mt-0.5 transition-colors cursor-pointer"
-                      title="Open original job posting in a new tab"
+                      aria-label={`${job.title} — open job posting (new tab)`}
+                      className="group/title flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-indigo-300 mt-0.5 transition-colors cursor-pointer"
                     >
-                      <Briefcase size={14} className="text-indigo-400" />
-                      <span className="underline decoration-slate-600 group-hover/title:decoration-indigo-400">{job.title}</span>
+                      <Briefcase size={13} className="text-indigo-400 shrink-0" aria-hidden="true" />
+                      <span className="underline decoration-slate-700 group-hover/title:decoration-indigo-400">{job.title}</span>
                     </a>
                   ) : (
-                    <p className="text-sm font-semibold text-slate-300 mt-0.5 flex items-center gap-1.5">
-                      <Briefcase size={14} className="text-indigo-400" />
+                    <p className="text-sm font-medium text-slate-400 mt-0.5 flex items-center gap-1.5">
+                      <Briefcase size={13} className="text-indigo-400 shrink-0" aria-hidden="true" />
                       <span>{job.title}</span>
                     </p>
                   )}

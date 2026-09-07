@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import { X } from 'lucide-react';
 
 const SIZES = {
@@ -26,9 +26,15 @@ export const Modal = ({
   bodyClassName = ''
 }) => {
   const modalRef = useRef(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (!isOpen) return;
+
+    // Auto-focus the modal panel so keyboard users don't stay stuck behind
+    const raf = requestAnimationFrame(() => {
+      modalRef.current?.focus();
+    });
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -38,7 +44,10 @@ export const Modal = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -56,10 +65,12 @@ export const Modal = ({
       }}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
     >
       <div
         ref={modalRef}
-        className={`bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl flex flex-col w-full max-h-[95vh] overflow-hidden ${sizeClass} ${className}`}
+        tabIndex={-1}
+        className={`bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl flex flex-col w-full max-h-[95vh] overflow-hidden focus-visible:outline-hidden ${sizeClass} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -67,14 +78,14 @@ export const Modal = ({
           <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               {Icon && (
-                <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 shrink-0">
+                <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 shrink-0" aria-hidden="true">
                   <Icon size={16} />
                 </div>
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   {title && (
-                    <h2 className="text-sm sm:text-base font-black text-white font-mono uppercase tracking-wide truncate">
+                    <h2 id={titleId} className="text-sm sm:text-base font-black text-white font-mono uppercase tracking-wide truncate">
                       {title}
                     </h2>
                   )}
@@ -95,7 +106,7 @@ export const Modal = ({
                 aria-label="Close modal"
                 className="p-1.5 sm:p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer border border-slate-700/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 shrink-0"
               >
-                <X size={16} />
+                <X size={16} aria-hidden="true" />
               </button>
             )}
           </div>

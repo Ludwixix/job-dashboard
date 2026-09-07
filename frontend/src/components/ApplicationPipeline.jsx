@@ -12,6 +12,8 @@ import {
   verticalListSortingStrategy 
 } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
+import { EmptyState } from './ui/EmptyState';
+
 import { PipelineTableView } from './PipelineTableView';
 import { JobDrawer } from './JobDrawer';
 import { KanbanColumnSkeleton, TableSkeleton } from './SkeletonLoaders';
@@ -263,11 +265,20 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
               </div>
             </DndContext>
           ) : (
-            <PipelineTableView 
-              jobs={activeJobs} 
-              onUpdateStatus={onUpdateStatus} 
-              onSelectJob={(job) => setSelectedJob(job)}
-            />
+            activeJobs.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No applications tracked"
+                description={searchQuery || filterStatus !== 'All' ? 'No applications match your current search or filter criteria.' : 'Star jobs in the seeker or submit applications to track them here.'}
+                className="bg-slate-900/40 rounded-3xl border border-slate-800 my-8"
+              />
+            ) : (
+              <PipelineTableView 
+                jobs={activeJobs} 
+                onUpdateStatus={onUpdateStatus} 
+                onSelectJob={(job) => setSelectedJob(job)}
+              />
+            )
           )
         )}
       </div>

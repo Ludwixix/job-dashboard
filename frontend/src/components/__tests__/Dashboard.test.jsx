@@ -83,7 +83,7 @@ describe('Dashboard Top-Level Integration', () => {
     });
 
     // Switch to Highlights section
-    const actionTab = screen.getByRole('button', { name: /ACTION/i });
+    const actionTab = screen.getByRole('tab', { name: /ACTION/i });
     fireEvent.click(actionTab);
     
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe('Dashboard Top-Level Integration', () => {
     });
 
     // Switch to Kanban section
-    const kanbanTab = screen.getByRole('button', { name: /KANBAN/i });
+    const kanbanTab = screen.getByRole('tab', { name: /KANBAN/i });
     fireEvent.click(kanbanTab);
     
     await waitFor(() => {
@@ -99,7 +99,7 @@ describe('Dashboard Top-Level Integration', () => {
     });
 
     // Switch to Analytics section
-    const analyticsTab = screen.getByRole('button', { name: /ANALYTICS/i });
+    const analyticsTab = screen.getByRole('tab', { name: /ANALYTICS/i });
     fireEvent.click(analyticsTab);
     
     await waitFor(() => {

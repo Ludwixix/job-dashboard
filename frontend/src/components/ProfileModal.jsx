@@ -52,6 +52,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [llmProvider, setLlmProvider] = useState(() => getLlmConfig().provider || 'openrouter');
   const [llmModel, setLlmModel] = useState(() => getLlmConfig().model || 'z-ai/glm-5.3-flash');
   const [apiKey, setApiKey] = useState(() => getLlmConfig().apiKey || '');
@@ -316,6 +318,9 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
       return;
     }
 
+    if (isSaving) return;
+    setIsSaving(true);
+
     saveLlmConfig({
       provider: llmProvider,
       model: llmModel,
@@ -328,6 +333,7 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
       onProfileSaved(saved);
     }
     setTimeout(() => {
+      setIsSaving(false);
       onClose();
     }, 450);
   };
@@ -1088,15 +1094,18 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+              disabled={isSaving}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              disabled={isSaving}
+              aria-busy={isSaving}
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <CheckCircle2 size={16} /> SAVE & ACTIVATE PROFILE
+              <CheckCircle2 size={16} aria-hidden="true" /> {isSaving ? 'SAVING PROFILE...' : 'SAVE & ACTIVATE PROFILE'}
             </button>
           </div>
         </div>

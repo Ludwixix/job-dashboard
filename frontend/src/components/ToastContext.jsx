@@ -24,7 +24,13 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full font-mono">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label="Notifications"
+        className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full font-mono"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -37,6 +43,7 @@ export const ToastProvider = ({ children }) => {
             }`}
           >
             <div
+              aria-hidden="true"
               className={`p-2 rounded-xl shrink-0 ${
                 toast.type === 'success'
                   ? 'bg-emerald-500/20 text-emerald-400'
@@ -52,9 +59,10 @@ export const ToastProvider = ({ children }) => {
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white transition-colors"
+              aria-label="Dismiss notification"
+              className="text-slate-400 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
             >
-              <X size={16} />
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
         ))}
@@ -66,7 +74,11 @@ export const ToastProvider = ({ children }) => {
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
+    // Outside ToastProvider (e.g. unit tests) — return safe no-ops
+    return {
+      addToast: () => {},
+      removeToast: () => {},
+    };
   }
   return context;
 };

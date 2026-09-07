@@ -302,10 +302,13 @@ export const RoleFilterBar = ({
                       const isRecommended = role.isRecommended;
 
                       return (
-                        <div
+                        <button
                           key={role.id}
+                          type="button"
                           onClick={() => onSelectRole(role.id)}
-                          className={`p-2 rounded-xl border text-xs flex items-center justify-between gap-2 cursor-pointer transition-all select-none ${
+                          aria-pressed={isSelected}
+                          aria-label={`${role.title}${isRecommended ? ' (profile fit)' : ''} — ${role.count || 0} jobs${isSelected ? ', currently selected' : ''}`}
+                          className={`p-2 rounded-xl border text-xs flex items-center justify-between gap-2 cursor-pointer transition-all select-none w-full text-left ${
                             isSelected
                               ? 'bg-indigo-950/50 border-indigo-500/60 text-indigo-100 shadow-sm ring-1 ring-indigo-500/30'
                               : 'bg-slate-900/80 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-300'
@@ -347,14 +350,14 @@ export const RoleFilterBar = ({
                                   e.stopPropagation();
                                   onRemoveCustomRole(role.id);
                                 }}
+                                aria-label={`Remove custom role: ${role.title}`}
                                 className="p-1 hover:text-red-400 text-slate-500 transition-colors"
-                                title="Delete custom target role"
                               >
-                                <Trash2 size={11} />
+                                <Trash2 size={11} aria-hidden="true" />
                               </button>
                             )}
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>

@@ -222,7 +222,7 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
             </div>
           </div>
         ) : (
-          <form onSubmit={handleGenerateFromInput} className="space-y-4 text-xs">
+          <form onSubmit={handleGenerateFromInput} aria-busy={loading} className="space-y-4 text-xs">
             <div className="flex gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
               <button
                 type="button"
@@ -330,10 +330,11 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="py-2 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs cursor-pointer flex items-center gap-2 shadow-md disabled:opacity-50"
+                  aria-disabled={loading}
+                  className="py-2 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs cursor-pointer flex items-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                  Generate & Download
+                  {loading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
+                  {loading ? 'Generating...' : 'Generate & Download'}
                 </button>
               </div>
             </div>

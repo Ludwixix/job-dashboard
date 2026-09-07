@@ -43,6 +43,8 @@ import {
   removeCustomRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
+import { EmptyState } from './ui/EmptyState';
+
 import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 
 
@@ -1344,15 +1346,21 @@ export const JobSeeker = ({
 
             <div className="space-y-6">
               {paginatedJobs.length === 0 ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }} 
-                  animate={{ opacity: 1, scale: 1 }} 
-                  className="flex flex-col items-center justify-center py-24 text-slate-400 bg-white/50 rounded-3xl border-2 border-dashed border-slate-200"
-                >
-                  <Bot size={64} className="mb-4 text-slate-300" />
-                  <h3 className="text-xl font-bold text-slate-600 mb-2">No jobs found in this view</h3>
-                  <p className="text-sm max-w-md text-center">Try adjusting your filters, selecting a different tab, or running the scraper to find new opportunities.</p>
-                </motion.div>
+                <EmptyState
+                  icon={Bot}
+                  title="No jobs found in this view"
+                  description="Try adjusting your filters, selecting a different tab, or running the scraper to find new opportunities."
+                  className="bg-white/50 dark:bg-slate-900/40 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800"
+                  action={
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold font-mono transition-colors shadow-xs"
+                    >
+                      Reset All Filters
+                    </button>
+                  }
+                />
               ) : (
                 <div className={`grid gap-3 sm:gap-3.5 ${showSidebar ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8'}`}>
                   {paginatedJobs.map(job => {
@@ -1567,26 +1575,26 @@ export const JobSeeker = ({
                       </div>
 
                       {/* Score & Source Bar */}
-                      <div className="flex items-center justify-between gap-2 pt-1 font-mono text-xs">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-black border ${
+                      <div className="flex items-center justify-between gap-2 pt-1 text-xs">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-semibold border ${
                           isTopFit 
                             ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-2xs'
                             : (job.score || 0) >= 80
                             ? 'bg-indigo-100 text-indigo-950 border-indigo-300'
                             : 'bg-slate-100 text-slate-900 border-slate-300'
                         }`}>
-                          <Award size={13} className={isTopFit ? "text-slate-950" : "text-indigo-700"} />
-                          {job.score || 85}% MATCH
+                          <Award size={13} className={isTopFit ? "text-slate-950" : "text-indigo-700"} aria-hidden="true" />
+                          {job.score || 85}% match
                         </span>
 
                         <div className="flex items-center gap-2 text-slate-500">
                           {job.source && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                            <span className="type-meta px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                               {job.source}
                             </span>
                           )}
-                          <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                            <Clock size={11} /> {formatJobPostedAge(job.date)}
+                          <span className="type-meta text-slate-400 flex items-center gap-1">
+                            <Clock size={11} aria-hidden="true" /> {formatJobPostedAge(job.date)}
                           </span>
                         </div>
                       </div>
@@ -1603,23 +1611,23 @@ export const JobSeeker = ({
                                   target="_blank"
                                   rel="noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="font-black text-lg text-slate-900 hover:text-indigo-600 transition-colors leading-snug cursor-pointer inline-flex items-center gap-1.5"
-                                  title="Open original job posting in a new tab"
+                                  aria-label={`${job.title} at ${job.company} — open job posting (new tab)`}
+                                  className="type-heading text-base text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
                                 >
-                                  <span>{job.title}</span>
-                                  <ExternalLink size={14} className="text-slate-400 hover:text-indigo-600 shrink-0" />
+                                  <span className="leading-snug">{job.title}</span>
+                                  <ExternalLink size={13} className="text-slate-300 group-hover/title:text-indigo-500 shrink-0 mt-0.5" aria-hidden="true" />
                                 </a>
                               ) : (
-                                <h3 className="font-black text-lg text-slate-900 leading-snug">
+                                <h3 className="type-heading text-base text-slate-900 leading-snug">
                                   {job.title}
                                 </h3>
                               )}
 
-                              <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                                <Building2 size={13} className="text-indigo-500 shrink-0" />
-                                <span>{job.company}</span>
-                                <span className="text-slate-400">•</span>
-                                <MapPin size={12} className="text-slate-400 shrink-0" />
+                              <p className="type-meta text-slate-500 flex items-center gap-1.5 flex-wrap">
+                                <Building2 size={12} className="text-indigo-400 shrink-0" aria-hidden="true" />
+                                <span className="font-semibold text-slate-700">{job.company}</span>
+                                <span className="text-slate-300" aria-hidden="true">•</span>
+                                <MapPin size={11} className="text-slate-400 shrink-0" aria-hidden="true" />
                                 <span className="truncate">{job.location || 'Australia'}</span>
                               </p>
                             </>

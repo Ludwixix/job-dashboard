@@ -44,8 +44,34 @@ class JobRepository:
         """Get a database connection from the pool."""
         return get_db_connection(self.path)
 
+    def _check_and_recover_db(self):
+        """Run PRAGMA integrity_check; delete and recreate if malformed."""
+        import os
+        try:
+            with get_db_connection(self.path) as conn:
+                result = conn.execute("PRAGMA integrity_check").fetchone()
+                if result and result[0] != "ok":
+                    logger.error(
+                        f"DB integrity check failed ({result[0]}) at {self.path}. "
+                        "Deleting corrupt database — a fresh empty DB will be created."
+                    )
+                    conn.close()
+        except Exception as exc:
+            logger.error(f"DB integrity check raised {exc} at {self.path}. Deleting and recreating.")
+        else:
+            # No exception and result is ok — nothing to do
+            if result and result[0] == "ok":
+                return
+        # If we reach here the DB is malformed or unreadable — nuke it
+        try:
+            os.remove(self.path)
+            logger.info(f"Deleted corrupt DB at {self.path}. Fresh schema will be created.")
+        except FileNotFoundError:
+            pass
+
     def _init_schema(self):
-        """Initialize database schema."""
+        """Initialize database schema, auto-recovering from corruption."""
+        self._check_and_recover_db()
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
             conn.executescript("""

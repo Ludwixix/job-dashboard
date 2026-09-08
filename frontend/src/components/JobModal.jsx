@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -575,6 +575,21 @@ ${candidatePhone}`;
                       <div className="font-bold">Executive Dossier</div>
                       <div className="text-[10px] text-slate-400 font-sans">90-Day briefing blueprint</div>
                     </div>
+                {onOpenInfluenceHub && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenInfluenceHub(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-amber-950/60 text-slate-200 hover:text-amber-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <ShieldCheck size={14} className="text-amber-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Influence &amp; Debrief Hub</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Objection memo &amp; referee pack</div>
+                    </div>
+                  </button>
+                )}
+
                   </button>
                 )}
                 {onOpenOfferHub && (
@@ -1852,6 +1867,20 @@ ${data.pipeline_result?.cover_text || ''}`;
                       <Building2 size={14} className="text-cyan-600" /> EXECUTIVE DOSSIER
                     </div>
                     <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                  {onOpenInfluenceHub && (
+                    <button
+                      onClick={() => { onClose(); onOpenInfluenceHub(job); }}
+                      className="p-3 rounded-2xl bg-amber-50/80 hover:bg-amber-100/90 border border-amber-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 group-hover:text-amber-700">
+                        <ShieldCheck size={14} className="text-amber-600" /> INFLUENCE &amp; DEBRIEF
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Objection overcoming &amp; referee briefing.
+                      </p>
+                    </button>
+                  )}
+
                       90-day plan, leadership alignment &amp; pain points.
                     </p>
                   </button>

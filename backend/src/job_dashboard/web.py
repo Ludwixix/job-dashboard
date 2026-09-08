@@ -69,6 +69,13 @@ from .smart_applications import get_smart_application_tracker
 from .network_crm import NetworkCRMManager, NetworkContact
 from .funnel_analytics import compute_funnel_analytics, AU_SECTOR_BENCHMARKS
 from .career_matrix import generate_career_roadmap, SECTOR_CAREER_TRACKS, AU_CERTIFICATION_REGISTRY
+from .interview_influence import (
+    InterviewDebrief,
+    evaluate_influence_health,
+    generate_objection_resolution_memo,
+    generate_referee_alignment_pack,
+)
+
 from datetime import timedelta
 from urllib.error import URLError
 
@@ -1295,6 +1302,25 @@ def make_handler(app: DashboardApp):
                 profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
                 roadmap = generate_career_roadmap(profile, target_level=target_level, sector=sector)
                 self.send_json(200, {"success": True, "roadmap": roadmap})
+            # Phase 19: Post-Interview Influence & Debrief GET Endpoint
+            if path == "/api/interview-debrief":
+                job_id = query_params.get("job_id", [""])[0]
+                if not job_id:
+                    self.send_json(400, {"success": False, "error": "job_id is required"})
+                    return
+                user_id = resolve_user_id(self, query_params) or "default_user"
+                # Check stored debrief in memory or persistence
+                debriefs_store = getattr(app, "_interview_debriefs", {})
+                store_key = f"{user_id}::{job_id}"
+                raw_debrief = debriefs_store.get(store_key)
+                if raw_debrief:
+                    debrief_obj = InterviewDebrief.from_dict(raw_debrief)
+                    health = evaluate_influence_health(debrief_obj)
+                    self.send_json(200, {"success": True, "debrief": raw_debrief, "health": health})
+                else:
+                    self.send_json(200, {"success": True, "debrief": None, "health": None})
+                return
+
                 return
 
             if path == "/api/network/cadence":
@@ -2736,6 +2762,51 @@ def make_handler(app: DashboardApp):
                     roadmap = generate_career_roadmap(profile, target_level=target_level, sector=sector)
                     self.send_json(200, {"success": True, "roadmap": roadmap})
                     return
+                # Phase 19: Post-Interview Influence & Debrief POST Endpoints
+                if path == "/api/interview-debrief":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_id = payload.get("job_id")
+                    if not job_id:
+                        self.send_json(400, {"success": False, "error": "job_id is required"})
+                        return
+                    user_id = resolve_user_id(self, query_params) or payload.get("user_id") or "default_user"
+                    debrief = InterviewDebrief.from_dict(payload)
+                    if not hasattr(app, "_interview_debriefs"):
+                        app._interview_debriefs = {}
+                    store_key = f"{user_id}::{job_id}"
+                    app._interview_debriefs[store_key] = debrief.to_dict()
+                    health = evaluate_influence_health(debrief)
+                    self.send_json(200, {"success": True, "debrief": debrief.to_dict(), "health": health})
+                    return
+
+                if path == "/api/interview-debrief/follow-up":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_data = payload.get("job", {})
+                    debrief_data = payload.get("debrief", {})
+                    user_id = resolve_user_id(self, query_params)
+                    profile = payload.get("profile") or (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    debrief = InterviewDebrief.from_dict(debrief_data)
+                    memo = generate_objection_resolution_memo(job_data, debrief, profile)
+                    self.send_json(200, {"success": True, "memo": memo})
+                    return
+
+                if path == "/api/interview-debrief/referee-pack":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_data = payload.get("job", {})
+                    debrief_data = payload.get("debrief", {})
+                    referee_name = payload.get("referee_name", "Referee")
+                    referee_title = payload.get("referee_title", "Professional Reference")
+                    referee_relationship = payload.get("referee_relationship", "Former Supervisor")
+                    user_id = resolve_user_id(self, query_params)
+                    profile = payload.get("profile") or (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    debrief = InterviewDebrief.from_dict(debrief_data)
+                    pack = generate_referee_alignment_pack(job_data, debrief, referee_name, referee_title, referee_relationship, profile)
+                    self.send_json(200, {"success": True, "pack": pack})
+                    return
+
 
                 # Phase 16: Network CRM POST Endpoints
                 if path in ("/api/network/contacts", "/api/network/contacts/"):

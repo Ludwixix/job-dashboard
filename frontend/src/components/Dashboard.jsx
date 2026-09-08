@@ -35,6 +35,8 @@ const RecruiterRelationshipModal = lazy(() => import('./RecruiterRelationshipMod
 const FunnelIntelligenceModal = lazy(() => import('./FunnelIntelligenceModal'));
 const CareerMatrixModal = lazy(() => import('./CareerMatrixModal'));
 const WorkforceAustraliaModal = lazy(() => import('./WorkforceAustraliaModal'));
+const InterviewInfluenceModal = lazy(() => import('./InterviewInfluenceModal'));
+
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
 
@@ -69,6 +71,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForOutreach, setSelectedForOutreach] = useState(null);
   const [selectedForOfferHub, setSelectedForOfferHub] = useState(null);
   const [selectedForDossier, setSelectedForDossier] = useState(null);
+  const [selectedForInfluenceHub, setSelectedForInfluenceHub] = useState(null);
+
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
   const [isFunnelModalOpen, setIsFunnelModalOpen] = useState(false);
@@ -472,6 +476,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     );
     return match || selectedForDossier;
   }, [selectedForDossier, jobs]);
+
+  const liveSelectedForInfluenceHub = useMemo(() => {
+    if (!selectedForInfluenceHub) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForInfluenceHub.id)) ||
+      `${j.company}_${j.title}` === `${selectedForInfluenceHub.company}_${selectedForInfluenceHub.title}`
+    );
+    return match || selectedForInfluenceHub;
+  }, [selectedForInfluenceHub, jobs]);
 
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
@@ -1103,6 +1116,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenOutreach={(j) => { setSelectedJob(null); setSelectedForOutreach(j); }}
               onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
               onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
+              onOpenInfluenceHub={(j) => { setSelectedForInfluenceHub(j); }}
+
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
               job={liveSelectedJob} 
@@ -1237,6 +1252,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       {/* Recruiter & Talent CRM Hub Modal */}
       {isRecruiterCrmOpen && (
         <SafeErrorBoundary sectionName="Recruiter CRM Hub" onClose={() => { setIsRecruiterCrmOpen(false); setSelectedForRecruiterCrm(null); }}>
+      {/* Phase 19: Post-Interview Tactical Influence & Debrief Hub Modal */}
+      {liveSelectedForInfluenceHub && (
+        <SafeErrorBoundary sectionName="Post-Interview Influence Hub" onClose={() => setSelectedForInfluenceHub(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <InterviewInfluenceModal
+              job={liveSelectedForInfluenceHub}
+              userProfile={activeProfile}
+              isOpen={Boolean(liveSelectedForInfluenceHub)}
+              onClose={() => setSelectedForInfluenceHub(null)}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
           <Suspense fallback={<ModalSkeleton />}>
             <RecruiterRelationshipModal
               isOpen={isRecruiterCrmOpen}

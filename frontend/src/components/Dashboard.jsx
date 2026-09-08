@@ -602,7 +602,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         </div>
       )}
 
-      <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[11px] border-b border-slate-800 flex items-center justify-between font-semibold">
+      <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 text-slate-300 py-1.5 px-3 sm:px-5 lg:px-6 font-mono text-[11px] flex flex-wrap items-center justify-between gap-2 font-semibold shadow-md">
         <div className="flex items-center gap-4 truncate">
           <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0">
             <Activity size={13} className="animate-pulse" /> V2.0 ENGINE ACTIVE
@@ -643,8 +643,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
-          {/* Active Candidate Profile Switcher & Customizer */}
+        <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] flex-wrap justify-end">
+          {/* Active Candidate Profile Switcher */}
           <ProfileSwitcher 
             activeProfile={activeProfile}
             onProfileChange={(p) => {
@@ -660,68 +660,64 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
 
-          {/* Recruiter & Talent CRM Hub */}
-          <button
-            onClick={() => setIsRecruiterCrmOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-500/50 text-purple-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
-            title="Recruiter & Talent Network CRM: Agency Directory & Follow-Up Radar"
-          >
-            <Users size={12} className="text-purple-400" />
-            <span>RECRUITER CRM</span>
-            {overdueTouchpointCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse">
-                {overdueTouchpointCount}
-              </span>
-            )}
-          </button>
+          {/* Intelligence & Analytics Tools Group */}
+          <div className="inline-flex items-center bg-slate-900/90 p-0.5 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setIsRecruiterCrmOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-purple-300 hover:text-white hover:bg-purple-950/70 transition-colors font-bold text-[10px] cursor-pointer"
+              title="Recruiter & Talent Network CRM"
+            >
+              <Users size={12} className="text-purple-400" />
+              <span>CRM</span>
+              {overdueTouchpointCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse">
+                  {overdueTouchpointCount}
+                </span>
+              )}
+            </button>
 
-          {/* Funnel & Pipeline Velocity Intelligence */}
-          <button
-            onClick={() => setIsFunnelModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
-            title="Talent Funnel Intelligence: Stage Conversion, Velocity & SLA Lag Alerts"
-          >
-            <TrendingUp size={12} className="text-cyan-400" />
-            <span>FUNNEL INTEL</span>
-          </button>
+            <button
+              onClick={() => setIsFunnelModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-cyan-300 hover:text-white hover:bg-cyan-950/70 transition-colors font-bold text-[10px] cursor-pointer"
+              title="Talent Funnel Intelligence"
+            >
+              <TrendingUp size={12} className="text-cyan-400" />
+              <span>FUNNEL</span>
+            </button>
 
-          {/* Strategic Career Roadmap & Trajectory Compass */}
-          <button
-            onClick={() => setIsCareerModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
-            title="Career Vector Matrix: Seniority Roadmap, Skill Deltas & Salary Lift"
-          >
-            <Compass size={12} className="text-indigo-400" />
-            <span>CAREER COMPASS</span>
-          </button>
+            <button
+              onClick={() => setIsCareerModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-indigo-300 hover:text-white hover:bg-indigo-950/70 transition-colors font-bold text-[10px] cursor-pointer"
+              title="Career Vector Matrix & Roadmap"
+            >
+              <Compass size={12} className="text-indigo-400" />
+              <span>COMPASS</span>
+            </button>
 
-          {/* Dashboard Settings & LLM Configuration */}
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
-            title="Configure LLM Provider, Model, and API Credentials"
-          >
-            <Settings size={12} className="text-indigo-400" />
-            <span>SETTINGS</span>
-          </button>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors font-bold text-[10px] cursor-pointer"
+              title="Configure LLM Provider, Model, and API Credentials"
+            >
+              <Settings size={12} className="text-indigo-400" />
+              <span>SETTINGS</span>
+            </button>
+          </div>
 
-          <span className="text-slate-800">|</span>
-
-          {/* Google Auth & Cloud Sync Buttons */}
+          {/* Sync & Auth Group */}
           {authUser ? (
             <button
               onClick={() => setIsGoogleIntegrationOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 hover:text-white hover:bg-emerald-900 transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 hover:text-white hover:bg-emerald-900 transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
               title="Open Personal Google Sheet Tracker & Gmail Scanner"
             >
               <Table size={12} className="text-emerald-400" />
-              <span className="hidden sm:inline">MY GOOGLE TRACKER</span>
-              <span className="sm:hidden">TRACKER</span>
+              <span>TRACKER</span>
             </button>
           ) : (
             <button
               onClick={() => setIsAuthModalOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors font-bold text-[10px] cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors font-bold text-[10px] cursor-pointer"
               title="Sign in with Google to sync personal sheets and scan Gmail"
             >
               <Lock size={12} className="text-indigo-400" />
@@ -730,59 +726,61 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           )}
 
           <button
-            onClick={() => setViewMode('ambient')}
-            className="flex items-center gap-1.5 px-3 py-1 bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-colors font-bold text-[10px] rounded-xl shadow-xs cursor-pointer tracking-wider backdrop-blur-md"
-            title="Switch to Cyberpunk Ambient Flow Mode (Realtime Metrics & Dystopian Soundscape)"
+            onClick={() => setViewMode("ambient")}
+            className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-colors font-bold text-[10px] rounded-xl cursor-pointer"
+            title="Switch to Cyberpunk Ambient Flow Mode"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             <span>AMBIENT FLOW</span>
           </button>
 
-          <button
-            onClick={() => setIsCustomJobModalOpen(true)}
-            className="flex items-center gap-1 text-purple-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-purple-950 border border-purple-500/40 px-2 py-1 rounded-xl shadow-xs"
-            title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
-          >
-            <Sparkles size={12} className="text-purple-400" /> + CUSTOM JOB
-          </button>
-
-          <button
-            onClick={() => setIsBatchApplyOpen(true)}
-            className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-black bg-emerald-950 border border-emerald-500/40 px-2 py-1 rounded-xl shadow-xs"
-            title="Dispatch 1-Click Batch Automated Applications"
-          >
-            <Zap size={12} className="animate-bounce text-emerald-400" /> BATCH APPLY
-          </button>
-
-          <button
-            onClick={() => setIsCommandPaletteOpen(true)}
-            className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950 border border-indigo-500/40 px-2 py-1 rounded-xl"
-            title="Open Command Palette (Ctrl+K)"
-          >
-            <Command size={12} /> ⌘K
-          </button>
-
-          <button 
-            onClick={refetch}
-            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-slate-900 border border-slate-800"
-            title="Sync Database Feed"
-          >
-            <RefreshCw size={12} /> SYNC
-          </button>
-
-          {onSignOut && (
-            <button 
-              onClick={() => {
-                logoutUser();
-                onSignOut();
-              }}
-              className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-rose-950/60 border border-rose-500/40"
-              title="Sign Out / Switch User"
+          {/* Quick Action Pills */}
+          <div className="inline-flex items-center gap-1.5">
+            <button
+              onClick={() => setIsCustomJobModalOpen(true)}
+              className="flex items-center gap-1 text-purple-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-purple-950 border border-purple-500/40 px-2.5 py-1 rounded-xl shadow-xs"
+              title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
             >
-              <LogOut size={12} />
-              <span className="hidden md:inline">EXIT</span>
+              <Sparkles size={11} className="text-purple-400" /> + CUSTOM
             </button>
-          )}
+
+            <button
+              onClick={() => setIsBatchApplyOpen(true)}
+              className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-emerald-950 border border-emerald-500/40 px-2.5 py-1 rounded-xl shadow-xs"
+              title="Dispatch 1-Click Batch Automated Applications"
+            >
+              <Zap size={11} className="text-emerald-400" /> BATCH
+            </button>
+
+            <button
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950 border border-indigo-500/40 px-2 py-1 rounded-xl"
+              title="Open Command Palette (Ctrl+K)"
+            >
+              <Command size={11} /> ⌘K
+            </button>
+
+            <button 
+              onClick={refetch}
+              className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-slate-900 border border-slate-800"
+              title="Sync Database Feed"
+            >
+              <RefreshCw size={11} />
+            </button>
+
+            {onSignOut && (
+              <button 
+                onClick={() => {
+                  logoutUser();
+                  onSignOut();
+                }}
+                className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-rose-950/60 border border-rose-500/40"
+                title="Sign Out / Switch User"
+              >
+                <LogOut size={11} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -807,7 +805,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       )}
 
       {/* Technocratic Header & Top Navigation */}
-      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 shadow-xl font-mono">
+      <header className="bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 sticky top-[33px] z-30 shadow-xl font-mono">
         <div className="w-full px-3 sm:px-5 lg:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md border border-indigo-400/40">

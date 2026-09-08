@@ -1362,7 +1362,7 @@ export const JobSeeker = ({
                   }
                 />
               ) : (
-                <div className={`grid gap-3 sm:gap-3.5 ${showSidebar ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8'}`}>
+                <div className={`grid gap-4 sm:gap-5 ${showSidebar ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-4 4xl:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6'}`}>
                   {paginatedJobs.map(job => {
                     const isGeneratingThisJob = Boolean(
                       asyncGeneratingIds?.has?.(job.id) || 
@@ -1378,7 +1378,7 @@ export const JobSeeker = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         onClick={() => onSelectJob(job)}
-                      className={`rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col justify-between space-y-2.5 group cursor-pointer relative overflow-hidden card-hover-lift ${
+                      className={`rounded-2xl p-5 sm:p-6 transition-all duration-300 flex flex-col justify-between space-y-3.5 group cursor-pointer relative overflow-hidden card-hover-lift ${
                         hasCustomDocs
                           ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 border-2 border-emerald-500 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-500/30'
                           : isGeneratingThisJob

@@ -77,10 +77,10 @@ export default function InterviewInfluenceModal({
   }), [stage, interviewDate, panelNames, panelSentiment, topicsCovered, perceivedObjections, promisedDecisionDate, notes]);
 
   const health = useMemo(() => calculateInfluenceHealth(debriefObject), [debriefObject]);
-  if (!isOpen || !job) return null;
-
   const memo = useMemo(() => buildObjectionResolutionMemo(job, debriefObject, profile), [job, debriefObject, profile]);
   const refereeBriefing = useMemo(() => buildRefereeBriefingDoc(job, debriefObject, refereeName, refereeTitle, refereeRelationship, profile), [job, debriefObject, refereeName, refereeTitle, refereeRelationship, profile]);
+
+  if (!isOpen || !job) return null;
 
 
   const handleAddTopic = () => {

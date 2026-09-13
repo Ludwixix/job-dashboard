@@ -116,3 +116,4 @@ def test_api_profile_auto_generate_endpoint(tmp_path):
     # Verify persisted in user_profiles
     persisted = app.repository.get_user_profile("usr_sam_101")
     assert persisted["title"] == res["profile"]["title"]
+

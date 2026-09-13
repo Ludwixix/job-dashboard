@@ -78,8 +78,10 @@ describe('SeekPassModal', () => {
       />
     );
 
+    expect(await screen.findByText(/Diagnostic Assessment/i)).toBeInTheDocument();
+
     fireEvent.click(await screen.findByRole('button', { name: /SEEK Pass Responses/i }));
-    const copyBtns = screen.getAllByRole('button', { name: /Copy Answer/i });
+    const copyBtns = await screen.findAllByRole('button', { name: /Copy Answer/i });
     expect(copyBtns.length).toBeGreaterThan(0);
 
     fireEvent.click(copyBtns[0]);

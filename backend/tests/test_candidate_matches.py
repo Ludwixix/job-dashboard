@@ -172,3 +172,4 @@ def test_api_matches_endpoints(tmp_path):
     assert res_get["success"] is True
     assert len(res_get["matches"]) >= 1
     assert res_get["matches"][0]["job_id"] == "job_api_match_1"
+

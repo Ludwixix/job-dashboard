@@ -45,6 +45,11 @@ from .cover_letter_polarizer import (
     audit_cover_letter,
     generate_polarized_variants,
 )
+from .screening_solver import (
+    generate_screening_report,
+    solve_screening_question,
+    extract_screening_questions_from_jd,
+)
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1562,6 +1567,24 @@ def make_handler(app: DashboardApp):
                 })
                 return
 
+            # Phase 23: Screening Questionnaire Solver GET Endpoints
+            if path.startswith("/api/jobs/") and path.endswith("/screening-solutions"):
+                job_id = path.removeprefix("/api/jobs/").removesuffix("/screening-solutions")
+                job = app.repository.get_job(job_id)
+                if not job:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job = j
+                            break
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+
+                job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
+                report = generate_screening_report(job_dict, profile)
+                self.send_json(200, {"success": True, "report": report.to_dict()})
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -3034,6 +3057,21 @@ def make_handler(app: DashboardApp):
                     profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
                     variants = generate_polarized_variants(job_data, profile)
                     self.send_json(200, {"success": True, "variants": variants})
+                    return
+
+                # Phase 23: Screening Questionnaire Solver POST Endpoints
+                if path == "/api/screening/solve":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_data = payload.get("job") or {}
+                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                    profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                    custom_questions = payload.get("questions") or payload.get("custom_questions")
+                    if isinstance(custom_questions, str):
+                        custom_questions = [custom_questions]
+
+                    report = generate_screening_report(job_data, profile, custom_questions=custom_questions)
+                    self.send_json(200, {"success": True, "report": report.to_dict()})
                     return
 
                 # Phase 16: Network CRM POST Endpoints

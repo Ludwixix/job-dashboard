@@ -33,30 +33,6 @@ The current scraping layer is built around provider isolation and multi-tier fal
 ```
                   ┌──────────────────────────────┐
                   │ Scrape Pipeline Orchestrator │
-
-## Phase 19: Post-Interview Tactical Influence, Objection Overcoming & Executive Referee Alignment Hub ("Post-Interview Influence Hub")
-
-**Status**: ✅ Complete — Implemented, tested, and integrated
-**Deployed**: 2026-09-08
-
-### Overview
-Maximizes conversion velocity from final-round interview to formal offer letter by addressing latent panel hesitation, providing evidence-based reassurance, and priming professional referees:
-1. **Post-Interview Tactical Debrief & Influence Posture Radar (`interview_influence.py`, `interviewInfluenceService.js`)**:
-   - Structured logging of interview stages: *Initial Screening & HR*, *Hiring Manager Deep Dive*, *Technical & Architecture*, *Panel Interview*, *Stakeholder & Cross-Functional*, *Final Executive & Board*.
-   - Panel sentiment classification: `Strong Positive`, `Leaning Positive`, `Neutral / Ambiguous`, `High Friction`.
-   - Automated tactical posture calculation: computes conviction health score (0–100), objection severity penalty, and strategic next steps.
-2. **Surgical Objection-Resolution Follow-Up Generator**:
-   - Synthesizes bespoke value-add letters specifically overcoming panel hesitations without sounding defensive or generic.
-   - Embeds concrete project precedents, automated rollback routines, and measurable SLA results directly addressing panel doubts.
-   - Built-in 1-click clipboard copy and direct `mailto:` launcher.
-3. **Executive Referee Alignment Pack**:
-   - Generates tailored 1-page alignment briefings for referees (e.g. former engineering managers, CFOs, clinical leads).
-   - Equips referees with targeted STAR proof points matching the exact competencies probed during panel interviews.
-   - Clean Markdown and printable briefing document for instant text/email distribution to references.
-4. **Full UI & Dashboard Integration (`InterviewInfluenceModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
-   - Integrated into `JobModal.jsx` (under Intelligence Tools dropdown and Action Grid).
-   - Registered in `Dashboard.jsx` modal router with dynamic lazy-loading and suspense fallback.
-
                   └──────────────┬───────────────┘
                                  │
      ┌───────────────────┬───────┴───────────┬───────────────────┐
@@ -557,6 +533,31 @@ Empowers candidates to manage long-term recruiter and hiring manager relationshi
 
 ---
 
+## Phase 19: Post-Interview Tactical Influence, Objection Overcoming & Executive Referee Alignment Hub ("Post-Interview Influence Hub")
+
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-08
+
+### Overview
+Maximizes conversion velocity from final-round interview to formal offer letter by addressing latent panel hesitation, providing evidence-based reassurance, and priming professional referees:
+1. **Post-Interview Tactical Debrief & Influence Posture Radar (`interview_influence.py`, `interviewInfluenceService.js`)**:
+   - Structured logging of interview stages: *Initial Screening & HR*, *Hiring Manager Deep Dive*, *Technical & Architecture*, *Panel Interview*, *Stakeholder & Cross-Functional*, *Final Executive & Board*.
+   - Panel sentiment classification: `Strong Positive`, `Leaning Positive`, `Neutral / Ambiguous`, `High Friction`.
+   - Automated tactical posture calculation: computes conviction health score (0–100), objection severity penalty, and strategic next steps.
+2. **Surgical Objection-Resolution Follow-Up Generator**:
+   - Synthesizes bespoke value-add letters specifically overcoming panel hesitations without sounding defensive or generic.
+   - Embeds concrete project precedents, automated rollback routines, and measurable SLA results directly addressing panel doubts.
+   - Built-in 1-click clipboard copy and direct `mailto:` launcher.
+3. **Executive Referee Alignment Pack**:
+   - Generates tailored 1-page alignment briefings for referees (e.g. former engineering managers, CFOs, clinical leads).
+   - Equips referees with targeted STAR proof points matching the exact competencies probed during panel interviews.
+   - Clean Markdown and printable briefing document for instant text/email distribution to references.
+4. **Full UI & Dashboard Integration (`InterviewInfluenceModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
+   - Integrated into `JobModal.jsx` (under Intelligence Tools dropdown and Action Grid).
+   - Registered in `Dashboard.jsx` modal router with dynamic lazy-loading and suspense fallback.
+
+---
+
 ## Phase 20: Algorithmic ATS Parsing Simulator & Cognitive Screening Triage Engine ("ATS Sentinel")
 
 **Status**: ✅ Complete — Implemented, tested, and integrated
@@ -634,3 +635,44 @@ Transforms generic AI cover letters into high-conviction, company-specific outre
    - `frontend/src/services/__tests__/coverLetterPolarizerService.test.js`: 7 vitest unit tests validating client engine mirroring and fallback robustness.
    - `frontend/src/components/__tests__/CoverLetterPolarizerModal.test.jsx`: 4 component tests validating modal rendering, tab navigation, copy/save callbacks.
    - Full regression: 220 backend tests passed, 248 frontend tests passed, 0 lint errors, clean Vite production build.
+
+---
+
+## Phase 23: Application Friction & Screening Questionnaire Solver Engine ("Screening Questionnaire Auto-Solver")
+
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-14
+
+### Overview
+Eliminates candidate drop-off and ATS questionnaire rejections by automatically resolving portal screening questions (Workday, Greenhouse, Lever, Seek, LinkedIn Quick Apply) with risk-mitigated answers grounded in candidate profiles:
+1. **Core Problem Formulation (`docs/Resume_Optimization.md`)**:
+   - Up to 60% of applicants abandon applications due to repetitive custom portal questions.
+   - Ambiguously answered questions (e.g. "Do you require visa sponsorship?" or "Years of experience with Docker") trigger instant algorithmic disqualifications.
+2. **5-Category Screening Taxonomy & Solution Engine (`screening_solver.py`, `screeningSolverService.js`)**:
+   - **Mandatory Legal & Australian Work Rights**: Unrestricted Australian citizen / permanent residency / full work rights; explicitly prevents false positives on sponsorship questions ("No sponsorship required").
+   - **Statutory Compliance & Regulated Clearances**: Automated verification against Australian credentials:
+     - Australian Health Practitioner Regulation Agency (AHPRA)
+     - Working with Children Check (WWCC)
+     - National Police Check / Criminal History Check
+     - NDIS Worker Screening Check
+     - SafeWork White Card / Construction Induction
+     - CPA / Chartered Accountants (CA ANZ)
+     - Australian Legal Practising Certificate
+     - Australian Government Security Clearance (Baseline / NV1 / NV2)
+   - **Commercial & Logistical Parameters**: Commute readiness, CBD office attendance / hybrid flexibility, notice period / availability, and salary expectation framing aligned with market bands.
+   - **Technical Stack Competency & Experience**: Years of hands-on experience calculation derived from profile roles, senior depth explanation, and stack competency mapping.
+   - **STAR Behavioral & Situational**: Concise 2-4 sentence STAR narratives (Situation + Task + Action + Metric Result) designed specifically for 200-500 character text boxes.
+3. **Question Extraction & Custom Sandbox**:
+   - `extract_screening_questions_from_jd()`: Automatically identifies screening questions or requirements embedded in job postings.
+   - Interactive custom question sandbox: Candidates can paste questions from any portal to obtain immediate recommended answers, rationale, risk ratings (`safe`, `warning`, `dealbreaker`), and character count validations.
+4. **1-Click Full Arsenal & Dealbreaker Radar**:
+   - Master summary of all standard portal questions and answers ready for one-click copy.
+   - Dealbreaker audit highlighting questions where candidate answers could trigger algorithmic knockout rules.
+5. **Interactive UI & Cross-Modal Integration (`ScreeningSolverModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
+   - 4-tab modal: Extracted Questions, Custom Question Sandbox, Dealbreaker Radar, and 1-Click Arsenal.
+   - Integrated into `JobModal.jsx` (Intelligence Tools menu & Tab 4 Action Grid) and lazily mounted in `Dashboard.jsx`.
+6. **Full Test & Verification Gauntlet**:
+   - `backend/tests/test_screening_solver.py`: 10 pytest tests (10/10 passed) verifying legal work rights, statutory clearances, experience extraction, core skill matching, STAR behavioral solving, commercial/salary solving, JD question extraction, report generation, custom solver sandbox, and HTTP endpoints.
+   - `frontend/src/services/__tests__/screeningSolverService.test.js`: 8 unit tests (8/8 passed) verifying client solver, question categorization, risk level badges, and network offline fallbacks.
+   - `frontend/src/components/__tests__/ScreeningSolverModal.test.jsx`: 4 component tests (4/4 passed) verifying UI rendering, tab navigation, custom question submission, and close handlers.
+   - Total regression: 230 backend pytest tests passed (100%), 260 frontend vitest tests passed (100%), 0 lint errors, clean Vite production bundle with zero bloat.

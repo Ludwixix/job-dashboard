@@ -5,7 +5,8 @@ import {
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
-  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search, Flame
+  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search, Flame,
+  ClipboardCheck, Compass
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -21,7 +22,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, onOpenScreeningSolver, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -633,6 +634,34 @@ ${candidatePhone}`;
                     <div>
                       <div className="font-bold">Cover Letter Polarizer</div>
                       <div className="text-[10px] text-slate-400 font-sans">Swappability audit &amp; anti-template rewrites</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenScreeningSolver && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenScreeningSolver(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950/60 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <ClipboardCheck size={14} className="text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Screening Questionnaire Solver</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Dealbreaker radar &amp; 1-click answers</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenCareerCompass && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenCareerCompass(); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950/60 text-slate-200 hover:text-indigo-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Compass size={14} className="text-indigo-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Career Compass &amp; Matrix</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Strategic alignment &amp; career trajectory</div>
                     </div>
                   </button>
                 )}
@@ -1967,6 +1996,34 @@ ${data.pipeline_result?.cover_text || ''}`;
                       </div>
                       <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
                         Swappability audit &amp; anti-template rewrites.
+                      </p>
+                    </button>
+                  )}
+
+                  {onOpenScreeningSolver && (
+                    <button
+                      onClick={() => { onClose(); onOpenScreeningSolver(job); }}
+                      className="p-3 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
+                        <ClipboardCheck size={14} className="text-emerald-600" /> SCREENING SOLVER
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Auto-solve portal questionnaires &amp; compliance.
+                      </p>
+                    </button>
+                  )}
+
+                  {onOpenCareerCompass && (
+                    <button
+                      onClick={() => { onClose(); onOpenCareerCompass(); }}
+                      className="p-3 rounded-2xl bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-indigo-950 group-hover:text-indigo-700">
+                        <Compass size={14} className="text-indigo-600" /> CAREER COMPASS
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Strategic matrix &amp; progression roadmap.
                       </p>
                     </button>
                   )}

@@ -54,6 +54,8 @@ describe('JobModal Component', () => {
     const onOpenOfferHub = vi.fn();
 
     const onOpenCoverLetterPolarizer = vi.fn();
+    const onOpenScreeningSolver = vi.fn();
+    const onOpenCareerCompass = vi.fn();
 
     render(
       <JobModal
@@ -64,6 +66,8 @@ describe('JobModal Component', () => {
         onOpenExecutiveDossier={onOpenExecutiveDossier}
         onOpenOfferHub={onOpenOfferHub}
         onOpenCoverLetterPolarizer={onOpenCoverLetterPolarizer}
+        onOpenScreeningSolver={onOpenScreeningSolver}
+        onOpenCareerCompass={onOpenCareerCompass}
       />
     );
 
@@ -80,13 +84,15 @@ describe('JobModal Component', () => {
     expect(screen.getByText('Executive Dossier')).toBeInTheDocument();
     expect(screen.getByText('Offer Action Hub')).toBeInTheDocument();
     expect(screen.getByText('Cover Letter Polarizer')).toBeInTheDocument();
+    expect(screen.getByText('Screening Questionnaire Solver')).toBeInTheDocument();
+    expect(screen.getByText('Career Compass & Matrix')).toBeInTheDocument();
 
-    // Click Cover Letter Polarizer
-    fireEvent.click(screen.getByText('Cover Letter Polarizer'));
-    expect(onOpenCoverLetterPolarizer).toHaveBeenCalledWith(mockJob);
+    // Click Screening Questionnaire Solver
+    fireEvent.click(screen.getByText('Screening Questionnaire Solver'));
+    expect(onOpenScreeningSolver).toHaveBeenCalledWith(mockJob);
 
     // Menu should be closed after selection
-    expect(screen.queryByText('Cover Letter Polarizer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Screening Questionnaire Solver')).not.toBeInTheDocument();
   });
 
   it('closes Intelligence Tools dropdown on outside click and Escape key', () => {

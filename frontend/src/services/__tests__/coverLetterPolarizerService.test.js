@@ -91,3 +91,4 @@ describe('coverLetterPolarizerService', () => {
     expect(result.variants.length).toBe(3);
   });
 });
+

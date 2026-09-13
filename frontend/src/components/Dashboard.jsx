@@ -39,6 +39,7 @@ const InterviewInfluenceModal = lazy(() => import('./InterviewInfluenceModal'));
 const AtsDiagnosticModal = lazy(() => import('./AtsDiagnosticModal'));
 const LinkedInInboundModal = lazy(() => import('./LinkedInInboundModal'));
 const CoverLetterPolarizerModal = lazy(() => import('./CoverLetterPolarizerModal').then(m => ({ default: m.CoverLetterPolarizerModal })));
+const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m => ({ default: m.ScreeningSolverModal })));
 
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
@@ -80,6 +81,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForAtsDiagnostic, setSelectedForAtsDiagnostic] = useState(null);
   const [selectedForLinkedInInbound, setSelectedForLinkedInInbound] = useState(null);
   const [selectedForCoverLetterPolarizer, setSelectedForCoverLetterPolarizer] = useState(null);
+  const [selectedForScreeningSolver, setSelectedForScreeningSolver] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -533,6 +535,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForCoverLetterPolarizer;
   }, [selectedForCoverLetterPolarizer, jobs]);
 
+  const liveSelectedForScreeningSolver = useMemo(() => {
+    if (!selectedForScreeningSolver) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForScreeningSolver.id)) ||
+      `${j.company}_${j.title}` === `${selectedForScreeningSolver.company}_${selectedForScreeningSolver.title}`
+    );
+    return match || selectedForScreeningSolver;
+  }, [selectedForScreeningSolver, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -610,6 +621,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenAtsDiagnostic={(j) => setSelectedForAtsDiagnostic(j)}
               onOpenLinkedInInbound={(j) => setSelectedForLinkedInInbound(j)}
               onOpenCoverLetterPolarizer={(j) => setSelectedForCoverLetterPolarizer(j)}
+              onOpenScreeningSolver={(j) => setSelectedForScreeningSolver(j)}
+              onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
               profile={activeProfile}
               allJobs={jobs}
             />
@@ -1170,6 +1183,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenAtsDiagnostic={(j) => { setSelectedForAtsDiagnostic(j); }}
               onOpenLinkedInInbound={(j) => { setSelectedForLinkedInInbound(j); }}
               onOpenCoverLetterPolarizer={(j) => { setSelectedForCoverLetterPolarizer(j); }}
+              onOpenScreeningSolver={(j) => { setSelectedForScreeningSolver(j); }}
+              onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1357,6 +1372,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 });
                 addToast('Polarized cover letter saved to job card', 'success');
               }}
+              userProfile={activeProfile}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Phase 23: Application Friction & Screening Questionnaire Solver Modal */}
+      {liveSelectedForScreeningSolver && (
+        <SafeErrorBoundary sectionName="Screening Questionnaire Solver" onClose={() => setSelectedForScreeningSolver(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <ScreeningSolverModal
+              job={liveSelectedForScreeningSolver}
+              onClose={() => setSelectedForScreeningSolver(null)}
               userProfile={activeProfile}
             />
           </Suspense>

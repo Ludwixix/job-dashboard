@@ -483,3 +483,4 @@ export const CoverLetterPolarizerModal = ({
     </div>
   );
 };
+

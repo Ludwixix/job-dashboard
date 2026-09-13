@@ -362,3 +362,4 @@ export const fetchPolarizedVariants = async (job = {}, profile = {}) => {
   }
   return clientGeneratePolarizedVariants(job, profile);
 };
+

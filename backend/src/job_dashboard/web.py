@@ -1811,6 +1811,17 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "applications": apps})
                 return
 
+            if path == "/api/matches":
+                user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required."})
+                    return
+                min_score = int(query_params.get("min_score", [0])[0] or 0)
+                limit = int(query_params.get("limit", [100])[0] or 100)
+                matches = app.repository.get_candidate_matches(user_id, min_score=min_score, limit=limit)
+                self.send_json(200, {"success": True, "matches": matches})
+                return
+
 
             if path == "/api/job-description":
                 job_id = query_params.get("job_id", [""])[0].strip()
@@ -2299,6 +2310,20 @@ def make_handler(app: DashboardApp):
                     score = float(body.get("score") or 0.0)
                     sess = app.repository.save_interview_session(user_id, job_id, company, title, session_data, score)
                     self.send_json(200, {"success": True, "session": sess})
+                    return
+
+                if path == "/api/matches/evaluate":
+                    user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required."})
+                        return
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    profile = body.get("profile") or app.repository.get_user_profile(user_id) or getattr(app.dashboard, "profile", {})
+                    min_score = int(body.get("min_score") or 50)
+                    staged_count = app.repository.evaluate_and_stage_matches(user_id, profile, min_score=min_score)
+                    matches = app.repository.get_candidate_matches(user_id, min_score=min_score)
+                    self.send_json(200, {"success": True, "staged_count": staged_count, "matches": matches})
                     return
 
                 if path == "/api/applications":

@@ -1,0 +1,33 @@
+{
+  "zero-secret-guard": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command|view_file|grep_search|write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/s/.openclaw/workspace/job-dashboard/scripts/hooks/pre_tool_security.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "auto-formatter": {
+    "enabled": true,
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/s/.openclaw/workspace/job-dashboard/scripts/hooks/post_tool_autoformat.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+

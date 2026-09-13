@@ -47,7 +47,9 @@ The repository is divided into two primary subtrees:
 - Frontend Documentation: `frontend/README.md`
 - OpenAPI Contract: `packages/shared/openapi.json`
 - Task Specifications: `docs/tasks/`
-- Component Workflows: `.agent/`
+- Agent Skills: `.agents/skills/` (e.g. `/test-driven-development`, `/systematic-debugging`, `/adversarial-review`, `/complex-planning`, etc.)
+- Modular Rules: `.agents/rules/` (`backend-architecture.md`, `frontend-architecture.md`, `security-zero-secrets.md`)
+
 
 ## Core Engineering Rules & Invariants
 1. **Zero Secret Exposure**: Never read, print, stage, or commit `.env*`, `client_secret*.json`, `KEYS.md`, `OpenRouterAPI.txt`, or credentials.

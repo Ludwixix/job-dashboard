@@ -220,6 +220,19 @@ class JobRepository:
                 CREATE INDEX IF NOT EXISTS idx_net_contacts_user ON network_contacts(user_id);
                 CREATE INDEX IF NOT EXISTS idx_net_contacts_health ON network_contacts(relationship_health);
                 CREATE INDEX IF NOT EXISTS idx_net_contacts_followup ON network_contacts(next_follow_up_date);
+                CREATE TABLE IF NOT EXISTS candidate_matches (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    job_id TEXT NOT NULL,
+                    score INTEGER NOT NULL DEFAULT 0,
+                    fit TEXT NOT NULL DEFAULT 'moderate',
+                    reasons_json TEXT NOT NULL DEFAULT '[]',
+                    matched_at TEXT NOT NULL,
+                    reviewed INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'matched',
+                    UNIQUE(user_id, job_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_matches_user_score ON candidate_matches(user_id, score DESC);
             """)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
@@ -1207,6 +1220,118 @@ class JobRepository:
                 # generated_documents
                 c = conn.execute("UPDATE generated_documents SET user_id = ? WHERE user_id = 'default_user'", (new_user_id,))
                 total_migrated += c.rowcount
+                # candidate_matches
+                c = conn.execute("UPDATE candidate_matches SET user_id = ? WHERE user_id = 'default_user'", (new_user_id,))
+                total_migrated += c.rowcount
         
         logger.info(f"Migrated {total_migrated} records from 'default_user' to '{new_user_id}'")
         return total_migrated
+
+    def upsert_job(self, job_dict: dict[str, Any]) -> int:
+        """Convenience method to insert or update a single job."""
+        return self.upsert_scraped_jobs([job_dict])
+
+    def upsert_candidate_match(
+        self,
+        user_id: str,
+        job_id: str,
+        score: int,
+        fit: str = "moderate",
+        reasons: list[str] | None = None,
+        status: str = "matched"
+    ) -> dict[str, Any]:
+        """Stage or update a high-relevance job match for candidate intake."""
+        now = datetime.now(timezone.utc).isoformat()
+        match_id = f"match_{user_id[:8]}_{job_id}"
+        reasons_json = json.dumps(reasons or [], ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT INTO candidate_matches (id, user_id, job_id, score, fit, reasons_json, matched_at, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, job_id) DO UPDATE SET
+                        score = excluded.score,
+                        fit = excluded.fit,
+                        reasons_json = excluded.reasons_json,
+                        matched_at = excluded.matched_at,
+                        status = excluded.status
+                """, (match_id, user_id, job_id, score, fit, reasons_json, now, status))
+        return {
+            "id": match_id,
+            "user_id": user_id,
+            "job_id": job_id,
+            "score": score,
+            "fit": fit,
+            "reasons": reasons or [],
+            "matched_at": now,
+            "status": status
+        }
+
+    def get_candidate_matches(self, user_id: str, min_score: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+        """Retrieve staged candidate matches with joined job details."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT m.*, j.title, j.company, j.location, j.description, j.source, j.url, j.posted, j.stream, j.data_json
+                FROM candidate_matches m
+                LEFT JOIN jobs j ON m.job_id = j.id
+                WHERE m.user_id = ? AND m.score >= ?
+                ORDER BY m.score DESC, m.matched_at DESC
+                LIMIT ?
+            """, (user_id, min_score, limit)).fetchall()
+            results = []
+            for r in rows:
+                d = dict(r)
+                try:
+                    d["reasons"] = json.loads(d.get("reasons_json") or "[]")
+                except Exception:
+                    d["reasons"] = []
+                d["job"] = {
+                    "id": d.get("job_id"),
+                    "title": d.get("title") or "",
+                    "company": d.get("company") or "",
+                    "location": d.get("location") or "",
+                    "description": d.get("description") or "",
+                    "source": d.get("source") or "",
+                    "url": d.get("url") or "",
+                    "posted": d.get("posted") or "",
+                    "stream": d.get("stream") or ""
+                }
+                results.append(d)
+            return results
+
+    def evaluate_and_stage_matches(self, user_id: str, profile: dict[str, Any], min_score: int = 50, limit: int = 200) -> int:
+        """Autonomously score indexed jobs against candidate profile and stage top matches."""
+        from .models import Job
+        from .score import score_job
+        all_jobs = self.list_jobs()[:limit]
+        staged = 0
+        for j in all_jobs:
+            try:
+                job_model = Job(
+                    id=j["id"],
+                    title=j.get("title", ""),
+                    company=j.get("company", ""),
+                    location=j.get("location", ""),
+                    description=j.get("description", ""),
+                    source=j.get("source", "seek"),
+                    url=j.get("url", ""),
+                    posted=j.get("posted", "")
+                )
+                score_res = score_job(job_model, profile)
+                if score_res.score >= min_score:
+                    reasons = list(score_res.matched_skills[:3])
+                    if score_res.fit == "strong":
+                        reasons.append("High title & seniority match")
+                    self.upsert_candidate_match(
+                        user_id=user_id,
+                        job_id=j["id"],
+                        score=score_res.score,
+                        fit=score_res.fit,
+                        reasons=reasons,
+                        status="matched"
+                    )
+                    staged += 1
+            except Exception as e:
+                logger.warning(f"Error evaluating job {j.get('id')} for {user_id}: {e}")
+        return staged

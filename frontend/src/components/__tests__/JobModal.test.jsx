@@ -56,6 +56,7 @@ describe('JobModal Component', () => {
     const onOpenCoverLetterPolarizer = vi.fn();
     const onOpenScreeningSolver = vi.fn();
     const onOpenCareerCompass = vi.fn();
+    const onOpenKscGenerator = vi.fn();
 
     render(
       <JobModal
@@ -68,6 +69,7 @@ describe('JobModal Component', () => {
         onOpenCoverLetterPolarizer={onOpenCoverLetterPolarizer}
         onOpenScreeningSolver={onOpenScreeningSolver}
         onOpenCareerCompass={onOpenCareerCompass}
+        onOpenKscGenerator={onOpenKscGenerator}
       />
     );
 
@@ -86,13 +88,14 @@ describe('JobModal Component', () => {
     expect(screen.getByText('Cover Letter Polarizer')).toBeInTheDocument();
     expect(screen.getByText('Screening Questionnaire Solver')).toBeInTheDocument();
     expect(screen.getByText('Career Compass & Matrix')).toBeInTheDocument();
+    expect(screen.getByText('Key Selection Criteria (KSC)')).toBeInTheDocument();
 
-    // Click Screening Questionnaire Solver
-    fireEvent.click(screen.getByText('Screening Questionnaire Solver'));
-    expect(onOpenScreeningSolver).toHaveBeenCalledWith(mockJob);
+    // Click KSC & Capability Generator
+    fireEvent.click(screen.getByText('Key Selection Criteria (KSC)'));
+    expect(onOpenKscGenerator).toHaveBeenCalledWith(mockJob);
 
     // Menu should be closed after selection
-    expect(screen.queryByText('Screening Questionnaire Solver')).not.toBeInTheDocument();
+    expect(screen.queryByText('Key Selection Criteria (KSC)')).not.toBeInTheDocument();
   });
 
   it('closes Intelligence Tools dropdown on outside click and Escape key', () => {

@@ -676,3 +676,38 @@ Eliminates candidate drop-off and ATS questionnaire rejections by automatically 
    - `frontend/src/services/__tests__/screeningSolverService.test.js`: 8 unit tests (8/8 passed) verifying client solver, question categorization, risk level badges, and network offline fallbacks.
    - `frontend/src/components/__tests__/ScreeningSolverModal.test.jsx`: 4 component tests (4/4 passed) verifying UI rendering, tab navigation, custom question submission, and close handlers.
    - Total regression: 230 backend pytest tests passed (100%), 260 frontend vitest tests passed (100%), 0 lint errors, clean Vite production bundle with zero bloat.
+
+---
+
+## Phase 24: Australian Key Selection Criteria (KSC) & Capability Framework Generator Engine ("KSC Capability Matrix Generator")
+
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-14
+
+### Overview
+Automates the synthesis of Australian merit-based Key Selection Criteria (KSC) statements and aligns candidate competencies with public sector capability frameworks (Australian Public Service Integrated Leadership System and Victorian Public Sector Commission Capability Framework):
+1. **Core Problem Formulation (`docs/Resume_Optimization.md`)**:
+   - Australian government, university, health service, statutory authority, and enterprise job applications mandate formal Key Selection Criteria (KSC) responses (typically 250 to 500 words per criterion).
+   - Ambiguous, unstructured, or generic responses that fail to follow the Situation-Action-Outcome (SAO) / STAR model or fail to reflect core public sector capability expectations are algorithmically and manually screened out during merit-based reviews.
+2. **6-Pillar Capability Framework & Taxonomy Mapping (`ksc_generator.py`, `kscService.js`)**:
+   - **Shapes Strategic Direction / Vision & Strategy**: Strategic planning, critical thinking, research, problem-solving, and driving future goals.
+   - **Achieves Results / Delivery & Implementation**: Accountability, project execution, outcome delivery, governance, and resource optimization.
+   - **Cultivates Productive Working Relationships / People & Culture**: Stakeholder engagement, team leadership, cross-agency collaboration, and empathy.
+   - **Exemplifies Personal Drive & Integrity / Ethics & Resilience**: Ethical conduct, resilience under scrutiny, professionalism, and continuous learning.
+   - **Communicates with Influence / Stakeholder Management**: Persuasive communication, negotiation, public consultation, and executive briefing.
+   - **Technical Expertise & Domain Specialization**: Professional/engineering/clinical depth, modern tooling, and regulatory/legal standard compliance.
+3. **Automated KSC Extraction & SAO Statement Synthesis**:
+   - `extract_ksc_from_jd()`: Automatically parses position descriptions and job listings using multi-line anchors and pattern matching to identify numbered and bulleted criteria.
+   - `generate_sao_statement()`: Generates structured, Australian-English-localized responses with distinct **Situation**, **Action**, and **Outcome** sections respecting user-selected word count limits (250, 300, 350, 500 words).
+   - In-memory custom criterion sandbox allowing applicants to generate bespoke responses for any agency criterion.
+4. **Master Merit-Based Assessment Report & 1-Click Export**:
+   - Assembles executive-ready Markdown dossier including Table of Contents, Framework Mapping Table, and formatted responses.
+   - 1-Click clipboard copying, direct PDF generation via `downloadCoverLetterPdf`, and dossier persistence.
+5. **Interactive UI & Cross-Modal Integration (`KscGeneratorModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
+   - 4-tab modal: Extracted Criteria (with accordion views and individual copy), Custom Criteria Sandbox, Capability Framework Matrix, and Master Document & Export.
+   - Accessible via Intelligence Tools dropdown and Action Grid in `JobModal.jsx` and lazily loaded with suspense fallback in `Dashboard.jsx`.
+6. **Full Test & Verification Gauntlet**:
+   - `backend/tests/test_ksc_generator.py`: 10 pytest tests (10/10 passed) verifying numbered/bullet extraction, fallback criteria, capability pillar mapping, SAO statement structure, custom sandbox synthesis, GET `/api/jobs/{id}/ksc`, POST `/api/ksc/generate`, custom word limits, and Australian localization.
+   - `frontend/src/services/__tests__/kscService.test.js`: 7 vitest unit tests (7/7 passed) validating client fallback generator, extraction parser, taxonomy mapping, badge color tokens, word counting, and error recovery.
+   - `frontend/src/components/__tests__/KscGeneratorModal.test.jsx`: 4 component tests (4/4 passed) verifying rendering, tab navigation, custom criteria submission, and copy actions.
+   - Total regression: 240 backend pytest tests passed (100%), 268 frontend vitest tests passed (100%), 0 lint errors, clean Vite production bundle with zero bloat.

@@ -50,6 +50,11 @@ from .screening_solver import (
     solve_screening_question,
     extract_screening_questions_from_jd,
 )
+from .ksc_generator import (
+    generate_ksc_report,
+    extract_ksc_from_jd,
+    generate_sao_statement,
+)
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1585,6 +1590,24 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "report": report.to_dict()})
                 return
 
+            # Phase 24: Australian Key Selection Criteria (KSC) GET Endpoints
+            if path.startswith("/api/jobs/") and path.endswith("/ksc"):
+                job_id = path.removeprefix("/api/jobs/").removesuffix("/ksc")
+                job = app.repository.get_job(job_id)
+                if not job:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job = j
+                            break
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+
+                job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
+                report = generate_ksc_report(job_dict, profile)
+                self.send_json(200, {"success": True, "report": report.to_dict()})
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -3071,6 +3094,22 @@ def make_handler(app: DashboardApp):
                         custom_questions = [custom_questions]
 
                     report = generate_screening_report(job_data, profile, custom_questions=custom_questions)
+                    self.send_json(200, {"success": True, "report": report.to_dict()})
+                    return
+
+                # Phase 24: Australian Key Selection Criteria (KSC) POST Endpoints
+                if path == "/api/ksc/generate":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_data = payload.get("job") or {}
+                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                    profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                    custom_criteria = payload.get("criteria") or payload.get("custom_criteria")
+                    word_limit = int(payload.get("word_limit") or 300)
+                    if isinstance(custom_criteria, str):
+                        custom_criteria = [custom_criteria]
+
+                    report = generate_ksc_report(job_data, profile, custom_criteria=custom_criteria, word_limit=word_limit)
                     self.send_json(200, {"success": True, "report": report.to_dict()})
                     return
 

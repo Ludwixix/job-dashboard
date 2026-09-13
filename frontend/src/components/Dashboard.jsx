@@ -40,6 +40,7 @@ const AtsDiagnosticModal = lazy(() => import('./AtsDiagnosticModal'));
 const LinkedInInboundModal = lazy(() => import('./LinkedInInboundModal'));
 const CoverLetterPolarizerModal = lazy(() => import('./CoverLetterPolarizerModal').then(m => ({ default: m.CoverLetterPolarizerModal })));
 const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m => ({ default: m.ScreeningSolverModal })));
+const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ default: m.KscGeneratorModal })));
 
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
@@ -82,6 +83,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForLinkedInInbound, setSelectedForLinkedInInbound] = useState(null);
   const [selectedForCoverLetterPolarizer, setSelectedForCoverLetterPolarizer] = useState(null);
   const [selectedForScreeningSolver, setSelectedForScreeningSolver] = useState(null);
+  const [selectedForKscGenerator, setSelectedForKscGenerator] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -544,6 +546,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForScreeningSolver;
   }, [selectedForScreeningSolver, jobs]);
 
+  const liveSelectedForKscGenerator = useMemo(() => {
+    if (!selectedForKscGenerator) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForKscGenerator.id)) ||
+      `${j.company}_${j.title}` === `${selectedForKscGenerator.company}_${selectedForKscGenerator.title}`
+    );
+    return match || selectedForKscGenerator;
+  }, [selectedForKscGenerator, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -623,6 +634,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenCoverLetterPolarizer={(j) => setSelectedForCoverLetterPolarizer(j)}
               onOpenScreeningSolver={(j) => setSelectedForScreeningSolver(j)}
               onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
+              onOpenKscGenerator={(j) => setSelectedForKscGenerator(j)}
               profile={activeProfile}
               allJobs={jobs}
             />
@@ -1185,6 +1197,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenCoverLetterPolarizer={(j) => { setSelectedForCoverLetterPolarizer(j); }}
               onOpenScreeningSolver={(j) => { setSelectedForScreeningSolver(j); }}
               onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
+              onOpenKscGenerator={(j) => { setSelectedForKscGenerator(j); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1386,6 +1399,26 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               job={liveSelectedForScreeningSolver}
               onClose={() => setSelectedForScreeningSolver(null)}
               userProfile={activeProfile}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Phase 24: Key Selection Criteria (KSC) Generator Modal */}
+      {liveSelectedForKscGenerator && (
+        <SafeErrorBoundary sectionName="Key Selection Criteria Generator" onClose={() => setSelectedForKscGenerator(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <KscGeneratorModal
+              job={liveSelectedForKscGenerator}
+              onClose={() => setSelectedForKscGenerator(null)}
+              userProfile={activeProfile}
+              onSaveKscToJob={(jobId, text) => {
+                updateJobStatus(jobId, liveSelectedForKscGenerator.status || 'Applied', {
+                  kscStatementText: text,
+                  hasCustomDocs: true,
+                });
+                addToast('KSC capability statement saved to job dossier', 'success');
+              }}
             />
           </Suspense>
         </SafeErrorBoundary>

@@ -38,6 +38,7 @@ const WorkforceAustraliaModal = lazy(() => import('./WorkforceAustraliaModal'));
 const InterviewInfluenceModal = lazy(() => import('./InterviewInfluenceModal'));
 const AtsDiagnosticModal = lazy(() => import('./AtsDiagnosticModal'));
 const LinkedInInboundModal = lazy(() => import('./LinkedInInboundModal'));
+const CoverLetterPolarizerModal = lazy(() => import('./CoverLetterPolarizerModal').then(m => ({ default: m.CoverLetterPolarizerModal })));
 
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
@@ -78,6 +79,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForInfluenceHub, setSelectedForInfluenceHub] = useState(null);
   const [selectedForAtsDiagnostic, setSelectedForAtsDiagnostic] = useState(null);
   const [selectedForLinkedInInbound, setSelectedForLinkedInInbound] = useState(null);
+  const [selectedForCoverLetterPolarizer, setSelectedForCoverLetterPolarizer] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -522,6 +524,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForLinkedInInbound;
   }, [selectedForLinkedInInbound, jobs]);
 
+  const liveSelectedForCoverLetterPolarizer = useMemo(() => {
+    if (!selectedForCoverLetterPolarizer) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForCoverLetterPolarizer.id)) ||
+      `${j.company}_${j.title}` === `${selectedForCoverLetterPolarizer.company}_${selectedForCoverLetterPolarizer.title}`
+    );
+    return match || selectedForCoverLetterPolarizer;
+  }, [selectedForCoverLetterPolarizer, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -598,6 +609,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
               onOpenAtsDiagnostic={(j) => setSelectedForAtsDiagnostic(j)}
               onOpenLinkedInInbound={(j) => setSelectedForLinkedInInbound(j)}
+              onOpenCoverLetterPolarizer={(j) => setSelectedForCoverLetterPolarizer(j)}
               profile={activeProfile}
               allJobs={jobs}
             />
@@ -1157,6 +1169,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenInfluenceHub={(j) => { setSelectedForInfluenceHub(j); }}
               onOpenAtsDiagnostic={(j) => { setSelectedForAtsDiagnostic(j); }}
               onOpenLinkedInInbound={(j) => { setSelectedForLinkedInInbound(j); }}
+              onOpenCoverLetterPolarizer={(j) => { setSelectedForCoverLetterPolarizer(j); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1325,6 +1338,26 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               job={liveSelectedForLinkedInInbound}
               isOpen={Boolean(liveSelectedForLinkedInInbound)}
               onClose={() => setSelectedForLinkedInInbound(null)}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Phase 22: Cover Letter Swappability Analyzer & Anti-Template Polarizer Modal */}
+      {liveSelectedForCoverLetterPolarizer && (
+        <SafeErrorBoundary sectionName="Cover Letter Polarizer" onClose={() => setSelectedForCoverLetterPolarizer(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <CoverLetterPolarizerModal
+              job={liveSelectedForCoverLetterPolarizer}
+              onClose={() => setSelectedForCoverLetterPolarizer(null)}
+              onSaveCoverLetter={(jobId, text) => {
+                updateJobStatus(jobId, liveSelectedForCoverLetterPolarizer.status || 'Applied', {
+                  coverLetterText: text,
+                  hasCustomDocs: true,
+                });
+                addToast('Polarized cover letter saved to job card', 'success');
+              }}
+              userProfile={activeProfile}
             />
           </Suspense>
         </SafeErrorBoundary>

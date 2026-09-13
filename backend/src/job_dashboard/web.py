@@ -41,6 +41,10 @@ from .inbound_sourcing import (
     generate_boolean_optimized_headlines,
     generate_keyword_about_index,
 )
+from .cover_letter_polarizer import (
+    audit_cover_letter,
+    generate_polarized_variants,
+)
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1514,6 +1518,50 @@ def make_handler(app: DashboardApp):
                 })
                 return
 
+            # Phase 22: Cover Letter Polarizer & Swappability GET Endpoints
+            if path.startswith("/api/jobs/") and path.endswith("/cover-letter-audit"):
+                job_id = path.removeprefix("/api/jobs/").removesuffix("/cover-letter-audit")
+                job = app.repository.get_job(job_id)
+                if not job:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job = j
+                            break
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                
+                # Check for existing custom cover letter doc
+                cover_letter_text = ""
+                if user_id and job_id:
+                    existing_doc = app.repository.get_generated_document(user_id, job_id, "cover_letter")
+                    if existing_doc and isinstance(existing_doc, dict):
+                        cover_letter_text = existing_doc.get("content", "")
+
+                company = (job.get("company") if isinstance(job, dict) else getattr(job, "company", "")) or "Target Employer"
+                title = (job.get("title") if isinstance(job, dict) else getattr(job, "title", "")) or "Engineering Role"
+                desc = (job.get("description") if isinstance(job, dict) else getattr(job, "description", "")) or (job.get("notes") if isinstance(job, dict) else getattr(job, "notes", "")) or ""
+
+                audit = audit_cover_letter(
+                    cover_letter_text=cover_letter_text,
+                    company=company,
+                    job_title=title,
+                    job_description=desc,
+                )
+                variants = generate_polarized_variants(
+                    {"company": company, "title": title, "description": desc},
+                    profile,
+                )
+
+                self.send_json(200, {
+                    "success": True,
+                    "audit": audit.to_dict(),
+                    "variants": variants,
+                    "company": company,
+                    "title": title,
+                })
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -1887,6 +1935,7 @@ def make_handler(app: DashboardApp):
         def do_POST(self):
             parsed = urlparse(self.path)
             path = parsed.path
+            query_params = parse_qs(parsed.query)
             try:
                 if path.startswith("/api/jobs/") and path.endswith("/compare"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/compare")
@@ -2957,6 +3006,34 @@ def make_handler(app: DashboardApp):
                         "headlines": headlines,
                         "about_index": about_index
                     })
+                    return
+
+                # Phase 22: Cover Letter Polarizer & Swappability POST Endpoints
+                if path == "/api/cover-letter/audit":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    text = payload.get("cover_letter") or payload.get("text") or ""
+                    company = payload.get("company") or ""
+                    job_title = payload.get("job_title") or payload.get("title") or ""
+                    job_description = payload.get("job_description") or payload.get("description") or ""
+
+                    audit = audit_cover_letter(
+                        cover_letter_text=text,
+                        company=company,
+                        job_title=job_title,
+                        job_description=job_description,
+                    )
+                    self.send_json(200, {"success": True, "audit": audit.to_dict()})
+                    return
+
+                if path == "/api/cover-letter/polarize":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_data = payload.get("job") or {}
+                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                    profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                    variants = generate_polarized_variants(job_data, profile)
+                    self.send_json(200, {"success": True, "variants": variants})
                     return
 
                 # Phase 16: Network CRM POST Endpoints

@@ -133,3 +133,18 @@ When an exception, test failure, or build issue occurs:
 - **Procedural Resolution**:
   - Always import `getBackendApiBase` from `apiConfig.js` across all API service layers.
 
+#### 5. `do_POST` Query Parameter Initialization in Base HTTP Handlers
+- **Symptoms**:
+  - `NameError: name 'query_params' is not defined` when processing `POST` requests in `web.py` handlers that resolve query-string user authentication (`user_id = query_params.get('user_id', ...)`).
+- **Root Cause**:
+  - `query_params = parse_qs(parsed.query)` was defined in `do_GET` upon request parsing, but omitted in `do_POST` before routing.
+- **Procedural Resolution**:
+  - Unconditionally initialize `query_params = parse_qs(parsed.query)` immediately following `parsed = urlparse(self.path)` at the top of `do_POST()`.
+
+#### 6. Dynamic Async Modal Testing with Initial Effect Fetches
+- **Symptoms**:
+  - `TestingLibraryElementError: Unable to find an element with text...` when unit testing modals that asynchronously fetch initial data on mount (`fetchJobCoverLetterAudit`).
+- **Root Cause**:
+  - Component renders in loading state while waiting for the resolved Promise; synchronously querying tab elements or buttons causes an immediate test failure.
+- **Procedural Resolution**:
+  - Always await an asynchronous heading or element using `await screen.findByText(...)` before testing subsequent user interactions or tab switching.

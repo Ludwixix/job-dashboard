@@ -5,7 +5,7 @@ import {
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
-  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search
+  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search, Flame
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -21,7 +21,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -619,6 +619,20 @@ ${candidatePhone}`;
                     <div>
                       <div className="font-bold">LinkedIn Inbound Radar</div>
                       <div className="text-[10px] text-slate-400 font-sans">Recruiter Boolean indexing &amp; headlines</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenCoverLetterPolarizer && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenCoverLetterPolarizer(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-rose-950/60 text-slate-200 hover:text-rose-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Flame size={14} className="text-rose-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Cover Letter Polarizer</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Swappability audit &amp; anti-template rewrites</div>
                     </div>
                   </button>
                 )}
@@ -1939,6 +1953,20 @@ ${data.pipeline_result?.cover_text || ''}`;
                       </div>
                       <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
                         Recruiter Boolean indexing &amp; headlines.
+                      </p>
+                    </button>
+                  )}
+
+                  {onOpenCoverLetterPolarizer && (
+                    <button
+                      onClick={() => { onClose(); onOpenCoverLetterPolarizer(job); }}
+                      className="p-3 rounded-2xl bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-rose-950 group-hover:text-rose-700">
+                        <Flame size={14} className="text-rose-600" /> CL POLARIZER
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Swappability audit &amp; anti-template rewrites.
                       </p>
                     </button>
                   )}

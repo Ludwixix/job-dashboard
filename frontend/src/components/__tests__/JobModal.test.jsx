@@ -53,6 +53,8 @@ describe('JobModal Component', () => {
     const onOpenExecutiveDossier = vi.fn();
     const onOpenOfferHub = vi.fn();
 
+    const onOpenCoverLetterPolarizer = vi.fn();
+
     render(
       <JobModal
         job={mockJob}
@@ -61,6 +63,7 @@ describe('JobModal Component', () => {
         onOpenRecruiterCrm={onOpenRecruiterCrm}
         onOpenExecutiveDossier={onOpenExecutiveDossier}
         onOpenOfferHub={onOpenOfferHub}
+        onOpenCoverLetterPolarizer={onOpenCoverLetterPolarizer}
       />
     );
 
@@ -71,18 +74,19 @@ describe('JobModal Component', () => {
     const intelBtn = screen.getByRole('button', { name: /INTELLIGENCE TOOLS/i });
     fireEvent.click(intelBtn);
 
-    // Dropdown open: all 4 items visible
+    // Dropdown open: items visible
     expect(screen.getByText('Funnel Intelligence')).toBeInTheDocument();
     expect(screen.getByText('Recruiter CRM')).toBeInTheDocument();
     expect(screen.getByText('Executive Dossier')).toBeInTheDocument();
     expect(screen.getByText('Offer Action Hub')).toBeInTheDocument();
+    expect(screen.getByText('Cover Letter Polarizer')).toBeInTheDocument();
 
-    // Click Funnel Intelligence
-    fireEvent.click(screen.getByText('Funnel Intelligence'));
-    expect(onOpenFunnelIntel).toHaveBeenCalledWith(mockJob);
+    // Click Cover Letter Polarizer
+    fireEvent.click(screen.getByText('Cover Letter Polarizer'));
+    expect(onOpenCoverLetterPolarizer).toHaveBeenCalledWith(mockJob);
 
     // Menu should be closed after selection
-    expect(screen.queryByText('Funnel Intelligence')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cover Letter Polarizer')).not.toBeInTheDocument();
   });
 
   it('closes Intelligence Tools dropdown on outside click and Escape key', () => {

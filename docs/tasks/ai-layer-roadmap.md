@@ -602,8 +602,35 @@ Transforms candidate public profiles from static resumes into query-responsive s
    - 4-tab interactive modal featuring live Boolean query tester sandbox, headline generator, about indexer, and recruiter query arsenal.
    - 1-click clipboard copying and direct integration with `JobModal.jsx` and `Dashboard.jsx`.
 
+---
 
+## Phase 22: Cover Letter Swappability Analyzer & Anti-Template Polarizer Engine ("Cover Letter Polarizer")
 
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-14
 
-
-
+### Overview
+Transforms generic AI cover letters into high-conviction, company-specific outreach documents that cannot be swapped with a competitor:
+1. **Swappability Risk Index & Company Entity Extraction (`cover_letter_polarizer.py`, `coverLetterPolarizerService.js`)**:
+   - Calculates Swappability Risk (0–100%) measuring genericness and lack of company-specific grounding.
+   - Audits whether the cover letter mentions target company name, specific domain keywords, and unique technical stack elements.
+2. **Canned AI Opener & Corporate Fluff Eradication Engine**:
+   - Detects 12 canned ChatGPT/AI opener patterns (*"I am writing to express my enthusiastic interest in..."*, *"As a passionate and results-driven..."*).
+   - Flags 15 corporate fluff patterns with drop-in high-conviction replacements (*"fast-paced environment"*, *"wear many hats"*, *"hit the ground running"*).
+3. **3-Paragraph High-Yield Structural Blueprint**:
+   - **Paragraph 1 (The Specific Hook)**: Company/domain context, active challenges, and why this specific team.
+   - **Paragraph 2 (The Quantified Proof Story)**: Metric-backed achievement solving an analogous problem (Action + Metric + Impact).
+   - **Paragraph 3 (The Low-Friction Close)**: Consultative, value-first conversation starter avoiding submissive pleas (*"Please consider my attached resume"*).
+4. **Polarized Variant Synthesizer**:
+   - **High-Conviction Disruptor**: Bold, impact-first, highlighting velocity and commercial leverage.
+   - **Direct Systems Architect**: Pragmatic, engineering-driven, focusing on scalability and reliability.
+   - **Cultural Rebel**: Anti-corporate, candid, mission-aligned, prioritizing radical focus and ownership.
+5. **Interactive UI & Real-Time Anti-Generic Editor (`CoverLetterPolarizerModal.jsx`)**:
+   - 4 tabs: Swappability & Clichés, 3-Paragraph Blueprint, Polarizing Rewrites, and Live Anti-Generic Editor.
+   - Real-time client-side scoring updating Swappability score and fluff detections as the user types.
+   - One-click copy, PDF export via `downloadCoverLetterPdf`, and direct persistence to job card via `onSaveCoverLetter`.
+6. **Full Test & Production Suite Verification**:
+   - `backend/tests/test_cover_letter_polarizer.py`: 8 pytest tests covering audits, swappability index, canned opener traps, structure validation, fluff replacements, variants, empty text handling, and web API endpoints.
+   - `frontend/src/services/__tests__/coverLetterPolarizerService.test.js`: 7 vitest unit tests validating client engine mirroring and fallback robustness.
+   - `frontend/src/components/__tests__/CoverLetterPolarizerModal.test.jsx`: 4 component tests validating modal rendering, tab navigation, copy/save callbacks.
+   - Full regression: 220 backend tests passed, 248 frontend tests passed, 0 lint errors, clean Vite production build.

@@ -445,3 +445,4 @@ def generate_seek_pass_report(job: dict[str, Any], profile: dict[str, Any]) -> d
         "screening_responses": responses,
         "dossier_markdown": dossier_markdown,
     }
+

@@ -182,3 +182,4 @@ def test_seek_pass_api_endpoints():
     assert report is not None
     assert report["job_id"] == "job_test_99"
     assert report["readiness_score"] == 100
+

@@ -112,3 +112,4 @@ describe('seekPassService', () => {
     expect(report.readiness_score).toBe(95);
   });
 });
+

@@ -109,3 +109,4 @@ describe('SeekPassModal', () => {
     expect(handleClose).toHaveBeenCalledTimes(3);
   });
 });
+

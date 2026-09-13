@@ -410,3 +410,4 @@ export const SeekPassModal = ({
     </div>
   );
 };
+

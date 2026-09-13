@@ -22,7 +22,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, onOpenScreeningSolver, onOpenKscGenerator, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, onOpenScreeningSolver, onOpenKscGenerator, onOpenSeekPass, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -676,6 +676,20 @@ ${candidatePhone}`;
                     <div>
                       <div className="font-bold">Key Selection Criteria (KSC)</div>
                       <div className="text-[10px] text-slate-400 font-sans">APS/VPS SAO capability statements</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenSeekPass && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenSeekPass(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950/60 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">SEEK Pass &amp; Credentials</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Statutory pre-qualification radar</div>
                     </div>
                   </button>
                 )}
@@ -2052,6 +2066,20 @@ ${data.pipeline_result?.cover_text || ''}`;
                       </div>
                       <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
                         APS &amp; VPS capability criteria responses.
+                      </p>
+                    </button>
+                  )}
+
+                  {onOpenSeekPass && (
+                    <button
+                      onClick={() => { onClose(); onOpenSeekPass(job); }}
+                      className="p-3 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
+                        <ShieldCheck size={14} className="text-emerald-600" /> SEEK PASS AUDIT
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Pre-qualification knockout radar.
                       </p>
                     </button>
                   )}

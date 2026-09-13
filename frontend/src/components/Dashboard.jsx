@@ -41,6 +41,7 @@ const LinkedInInboundModal = lazy(() => import('./LinkedInInboundModal'));
 const CoverLetterPolarizerModal = lazy(() => import('./CoverLetterPolarizerModal').then(m => ({ default: m.CoverLetterPolarizerModal })));
 const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m => ({ default: m.ScreeningSolverModal })));
 const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ default: m.KscGeneratorModal })));
+const SeekPassModal = lazy(() => import('./SeekPassModal').then(m => ({ default: m.SeekPassModal })));
 
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
@@ -84,6 +85,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForCoverLetterPolarizer, setSelectedForCoverLetterPolarizer] = useState(null);
   const [selectedForScreeningSolver, setSelectedForScreeningSolver] = useState(null);
   const [selectedForKscGenerator, setSelectedForKscGenerator] = useState(null);
+  const [selectedForSeekPass, setSelectedForSeekPass] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -555,6 +557,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForKscGenerator;
   }, [selectedForKscGenerator, jobs]);
 
+  const liveSelectedForSeekPass = useMemo(() => {
+    if (!selectedForSeekPass) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForSeekPass.id)) ||
+      `${j.company}_${j.title}` === `${selectedForSeekPass.company}_${selectedForSeekPass.title}`
+    );
+    return match || selectedForSeekPass;
+  }, [selectedForSeekPass, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -635,6 +646,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenScreeningSolver={(j) => setSelectedForScreeningSolver(j)}
               onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
               onOpenKscGenerator={(j) => setSelectedForKscGenerator(j)}
+              onOpenSeekPass={(j) => setSelectedForSeekPass(j)}
               profile={activeProfile}
               allJobs={jobs}
             />
@@ -1198,6 +1210,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenScreeningSolver={(j) => { setSelectedForScreeningSolver(j); }}
               onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
               onOpenKscGenerator={(j) => { setSelectedForKscGenerator(j); }}
+              onOpenSeekPass={(j) => { setSelectedForSeekPass(j); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1419,6 +1432,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 });
                 addToast('KSC capability statement saved to job dossier', 'success');
               }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Phase 25: SEEK Pass & Verified Credentials Pre-Qualification Modal */}
+      {liveSelectedForSeekPass && (
+        <SafeErrorBoundary sectionName="SEEK Pass Pre-Qualification Auditor" onClose={() => setSelectedForSeekPass(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <SeekPassModal
+              job={liveSelectedForSeekPass}
+              onClose={() => setSelectedForSeekPass(null)}
+              userProfile={activeProfile}
             />
           </Suspense>
         </SafeErrorBoundary>

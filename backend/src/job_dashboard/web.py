@@ -55,6 +55,13 @@ from .ksc_generator import (
     extract_ksc_from_jd,
     generate_sao_statement,
 )
+from .seek_pass_auditor import (
+    generate_seek_pass_report,
+    extract_seek_pass_requirements,
+    audit_candidate_credentials,
+    calculate_readiness_score,
+    generate_seek_pass_responses,
+)
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1238,9 +1245,38 @@ def make_handler(app: DashboardApp):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json" if path == "/health" else "text/html; charset=utf-8")
                 self._send_cors_headers()
-                self.end_headers()
             else:
                 self.do_GET()
+
+        def _get_job_seek_pass_report(self, job_id: str, query_params: dict[str, list[str]] | None = None) -> dict[str, Any] | None:
+            job = None
+            repo = getattr(app, "repository", None) or (app if (hasattr(app, "get_job") or hasattr(app, "get_job_by_id")) else None) or getattr(self, "repository", None)
+            if repo:
+                if hasattr(repo, "get_job"):
+                    job = repo.get_job(job_id)
+                if not job and hasattr(repo, "get_job_by_id"):
+                    job = repo.get_job_by_id(job_id)
+            if not job and hasattr(app, "dashboard") and hasattr(app.dashboard, "jobs"):
+                for j in app.dashboard.jobs:
+                    if getattr(j, "id", "") == job_id:
+                        job = j
+                        break
+            if not job:
+                return None
+
+            user_id = resolve_user_id(self, query_params or {}) if hasattr(self, "headers") else None
+            profile = None
+            if repo and user_id and hasattr(repo, "get_user_profile"):
+                profile = repo.get_user_profile(user_id)
+            if not profile and hasattr(app, "dashboard") and hasattr(app.dashboard, "profile"):
+                profile = app.dashboard.profile
+            if not profile and repo and hasattr(repo, "get_profile"):
+                profile = repo.get_profile()
+            profile = profile or {}
+
+            job_dict = dict(job) if isinstance(job, dict) else (dict(job.__dict__) if hasattr(job, "__dict__") else {})
+            job_dict.setdefault("id", job_id)
+            return generate_seek_pass_report(job_dict, profile)
 
         def do_GET(self):
             parsed = urlparse(self.path)
@@ -1688,6 +1724,16 @@ def make_handler(app: DashboardApp):
                 job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
                 report = generate_ksc_report(job_dict, profile)
                 self.send_json(200, {"success": True, "report": report.to_dict()})
+                return
+
+            # Phase 25: SEEK Pass & Verified Credentials Pre-Qualification GET Endpoint
+            if path.startswith("/api/jobs/") and path.endswith("/seek-pass"):
+                job_id = path.removeprefix("/api/jobs/").removesuffix("/seek-pass")
+                report = self._get_job_seek_pass_report(job_id, query_params)
+                if not report:
+                    self.send_json(404, {"success": False, "error": f"Job {job_id} not found"})
+                    return
+                self.send_json(200, {"success": True, "report": report})
                 return
 
             if path == "/api/documents":
@@ -3193,6 +3239,17 @@ def make_handler(app: DashboardApp):
 
                     report = generate_ksc_report(job_data, profile, custom_criteria=custom_criteria, word_limit=word_limit)
                     self.send_json(200, {"success": True, "report": report.to_dict()})
+                    return
+
+                # Phase 25: SEEK Pass & Verified Credentials Pre-Qualification POST Endpoints
+                if path in ("/api/seek-pass/audit", "/api/seek-pass/audit/"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    job_data = payload.get("job") or {}
+                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                    profile = (app.repository.get_user_profile(user_id) if (user_id and hasattr(app, "repository")) else None) or payload.get("profile") or getattr(app.dashboard, "profile", {})
+                    report = generate_seek_pass_report(job_data, profile or {})
+                    self.send_json(200, {"success": True, "report": report})
                     return
 
                 # Phase 16: Network CRM POST Endpoints

@@ -711,3 +711,39 @@ Automates the synthesis of Australian merit-based Key Selection Criteria (KSC) s
    - `frontend/src/services/__tests__/kscService.test.js`: 7 vitest unit tests (7/7 passed) validating client fallback generator, extraction parser, taxonomy mapping, badge color tokens, word counting, and error recovery.
    - `frontend/src/components/__tests__/KscGeneratorModal.test.jsx`: 4 component tests (4/4 passed) verifying rendering, tab navigation, custom criteria submission, and copy actions.
    - Total regression: 240 backend pytest tests passed (100%), 268 frontend vitest tests passed (100%), 0 lint errors, clean Vite production bundle with zero bloat.
+
+---
+
+## Phase 25: SEEK Pass & Verified Credentials Pre-Qualification Auditor Engine ("SEEK Pass Readiness Engine")
+
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-14
+
+### Overview
+Eliminates instant algorithmic disqualifications on SEEK, JobAdder, and PageUp by pre-auditing Australian mandatory credentials, identifying knockout risks, calculating SEEK Pass Readiness Scores, and synthesizing verified pre-screening declarations:
+1. **Core Problem Formulation (`docs/Resume_Optimization.md`)**:
+   - SEEK is the dominant employment marketplace in Australia, utilizing AI models trained on millions of shortlisting decisions. Employers mandate pre-screening questions and verified credentials via SEEK Pass.
+   - Candidates who lack verified credentials or answer ambiguously are automatically filtered into employer "Not Suitable" buckets before a hiring manager reviews the profile.
+2. **8-Domain Statutory & Regulated Credential Taxonomy (`seek_pass_auditor.py`, `seekPassService.js`)**:
+   - **Australian Work Rights & Citizenship**: VEVO verification, citizenship, permanent residency, full unrestricted working rights.
+   - **AGSVA Australian Government Security Clearance**: Baseline, Negative Vetting 1 (NV1), Negative Vetting 2 (NV2), Positive Vetting (PV).
+   - **National Police Check (Criminal Record)**: ACIC and AFAC accredited background clearances.
+   - **Working with Children Check (WWCC / Blue Card / WWVP)**: State statutory child-related work clearances (VIC, NSW, QLD, WA, SA, TAS).
+   - **NDIS Worker Screening Check**: NDIS Quality and Safeguards Commission clearances.
+   - **Occupational & Construction Licences**: SafeWork White Card (CPCCWHS1001), Drivers Licence (Class C / Heavy Vehicle), Forklift (LF/LO), First Aid (HLTAID011).
+   - **AHPRA Professional Registration**: Medical, Nursing, Pharmacy, and Allied Health statutory boards.
+   - **Accounting & Finance Accreditation**: CPA Australia, CA ANZ, IPA, FASEA/ASIC registers.
+3. **Candidate Credential Audit & Algorithmic Knockout Radar**:
+   - Compares required credentials against candidate profile (`credentials`, `clearances`, `work_rights`, `licences`).
+   - Classifies each requirement into status: `VERIFIED`, `ACTION_REQUIRED`, or `KNOCKOUT_RISK`.
+   - Computes weighted **SEEK Pass Readiness Index (0–100%)** and Knockout Risk Level (`PASS_READY`, `MEDIUM_RISK`, `HIGH_RISK_KNOCKOUT`, `EXEMPT`).
+4. **Pre-Screening Questionnaire Response Synthesis**:
+   - Synthesizes pre-formulated, legally compliant responses tailored for 1-click copy into SEEK Pass or employer application questionnaires.
+5. **Interactive UI & Cross-Modal Integration (`SeekPassModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
+   - 4-tab modal: Credential Audit & Knockout Radar, Verification Action Plan (with official registry links), SEEK Pass Pre-Screening Responses, and Master Dossier & Export.
+   - Wired into `JobModal.jsx` (Intelligence Tools menu + Tab 4 Action Grid) and lazily loaded with Suspense fallback in `Dashboard.jsx`.
+6. **Full Test & Verification Gauntlet**:
+   - `backend/tests/test_seek_pass_auditor.py`: 7 pytest tests (7/7 passed) verifying domain extraction, profile auditing, readiness scoring, knockout detection, questionnaire synthesis, dossier generation, and API endpoints (`GET /api/jobs/{id}/seek-pass`, `POST /api/seek-pass/audit`).
+   - `frontend/src/services/__tests__/seekPassService.test.js`: 7 vitest unit tests (7/7 passed) validating client engine mirroring, domain taxonomy, risk badges, and network offline resilience.
+   - `frontend/src/components/__tests__/SeekPassModal.test.jsx`: 4 component tests (4/4 passed) verifying UI rendering, tab navigation, copy to clipboard, and modal dismissal.
+   - Total regression: 253 backend pytest tests passed (100%), 282 frontend vitest tests passed (100%), 0 lint errors, clean Vite production build with 23.68 kB code-split chunk.

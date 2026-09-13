@@ -94,3 +94,4 @@ describe('CyberpunkAmbientMode Component', () => {
     expect(onReturn).toHaveBeenCalledTimes(2);
   });
 });
+

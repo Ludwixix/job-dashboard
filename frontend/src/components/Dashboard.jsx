@@ -46,6 +46,8 @@ import { getAuthenticatedUser } from '../services/googleAuthService';
 import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
 import { fetchCadenceRadar } from '../services/recruiterCrmService';
+import { recordJobInteraction, evolveProfileFromLearnedContext } from '../services/profileLearningEngine';
+
 
 import { fetchJobsForProfile } from '../services/dataService';
 import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
@@ -214,6 +216,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         };
 
         updateJobStatus(jobId, 'Package Prepared / To Submit', appPayload);
+        // Train Profile Learning Engine with synthesized application
+        try {
+          recordJobInteraction(job, 'generated_docs', activeProfile);
+          const evolved = evolveProfileFromLearnedContext(activeProfile, { threshold: 3 });
+          if (evolved && evolved.coreSkills?.length > (activeProfile.coreSkills?.length || 0)) {
+            setActiveProfile(evolved);
+            addToast(`Profile evolved! Learned: ${evolved.coreSkills.slice(-1)[0]}`, 'info');
+          }
+        } catch (e) {
+          console.warn('Profile learning note:', e);
+        }
+
 
         // Auto append or update to Google Sheet if user has an active spreadsheet
         if (currentUser?.accessToken && currentUser?.spreadsheetId) {

@@ -72,9 +72,11 @@ def test_fetch_seek_job_description_http_mocked():
     window.SEEK_REDUX_DATA = {"jobdetails":{"result":{"job":{"content":"<p>Detailed Cloud Engineer duties and salary benefits.</p>"}}}};
     </script>
     """
-    with patch("urllib.request.OpenerDirector.open") as mock_open:
+    with patch("urllib.request.urlopen") as mock_urlopen, \
+         patch("urllib.request.OpenerDirector.open") as mock_open:
         mock_response = MagicMock()
         mock_response.read.return_value = sample_html.encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
         mock_open.return_value.__enter__.return_value = mock_response
 
         desc = fetch_seek_job_description("https://www.seek.com.au/job/94061629", allow_browser_fallback=False)

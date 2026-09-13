@@ -8,6 +8,8 @@ import {
   ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
   ChevronFirst, ChevronLast, ArrowDown, Wrench, Briefcase,
   ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
+  Target,
+
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
   Train, Car, Bike, MoreVertical
 } from 'lucide-react';
@@ -43,6 +45,8 @@ import {
   removeCustomRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
+import { recordJobInteraction, generateSmartJobSuggestions } from '../services/profileLearningEngine';
+
 import { EmptyState } from './ui/EmptyState';
 
 import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
@@ -186,7 +190,16 @@ export const JobSeeker = ({
 
   const toggleStar = (jobId, e) => {
     if (e) e.stopPropagation();
-    setStarredJobIds(prev => prev.includes(jobId) ? prev.filter(id => id !== jobId) : [...prev, jobId]);
+    const isNowStarred = !starredJobIds.includes(jobId);
+    setStarredJobIds(prev => isNowStarred ? [...prev, jobId] : prev.filter(id => id !== jobId));
+    if (isNowStarred) {
+      const targetJob = jobs.find(j => (j.id || `${j.company}_${j.title}`) === jobId);
+      if (targetJob) {
+        try {
+          recordJobInteraction(targetJob, 'starred', currentProfile);
+        } catch {}
+      }
+    }
   };
   const [docsReadyFilter, setDocsReadyFilter] = useState(false);
   const [minSalaryFilter, setMinSalaryFilter] = useState('All');
@@ -402,6 +415,9 @@ export const JobSeeker = ({
   const handlePromote = (job) => {
     const updated = promoteSimilarJobs(job);
     setUserPrefs(updated);
+    try {
+      recordJobInteraction(job, 'promoted', currentProfile);
+    } catch {}
     setPrefToast(`👍 Promoted! Algorithm prioritizing roles like "${job.title}" & ${job.company}`);
     setTimeout(() => setPrefToast(null), 4000);
   };
@@ -448,6 +464,8 @@ export const JobSeeker = ({
       Custom: completeJobs.filter(j => j.isCustom || String(j.id || '').startsWith('custom_')).length,
       Starred: completeJobs.filter(j => starredJobIds.includes(j.id || `${j.company}_${j.title}`)).length,
       TopFit: 0,
+      SmartSuggestions: completeJobs.filter(j => (j.score || 0) >= 70).length,
+
       QuickApply: 0,
       ReadyForSubmission: readyToSubmitCount,
       'Healthcare & Medical': 0,
@@ -515,6 +533,9 @@ export const JobSeeker = ({
       if (activeStreamTab === 'Custom') {
         matchesStream = Boolean(job.isCustom || String(job.id || '').startsWith('custom_'));
       } else if (activeStreamTab === 'TopFit') {
+      } else if (activeStreamTab === 'SmartSuggestions') {
+        matchesStream = (job.score || 0) >= 70 || Boolean(job.learnedMatch);
+
         matchesStream = (job.score || 0) >= 85;
       } else if (activeStreamTab === 'Starred') {
         matchesStream = starredJobIds.includes(job.id);
@@ -761,6 +782,8 @@ export const JobSeeker = ({
 
   const STREAM_TAB_DEFINITIONS = [
     { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
+    { id: 'SmartSuggestions', name: '🎯 SMART SUGGESTIONS', icon: Target, color: 'emerald', highlight: true },
+
     { id: 'Custom', name: '✨ CUSTOM JOBS', icon: Sparkles, color: 'purple', highlight: true },
     { id: 'Starred', name: '⭐ SAVED', icon: Star, color: 'amber', highlight: true },
     { id: 'TopFit', name: '🔥 TOP MATCHES', icon: Flame, color: 'rose', highlight: true },

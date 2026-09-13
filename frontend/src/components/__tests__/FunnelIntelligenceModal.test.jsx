@@ -70,7 +70,7 @@ describe('FunnelIntelligenceModal', () => {
     expect(screen.getByText(/Senior Cloud Engineer/i)).toBeInTheDocument();
     expect(screen.getByText(/Atlassian/i)).toBeInTheDocument();
 
-    const viewButton = screen.getByRole('button', { name: /View Job/i });
+    const viewButton = screen.getAllByRole('button', { name: /View Job/i })[0];
     fireEvent.click(viewButton);
     expect(onSelectJob).toHaveBeenCalled();
   });

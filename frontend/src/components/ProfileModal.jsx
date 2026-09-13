@@ -18,6 +18,8 @@ import {
 } from '../services/profileService';
 import { getActiveApiKey, getActiveModel, setActiveApiKey } from '../services/generationService';
 import { PROVIDERS, getLlmConfig, saveLlmConfig, testLlmConnection } from '../services/llmConfig';
+import { getLearnedContext, evolveProfileFromLearnedContext } from '../services/profileLearningEngine';
+
 import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
 import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
 
@@ -417,13 +419,23 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
             2. SYNTHESIZED CHARACTERISTICS & TRAITS
           </button>
           <button
+            onClick={() => setActiveTab('learning')}
+            className={`py-3 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
+              activeTab === 'learning' ? 'border-amber-400 text-amber-300' : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Brain size={14} className="text-amber-400" />
+            3. ADAPTIVE LEARNING & CONTEXT
+          </button>
+
+          <button
             onClick={() => setActiveTab('api')}
             className={`py-3 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
               activeTab === 'api' ? 'border-indigo-400 text-indigo-300' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <ShieldCheck size={14} className="text-indigo-400" />
-            3. API & ENGINE SETTINGS
+            4. API & ENGINE SETTINGS
           </button>
         </div>
 
@@ -935,6 +947,94 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
               </div>
             </div>
           )}
+          {/* TAB 3: ADAPTIVE LEARNING & CONTEXT */}
+          {activeTab === 'learning' && (
+            <div className="space-y-6 font-mono text-xs max-w-2xl mx-auto">
+              <div className="p-5 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-4">
+                <div className="text-amber-300 font-extrabold flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Brain size={18} className="text-amber-400" />
+                    Adaptive Profile Learning Engine
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black uppercase">
+                    Continuous Evolution
+                  </span>
+                </div>
+
+                <p className="text-slate-300 text-xs font-sans leading-relaxed">
+                  As you interact with jobs, apply, star roles, or generate application materials, CAREER.AGENT extracts recurring technical skills, certifications, and target scope to incrementally build your profile.
+                </p>
+
+                {(() => {
+                  const context = getLearnedContext(formData.id);
+                  const discovered = context.discoveredSkills || [];
+                  const existingSet = new Set((formData.coreSkills || []).map(s => s.toLowerCase()));
+                  const freshSkills = discovered.filter(s => !existingSet.has(s.toLowerCase()));
+
+                  return (
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 text-[10px] block">INTERACTIONS</span>
+                          <span className="text-lg font-black text-white">{context.totalInteractions || 0}</span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 text-[10px] block">DISCOVERED</span>
+                          <span className="text-lg font-black text-amber-400">{freshSkills.length}</span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 text-[10px] block">TITLES</span>
+                          <span className="text-lg font-black text-indigo-400">{context.appliedTitles?.length || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* Fresh Discovered Skills */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-slate-300 font-bold uppercase text-[11px]">
+                            Discovered Competencies
+                          </span>
+                          {freshSkills.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const evolved = evolveProfileFromLearnedContext(formData, { threshold: 1 });
+                                if (evolved) {
+                                  setFormData(evolved);
+                                  if (onProfileSaved) onProfileSaved(evolved);
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-black transition-colors cursor-pointer"
+                            >
+                              + Merge All ({freshSkills.length})
+                            </button>
+                          )}
+                        </div>
+
+                        {freshSkills.length === 0 ? (
+                          <div className="p-4 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-slate-500 text-center italic">
+                            No unmerged skills detected yet. Star or apply for jobs to train your profile!
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {freshSkills.map((skill, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold"
+                              >
+                                <span>{skill}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
 
           {/* TAB 3: API SETTINGS */}
           {activeTab === 'api' && (

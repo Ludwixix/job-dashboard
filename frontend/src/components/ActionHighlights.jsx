@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles, Scale, Building2 } from 'lucide-react';
-import { PsychologyDecoderModal } from './PsychologyDecoderModal';
+import { SafeErrorBoundary } from './SafeErrorBoundary';
+import { ModalSkeleton } from './SkeletonLoaders';
+
+const PsychologyDecoderModal = lazy(() => import('./PsychologyDecoderModal').then(m => ({ default: m.PsychologyDecoderModal })));
 
 export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onOpenOfferHub, onOpenExecutiveDossier, onSelectJob, onJobStatusUpdate }) => {
   const [psychJob, setPsychJob] = React.useState(null);
@@ -194,15 +197,19 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
       </div>
     </div>
     {psychJob && (
-      <PsychologyDecoderModal 
-        job={psychJob} 
-        onClose={() => setPsychJob(null)} 
-        onSaveInsights={(id, insights) => {
-          if (onJobStatusUpdate) {
-            onJobStatusUpdate(id, psychJob.status || 'Discovered', { psychologyInsights: insights });
-          }
-        }}
-      />
+      <SafeErrorBoundary sectionName="Psychology Decoder" onClose={() => setPsychJob(null)}>
+        <Suspense fallback={<ModalSkeleton />}>
+          <PsychologyDecoderModal 
+            job={psychJob} 
+            onClose={() => setPsychJob(null)} 
+            onSaveInsights={(id, insights) => {
+              if (onJobStatusUpdate) {
+                onJobStatusUpdate(id, psychJob.status || 'Discovered', { psychologyInsights: insights });
+              }
+            }}
+          />
+        </Suspense>
+      </SafeErrorBoundary>
     )}
     </>
   );

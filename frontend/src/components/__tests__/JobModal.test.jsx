@@ -35,7 +35,7 @@ describe('JobModal Component', () => {
     expect(screen.getByText(/Ready to Apply/i)).toBeInTheDocument();
   });
 
-  it('opens Psychological Decoder modal when button is clicked in assets tab', () => {
+  it('opens Psychological Decoder modal when button is clicked in assets tab', async () => {
     render(<JobModal job={mockJob} onClose={vi.fn()} />);
 
     const assetsTab = screen.getByRole('button', { name: /ASSETS & ACTIONS/i });
@@ -44,7 +44,7 @@ describe('JobModal Component', () => {
     const psychButton = screen.getByRole('button', { name: /DECRYPT EMPLOYER PSYCHOLOGY/i });
     fireEvent.click(psychButton);
 
-    expect(screen.getByText(/Employer Psychology Decoder/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Employer Psychology Decoder/i)).toBeInTheDocument();
   });
 
   it('toggles Intelligence Tools dropdown and calls respective tool callbacks', () => {

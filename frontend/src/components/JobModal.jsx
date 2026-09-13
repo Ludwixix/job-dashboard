@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { Badge } from './Badge';
 import { 
   X, ExternalLink, FileText, DollarSign, Mail, 
@@ -12,7 +12,10 @@ import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
 import { getCommuteDetails } from '../services/commuteService';
-import { PsychologyDecoderModal } from './PsychologyDecoderModal';
+import { SafeErrorBoundary } from './SafeErrorBoundary';
+import { ModalSkeleton } from './SkeletonLoaders';
+
+const PsychologyDecoderModal = lazy(() => import('./PsychologyDecoderModal').then(m => ({ default: m.PsychologyDecoderModal })));
 import { cleanDescriptionText, fetchDetailedJobDescription, downloadAtsDocxResume } from '../services/dataService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
@@ -2051,15 +2054,19 @@ ${data.pipeline_result?.cover_text || ''}`;
 
       </div>
       {showPsychology && (
-        <PsychologyDecoderModal 
-          job={job} 
-          onClose={() => setShowPsychology(false)}
-          onSaveInsights={(id, insights) => {
-            if (onJobStatusUpdate) {
-              onJobStatusUpdate(id, job.status || 'Discovered', { psychologyInsights: insights });
-            }
-          }}
-        />
+        <SafeErrorBoundary sectionName="Psychology Decoder" onClose={() => setShowPsychology(false)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <PsychologyDecoderModal 
+              job={job} 
+              onClose={() => setShowPsychology(false)}
+              onSaveInsights={(id, insights) => {
+                if (onJobStatusUpdate) {
+                  onJobStatusUpdate(id, job.status || 'Discovered', { psychologyInsights: insights });
+                }
+              }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
       )}
     </div>
   );

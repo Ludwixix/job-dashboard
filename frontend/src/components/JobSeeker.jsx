@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { GeneratorModal } from './GeneratorModal';
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { TopMatchesSidebar } from './TopMatchesSidebar';
 import { 
   Sparkles, Search, Filter, 
@@ -15,10 +14,13 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-import { AutoApplyModal } from './AutoApplyModal';
-import { PsychologyDecoderModal } from './PsychologyDecoderModal';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
+import { ModalSkeleton } from './SkeletonLoaders';
 import { getCachedPsychology } from '../services/psychologyService';
+
+const GeneratorModal = lazy(() => import('./GeneratorModal').then(m => ({ default: m.GeneratorModal })));
+const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ default: m.AutoApplyModal })));
+const PsychologyDecoderModal = lazy(() => import('./PsychologyDecoderModal').then(m => ({ default: m.PsychologyDecoderModal })));
 
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
@@ -1878,37 +1880,45 @@ export const JobSeeker = ({
 
       {/* Generator Modal */}
       {selectedForGenerator && (
-        <GeneratorModal 
-          job={selectedForGenerator} 
-          onClose={() => setSelectedForGenerator(null)} 
-          onSaveCustomDocs={onSaveCustomDocs}
-          onUpdateStatus={onJobStatusUpdate}
-        />
+        <SafeErrorBoundary sectionName="Generator Modal" onClose={() => setSelectedForGenerator(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <GeneratorModal 
+              job={selectedForGenerator} 
+              onClose={() => setSelectedForGenerator(null)} 
+              onSaveCustomDocs={onSaveCustomDocs}
+              onUpdateStatus={onJobStatusUpdate}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
       )}
 
       {/* Auto-Apply Engine Modal (LinkedIn Easy Apply & SEEK Quick Apply) */}
       {selectedAutoApplyJob && (
         <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
-          <AutoApplyModal 
-            job={selectedAutoApplyJob} 
-            onClose={() => setSelectedAutoApplyJob(null)}
-            onJobStatusUpdated={onJobStatusUpdate}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <AutoApplyModal 
+              job={selectedAutoApplyJob} 
+              onClose={() => setSelectedAutoApplyJob(null)}
+              onJobStatusUpdated={onJobStatusUpdate}
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
 
       {/* Psychological Edge & Covert Subtext Decoder Modal */}
       {psychologyJob && (
         <SafeErrorBoundary sectionName="Psychology Decoder" onClose={() => setPsychologyJob(null)}>
-          <PsychologyDecoderModal 
-            job={psychologyJob} 
-            onClose={() => setPsychologyJob(null)}
-            onSaveInsights={(id, insights) => {
-              if (onJobStatusUpdate) {
-                onJobStatusUpdate(id, psychologyJob.status || 'Discovered', { psychologyInsights: insights });
-              }
-            }}
-          />
+          <Suspense fallback={<ModalSkeleton />}>
+            <PsychologyDecoderModal 
+              job={psychologyJob} 
+              onClose={() => setPsychologyJob(null)}
+              onSaveInsights={(id, insights) => {
+                if (onJobStatusUpdate) {
+                  onJobStatusUpdate(id, psychologyJob.status || 'Discovered', { psychologyInsights: insights });
+                }
+              }}
+            />
+          </Suspense>
         </SafeErrorBoundary>
       )}
     </div>

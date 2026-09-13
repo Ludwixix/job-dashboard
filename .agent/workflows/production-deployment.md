@@ -1,6 +1,6 @@
 ---
 name: production-deployment
-description: Use before and during any deployment to Google Cloud Run or Netlify production. Enforces pre-deployment test gauntlet, zero secret exposure checks, Cloud Run artifact builds, health checks, and live rollback readiness.
+description: Use before and during any deployment to Google Cloud Run or Cloud Run production. Enforces pre-deployment test gauntlet, zero secret exposure checks, Cloud Run artifact builds, health checks, and live rollback readiness.
 ---
 
 # Production Deployment Workflow

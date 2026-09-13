@@ -1,13 +1,13 @@
 ---
 name: complex-planning
-description: Use before starting any task that might touch multiple interdependent files — anything in job-dashboard-site or job-dashboard-modular that changes shared helpers (stream_classifier, reclassify, scoring), data-file schemas, the Makefile, or modular src/job_dashboard internals. Run the 5-condition checklist first; if 2+ apply, call sequential-thinking BEFORE any file edit.
+description: Use before starting any task that might touch multiple interdependent files — anything in job-dashboard/backend or job-dashboard/backend that changes shared helpers (stream_classifier, reclassify, scoring), data-file schemas, the Makefile, or modular src/job_dashboard internals. Run the 5-condition checklist first; if 2+ apply, call sequential-thinking BEFORE any file edit.
 ---
 
 # Complex Planning Workflow
 
 ## Trigger Conditions
 - Any task touching shared modules, scoring algorithms, classification pipelines, or data schemas.
-- Tasks spanning multiple files or repositories in the workspace (`job-dashboard-site`, `job-dashboard-modular`).
+- Tasks spanning multiple files or repositories in the workspace (`job-dashboard/backend`, `job-dashboard/backend`).
 - Refactor requests or architectural modifications.
 
 ## Mandatory Gate — Run Before ANY File Edit
@@ -24,8 +24,8 @@ If 2+ apply: call the `sequential-thinking` MCP tool BEFORE any file edit, stati
 ## Ordered Steps (After the Gate Fires)
 1. **Call `sequential-thinking` as your FIRST action**: State explicitly which checklist conditions triggered the gate. If the MCP tool is unavailable, output equivalent structured reasoning in chat before proceeding.
 2. **Map the blast radius with evidence**: Use grep and symbol lookups (`grep -rn <symbol> <project>`) for every function/type to be touched. Include non-obvious callers:
-   - `job-dashboard-site/scrapers/scrape_all.py` imports `stream_classifier.classify_all_jobs`.
-   - `job-dashboard-site/Makefile` embeds inline python (e.g., `make build` calls `reclassify_jobs.reclassify`).
+   - `job-dashboard/backend/scrapers/scrape_all.py` imports `stream_classifier.classify_all_jobs`.
+   - `job-dashboard/backend/Makefile` embeds inline python (e.g., `npm run build` calls `reclassify_jobs.reclassify`).
 3. **Order the work test-first**: Reference `.agent/workflows/test-driven-development.md`: failing test → minimal implementation → full suite → lint.
 4. **Execute incrementally**: Keep each edit coherent. After each step, verify against `pytest` and `ruff`.
 5. **Re-evaluate when reality diverges**: If new dependencies or unexpected data schemas appear, re-enter `sequential-thinking` with a revision thought instead of improvising.
@@ -34,7 +34,7 @@ If 2+ apply: call the `sequential-thinking` MCP tool BEFORE any file edit, stati
 ## Worked Example (Real Files & Dependency Edges)
 **Task**: "Add a posted-age freshness signal to the job score."
 **Why the gate fires (2+ conditions apply)**:
-- *Touches 3+ files with dependency relationships*: `job-dashboard-site/scoring_engine.py` (`score_job` at line 221 + `calculate_*` helpers), test suite (`tests/test_scoring.py` and `sample_job` fixture in `tests/conftest.py` containing `"posted": "2026-08-20"`), and `build_categorized_dashboard.py` (which renders scores to HTML).
+- *Touches 3+ files with dependency relationships*: `job-dashboard/backend/scoring_engine.py` (`score_job` at line 221 + `calculate_*` helpers), test suite (`tests/test_scoring.py` and `sample_job` fixture in `tests/conftest.py` containing `"posted": "2026-08-20"`), and `build_categorized_dashboard.py` (which renders scores to HTML).
 - *Changes a function signature*: Adding a `today`/`now` reference parameter to `score_job` for testability changes its call contract.
 - *Touches shared/core modules*: Score generation impacts both site dashboard tables and categorized views.
 
@@ -44,6 +44,6 @@ If 2+ apply: call the `sequential-thinking` MCP tool BEFORE any file edit, stati
 
 ## Stop / Escalate Conditions
 - The blast-radius grep reveals callers outside this workspace (e.g. other agent workspaces): stop and confirm authoritative source with user.
-- The plan requires data schema changes (`*.sql` migrations, SQLite schemas under `job-dashboard-modular/src/data/`, or jobtracker formats): the backend is strictly local SQLite/JSON; schema changes require explicit user approval.
-- Any step involves deploying (`make deploy`) or hitting live job scrapers with external requests: request explicit user approval.
+- The plan requires data schema changes (`*.sql` migrations, SQLite schemas under `job-dashboard/backend/src/data/`, or jobtracker formats): the backend is strictly local SQLite/JSON; schema changes require explicit user approval.
+- Any step involves deploying (`bash deploy-cloudrun.sh acaa-agent`) or hitting live job scrapers with external requests: request explicit user approval.
 - If in doubt whether a task meets the gate criteria (e.g. 1 borderline condition): trigger the gate anyway.

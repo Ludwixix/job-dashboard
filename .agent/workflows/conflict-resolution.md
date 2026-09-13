@@ -23,8 +23,8 @@ This workflow MUST be followed whenever a `git merge`, `git rebase`, or `git che
 
 ### 5. Verify & Test
 - Run full project lint and test suites:
-  - `cd workspace/job-dashboard-site && python3 -m pytest tests/ -v`
-  - `cd workspace/job-dashboard-modular && python3 -m pytest`
+  - `cd workspace/job-dashboard/backend && python3 -m pytest tests/ -v`
+  - `cd workspace/job-dashboard/backend && python3 -m pytest`
   - `cd workspace/job-dashboard-react && npm run lint`
 - Ensure zero syntax errors or broken assertions remain.
 

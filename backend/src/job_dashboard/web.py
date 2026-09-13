@@ -71,6 +71,7 @@ from .email_connector import EmailClassifier, GmailApiScanner, GmailScanner
 from .gcs_backup import backup_to_gcs
 from .health import get_health_check
 from .logging import get_logger
+from .profile_builder import build_candidate_profile
 from .normalize import normalize_job
 from .predictive_analytics import get_predictive_analytics
 from .repository import JobRepository
@@ -2191,6 +2192,27 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {"success": True, "profile": res})
                     return
 
+                if path == "/api/profile/auto-generate":
+                    user_id = resolve_user_id(self)
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    raw_text = body.get("raw_text") or body.get("resume_text") or body.get("text") or ""
+                    pdf_b64 = body.get("pdf_base64") or body.get("resume_base64")
+                    raw_input = raw_text
+                    if pdf_b64:
+                        import base64
+                        try:
+                            raw_input = base64.b64decode(pdf_b64)
+                        except Exception as b64_err:
+                            logger.warning(f"Failed to decode base64 PDF: {b64_err}")
+                    
+                    profile = build_candidate_profile(raw_input)
+                    if user_id and body.get("save", True):
+                        profile["id"] = user_id
+                        app.repository.upsert_user_profile(user_id, profile)
+                    self.send_json(200, {"success": True, "profile": profile})
+                    return
+
                 if path == "/api/preferences":
                     user_id = resolve_user_id(self)
                     if not user_id:
@@ -2426,6 +2448,11 @@ def make_handler(app: DashboardApp):
                                     "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
                                     (user_id, email, name, dummy_hash, now)
                                 )
+                                if hasattr(app, "repository") and app.repository:
+                                    try:
+                                        app.repository.migrate_default_user(user_id)
+                                    except Exception as mig_err:
+                                        logger.warning(f"Could not migrate default_user data for {user_id}: {mig_err}")
                             conn.commit()
                     except Exception as e:
                         logger.error(f"Error persisting Google user: {e}")
@@ -2501,6 +2528,12 @@ def make_handler(app: DashboardApp):
                     except sqlite3.IntegrityError:
                         self.send_json(400, {"error": "Email already exists"})
                         return
+                    
+                    if hasattr(app, "repository") and app.repository:
+                        try:
+                            app.repository.migrate_default_user(user_id)
+                        except Exception as mig_err:
+                            logger.warning(f"Could not migrate default_user data for {user_id}: {mig_err}")
                     
                     # Create token
                     payload_data = {

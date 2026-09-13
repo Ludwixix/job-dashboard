@@ -1162,3 +1162,51 @@ class JobRepository:
         }
 
 
+
+    # ==========================================
+    # IDENTITY & AUTH FOUNDATION
+    # ==========================================
+    def create_user(self, user_id: str, email: str, password_hash: str, name: str = None) -> dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute(
+                    "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, email, name, password_hash, now)
+                )
+        return {"id": user_id, "email": email, "name": name, "created_at": now}
+
+    def get_user_by_email(self, email: str) -> dict[str, Any] | None:
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
+        with get_db_connection(self.path) as conn:
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def migrate_default_user(self, new_user_id: str) -> int:
+        """Migrates all data from 'default_user' to the newly registered user account."""
+        total_migrated = 0
+        with get_db_connection(self.path) as conn:
+            with conn:
+                # user_applications
+                c = conn.execute("UPDATE user_applications SET user_id = ? WHERE user_id = 'default_user'", (new_user_id,))
+                total_migrated += c.rowcount
+                # user_profiles
+                c = conn.execute("UPDATE user_profiles SET user_id = ? WHERE user_id = 'default_user'", (new_user_id,))
+                total_migrated += c.rowcount
+                # user_preferences
+                c = conn.execute("UPDATE user_preferences SET user_id = ? WHERE user_id = 'default_user'", (new_user_id,))
+                total_migrated += c.rowcount
+                # generated_documents
+                c = conn.execute("UPDATE generated_documents SET user_id = ? WHERE user_id = 'default_user'", (new_user_id,))
+                total_migrated += c.rowcount
+        
+        logger.info(f"Migrated {total_migrated} records from 'default_user' to '{new_user_id}'")
+        return total_migrated

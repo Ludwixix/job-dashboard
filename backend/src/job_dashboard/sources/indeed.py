@@ -8,7 +8,15 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from ..logging import get_logger
-from .base import SearchQuery, canonical_posted_date, clean_description
+from ..models import JobRecord
+from .base import (
+    SearchQuery,
+    canonical_posted_date,
+    clean_description,
+    estimate_salary_bracket,
+    parse_salary_bracket,
+    sanitize_html,
+)
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
 from .proxy import ProxyRotator, sanitize_proxy_url
 
@@ -119,41 +127,76 @@ class IndeedJobSpySource:
 
         marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]='
         start = html.find(marker)
-        if start < 0:
-            return
-        start += len(marker)
-        payload_text = _extract_balanced_json(html, start)
-        if not payload_text:
-            return
-        payload = json.loads(payload_text)
-        model = payload.get("metaData", {}).get("mosaicProviderJobCardsModel", {})
-        for item in model.get("results", [])[: self.results_wanted]:
-            if not isinstance(item, Mapping):
-                continue
-            job_key = str(item.get("jobkey") or item.get("jobKey") or "").strip()
-            url = f"https://au.indeed.com/viewjob?jk={job_key}" if job_key else str(item.get("viewJobLink") or "")
-            title = str(item.get("displayTitle") or item.get("title") or "").strip()
-            company = str(item.get("company") or item.get("truncatedCompany") or "").strip()
-            location = str(item.get("formattedLocation") or query.location).strip()
-            description = clean_description(item.get("snippet") or item.get("jobDescription") or "")
-            if not description:
-                description = f"{title} at {company} in {location}. Full position description and direct application available on Indeed Australia."
-            posted = item.get("pubDate") or item.get("formattedRelativeTime") or ""
-            if title and url:
-                yield {
-                    "id": f"indeed-{job_key}" if job_key else "",
-                    "title": title,
-                    "company": company,
-                    "location": location,
-                    "description": description,
-                    "url": url,
-                    "source": "Indeed",
-                    "posted": canonical_posted_date(posted),
-                    "remote": bool(item.get("remoteLocation")),
-                    "tags": [query.term, "indeed", query.stream],
-                    "application_route": url,
-                    "salary": str(item.get("salarySnippet", {}).get("text") or "") if isinstance(item.get("salarySnippet"), Mapping) else "",
-                }
+        payload_text = ""
+        if start >= 0:
+            start += len(marker)
+            payload_text = _extract_balanced_json(html, start)
+
+        if payload_text:
+            try:
+                payload = json.loads(payload_text)
+                model = payload.get("metaData", {}).get("mosaicProviderJobCardsModel", {})
+                for item in model.get("results", [])[: self.results_wanted]:
+                    if not isinstance(item, Mapping):
+                        continue
+                    job_key = str(item.get("jobkey") or item.get("jobKey") or "").strip()
+                    url = f"https://au.indeed.com/viewjob?jk={job_key}" if job_key else str(item.get("viewJobLink") or "")
+                    title = str(item.get("displayTitle") or item.get("title") or "").strip()
+                    company = str(item.get("company") or item.get("truncatedCompany") or "").strip()
+                    location = str(item.get("formattedLocation") or query.location).strip()
+                    description = clean_description(item.get("snippet") or item.get("jobDescription") or "")
+                    if not description:
+                        description = f"{title} at {company} in {location}. Full position description and direct application available on Indeed Australia."
+                    salary_raw = str(item.get("salarySnippet", {}).get("text") or "") if isinstance(item.get("salarySnippet"), Mapping) else ""
+                    bracket = parse_salary_bracket(salary_raw)
+                    if bracket.min_amount is None and bracket.max_amount is None:
+                        bracket = estimate_salary_bracket(title=title, location=location)
+                    if title and url:
+                        yield JobRecord(
+                            id=f"indeed-{job_key}" if job_key else None,
+                            provider_job_id=job_key or url or title,
+                            provider="indeed",
+                            title=title,
+                            company=company,
+                            location=location,
+                            work_mode="remote" if item.get("remoteLocation") else "onsite",
+                            url=url,
+                            raw_description=sanitize_html(description),
+                            key_requirements=[query.term, query.stream],
+                            salary=bracket,
+                        )
+                return
+            except Exception as e:
+                logger.debug(f"Indeed structured payload parse failed: {e}")
+
+        # Resilient degradation: fallback to JSON-LD or HTML card regex
+        ld_matches = re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html, re.DOTALL)
+        for raw_ld in ld_matches:
+            try:
+                parsed_ld = json.loads(raw_ld)
+                items = parsed_ld.get("@graph", [parsed_ld]) if isinstance(parsed_ld, dict) else (parsed_ld if isinstance(parsed_ld, list) else [])
+                for it in items:
+                    if isinstance(it, dict) and it.get("@type") == "JobPosting":
+                        title = str(it.get("title", "")).strip()
+                        comp = str(it.get("hiringOrganization", {}).get("name", "") if isinstance(it.get("hiringOrganization"), dict) else "")
+                        loc = str(it.get("jobLocation", {}).get("address", {}).get("addressLocality", "") if isinstance(it.get("jobLocation"), dict) else query.location)
+                        desc = sanitize_html(clean_description(it.get("description", "")))
+                        job_url = str(it.get("url", "") or "")
+                        if title:
+                            yield JobRecord(
+                                provider_job_id=job_url or title,
+                                provider="indeed",
+                                title=title,
+                                company=comp,
+                                location=loc,
+                                work_mode="remote" if "remote" in loc.lower() or "remote" in desc.lower() else "onsite",
+                                url=job_url or f"https://au.indeed.com/jobs?q={query.term}",
+                                raw_description=desc,
+                                key_requirements=[query.term, query.stream],
+                                salary=estimate_salary_bracket(title, loc),
+                            )
+            except Exception:
+                pass
 
     def _search_browser(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         """Stealth Playwright browser fallback for Indeed."""
@@ -178,21 +221,28 @@ class IndeedJobSpySource:
 
                 raw_jobs = page.evaluate(_INDEED_EXTRACTOR)
                 for record in raw_jobs:
-                    posted_val = record.get("posted") or "today"
                     b_desc = clean_description(record.get("description", ""))
                     if not b_desc:
                         b_title = record.get("title", "")
                         b_comp = record.get("company", "")
                         b_loc = record.get("location", "")
                         b_desc = f"{b_title} at {b_comp} in {b_loc}. Full position description and direct application available on Indeed Australia."
-                    yield {
-                        **record,
-                        "description": b_desc,
-                        "source": "Indeed",
-                        "posted": canonical_posted_date(posted_val),
-                        "tags": [query.term, "indeed", query.stream],
-                        "application_route": record.get("url", ""),
-                    }
+                    sal_raw = str(record.get("salary") or "")
+                    bracket = parse_salary_bracket(sal_raw)
+                    rec_id = str(record.get("id") or "")
+                    yield JobRecord(
+                        id=rec_id if rec_id else None,
+                        provider_job_id=rec_id.replace("indeed-", "") if rec_id else str(record.get("url", "")),
+                        provider="indeed",
+                        title=str(record.get("title", "")),
+                        company=str(record.get("company", "")),
+                        location=str(record.get("location", "")),
+                        work_mode="remote" if record.get("remote") else "onsite",
+                        url=str(record.get("url", "")),
+                        raw_description=sanitize_html(b_desc),
+                        key_requirements=[query.term, query.stream],
+                        salary=bracket,
+                    )
             finally:
                 browser.close()
 
@@ -226,9 +276,8 @@ def _extract_balanced_json(text: str, start: int) -> str:
     return ""
 
 
-def _indeed_record(row: Any, query: SearchQuery) -> dict[str, Any]:
+def _indeed_record(row: Any, query: SearchQuery) -> JobRecord:
     url = str(row.get("job_url", "") or "").strip()
-    source_name = str(row.get("site", "") or "Indeed").capitalize()
     title = str(row.get("title", "") or "")
     company = str(row.get("company", "") or "")
     location = str(row.get("location", "") or query.location)
@@ -240,19 +289,35 @@ def _indeed_record(row: Any, query: SearchQuery) -> dict[str, Any]:
         match = re.search(r"jk=([a-zA-Z0-9]+)", url)
         if match:
             job_id = f"indeed-{match.group(1)}"
-    return {
-        "id": job_id,
-        "title": title,
-        "company": company,
-        "location": location,
-        "description": desc,
-        "url": url,
-        "source": source_name,
-        "posted": canonical_posted_date(row.get("date_posted", "") or ""),
-        "remote": bool(row.get("is_remote", False)),
-        "tags": [query.term, source_name.lower(), query.stream],
-        "application_route": url,
-    }
+    
+    salary_raw = str(row.get("salary") or row.get("salary_source", "") or "")
+    min_amount = None
+    max_amount = None
+    try:
+        if row.get("min_amount"):
+            min_amount = float(row.get("min_amount"))
+        if row.get("max_amount"):
+            max_amount = float(row.get("max_amount"))
+    except (ValueError, TypeError):
+        pass
+    bracket = parse_salary_bracket(salary_raw, min_amount=min_amount, max_amount=max_amount)
+    if bracket.min_amount is None and bracket.max_amount is None:
+        bracket = estimate_salary_bracket(title=title, location=location)
+    is_rem = bool(row.get("is_remote", False))
+
+    return JobRecord(
+        id=job_id if job_id else None,
+        provider_job_id=job_id or url or title,
+        provider="indeed",
+        title=title,
+        company=company,
+        location=location,
+        work_mode="remote" if is_rem else "onsite",
+        url=url,
+        raw_description=sanitize_html(desc),
+        key_requirements=[query.term, query.stream],
+        salary=bracket,
+    )
 
 
 _INDEED_EXTRACTOR = """() => {

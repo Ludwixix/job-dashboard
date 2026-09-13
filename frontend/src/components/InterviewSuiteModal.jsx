@@ -343,13 +343,24 @@ ${fullJobText}`;
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div 
-      className="fixed inset-0 z-[60] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[60] font-sans">
       <div 
-        className="bg-slate-900 border border-slate-700/70 rounded-3xl w-full max-w-5xl 2xl:max-w-6xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[95vh] text-slate-100"
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300"
+        onClick={onClose}
+      />
+      <div 
+        className="fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-0 transition-transform duration-300 ease-in-out flex flex-col font-sans text-slate-100 h-full overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

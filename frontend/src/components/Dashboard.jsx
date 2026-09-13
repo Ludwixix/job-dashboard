@@ -43,6 +43,7 @@ const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m 
 const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ default: m.KscGeneratorModal })));
 const SeekPassModal = lazy(() => import('./SeekPassModal').then(m => ({ default: m.SeekPassModal })));
 
+import { TelemetryDesk } from './TelemetryDesk';
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
 
@@ -833,6 +834,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             <span>AMBIENT FLOW</span>
           </button>
+
+          {/* Provider Mesh Telemetry Desk */}
+          <TelemetryDesk />
 
           {/* Quick Action Pills */}
           <div className="inline-flex items-center gap-1.5">

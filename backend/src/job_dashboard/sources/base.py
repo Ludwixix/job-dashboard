@@ -9,10 +9,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from html import unescape
 from html.parser import HTMLParser
-from typing import Any, Protocol
+from typing import Any, Protocol, Literal
+
+import nh3
 
 from ..health import HealthCheck
 from ..logging import get_logger
+from ..models import SalaryBracket, JobRecord
 
 logger = get_logger("job_dashboard.sources.base")
 
@@ -107,6 +110,89 @@ def clean_description(value: Any, limit: int = 12000) -> str:
     text = "\n".join(lines).strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text[:limit].rstrip() + ("..." if len(text) > limit else "")
+
+
+def sanitize_html(html_content: Any) -> str:
+    """Sanitize raw_description with nh3.clean() allowing only safe structural tags."""
+    raw = str(html_content or "").strip()
+    if not raw:
+        return ""
+    allowed_tags = {"p", "ul", "ol", "li", "strong", "em", "br"}
+    try:
+        return nh3.clean(raw, tags=allowed_tags)
+    except Exception:
+        return raw
+
+
+def estimate_salary_bracket(title: str = "", location: str = "") -> SalaryBracket:
+    """Heuristically estimate Australian salary bracket based on role seniority and location averages."""
+    title_lower = str(title or "").lower()
+
+    # Executive / Lead / Principal / Architect
+    if any(k in title_lower for k in ("principal", "architect", "lead", "head of", "director", "manager", "staff")):
+        min_amt, max_amt = 160000.0, 210000.0
+    # Senior / Specialist
+    elif any(k in title_lower for k in ("senior", "sr", "specialist", "expert")):
+        min_amt, max_amt = 130000.0, 165000.0
+    # Junior / Graduate / Entry
+    elif any(k in title_lower for k in ("junior", "jr", "graduate", "entry", "intern", "associate")):
+        min_amt, max_amt = 70000.0, 95000.0
+    # Standard Mid-Level
+    else:
+        min_amt, max_amt = 105000.0, 135000.0
+
+    return SalaryBracket(
+        raw_text=f"~${min_amt:,.0f} - ${max_amt:,.0f} (Estimated)",
+        min_amount=min_amt,
+        max_amount=max_amt,
+        currency="AUD",
+        is_hourly=False,
+        estimated=True,
+    )
+
+
+def parse_salary_bracket(
+    salary_text: str | None = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
+    currency: str = "AUD",
+    is_hourly: bool = False,
+    title: str | None = None,
+    estimate_if_missing: bool = False,
+) -> SalaryBracket:
+    """Extract and parse salary metrics into a structured canonical SalaryBracket."""
+    raw = str(salary_text or "").strip()
+    if re.search(r"/\s*hr|hour|\bph\b|p/h|p\.h\.", raw, re.IGNORECASE):
+        is_hourly = True
+
+    if (min_amount is None or max_amount is None) and raw:
+        numbers = re.findall(r"\$?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)", raw)
+        extracted = []
+        for n in numbers:
+            try:
+                val = float(n.replace(",", ""))
+                if val > 0:
+                    extracted.append(val)
+            except ValueError:
+                pass
+        if extracted:
+            if min_amount is None:
+                min_amount = extracted[0]
+            if max_amount is None:
+                max_amount = extracted[-1] if len(extracted) > 1 else extracted[0]
+
+    if min_amount is None and max_amount is None and (not raw or raw.lower() in ("not stated", "competitive", "none", "null")):
+        if estimate_if_missing and title:
+            return estimate_salary_bracket(title)
+
+    return SalaryBracket(
+        raw_text=raw if raw else (f"${min_amount:,.0f} - ${max_amount:,.0f}" if min_amount and max_amount else None),
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        is_hourly=is_hourly,
+        estimated=False,
+    )
 
 
 def is_recent(job: Mapping[str, Any], days: int = 14, now: datetime | None = None) -> bool:

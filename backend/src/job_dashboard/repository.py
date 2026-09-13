@@ -86,6 +86,9 @@ class JobRepository:
         self._check_and_recover_db()
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS jobs (
                     id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL,
@@ -237,6 +240,12 @@ class JobRepository:
                     key TEXT PRIMARY KEY,
                     enabled INTEGER NOT NULL DEFAULT 1,
                     description TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS provider_cookies (
+                    provider TEXT PRIMARY KEY,
+                    headers_json TEXT NOT NULL DEFAULT '{}',
+                    cookies_json TEXT NOT NULL DEFAULT '{}',
                     updated_at TEXT NOT NULL
                 );
             """)
@@ -1431,4 +1440,51 @@ class JobRepository:
             if row is not None:
                 return bool(row[0])
         return default
+
+    def set_provider_cookies(
+        self,
+        provider: str,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+    ) -> bool:
+        """Store manual session headers and cookies per provider in SQLite."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self.pool.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO provider_cookies (provider, headers_json, cookies_json, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(provider) DO UPDATE SET
+                    headers_json = excluded.headers_json,
+                    cookies_json = excluded.cookies_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    provider.lower().strip(),
+                    json.dumps(headers or {}),
+                    json.dumps(cookies or {}),
+                    now_iso,
+                ),
+            )
+            conn.commit()
+            return True
+
+    def get_provider_cookies(self, provider: str) -> dict[str, Any]:
+        """Retrieve stored headers and cookies for a provider."""
+        with self.pool.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT headers_json, cookies_json, updated_at FROM provider_cookies WHERE provider = ?",
+                (provider.lower().strip(),),
+            )
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "provider": provider,
+                    "headers": json.loads(row[0]) if row[0] else {},
+                    "cookies": json.loads(row[1]) if row[1] else {},
+                    "updated_at": row[2],
+                }
+        return {"provider": provider, "headers": {}, "cookies": {}, "updated_at": None}
+
 

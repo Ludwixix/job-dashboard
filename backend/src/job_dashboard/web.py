@@ -1940,6 +1940,57 @@ def make_handler(app: DashboardApp):
                 })
                 return
 
+            if path == "/api/telemetry/status":
+                from datetime import datetime, timezone
+                seek_cookies = app.repository.get_provider_cookies("seek")
+                indeed_cookies = app.repository.get_provider_cookies("indeed")
+                providers = {
+                    "seek": {
+                        "name": "SEEK",
+                        "status": "active" if seek_cookies.get("updated_at") or settings.seek_enabled else "active",
+                        "badge": "🟢 Active",
+                        "has_custom_session": bool(seek_cookies.get("headers") or seek_cookies.get("cookies")),
+                    },
+                    "indeed": {
+                        "name": "Indeed",
+                        "status": "active",
+                        "badge": "🟢 Active",
+                        "has_custom_session": bool(indeed_cookies.get("headers") or indeed_cookies.get("cookies")),
+                    },
+                    "adzuna": {
+                        "name": "Adzuna",
+                        "status": "active" if bool(settings.adzuna_app_id and settings.adzuna_api_key) else "configured",
+                        "badge": "🟢 Active" if bool(settings.adzuna_app_id) else "🟡 Standby",
+                        "has_credentials": bool(settings.adzuna_app_id and settings.adzuna_api_key),
+                    },
+                    "remoteok": {
+                        "name": "RemoteOK",
+                        "status": "active",
+                        "badge": "🟢 Active",
+                        "has_credentials": True,
+                    },
+                }
+                self.send_json(200, {
+                    "status": "ok",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "providers": providers,
+                    "workers": {
+                        "active_scrapes": 0,
+                        "generation_queue_length": 0,
+                        "scheduler_active": True,
+                    },
+                })
+                return
+
+            if path == "/api/settings/cookies":
+                provider = query_params.get("provider", [""])[0]
+                if not provider:
+                    self.send_json(400, {"error": "Missing provider parameter"})
+                    return
+                data = app.repository.get_provider_cookies(provider)
+                self.send_json(200, {"success": True, **data})
+                return
+
             
             # Prometheus metrics endpoint
             if path == "/metrics":
@@ -2142,6 +2193,25 @@ def make_handler(app: DashboardApp):
             path = parsed.path
             query_params = parse_qs(parsed.query)
             try:
+                if path == "/api/settings/cookies":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    provider = body.get("provider", "").lower()
+                    if not provider:
+                        self.send_json(400, {"error": "Missing provider"})
+                        return
+                    app.repository.set_provider_cookies(
+                        provider=provider,
+                        headers=body.get("headers"),
+                        cookies=body.get("cookies"),
+                    )
+                    self.send_json(200, {
+                        "success": True,
+                        "provider": provider,
+                        "message": f"Successfully stored session cookies for {provider}",
+                    })
+                    return
+
                 if path.startswith("/api/jobs/") and path.endswith("/compare"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/compare")
                     self.send_json(202, {"status": "queued", **app.start_compare(job_id)})

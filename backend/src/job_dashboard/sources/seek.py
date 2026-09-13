@@ -12,7 +12,17 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 
 from ..logging import get_logger
-from .base import SearchQuery, SeekUnavailableError, canonical_posted_date, clean_description, is_recent
+from ..models import JobRecord
+from .base import (
+    SearchQuery,
+    SeekUnavailableError,
+    canonical_posted_date,
+    clean_description,
+    estimate_salary_bracket,
+    is_recent,
+    parse_salary_bracket,
+    sanitize_html,
+)
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
 from .proxy import ProxyRotator, parse_proxy, sanitize_proxy_url
 
@@ -189,14 +199,23 @@ class SeekApiSource:
 
                 raw_jobs = page.evaluate(_SEEK_EXTRACTOR)
                 for record in raw_jobs:
-                    posted_val = record.get("posted") or "today"
-                    yield {
-                        **record,
-                        "source": "Seek",
-                        "posted": canonical_posted_date(posted_val),
-                        "tags": [query.term, "seek", query.stream],
-                        "application_route": record.get("url", ""),
-                    }
+                    sal_raw = str(record.get("salary") or "")
+                    bracket = parse_salary_bracket(sal_raw)
+                    cleaned = clean_description(record.get("description", ""))
+                    job_id = extract_seek_job_id(record.get("url", "")) or ""
+                    yield JobRecord(
+                        id=f"seek-{job_id}" if job_id else None,
+                        provider_job_id=job_id or str(record.get("url", "")),
+                        provider="seek",
+                        title=str(record.get("title", "")),
+                        company=str(record.get("company", "")),
+                        location=str(record.get("location", "")),
+                        work_mode="remote" if record.get("remote") else "onsite",
+                        url=str(record.get("url", "")),
+                        raw_description=sanitize_html(cleaned),
+                        key_requirements=[query.term, query.stream],
+                        salary=bracket,
+                    )
             finally:
                 browser.close()
 
@@ -222,15 +241,23 @@ class SeekApiSource:
                 "title", "company", "location", "description", "tags"
             )).casefold()
             if term in searchable:
-                tags = record.get("tags") or []
-                if isinstance(tags, str):
-                    tags = [tags]
-                matched.append({
-                    **record,
-                    "source": "Seek",
-                    "tags": [*tags, query.term, "seek", query.stream],
-                    "application_route": record.get("url", ""),
-                })
+                record_id = str(record.get("id") or "")
+                sal_raw = str(record.get("salary") or "")
+                bracket = parse_salary_bracket(sal_raw)
+                cleaned = clean_description(record.get("description", ""))
+                matched.append(JobRecord(
+                    id=record_id if record_id else None,
+                    provider_job_id=record_id.replace("seek-", "") if record_id else str(record.get("url", "")),
+                    provider="seek",
+                    title=str(record.get("title", "")),
+                    company=str(record.get("company", "")),
+                    location=str(record.get("location", "")),
+                    work_mode="remote" if record.get("remote") else "onsite",
+                    url=str(record.get("url", "")),
+                    raw_description=sanitize_html(cleaned),
+                    key_requirements=[query.term, query.stream],
+                    salary=bracket,
+                ))
             if len(matched) >= self.max_results:
                 break
         yield from matched
@@ -260,25 +287,29 @@ class SeekApiSource:
                     url = str(row.get("job_url", "") or "").strip()
                     if not url:
                         continue
-                    output.append({
-                        "title": str(row.get("title", "") or ""),
-                        "company": str(row.get("company", "") or ""),
-                        "location": str(row.get("location", "") or query.location),
-                        "description": clean_description(row.get("description", "")),
-                        "url": url,
-                        "source": "Seek (Gateway)",
-                        "posted": canonical_posted_date(row.get("date_posted", "") or ""),
-                        "remote": bool(row.get("is_remote", False)),
-                        "tags": [query.term, "seek-fallback", query.stream],
-                        "application_route": url,
-                    })
+                    sal_raw = str(row.get("salary", "") or "")
+                    bracket = parse_salary_bracket(sal_raw)
+                    cleaned = clean_description(row.get("description", ""))
+                    output.append(JobRecord(
+                        id=f"seek-cross-{abs(hash(url))}",
+                        provider_job_id=url,
+                        provider="seek",
+                        title=str(row.get("title", "") or ""),
+                        company=str(row.get("company", "") or ""),
+                        location=str(row.get("location", "") or query.location),
+                        work_mode="remote" if bool(row.get("is_remote", False)) else "onsite",
+                        url=url,
+                        raw_description=sanitize_html(cleaned),
+                        key_requirements=[query.term, query.stream],
+                        salary=bracket,
+                    ))
                 return iter(output)
         except Exception as err:
             logger.warning(f"Cross-source fallback failed: {err}")
         return iter(())
 
 
-def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
+def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
     identifier = str(job.get("id", "") or "")
     advertiser = job.get("advertiser") if isinstance(job.get("advertiser"), Mapping) else {}
     places = job.get("places") if isinstance(job.get("places"), Mapping) else {}
@@ -286,20 +317,27 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> dict[str, Any]:
     url = f"https://www.seek.com.au/job/{identifier}" if identifier else ""
     work_types = job.get("workType") or []
     stable_id = identifier or re.sub(r"[^a-z0-9]+", "-", f"{job.get('title', '')}-{advertiser.get('description', '')}".lower()).strip("-")
-    return {
-        "id": f"seek-{stable_id}" if stable_id else "",
-        "title": job.get("title", ""),
-        "company": advertiser.get("description", job.get("advertiserDescription", "")),
-        "location": location,
-        "description": clean_description(job.get("teaser", "")),
-        "url": url,
-        "source": "Seek",
-        "posted": canonical_posted_date(job.get("listingDate", "") or ""),
-        "remote": any(str(item.get("label", "")).lower() == "remote" for item in work_types),
-        "tags": [query.term, "seek", query.stream],
-        "application_route": url,
-        "salary": job.get("salary") or job.get("salaryLabel", ""),
-    }
+    is_remote = any(str(item.get("label", "")).lower() == "remote" for item in work_types)
+    raw_desc = str(job.get("teaser") or job.get("description") or "")
+    sanitized_desc = sanitize_html(raw_desc) if "<" in raw_desc else clean_description(raw_desc)
+    raw_salary = str(job.get("salary") or job.get("salaryLabel", "") or "")
+    salary_bracket = parse_salary_bracket(raw_salary)
+    if salary_bracket.min_amount is None and salary_bracket.max_amount is None:
+        salary_bracket = estimate_salary_bracket(title=str(job.get("title", "")), location=location)
+
+    return JobRecord(
+        id=f"seek-{stable_id}" if stable_id else None,
+        provider_job_id=identifier or stable_id,
+        provider="seek",
+        title=str(job.get("title", "")),
+        company=str(advertiser.get("description", job.get("advertiserDescription", ""))),
+        location=location,
+        work_mode="remote" if is_remote else "onsite",
+        url=url,
+        raw_description=sanitized_desc,
+        key_requirements=[query.term, query.stream],
+        salary=salary_bracket,
+    )
 
 
 _SEEK_EXTRACTOR = """() => {
@@ -392,6 +430,30 @@ def extract_seek_description_from_html(html_content: str) -> str:
                         return clean_description(desc)
         except Exception:
             pass
+
+    # Strategy 4: Resilient Selector Degradation — structural content blocks
+    try:
+        content_blocks = re.findall(
+            r'<(?:article|section|main|div[^>]*class=["\'][^"\']*(?:job|description|content|details)[^"\']*["\'])[^>]*>(.*?)</(?:article|section|main|div)>',
+            html_content,
+            re.DOTALL | re.IGNORECASE
+        )
+        for block in content_blocks:
+            cleaned = clean_description(block)
+            if len(cleaned) >= 80:
+                return cleaned
+    except Exception:
+        pass
+
+    # Strategy 5: Paragraph cluster heuristic
+    try:
+        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html_content, re.DOTALL | re.IGNORECASE)
+        if len(paragraphs) >= 2:
+            combined = "\n\n".join(clean_description(p) for p in paragraphs if len(clean_description(p)) > 20)
+            if len(combined) >= 50:
+                return combined
+    except Exception:
+        pass
 
     return ""
 

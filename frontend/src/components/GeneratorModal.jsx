@@ -319,16 +319,28 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
     }, 2200);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const hasDocuments = Boolean(resumeText && coverLetterText);
 
   return (
-    <div
-      className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 lg:p-8 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[60] font-sans">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300"
+        onClick={onClose}
+      />
+      {/* Drawer */}
       <div
-        className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl overflow-hidden border border-slate-700/60 flex flex-col max-h-[92vh] relative"
+        className="fixed inset-y-0 right-0 z-50 w-full md:w-[600px] lg:w-[680px] bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-0 transition-transform duration-300 ease-in-out flex flex-col h-full overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Settings Overlay ── */}

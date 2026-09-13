@@ -66,7 +66,8 @@ class ConnectionPool:
             conn.row_factory = sqlite3.Row
             try:
                 conn.execute("PRAGMA journal_mode=WAL;")
-                conn.execute(f"PRAGMA busy_timeout={int(self.timeout * 1000)};")
+                conn.execute("PRAGMA busy_timeout=5000;")
+                conn.execute("PRAGMA synchronous=NORMAL;")
             except sqlite3.Error:
                 pass
             self._stats["connections_created"] += 1

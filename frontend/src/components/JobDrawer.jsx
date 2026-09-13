@@ -35,6 +35,18 @@ export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes, o
     return getCommuteDetails(baseLocation, job.location);
   }, [baseLocation, job?.location]);
   
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !job) return null;
 
   const handleSaveNotes = () => {
@@ -83,15 +95,15 @@ export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes, o
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end font-sans">
+    <div className="fixed inset-0 z-[100] font-sans">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
       />
       
       {/* Drawer */}
-      <div className="relative w-full max-w-xl h-full bg-slate-900 border-l border-slate-800 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col overflow-hidden">
+      <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-0 transition-transform duration-300 ease-in-out flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-800 bg-slate-900/90 shrink-0">

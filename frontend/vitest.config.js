@@ -8,5 +8,6 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/setupTests.js'],
     onConsoleLog: () => false,
+    silent: true,
   },
 });

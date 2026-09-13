@@ -233,6 +233,12 @@ class JobRepository:
                     UNIQUE(user_id, job_id)
                 );
                 CREATE INDEX IF NOT EXISTS idx_matches_user_score ON candidate_matches(user_id, score DESC);
+                CREATE TABLE IF NOT EXISTS feature_flags (
+                    key TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    description TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
             """)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
@@ -245,8 +251,22 @@ class JobRepository:
             ]:
                 try:
                     conn.execute(col_sql)
-                except Exception:
+                except sqlite3.OperationalError:
                     pass
+
+            default_flags = [
+                ("automated_gmail_sync", 1, "Autonomous background tracking and status updating via Gmail"),
+                ("candidate_matching_engine", 1, "Dual-layer candidate intake scoring and automated staging"),
+                ("stream_classifier_v3", 1, "High-precision multi-industry career classification engine"),
+                ("headless_scrapers", 1, "Scheduled headless web scrapers with automatic backoff"),
+                ("instant_asset_generation", 1, "One-click resume and cover letter synthesis"),
+            ]
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for k, en, desc in default_flags:
+                conn.execute(
+                    "INSERT OR IGNORE INTO feature_flags (key, enabled, description, updated_at) VALUES (?, ?, ?, ?)",
+                    (k, en, desc, now_iso),
+                )
             conn.commit()
             logger.debug(f"Database schema initialized for {self.path}")
 
@@ -1335,3 +1355,80 @@ class JobRepository:
             except Exception as e:
                 logger.warning(f"Error evaluating job {j.get('id')} for {user_id}: {e}")
         return staged
+
+    def get_feature_flags(self) -> dict[str, dict[str, Any]]:
+        """Retrieve all registered feature flags with state and descriptions.
+
+        Returns:
+            Dictionary mapping flag key to metadata dict {'enabled': bool, 'description': str, 'updated_at': str}.
+        """
+        flags: dict[str, dict[str, Any]] = {}
+        with self.pool.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, enabled, description, updated_at FROM feature_flags")
+            for row in cursor.fetchall():
+                flags[row[0]] = {
+                    "enabled": bool(row[1]),
+                    "description": row[2],
+                    "updated_at": row[3],
+                }
+        return flags
+
+    def set_feature_flag(self, key: str, enabled: bool, description: str = "") -> bool:
+        """Update or insert a feature flag state.
+
+        Args:
+            key: Unique flag key string.
+            enabled: Boolean flag state.
+            description: Optional descriptive text.
+
+        Returns:
+            True on successful update.
+        """
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self.pool.get_connection() as conn:
+            cursor = conn.cursor()
+            if description:
+                cursor.execute(
+                    """
+                    INSERT INTO feature_flags (key, enabled, description, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET
+                        enabled = excluded.enabled,
+                        description = excluded.description,
+                        updated_at = excluded.updated_at
+                    """,
+                    (key, 1 if enabled else 0, description, now_iso),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO feature_flags (key, enabled, description, updated_at)
+                    VALUES (?, ?, '', ?)
+                    ON CONFLICT(key) DO UPDATE SET
+                        enabled = excluded.enabled,
+                        updated_at = excluded.updated_at
+                    """,
+                    (key, 1 if enabled else 0, now_iso),
+                )
+            conn.commit()
+            return True
+
+    def is_feature_enabled(self, key: str, default: bool = True) -> bool:
+        """Check whether a given feature flag is enabled.
+
+        Args:
+            key: Unique flag key string.
+            default: Fallback status if flag is not registered.
+
+        Returns:
+            Boolean indicating whether feature is active.
+        """
+        with self.pool.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT enabled FROM feature_flags WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            if row is not None:
+                return bool(row[0])
+        return default
+

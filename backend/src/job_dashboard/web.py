@@ -117,9 +117,9 @@ TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
 
 
 class DashboardApp:
-    def __init__(self, profile, sources, data_dir: str | Path, document_generator=None, search_queries=None):
-        self.dashboard = JobDashboard(profile)
-        self.sources = sources
+    def __init__(self, profile=None, sources=None, data_dir: str | Path = "data", document_generator=None, search_queries=None, repository=None):
+        self.dashboard = JobDashboard(profile or {})
+        self.sources = sources or []
         self.document_generator = document_generator
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -127,7 +127,7 @@ class DashboardApp:
         self.search_queries_path = self.data_dir / "search_queries.json"
         self.search_queries = self._load_search_queries(search_queries)
         self.jobs: list[dict] = self._load_jobs()
-        self.repository = JobRepository(self.data_dir / "jobs.sqlite3")
+        self.repository = repository or JobRepository(self.data_dir / "jobs.sqlite3")
         self.health_check = get_health_check(self.data_dir)
         self.db = self.repository
         self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
@@ -1380,7 +1380,26 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/source-health":
                 hours = max(1, min(168, int(query_params.get("hours", ["24"])[0])))
-                self.send_json(200, {"success": True, "checks": app.health_check.get_recent_checks(hours=hours)})
+                workers_info = {
+                    "generation_tasks": len(getattr(app, "generation_progress", {})),
+                    "active_generation_tasks": len([p for p in getattr(app, "generation_progress", {}).values() if not p.get("done", False)]),
+                    "scrape_in_progress": getattr(app, "scrape_in_progress", False),
+                    "scheduler_active": getattr(app, "scheduler_active", True),
+                }
+                self.send_json(200, {
+                    "success": True,
+                    "checks": app.health_check.get_recent_checks(hours=hours),
+                    "workers": workers_info,
+                })
+                return
+
+            if path == "/api/feature-flags":
+                user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    return
+                flags = app.repository.get_feature_flags()
+                self.send_json(200, {"success": True, "flags": flags})
                 return
 
             if path == "/api/job-explanation":
@@ -2310,6 +2329,23 @@ def make_handler(app: DashboardApp):
                     score = float(body.get("score") or 0.0)
                     sess = app.repository.save_interview_session(user_id, job_id, company, title, session_data, score)
                     self.send_json(200, {"success": True, "session": sess})
+                    return
+
+                if path == "/api/feature-flags":
+                    user_id = resolve_user_id(self)
+                    if not user_id:
+                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        return
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    key = body.get("key")
+                    enabled = body.get("enabled")
+                    desc = body.get("description", "")
+                    if not key or enabled is None:
+                        self.send_json(400, {"success": False, "error": "Missing key or enabled state"})
+                        return
+                    app.repository.set_feature_flag(key, bool(enabled), description=desc)
+                    self.send_json(200, {"success": True, "key": key, "enabled": bool(enabled)})
                     return
 
                 if path == "/api/matches/evaluate":

@@ -555,6 +555,54 @@ Empowers candidates to manage long-term recruiter and hiring manager relationshi
 - `frontend/src/components/__tests__/RecruiterRelationshipModal.test.jsx`: 5 component tests verifying modal rendering, tab transitions, search filtering, interaction timeline display, and close handlers.
 - Full regression suite: 178 backend pytest tests and 129 frontend vitest tests pass (100% pass rate, 0 lint errors).
 
+---
+
+## Phase 20: Algorithmic ATS Parsing Simulator & Cognitive Screening Triage Engine ("ATS Sentinel")
+
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-14
+
+### Overview
+Addresses mechanical parsing vulnerabilities, topological flattening, and content density per `docs/Resume_Optimization.md`:
+1. **Multi-Platform ATS Parsing Simulation (`ats_simulator.py`)**:
+   - Platform compliance scoring across Workday, Greenhouse, Taleo, and JobAdder.
+   - Topological flattening simulator extracting raw text streams, candidate names, contact details, and section hierarchies.
+2. **STAR Metric Density & Fluff Sanitizer**:
+   - Calculates quantitative STAR achievement density (target > 40%).
+   - Identifies and isolates subjective corporate clichés ("results-driven", "team player").
+3. **Australian Fair Work Anti-Bias & Regional Compliance Audit**:
+   - Checks presence of mandatory professional referees (2-3 names).
+   - Audits against prohibited demographic data (date of birth, marital status, photos) to mitigate legal discrimination risks.
+4. **UI & Dashboard Integration (`AtsDiagnosticModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
+   - 4-tab interactive diagnostic modal with visual score rings and actionable recommendations.
+   - Integrated into `JobModal.jsx` and lazy-loaded in `Dashboard.jsx`.
+
+---
+
+## Phase 21: Inbound Sourcing Optimization & LinkedIn Boolean Search Indexing Engine ("LinkedIn Inbound Radar")
+
+**Status**: ✅ Complete — Implemented, tested, and integrated
+**Deployed**: 2026-09-14
+
+### Overview
+Transforms candidate public profiles from static resumes into query-responsive search indices capturing recruiter searches on LinkedIn Recruiter and LinkedIn Sales Navigator:
+1. **Recruiter Boolean Query Engine & Evaluator (`inbound_sourcing.py`, `inboundSourcingService.js`)**:
+   - Full parser evaluating complex Boolean queries (`AND`, `OR`, `NOT`, `"Quotes"`, `(Parentheses)`).
+   - Detects typographic curly quotes (“ ”) that corrupt recruiter search engines.
+   - Evaluates truth tables returning matched vs missing terms.
+2. **Inbound Visibility Scoring & Profile Auditor**:
+   - Calculates Inbound Visibility Score (0–100).
+   - Audits headline literal title match vs vague buzzwords ("guru", "ninja", "rockstar").
+   - Evaluates About section for structured competency clusters and scale metrics.
+3. **Automated Asset Synthesizers**:
+   - Generates 3 Boolean-optimized headlines: Exact Title & Core Stack, Dual-Title Sourcing Index, and Enterprise Scale & Moat.
+   - Synthesizes keyword-rich 'About' section index grouping Core Competencies, Technical Ecosystem, and Role Synonyms.
+   - Generates 5 high-yield recruiter Boolean queries tailored to the target role.
+4. **Full UI & Dashboard Integration (`LinkedInInboundModal.jsx`, `JobModal.jsx`, `Dashboard.jsx`)**:
+   - 4-tab interactive modal featuring live Boolean query tester sandbox, headline generator, about indexer, and recruiter query arsenal.
+   - 1-click clipboard copying and direct integration with `JobModal.jsx` and `Dashboard.jsx`.
+
+
 
 
 

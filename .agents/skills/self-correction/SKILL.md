@@ -63,6 +63,18 @@ When an exception, test failure, or build issue occurs:
   - Disqualify isolated 4-digit calendar years (`(?!19\d\d|20\d\d)`) and standalone single digits from metric quantifiers unless accompanied by metric units (%, $, k, M, x, fold, ms, etc.).
   - Benchmark regex tokenization with linear-time pre-tokenized scanning or bounded character lookbehinds/lookaheads.
 
+#### 4. Python 3.14 Datetime Deprecations (`datetime.utcnow()`)
+- **Symptoms**:
+  - `DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.timezone.utc)`.
+- **Root Cause**:
+  - Naive UTC datetime generation in JWT token creation and database timestamps (`now = datetime.datetime.utcnow()`).
+- **Procedural Resolution**:
+  - Replace all occurrences with timezone-aware representations:
+    ```python
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_iso = now.isoformat()
+    ```
+
 ---
 
 ### [Frontend/React]

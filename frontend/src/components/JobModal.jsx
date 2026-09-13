@@ -5,7 +5,7 @@ import {
   MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
-  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp
+  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -602,6 +602,20 @@ ${candidatePhone}`;
                     <div>
                       <div className="font-bold">ATS Sentinel &amp; Parser Audit</div>
                       <div className="text-[10px] text-slate-400 font-sans">Workday &amp; STAR density simulation</div>
+                    </div>
+                  </button>
+                )}
+                {onOpenLinkedInInbound && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenLinkedInInbound(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-blue-950/60 text-slate-200 hover:text-blue-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Search size={14} className="text-blue-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">LinkedIn Inbound Radar</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Recruiter Boolean indexing &amp; headlines</div>
                     </div>
                   </button>
                 )}
@@ -1908,6 +1922,20 @@ ${data.pipeline_result?.cover_text || ''}`;
                       </div>
                       <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
                         Workday &amp; STAR parser simulation.
+                      </p>
+                    </button>
+                  )}
+
+                  {onOpenLinkedInInbound && (
+                    <button
+                      onClick={() => { onClose(); onOpenLinkedInInbound(job); }}
+                      className="p-3 rounded-2xl bg-blue-50/80 hover:bg-blue-100/90 border border-blue-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-blue-950 group-hover:text-blue-700">
+                        <Search size={14} className="text-blue-600" /> LINKEDIN INBOUND
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Recruiter Boolean indexing &amp; headlines.
                       </p>
                     </button>
                   )}

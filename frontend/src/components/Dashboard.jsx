@@ -37,6 +37,7 @@ const CareerMatrixModal = lazy(() => import('./CareerMatrixModal'));
 const WorkforceAustraliaModal = lazy(() => import('./WorkforceAustraliaModal'));
 const InterviewInfluenceModal = lazy(() => import('./InterviewInfluenceModal'));
 const AtsDiagnosticModal = lazy(() => import('./AtsDiagnosticModal'));
+const LinkedInInboundModal = lazy(() => import('./LinkedInInboundModal'));
 
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
@@ -76,6 +77,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForDossier, setSelectedForDossier] = useState(null);
   const [selectedForInfluenceHub, setSelectedForInfluenceHub] = useState(null);
   const [selectedForAtsDiagnostic, setSelectedForAtsDiagnostic] = useState(null);
+  const [selectedForLinkedInInbound, setSelectedForLinkedInInbound] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -511,6 +513,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForAtsDiagnostic;
   }, [selectedForAtsDiagnostic, jobs]);
 
+  const liveSelectedForLinkedInInbound = useMemo(() => {
+    if (!selectedForLinkedInInbound) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForLinkedInInbound.id)) ||
+      `${j.company}_${j.title}` === `${selectedForLinkedInInbound.company}_${selectedForLinkedInInbound.title}`
+    );
+    return match || selectedForLinkedInInbound;
+  }, [selectedForLinkedInInbound, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -585,6 +596,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
+              onOpenAtsDiagnostic={(j) => setSelectedForAtsDiagnostic(j)}
+              onOpenLinkedInInbound={(j) => setSelectedForLinkedInInbound(j)}
               profile={activeProfile}
               allJobs={jobs}
             />
@@ -1143,6 +1156,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
               onOpenInfluenceHub={(j) => { setSelectedForInfluenceHub(j); }}
               onOpenAtsDiagnostic={(j) => { setSelectedForAtsDiagnostic(j); }}
+              onOpenLinkedInInbound={(j) => { setSelectedForLinkedInInbound(j); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1298,6 +1312,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               profile={activeProfile}
               isOpen={Boolean(liveSelectedForAtsDiagnostic)}
               onClose={() => setSelectedForAtsDiagnostic(null)}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Phase 21: LinkedIn Inbound Sourcing Radar & Boolean Indexing Modal */}
+      {liveSelectedForLinkedInInbound && (
+        <SafeErrorBoundary sectionName="LinkedIn Inbound Hub" onClose={() => setSelectedForLinkedInInbound(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <LinkedInInboundModal
+              job={liveSelectedForLinkedInInbound}
+              isOpen={Boolean(liveSelectedForLinkedInInbound)}
+              onClose={() => setSelectedForLinkedInInbound(null)}
             />
           </Suspense>
         </SafeErrorBoundary>

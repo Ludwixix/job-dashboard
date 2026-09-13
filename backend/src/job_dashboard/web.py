@@ -34,6 +34,13 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 from .ai_resume_analyzer import get_resume_analyzer
 from .ats_optimizer import generate_ats_optimized_resume, generate_ats_docx_bytes
 from .ats_simulator import generate_ats_diagnostic_report
+from .inbound_sourcing import (
+    evaluate_boolean_query,
+    generate_recruiter_boolean_queries,
+    audit_linkedin_indexability,
+    generate_boolean_optimized_headlines,
+    generate_keyword_about_index,
+)
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1470,6 +1477,43 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "diagnostic": report})
                 return
 
+            # Phase 21: Inbound Sourcing & LinkedIn Boolean Indexing GET Endpoints
+            if path == "/api/inbound-sourcing/queries":
+                title = query_params.get("title", ["Systems Engineer"])[0]
+                industry = query_params.get("industry", ["Technology"])[0]
+                skills_param = query_params.get("skills", [""])[0]
+                skills = [s.strip() for s in skills_param.split(",") if s.strip()] if skills_param else None
+                queries = generate_recruiter_boolean_queries(title=title, skills=skills, industry=industry)
+                self.send_json(200, {"success": True, "queries": queries})
+                return
+
+            if path.startswith("/api/jobs/") and path.endswith("/inbound-optimization"):
+                job_id = path.removeprefix("/api/jobs/").removesuffix("/inbound-optimization")
+                job = app.repository.get_job(job_id)
+                if not job:
+                    for j in app.dashboard.jobs:
+                        if getattr(j, "id", "") == job_id:
+                            job = j
+                            break
+
+                title = getattr(job, "title", "") or "Senior Systems Engineer"
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                skills = profile.get("coreSkills", []) if profile else ["Cloud", "Infrastructure", "Automation", "Security"]
+                
+                queries = generate_recruiter_boolean_queries(title=title, skills=skills)
+                headlines = generate_boolean_optimized_headlines(target_title=title, core_skills=skills)
+                about_index = generate_keyword_about_index(target_title=title, core_skills=skills)
+                
+                self.send_json(200, {
+                    "success": True,
+                    "target_title": title,
+                    "queries": queries,
+                    "headlines": headlines,
+                    "about_index": about_index
+                })
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -2107,7 +2151,7 @@ def make_handler(app: DashboardApp):
                     user_id = payload.get("credential_id") or f"passkey_{uuid.uuid4()}"
                     
                     # Generate authentic JWT token
-                    now = datetime.datetime.utcnow()
+                    now = datetime.datetime.now(datetime.timezone.utc)
                     token = jwt.encode({
                         "sub": user_id,
                         "email": email,
@@ -2144,7 +2188,7 @@ def make_handler(app: DashboardApp):
                         self.send_json(400, {"error": "Missing Google email address"})
                         return
                         
-                    now = datetime.datetime.utcnow().isoformat()
+                    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     try:
                         with app.db.get_connection() as conn:
                             cur = conn.cursor()
@@ -2167,7 +2211,7 @@ def make_handler(app: DashboardApp):
                         "sub": user_id,
                         "email": email,
                         "name": name,
-                        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=7)
+                        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
                     }, JWT_SECRET, algorithm="HS256")
                     
                     user_profile = app.repository.get_user_profile(user_id) if user_id else {}
@@ -2221,7 +2265,7 @@ def make_handler(app: DashboardApp):
                         
                     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                     user_id = str(uuid.uuid4())
-                    now = datetime.datetime.utcnow().isoformat()
+                    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     
                     try:
                         with app.db.get_connection() as conn:
@@ -2240,7 +2284,7 @@ def make_handler(app: DashboardApp):
                         "sub": user_id,
                         "email": email,
                         "name": name,
-                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
                     }
                     token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
                     
@@ -2303,7 +2347,7 @@ def make_handler(app: DashboardApp):
                         "sub": user_id,
                         "email": email,
                         "name": name,
-                        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
                     }
                     token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
                     
@@ -2864,6 +2908,55 @@ def make_handler(app: DashboardApp):
 
                     report = generate_ats_diagnostic_report(resume_text or "", job)
                     self.send_json(200, {"success": True, "diagnostic": report})
+                    return
+
+                # Phase 21: Inbound Sourcing & LinkedIn Boolean Indexing POST Endpoints
+                if path == "/api/inbound-sourcing/test-query":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    query = payload.get("query") or ""
+                    text = payload.get("text") or ""
+                    if not text:
+                        user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                        if profile:
+                            text = f"{profile.get('headline', '')} {profile.get('about', '')} {profile.get('summary', '')} {' '.join(profile.get('coreSkills', []))}"
+                    
+                    eval_result = evaluate_boolean_query(query, text)
+                    self.send_json(200, {"success": True, "result": eval_result})
+                    return
+
+                if path == "/api/inbound-sourcing/audit":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    headline = payload.get("headline") or ""
+                    about = payload.get("about") or ""
+                    target_role = payload.get("target_role") or payload.get("targetRole") or "Systems Engineer"
+                    core_skills = payload.get("core_skills") or payload.get("coreSkills") or []
+
+                    if not headline or not about:
+                        user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                        if profile:
+                            headline = headline or profile.get("headline") or profile.get("title") or ""
+                            about = about or profile.get("about") or profile.get("summary") or ""
+                            core_skills = core_skills or profile.get("coreSkills") or []
+
+                    audit = audit_linkedin_indexability(
+                        headline=headline,
+                        about=about,
+                        target_role=target_role,
+                        core_skills=core_skills
+                    )
+                    headlines = generate_boolean_optimized_headlines(target_title=target_role, core_skills=core_skills)
+                    about_index = generate_keyword_about_index(target_title=target_role, core_skills=core_skills)
+                    
+                    self.send_json(200, {
+                        "success": True,
+                        "audit": audit,
+                        "headlines": headlines,
+                        "about_index": about_index
+                    })
                     return
 
                 # Phase 16: Network CRM POST Endpoints

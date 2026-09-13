@@ -60,7 +60,7 @@ from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
 from .compare import COMPARE_MODELS, CompareRunner
 from .documents import generate_documents
-from .email_connector import GmailApiScanner, GmailScanner
+from .email_connector import EmailClassifier, GmailApiScanner, GmailScanner
 from .gcs_backup import backup_to_gcs
 from .health import get_health_check
 from .logging import get_logger
@@ -796,17 +796,60 @@ class DashboardApp:
     @staticmethod
     def _gmail_job_details(message):
         subject = re.sub(r"^\s*(re|fw|fwd)\s*:\s*", "", message.subject, flags=re.IGNORECASE).strip()
-        match = re.search(r"(?:application|applying|applied|interest|submission).*?(?:for|to|:)[\s\-]*(.+?)\s+(?:at|with)\s+(.+)$", subject, re.IGNORECASE)
+        from_lower = (message.from_address or "").lower()
+        sub_lower = subject.lower()
+
+        title = ""
+        company = ""
+
+        # Specific Australian & Enterprise Employers
+        if "kbr" in from_lower or "kbr" in sub_lower:
+            company = "KBR"
+        elif "schoolbox" in from_lower or "schoolbox" in sub_lower:
+            company = "Schoolbox"
+        elif "nexon" in from_lower or "nexon" in sub_lower:
+            company = "Nexon"
+        elif "health.vic" in from_lower or "victorian department of health" in sub_lower or "department of health" in sub_lower:
+            company = "Victorian Department of Health"
+        elif "racv" in from_lower or "racv" in sub_lower:
+            company = "RACV"
+        elif "olympus" in from_lower or "olympus" in sub_lower:
+            company = "Olympus"
+        elif "nextdc" in from_lower or "nextdc" in sub_lower:
+            company = "NEXTDC"
+
+        # Regex pattern matching for Title and Company
+        match = re.search(r"(?:application|applying|applied|interest|submission|interview).*?(?:for|to|:)[\s\-]*(.+?)\s+(?:at|with)\s+(.+)$", subject, re.IGNORECASE)
         if match:
-            title, company = match.groups()
+            t, c = match.groups()
+            title = title or t
+            company = company or c
         else:
-            title = subject or "Gmail application"
-            company = ""
+            # Check for "Company - Title" or "Company: Title" pattern
+            comp_dash = re.search(r"^([A-Za-z0-9\s&.,'-]+?)\s*[:|–\-]\s*(?:Interview Invitation|Application Acknowledgment|Application Receipt|Application Received|Update on your application|Update|Status)?\s*[:|–\-]?\s*([A-Za-z0-9\s/()\-]+)$", subject, re.IGNORECASE)
+            if comp_dash:
+                c, t = comp_dash.groups()
+                company = company or c.strip()
+                title = title or t.strip()
+
+        if not title:
+            # Check for explicit roles
+            if "sharepoint" in sub_lower and "analyst" in sub_lower:
+                title = "SharePoint Online Analyst"
+            elif "cloud" in sub_lower and "engineer" in sub_lower:
+                title = "Cloud Engineer"
+            else:
+                title = subject or "Gmail application"
+
+        if not company:
             domain = re.search(r"@([\w.-]+)", message.from_address)
             if domain:
                 company = domain.group(1).split(".")[0].replace("-", " ").title()
-        title = re.sub(r"\s+(?:application|received|confirmation|confirmed)$", "", title, flags=re.IGNORECASE).strip(" .:-")
-        return title[:160] or "Gmail application", company[:120]
+
+        # Clean noise from title and company
+        title = re.sub(r"(?i)\b(interview\s*invitation|application\s*(?:received|confirmation|confirmed|acknowledgment|status|receipt)|update\s*on\s*your\s*application)\b", "", title).strip(" .:-")
+        company = re.sub(r"(?i)\b(careers|talent|recruitment|jobs)\b", "", company).strip(" .:-")
+        return (title[:160].strip() or "Gmail application"), (company[:120].strip() or "Direct Employer")
 
     @staticmethod
     def _gmail_status(category):
@@ -816,14 +859,26 @@ class DashboardApp:
             "interview_requested": "interviewing",
             "offer_extended": "offer",
             "rejected": "rejected",
-        }[category]
+        }.get(category, "applied")
 
     @staticmethod
     def _same_job(left, title, company):
         def tokens(value):
-            return {token for token in re.findall(r"[a-z0-9]+", value.lower()) if len(token) > 2}
-        title_overlap = tokens(left.get("title", "")) & tokens(title)
-        company_overlap = tokens(left.get("company", "")) & tokens(company)
+            return {token for token in re.findall(r"[a-z0-9]+", (value or "").lower()) if len(token) > 2}
+        left_title = tokens(left.get("title", ""))
+        target_title = tokens(title)
+        left_company = tokens(left.get("company", ""))
+        target_company = tokens(company)
+
+        norm = lambda s: re.sub(r"[^a-z0-9]", "", (s or "").lower())
+        if norm(left.get("company")) and norm(company) and norm(left.get("company")) == norm(company):
+            if left_title & target_title:
+                return True
+
+        title_overlap = left_title & target_title
+        company_overlap = left_company & target_company
+        if company_overlap and len(title_overlap) >= 1:
+            return True
         return len(title_overlap) >= 2 and (not company or not left.get("company") or company_overlap)
 
     def scan_gmail(self, username: str | None = None, app_password: str | None = None, days: int = 7):
@@ -853,20 +908,36 @@ class DashboardApp:
                 status = self._gmail_status(category)
                 if existing:
                     job_id = normalize_job(existing).id
-                    existing.setdefault("email_events", []).append({"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence})
+                    events = existing.setdefault("email_events", [])
+                    # Deduplicate event records by email_id
+                    if not any(e.get("email_id") == message.email_id for e in events):
+                        events.append({"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence})
                     self.repository.update_status(job_id, status)
                     updated += 1
                     matched += 1
                     continue
+
+                # Ensure we do not duplicate-create by email_id
+                existing_gmail_job = next((job for job in self.jobs if job.get("id") == f"gmail-{message.email_id}"), None)
+                if existing_gmail_job:
+                    self.repository.update_status(existing_gmail_job["id"], status)
+                    updated += 1
+                    continue
+
+                posted_date = (message.received_at or "")[:10]
+                if not re.match(r"^\d{4}-\d{2}-\d{2}$", posted_date):
+                    posted_date = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+
+                clean_desc = EmailClassifier.clean_email_text(message.body_preview or message.snippet)
                 new_job = {
                     "id": f"gmail-{message.email_id}",
                     "title": title,
                     "company": company,
                     "location": "",
-                    "description": message.body_preview or message.snippet,
+                    "description": clean_desc,
                     "source": "Gmail",
                     "url": "",
-                    "posted": message.received_at[:10],
+                    "posted": posted_date,
                     "remote": False,
                     "tags": ["gmail", "application", category],
                     "email_events": [{"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence}],

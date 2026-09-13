@@ -30,25 +30,45 @@ class EmailMessage:
     body_preview: str = ""
 
 
+def clean_email_text(raw: str) -> str:
+    """Sanitize malformed text blocks, stripping HTML tags, HTML entities, and excessive whitespace."""
+    if not raw:
+        return ""
+    text = re.sub(r"<[^>]+>", " ", str(raw))
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"').replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
+    return re.sub(r"\s+", " ", text).strip()
+
+
 class EmailClassifier:
     """Read-only email classification without any modifications to the inbox."""
 
+    clean_email_text = staticmethod(clean_email_text)
+
     PATTERNS = {
-        "application_confirmed": (
-            r"(?:application|submission|resume|cv).*(?:received|confirm|registered|thank you)",
-            r"(?:congratulations|thank you|we.*receive).*(?:application|submission|resume)",
-        ),
-        "interview_requested": (
-            r"(?:interview|phone.*screening|technical.*test).*(?:schedule|next step|let.*know)",
-            r"(?:next step|move forward|interview).*(?:process|round|stage)",
-        ),
         "offer_extended": (
             r"(?:offer|position|role).*(?:pleased|happy|excited).*(?:extend|offer)",
             r"(?:congratulations|we.*offer).*(?:position|role|salary)",
+            r"(?:letter of offer|employment contract|formal offer)",
+        ),
+        "interview_requested": (
+            r"(?:interview|phone.*screening|technical.*test|coding.*assessment).*(?:schedule|next step|let.*know|invitation|loop|availability)",
+            r"(?:next step|move forward|progress.*to|invite.*to|invitation.*to).*(?:interview|process|round|stage|conversation)",
+            r"(?:kbr|sharepoint.*analyst).*(?:interview|schedule|meeting|discussion|loop)",
+            r"(?:interview\s*loop|panel\s*interview|first\s*round\s*interview|video\s*interview)",
+            r"(?:availability|timeslot|calendar|teams meeting|zoom|google meet).*(?:interview|chat|discussion|catch.*up)",
         ),
         "rejected": (
-            r"(?:regret|unfortunately|not.*proceed).*(?:candidate|application|role)",
-            r"(?:decided|chosen).*(?:candidate|successful|other)",
+            r"(?:regret|unfortunately|not.*proceed|not.*moving forward|unsuccessful).*(?:candidate|application|role|position|candidacy|stage)",
+            r"(?:decided|chosen|pursu(?:e|ing)).*(?:candidate|successful|other|another|different)",
+            r"(?:racv|olympus|nextdc).*(?:not.*proceed|unsuccessful|other candidates|regret|careful consideration)",
+            r"(?:not\s*been\s*successful|will\s*not\s*be\s*(?:progressing|moving forward)|chosen\s*not\s*to\s*progress)",
+        ),
+        "application_confirmed": (
+            r"(?:application|submission|resume|cv).*(?:received|confirm|registered|thank you|acknowledg|receipt)",
+            r"(?:congratulations|thank you|we.*receive|acknowledg).*(?:application|submission|resume)",
+            r"(?:confirmation|receipt|acknowledgment)\s*(?:of|for)\s*(?:your\s*)?(?:application|submission)",
+            r"(?:schoolbox|nexon|department of health).*(?:application|received|submission|acknowledg)",
+            r"application\s*(?:submitted|received|confirmation|acknowledgment)",
         ),
         "recruiter_reply": (
             r"(?:follow up|checking in|interested).*(?:position|opportunity|role)",
@@ -56,23 +76,38 @@ class EmailClassifier:
         ),
     }
 
+    CATEGORY_PRIORITY = {
+        "offer_extended": 10,
+        "interview_requested": 8,
+        "rejected": 6,
+        "application_confirmed": 4,
+        "recruiter_reply": 2,
+    }
+
     def classify(self, email: EmailMessage) -> tuple[str, float]:
         """Classify a single email into one category with confidence score.
 
         Returns (category, confidence) where confidence is 0.0-1.0.
         Categories: application_confirmed, recruiter_reply, interview_requested, offer_extended, rejected.
+        Applies strict category priority so definitive notices (offers, interviews, rejections)
+        override generic application acknowledgments.
         """
         search_text = f"{email.subject} {email.snippet} {email.body_preview}".lower()
         best_match = "recruiter_reply"
         best_confidence = 0.0
+        best_priority = -1
 
         for category, patterns in self.PATTERNS.items():
+            category_priority = self.CATEGORY_PRIORITY.get(category, 0)
             for pattern in patterns:
-                if re.search(pattern, search_text, re.IGNORECASE):
-                    confidence = 0.7 if len(re.findall(pattern, search_text, re.IGNORECASE)) == 1 else 0.9
-                    if confidence > best_confidence:
+                matches = re.findall(pattern, search_text, re.IGNORECASE)
+                if matches:
+                    confidence = 0.7 if len(matches) == 1 else 0.9
+                    # Favor higher category priority when confidence is comparable
+                    if (category_priority > best_priority and confidence >= 0.7) or (confidence > best_confidence and category_priority >= best_priority):
                         best_confidence = confidence
                         best_match = category
+                        best_priority = category_priority
         return (best_match, best_confidence)
 
     def process_messages(self, messages: Iterable[EmailMessage]) -> dict[str, Any]:
@@ -245,6 +280,15 @@ class GmailScanner:
         return results
 
     @staticmethod
+    def clean_email_text(raw: str) -> str:
+        """Sanitize malformed text blocks, stripping HTML tags, HTML entities, and excessive whitespace."""
+        if not raw:
+            return ""
+        text = re.sub(r"<[^>]+>", " ", str(raw))
+        text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"').replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
+        return re.sub(r"\s+", " ", text).strip()
+
+    @staticmethod
     def _decode(value: str) -> str:
         parts = decode_header(value or "")
         return "".join(part.decode(charset or "utf-8", errors="replace") if isinstance(part, bytes) else part for part, charset in parts)
@@ -265,13 +309,14 @@ class GmailScanner:
             received = datetime.fromtimestamp(email.utils.mktime_tz(email.utils.parsedate_tz(received)), timezone.utc).isoformat()
         except (TypeError, ValueError, OverflowError):
             received = datetime.now(timezone.utc).isoformat()
+        cleaned_body = cls.clean_email_text(body)
         return EmailMessage(
-            subject=cls._decode(message.get("Subject", "")),
-            snippet=re.sub(r"\s+", " ", body).strip()[:1000],
-            from_address=cls._decode(message.get("From", "")),
+            subject=cls.clean_email_text(cls._decode(message.get("Subject", ""))),
+            snippet=cleaned_body[:1000],
+            from_address=cls._decode(message.get("From", "")).strip(),
             received_at=received,
             email_id=message_id,
-            body_preview=body[:4000],
+            body_preview=cleaned_body[:4000],
         )
 
 
@@ -370,11 +415,18 @@ class GmailApiScanner(GmailScanner):
                 collect(child)
 
         collect(payload.get("payload", {}))
+        raw_body = "\n".join(body_parts)
+        cleaned_body = cls.clean_email_text(raw_body)
+        raw_date = headers.get("date", "")
+        try:
+            received = datetime.fromtimestamp(email.utils.mktime_tz(email.utils.parsedate_tz(raw_date)), timezone.utc).isoformat()
+        except (TypeError, ValueError, OverflowError):
+            received = datetime.now(timezone.utc).isoformat()
         return EmailMessage(
-            subject=cls._decode(headers.get("subject", "")),
-            snippet=payload.get("snippet", ""),
-            from_address=cls._decode(headers.get("from", "")),
-            received_at=headers.get("date", ""),
+            subject=cls.clean_email_text(cls._decode(headers.get("subject", ""))),
+            snippet=cls.clean_email_text(payload.get("snippet", ""))[:1000] or cleaned_body[:1000],
+            from_address=cls._decode(headers.get("from", "")).strip(),
+            received_at=received,
             email_id=payload.get("id", ""),
-            body_preview="\n".join(body_parts)[:4000],
+            body_preview=cleaned_body[:4000],
         )

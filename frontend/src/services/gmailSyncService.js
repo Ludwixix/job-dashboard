@@ -98,11 +98,23 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
   let company = '';
   let title = '';
 
+  // Specific Enterprise & Australian Employers
+  if (!company) {
+    const fromLower = (fromHeader || '').toLowerCase();
+    if (fromLower.includes('kbr') || subLower.includes('kbr')) company = 'KBR';
+    else if (fromLower.includes('schoolbox') || subLower.includes('schoolbox')) company = 'Schoolbox';
+    else if (fromLower.includes('nexon') || subLower.includes('nexon')) company = 'Nexon';
+    else if (fromLower.includes('health.vic') || subLower.includes('department of health') || subLower.includes('victorian department of health')) company = 'Victorian Department of Health';
+    else if (fromLower.includes('racv') || subLower.includes('racv')) company = 'RACV';
+    else if (fromLower.includes('olympus') || subLower.includes('olympus')) company = 'Olympus';
+    else if (fromLower.includes('nextdc') || subLower.includes('nextdc')) company = 'NEXTDC';
+  }
+
   // 1. LinkedIn Application Sent Pattern:
   // e.g. "Sam, your application was sent to Bitwarden"
   const liSentMatch = subject.match(/(?:your application was sent to|application sent to|applied to)\s+([A-Za-z0-9\s/()\-&.,]+)/i);
   if (liSentMatch) {
-    company = liSentMatch[1].replace(/[.!?]+$/, '').trim();
+    company = company || liSentMatch[1].replace(/[.!?]+$/, '').trim();
     // Extract title from body: "You applied for Systems Administrator at Bitwarden"
     const liBodyMatch = fullText.match(/(?:You applied for|applied for the role of|application for)\s+(?:the )?([A-Za-z0-9\s/()\-]+?)\s+(?:at|with)\s+/i);
     if (liBodyMatch) {
@@ -115,7 +127,7 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
   if (!company || !title) {
     const portalDashMatch = subject.match(/^([A-Za-z0-9\s&.,]+?)\s+Careers\s*[-|–:]\s*([^\n\r]+)/i);
     if (portalDashMatch) {
-      company = portalDashMatch[1].trim();
+      company = company || portalDashMatch[1].trim();
       title = portalDashMatch[2].trim();
     }
   }
@@ -127,7 +139,7 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
     const seekAdvMatch = fullText.match(seekAdvPattern);
     if (seekAdvMatch) {
       title = seekAdvMatch[1].trim();
-      company = seekAdvMatch[2].trim();
+      company = company || seekAdvMatch[2].trim();
     }
   }
 
@@ -137,7 +149,7 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
     const appliedMatch = fullText.match(appliedPattern);
     if (appliedMatch) {
       title = appliedMatch[1].trim();
-      company = appliedMatch[2].trim();
+      company = company || appliedMatch[2].trim();
     }
   }
 
@@ -147,17 +159,26 @@ export const extractJobDetailsFromEmail = (fromHeader = '', subject = '', bodyTe
     const interestMatch = fullText.match(interestPattern);
     if (interestMatch) {
       title = interestMatch[1].trim();
-      company = interestMatch[2].trim();
+      company = company || interestMatch[2].trim();
     }
   }
 
   // 6. Subject: "Application submitted: Senior DevOps Engineer - Melbourne Recital Centre"
   if (!company || !title) {
-    const subDashPattern = /(?:Application submitted|Application received|Application|Applied):\s*([^-\n|]+?)\s*[-|–]\s*([^\n\r]+)/i;
+    const subDashPattern = /(?:Application submitted|Application received|Application|Applied|Interview Invitation|Update on your application):\s*([^-\n|]+?)\s*[-|–]\s*([^\n\r]+)/i;
     const subDashMatch = subject.match(subDashPattern);
     if (subDashMatch) {
       title = subDashMatch[1].trim();
-      company = subDashMatch[2].trim();
+      company = company || subDashMatch[2].trim();
+    }
+  }
+
+  // 7. Role fallback detection (e.g. SharePoint Online Analyst, Cloud Engineer)
+  if (!title) {
+    if (subLower.includes('sharepoint') && subLower.includes('analyst')) {
+      title = 'SharePoint Online Analyst';
+    } else if (subLower.includes('cloud') && subLower.includes('engineer')) {
+      title = 'Cloud Engineer';
     }
   }
 
@@ -221,14 +242,36 @@ export const classifyEmailStatus = (subject = '', snippet = '', bodyText = '') =
   if (text.includes('offer') || text.includes('contract of employment') || text.includes('letter of offer')) {
     return 'Offer Received 🎉';
   }
-  if (text.includes('interview') || text.includes('invitation to meet') || text.includes('schedule a chat') || text.includes('phone screen') || text.includes('video call') || text.includes('first round')) {
+  if (
+    text.includes('interview') ||
+    text.includes('invitation to meet') ||
+    text.includes('schedule a chat') ||
+    text.includes('phone screen') ||
+    text.includes('video call') ||
+    text.includes('first round') ||
+    text.includes('interview loop') ||
+    text.includes('panel interview') ||
+    (text.includes('kbr') && (text.includes('sharepoint') || text.includes('meeting') || text.includes('interview')))
+  ) {
     return 'Interview Scheduled';
+  }
+  if (
+    text.includes('unsuccessful') ||
+    text.includes('not moving forward') ||
+    text.includes('other candidates') ||
+    text.includes('unfortunately') ||
+    text.includes('pursuing other') ||
+    text.includes('unlikely to progress') ||
+    text.includes('not to proceed') ||
+    text.includes('not proceeding') ||
+    (text.includes('racv') && (text.includes('update') || text.includes('regret') || text.includes('not'))) ||
+    (text.includes('olympus') && (text.includes('status') || text.includes('other') || text.includes('regret'))) ||
+    (text.includes('nextdc') && (text.includes('status') || text.includes('consideration') || text.includes('not')))
+  ) {
+    return 'Rejected / Dismissed';
   }
   if (text.includes('action required') || text.includes('assessment') || text.includes('technical test') || text.includes('complete your application') || text.includes('take-home')) {
     return 'Screening / Assessment';
-  }
-  if (text.includes('unsuccessful') || text.includes('not moving forward') || text.includes('other candidates') || text.includes('unfortunately') || text.includes('pursuing other') || text.includes('unlikely to progress')) {
-    return 'Rejected / Dismissed';
   }
 
   return 'Applied / In Review';

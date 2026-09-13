@@ -75,6 +75,25 @@ When an exception, test failure, or build issue occurs:
     now_iso = now.isoformat()
     ```
 
+#### 5. Enterprise Gmail Application Retrieval, Classification Priority & Deduplication Heuristics
+- **Symptoms**:
+  - Rejection or interview emails misclassified as generic `applied` confirmations because emails contained both acknowledgment phrases ("Thank you for your application") and definitive outcomes ("Unfortunately we will not be moving forward").
+  - Inability to parse multi-word public sector or Australian enterprise employers (KBR, Schoolbox, Nexon, Victorian Department of Health, RACV, Olympus, NEXTDC).
+  - SQLite/WAL lock or duplicate event records when scanning the inbox multiple times.
+- **Root Cause**:
+  - Unprioritized regex scanning where generic submission acknowledgments won pattern matching over subsequent rejection or interview clauses.
+  - Naive subject parsing requiring `"application for X at Y"` syntax, missing dash-delimited portal patterns like `"KBR: Interview Invitation - SharePoint Online Analyst"` or `"RACV - Update on your application"`.
+  - Unchecked insertion of duplicate `email_id` events into `existing["email_events"]`.
+- **Procedural Resolution**:
+  1. **Strict Category Priority in `EmailClassifier`**:
+     Enforce `CATEGORY_PRIORITY` (`offer_extended: 10 > interview_requested: 8 > rejected: 6 > application_confirmed: 4 > recruiter_reply: 2`). When multiple patterns match with confidence >= 0.7, definitive progression states unconditionally supersede generic receipt confirmations.
+  2. **Enterprise Employer Extraction & Canonical Role Resolution**:
+     Match explicit known Australian employers (`kbr`, `schoolbox`, `nexon`, `health.vic`, `racv`, `olympus`, `nextdc`) and parse dash/colon patterns (`"Company: Title"`, `"Company - Title"`), stripping common application status noise from extracted job titles.
+  3. **Idempotent Deduplication & Payload Sanitization**:
+     - Check `any(e.get("email_id") == message.email_id for e in existing_events)` before appending to avoid database bloating.
+     - Strip HTML tags (`re.sub(r"<[^>]+>", " ", raw)`) and decode entities before persisting descriptions.
+     - Validate timestamp format (`^\d{4}-\d{2}-\d{2}$`) and fallback safely to current UTC ISO timestamp to prevent SQLite query formatting regressions.
+
 ---
 
 ### [Frontend/React]

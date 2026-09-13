@@ -1231,6 +1231,17 @@ def make_handler(app: DashboardApp):
             self.end_headers()
             self.wfile.write(data)
 
+        def do_HEAD(self):
+            parsed = urlparse(self.path)
+            path = parsed.path
+            if path in ("/health", "/", "/index.html"):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json" if path == "/health" else "text/html; charset=utf-8")
+                self._send_cors_headers()
+                self.end_headers()
+            else:
+                self.do_GET()
+
         def do_GET(self):
             parsed = urlparse(self.path)
             path = parsed.path

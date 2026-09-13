@@ -55,3 +55,25 @@ def test_refresh_handles_empty_body_cleanly(tmp_path):
     handler.do_POST()
     assert sent_response["status"] == 200
     assert sent_response["data"]["success"] is True
+
+
+def test_head_request_health_and_root(tmp_path):
+    from job_dashboard.web import DashboardApp, make_handler
+
+    app = DashboardApp({}, [], tmp_path)
+    handler_class = make_handler(app)
+    handler = handler_class.__new__(handler_class)
+    handler.path = "/health"
+    handler.headers = {}
+
+    responses = []
+    headers = {}
+    handler.send_response = lambda code: responses.append(code)
+    handler.send_header = lambda k, v: headers.update({k: v})
+    handler._send_cors_headers = lambda: None
+    handler.end_headers = lambda: None
+
+    handler.do_HEAD()
+    assert responses == [200]
+    assert headers.get("Content-Type") == "application/json"
+

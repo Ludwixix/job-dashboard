@@ -33,6 +33,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from .ai_resume_analyzer import get_resume_analyzer
 from .ats_optimizer import generate_ats_optimized_resume, generate_ats_docx_bytes
+from .ats_simulator import generate_ats_diagnostic_report
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
 from .interview_simulator import get_interview_simulator
@@ -1441,6 +1442,34 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "linkedin_optimization": opt.to_dict()})
                 return
 
+            # Phase 20: ATS Sentinel & Parser Diagnostic GET Endpoint
+            if path == "/api/ats-diagnostic" or (path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic")):
+                job_id = ""
+                if path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic"):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/ats-diagnostic")
+                else:
+                    job_id = query_params.get("job_id", [""])[0]
+
+                job_data = None
+                if job_id:
+                    job_data = app.repository.get_job(job_id)
+                    if not job_data:
+                        for j in app.dashboard.jobs:
+                            if getattr(j, "id", "") == job_id:
+                                job_data = j
+                                break
+
+                user_id = resolve_user_id(self, query_params)
+                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+
+                resume_text = query_params.get("resume_text", [None])[0]
+                if not resume_text and profile:
+                    resume_text = profile.get("resume_text") or profile.get("rawResumeText") or profile.get("summary") or ""
+
+                report = generate_ats_diagnostic_report(resume_text or "", job_data)
+                self.send_json(200, {"success": True, "diagnostic": report})
+                return
+
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -2807,6 +2836,35 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {"success": True, "pack": pack})
                     return
 
+                # Phase 20: ATS Sentinel & Parser Diagnostic POST Endpoint
+                if path == "/api/ats-diagnostic" or (path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic")):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    resume_text = payload.get("resume_text") or payload.get("resumeText") or ""
+                    job = payload.get("job")
+                    job_id = None
+                    if path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic"):
+                        job_id = path.removeprefix("/api/jobs/").removesuffix("/ats-diagnostic")
+                    elif payload.get("job_id"):
+                        job_id = payload["job_id"]
+
+                    if not job and job_id:
+                        job = app.repository.get_job(job_id)
+                        if not job:
+                            for j in app.dashboard.jobs:
+                                if getattr(j, "id", "") == job_id:
+                                    job = j
+                                    break
+
+                    if not resume_text:
+                        user_id = resolve_user_id(self, query_params) or payload.get("user_id")
+                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                        if profile:
+                            resume_text = profile.get("resume_text") or profile.get("rawResumeText") or profile.get("summary") or ""
+
+                    report = generate_ats_diagnostic_report(resume_text or "", job)
+                    self.send_json(200, {"success": True, "diagnostic": report})
+                    return
 
                 # Phase 16: Network CRM POST Endpoints
                 if path in ("/api/network/contacts", "/api/network/contacts/"):

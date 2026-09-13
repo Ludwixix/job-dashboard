@@ -35,13 +35,15 @@ class PartialSource:
     def search(self, query):
         if query.term == "broken":
             raise RuntimeError("provider unavailable")
-        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": "2026-08-24"}]
+        today = datetime.now(timezone.utc).date().isoformat()
+        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": today}]
 
 
 def test_pipeline_filters_recent_and_deduplicates_sources():
+    today = datetime.now(timezone.utc).date().isoformat()
     jobs = [
-        {"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": "2026-08-24"},
-        {"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": "2026-08-24"},
+        {"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": today},
+        {"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": today},
         {"title": "Old Role", "company": "Acme", "url": "https://acme/jobs/2", "posted": "2020-01-01"},
     ]
     pipeline = ScrapePipeline([FakeSource(jobs)], days=14)

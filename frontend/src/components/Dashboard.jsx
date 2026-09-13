@@ -36,6 +36,7 @@ const FunnelIntelligenceModal = lazy(() => import('./FunnelIntelligenceModal'));
 const CareerMatrixModal = lazy(() => import('./CareerMatrixModal'));
 const WorkforceAustraliaModal = lazy(() => import('./WorkforceAustraliaModal'));
 const InterviewInfluenceModal = lazy(() => import('./InterviewInfluenceModal'));
+const AtsDiagnosticModal = lazy(() => import('./AtsDiagnosticModal'));
 
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
@@ -74,6 +75,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForOfferHub, setSelectedForOfferHub] = useState(null);
   const [selectedForDossier, setSelectedForDossier] = useState(null);
   const [selectedForInfluenceHub, setSelectedForInfluenceHub] = useState(null);
+  const [selectedForAtsDiagnostic, setSelectedForAtsDiagnostic] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -499,6 +501,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     );
     return match || selectedForInfluenceHub;
   }, [selectedForInfluenceHub, jobs]);
+
+  const liveSelectedForAtsDiagnostic = useMemo(() => {
+    if (!selectedForAtsDiagnostic) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForAtsDiagnostic.id)) ||
+      `${j.company}_${j.title}` === `${selectedForAtsDiagnostic.company}_${selectedForAtsDiagnostic.title}`
+    );
+    return match || selectedForAtsDiagnostic;
+  }, [selectedForAtsDiagnostic, jobs]);
 
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
@@ -1131,6 +1142,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
               onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
               onOpenInfluenceHub={(j) => { setSelectedForInfluenceHub(j); }}
+              onOpenAtsDiagnostic={(j) => { setSelectedForAtsDiagnostic(j); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1263,9 +1275,6 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         </SafeErrorBoundary>
       )}
 
-      {/* Recruiter & Talent CRM Hub Modal */}
-      {isRecruiterCrmOpen && (
-        <SafeErrorBoundary sectionName="Recruiter CRM Hub" onClose={() => { setIsRecruiterCrmOpen(false); setSelectedForRecruiterCrm(null); }}>
       {/* Phase 19: Post-Interview Tactical Influence & Debrief Hub Modal */}
       {liveSelectedForInfluenceHub && (
         <SafeErrorBoundary sectionName="Post-Interview Influence Hub" onClose={() => setSelectedForInfluenceHub(null)}>
@@ -1280,6 +1289,23 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         </SafeErrorBoundary>
       )}
 
+      {/* Phase 20: ATS Sentinel & Parser Diagnostic Hub Modal */}
+      {liveSelectedForAtsDiagnostic && (
+        <SafeErrorBoundary sectionName="ATS Sentinel Hub" onClose={() => setSelectedForAtsDiagnostic(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <AtsDiagnosticModal
+              job={liveSelectedForAtsDiagnostic}
+              profile={activeProfile}
+              isOpen={Boolean(liveSelectedForAtsDiagnostic)}
+              onClose={() => setSelectedForAtsDiagnostic(null)}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Recruiter & Talent CRM Hub Modal */}
+      {isRecruiterCrmOpen && (
+        <SafeErrorBoundary sectionName="Recruiter CRM Hub" onClose={() => { setIsRecruiterCrmOpen(false); setSelectedForRecruiterCrm(null); }}>
           <Suspense fallback={<ModalSkeleton />}>
             <RecruiterRelationshipModal
               isOpen={isRecruiterCrmOpen}

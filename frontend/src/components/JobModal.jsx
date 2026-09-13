@@ -18,7 +18,7 @@ import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
   const initialPrefs = getUserPreferences();
@@ -575,6 +575,8 @@ ${candidatePhone}`;
                       <div className="font-bold">Executive Dossier</div>
                       <div className="text-[10px] text-slate-400 font-sans">90-Day briefing blueprint</div>
                     </div>
+                  </button>
+                )}
                 {onOpenInfluenceHub && (
                   <button
                     type="button"
@@ -589,7 +591,18 @@ ${candidatePhone}`;
                     </div>
                   </button>
                 )}
-
+                {onOpenAtsDiagnostic && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); onOpenAtsDiagnostic(job); }}
+                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950/60 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                    role="menuitem"
+                  >
+                    <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">ATS Sentinel &amp; Parser Audit</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Workday &amp; STAR density simulation</div>
+                    </div>
                   </button>
                 )}
                 {onOpenOfferHub && (
@@ -1867,6 +1880,10 @@ ${data.pipeline_result?.cover_text || ''}`;
                       <Building2 size={14} className="text-cyan-600" /> EXECUTIVE DOSSIER
                     </div>
                     <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      90-day plan, leadership alignment &amp; pain points.
+                    </p>
+                  </button>
+
                   {onOpenInfluenceHub && (
                     <button
                       onClick={() => { onClose(); onOpenInfluenceHub(job); }}
@@ -1881,9 +1898,19 @@ ${data.pipeline_result?.cover_text || ''}`;
                     </button>
                   )}
 
-                      90-day plan, leadership alignment &amp; pain points.
-                    </p>
-                  </button>
+                  {onOpenAtsDiagnostic && (
+                    <button
+                      onClick={() => { onClose(); onOpenAtsDiagnostic(job); }}
+                      className="p-3 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
+                        <ShieldCheck size={14} className="text-emerald-600" /> ATS SENTINEL
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                        Workday &amp; STAR parser simulation.
+                      </p>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => { onClose(); if (onOpenInterviewPrep) onOpenInterviewPrep(job); }}

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from job_dashboard.repository import JobRepository
 
 
@@ -5,7 +6,8 @@ class FakeRefreshSource:
     name = "fake"
 
     def search(self, query):
-        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/1", "posted": "2026-08-24", "location": "Melbourne"}]
+        today = datetime.now(timezone.utc).date().isoformat()
+        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/1", "posted": today, "location": "Melbourne"}]
 
 
 def test_dashboard_app_refresh_persists_jobs_and_reports_progress(tmp_path):

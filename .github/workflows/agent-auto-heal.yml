@@ -1,0 +1,146 @@
+name: Agent Auto-Heal Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [master]
+  workflow_run:
+    workflows: ["Monorepo CI and Frontend Deploy"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch to auto-heal"
+        required: false
+        default: "master"
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: auto-heal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose-and-heal:
+    name: Verify Tests & Auto-Heal on Failure
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure')
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-cloudrun.txt
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-cloudrun.txt
+          pip install pytest anyio typeguard
+          pip install -e .
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Test Suites & Trap Failures
+        id: test_run
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/agent_diagnostics
+          echo "=== RUNNING MONOREPO VERIFICATION ===" > /tmp/agent_diagnostics/test_output.log
+          
+          # Backend test run
+          echo "--- [BACKEND TESTS] ---" >> /tmp/agent_diagnostics/test_output.log
+          cd backend
+          python3 -m pytest tests/ -v >> /tmp/agent_diagnostics/test_output.log 2>&1
+          BACKEND_STATUS=$?
+          cd ..
+
+          # Frontend test run
+          echo "--- [FRONTEND TESTS] ---" >> /tmp/agent_diagnostics/test_output.log
+          cd frontend
+          npm test -- --run >> /tmp/agent_diagnostics/test_output.log 2>&1
+          FRONTEND_STATUS=$?
+          cd ..
+
+          if [ $BACKEND_STATUS -ne 0 ] || [ $FRONTEND_STATUS -ne 0 ]; then
+            echo "FAILED=true" >> "$GITHUB_OUTPUT"
+            echo "Detected failure: Backend exit code $BACKEND_STATUS, Frontend exit code $FRONTEND_STATUS"
+          else
+            echo "FAILED=false" >> "$GITHUB_OUTPUT"
+            echo "All test suites passed cleanly."
+          fi
+
+      - name: Isolate Broken Test Failure Log
+        if: steps.test_run.outputs.FAILED == 'true'
+        run: |
+          echo "Isolating failure logs into structured diagnostic report..."
+          mkdir -p .agents/diagnostics
+          cp /tmp/agent_diagnostics/test_output.log .agents/diagnostics/latest_failure.log
+          
+          # Extract failure traceback highlights
+          grep -E -C 3 "FAILED|FAIL|ERROR|AssertionError|Error:" /tmp/agent_diagnostics/test_output.log > .agents/diagnostics/isolated_trace.log || true
+          echo "Failure log isolated at .agents/diagnostics/latest_failure.log"
+
+      - name: Invoke Antigravity Headless CLI Execution Agent
+        if: steps.test_run.outputs.FAILED == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Invoking Antigravity autonomous self-healing agent..."
+          
+          # Ensure agy or antigravity CLI runner is available
+          if command -v agy &>/dev/null; then
+            agy run "Analyze failure log in .agents/diagnostics/latest_failure.log, diagnose root cause according to .agents/rules/architect.md, apply targeted fix, and verify tests pass."
+          elif command -v npx &>/dev/null; then
+            npx --yes @google/antigravity run "Self-heal: analyze .agents/diagnostics/latest_failure.log, fix failures, respect architecture in .agents/rules/architect.md, verify tests." || true
+          fi
+
+          # Re-verify fixes post-agent execution
+          echo "Re-running backend test verification..."
+          cd backend && python3 -m pytest tests/ -q --tb=short && cd ..
+          echo "Re-running frontend test verification..."
+          cd frontend && npm test -- --run && cd ..
+
+      - name: Commit and Push Self-Healed Patch
+        if: steps.test_run.outputs.FAILED == 'true'
+        run: |
+          git config --global user.name "Antigravity Autonomous Agent"
+          git config --global user.email "agent-auto-heal@antigravity.internal"
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "fix(auto-heal): self-corrected test failure via Antigravity agent [skip ci]"
+            TARGET_BRANCH="${{ github.head_ref || github.ref_name }}"
+            git push origin HEAD:"$TARGET_BRANCH"
+            echo "Self-healed patch pushed successfully to $TARGET_BRANCH"
+          else
+            echo "No workspace modifications required commit."
+          fi

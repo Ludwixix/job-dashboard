@@ -189,6 +189,16 @@ class ConnectionPool:
         try:
             conn = self.get_connection()
             yield conn
+        except Exception:
+            # Preserve the rollback-on-error semantics callers previously got
+            # from `with sqlite3_connection:` so a failed write never leaves an
+            # open transaction on a connection that returns to the pool.
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except sqlite3.Error:
+                    pass
+            raise
         finally:
             if conn:
                 self.return_connection(conn)

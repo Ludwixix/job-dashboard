@@ -208,3 +208,34 @@ def test_resilient_selector_degradation_indeed_embedded_json():
         assert jobs[0].salary.estimated is True
         assert jobs[0].salary.min_amount == 160000.0
 
+
+def test_api_telemetry_status_endpoint(tmp_path):
+    from job_dashboard.web import DashboardApp, make_handler
+    from io import BytesIO
+
+    jobs_file = tmp_path / "jobs.json"
+    jobs_file.write_text("[]")
+
+    app = DashboardApp(data_dir=str(tmp_path))
+    Handler = make_handler(app)
+    h = Handler.__new__(Handler)
+    h.path = "/api/telemetry/status"
+    h.headers = {}
+    h.rfile = BytesIO(b"")
+    h.wfile = BytesIO()
+
+    captured = {}
+    def mock_send_json(code, payload):
+        captured["code"] = code
+        captured["payload"] = payload
+    h.send_json = mock_send_json
+
+    h.do_GET()
+
+    assert captured["code"] == 200
+    assert captured["payload"]["status"] == "ok"
+    assert "seek" in captured["payload"]["providers"]
+    assert "indeed" in captured["payload"]["providers"]
+    assert "adzuna" in captured["payload"]["providers"]
+    assert "remoteok" in captured["payload"]["providers"]
+

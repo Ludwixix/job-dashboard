@@ -1942,6 +1942,7 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/telemetry/status":
                 from datetime import datetime, timezone
+                from .config import settings
                 seek_cookies = app.repository.get_provider_cookies("seek")
                 indeed_cookies = app.repository.get_provider_cookies("indeed")
                 providers = {

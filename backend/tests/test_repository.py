@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime, timezone
 from job_dashboard.repository import JobRepository
 
@@ -168,3 +169,83 @@ def test_repository_hourly_metrics(tmp_path):
     assert "hourly_ingestion" in summary
     assert summary["hourly_ingestion"]["added_last_hour"] == 1
     assert summary["hourly_ingestion"]["added_past_24h"] == 2
+
+
+def test_raw_pool_get_connection_leaks_and_exhausts_pool(tmp_path):
+    """`pool.get_connection()` returns a bare sqlite3.Connection.
+
+    Using it as a context manager runs sqlite3's *transaction* protocol
+    (commit/rollback) and never returns the connection to the pool, so
+    `_active_connections` is never decremented and the pool starves.
+    """
+    from job_dashboard.db_pool import ConnectionPool
+
+    pool = ConnectionPool(tmp_path / "leak.sqlite3", max_connections=3, timeout=0.5)
+
+    for _ in range(3):
+        with pool.get_connection() as conn:
+            conn.execute("SELECT 1").fetchone()
+
+    # Every slot was leaked, so the pool is now permanently exhausted.
+    assert pool._active_connections == 3
+    assert pool.get_stats()["pool_size"] == 0
+
+    with pytest.raises(TimeoutError):
+        pool.get_connection()
+
+
+def test_pool_connection_contextmanager_is_reusable(tmp_path):
+    """`pool.connection()` correctly returns the connection on exit."""
+    from job_dashboard.db_pool import ConnectionPool
+
+    pool = ConnectionPool(tmp_path / "ok.sqlite3", max_connections=3, timeout=0.5)
+
+    for _ in range(50):
+        with pool.connection() as conn:
+            conn.execute("SELECT 1").fetchone()
+
+    stats = pool.get_stats()
+    assert stats["active_connections"] == 0
+    assert stats["pool_size"] <= 3
+
+
+def test_pool_connection_rolls_back_and_returns_on_error(tmp_path):
+    """A failing write must not leak an open transaction back into the pool."""
+    from job_dashboard.db_pool import ConnectionPool
+
+    pool = ConnectionPool(tmp_path / "rollback.sqlite3", max_connections=3, timeout=0.5)
+
+    with pytest.raises(RuntimeError):
+        with pool.connection() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY)")
+            conn.execute("INSERT INTO t (id) VALUES (1)")
+            raise RuntimeError("boom")
+
+    # Connection was still returned, and the transaction rolled back.
+    assert pool.get_stats()["active_connections"] == 0
+    assert pool.get_stats()["pool_size"] == 1
+
+    with pool.connection() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM t").fetchone()[0] == 0
+
+
+def test_repeated_repository_reads_do_not_exhaust_connection_pool(tmp_path):
+    """Repository reads must return connections, else Cloud Run 503s.
+
+    `/api/telemetry/status` calls `get_provider_cookies()` twice per request;
+    a leak exhausts the 10-slot pool within a handful of polls.
+    """
+    from job_dashboard.db_pool import ConnectionPool
+
+    db_path = tmp_path / "jobs.sqlite3"
+    repo = JobRepository(db_path)
+    # Tiny pool with a short timeout so exhaustion surfaces immediately.
+    repo.pool = ConnectionPool(db_path, max_connections=3, timeout=0.5)
+
+    for _ in range(30):
+        repo.get_provider_cookies("seek")
+        repo.get_provider_cookies("indeed")
+
+    stats = repo.pool.get_stats()
+    assert stats["active_connections"] == 0
+    assert stats["pool_size"] <= 3

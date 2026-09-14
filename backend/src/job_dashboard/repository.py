@@ -1372,7 +1372,7 @@ class JobRepository:
             Dictionary mapping flag key to metadata dict {'enabled': bool, 'description': str, 'updated_at': str}.
         """
         flags: dict[str, dict[str, Any]] = {}
-        with self.pool.get_connection() as conn:
+        with self.pool.connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT key, enabled, description, updated_at FROM feature_flags")
             for row in cursor.fetchall():
@@ -1395,7 +1395,7 @@ class JobRepository:
             True on successful update.
         """
         now_iso = datetime.now(timezone.utc).isoformat()
-        with self.pool.get_connection() as conn:
+        with self.pool.connection() as conn:
             cursor = conn.cursor()
             if description:
                 cursor.execute(
@@ -1433,7 +1433,7 @@ class JobRepository:
         Returns:
             Boolean indicating whether feature is active.
         """
-        with self.pool.get_connection() as conn:
+        with self.pool.connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT enabled FROM feature_flags WHERE key = ?", (key,))
             row = cursor.fetchone()
@@ -1449,7 +1449,7 @@ class JobRepository:
     ) -> bool:
         """Store manual session headers and cookies per provider in SQLite."""
         now_iso = datetime.now(timezone.utc).isoformat()
-        with self.pool.get_connection() as conn:
+        with self.pool.connection() as conn:
             conn.execute(
                 """
                 INSERT INTO provider_cookies (provider, headers_json, cookies_json, updated_at)
@@ -1471,7 +1471,7 @@ class JobRepository:
 
     def get_provider_cookies(self, provider: str) -> dict[str, Any]:
         """Retrieve stored headers and cookies for a provider."""
-        with self.pool.get_connection() as conn:
+        with self.pool.connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT headers_json, cookies_json, updated_at FROM provider_cookies WHERE provider = ?",

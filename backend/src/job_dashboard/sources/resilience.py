@@ -363,3 +363,4 @@ ADAPTIVE_BROWSER_EXTRACTOR_JS = """() => {
     return results;
 };
 """
+

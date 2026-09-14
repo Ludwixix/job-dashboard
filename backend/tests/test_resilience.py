@@ -127,3 +127,4 @@ def test_indeed_graphql_gateway_live_or_fallback():
     assert any("engineer" in r.title.lower() or "systems" in r.title.lower() or "it" in r.title.lower() for r in records)
     assert all(r.provider == "indeed" for r in records)
     assert all(r.url.startswith("http") for r in records)
+

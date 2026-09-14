@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import { useToast } from './ToastContext';
 import { useJobs } from '../hooks/useJobs';
 import { JobSeeker } from './JobSeeker';
@@ -65,8 +65,10 @@ import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../se
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
+  ChevronDown, ChevronUp, Layers, Award
 } from 'lucide-react';
+
 
 
 export const Dashboard = ({ currentUser, onSignOut }) => {
@@ -136,6 +138,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const toolsMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) {
+        setIsToolsMenuOpen(false);
+      }
+    };
+    if (isToolsMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }
+  }, [isToolsMenuOpen]);
+
 
   // Single Dashboard Mode vs Minimalist Cyberpunk Ambient Flow Mode
   const [viewMode, setViewMode] = useState(() => {
@@ -714,41 +731,41 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         </div>
       )}
 
-      <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 text-slate-300 py-1.5 px-3 sm:px-5 lg:px-6 font-mono text-[11px] flex flex-wrap items-center justify-between gap-2 font-semibold shadow-md">
-        <div className="flex items-center gap-4 truncate">
-          <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0">
-            <Activity size={13} className="animate-pulse" /> V2.0 ENGINE ACTIVE
+      <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 text-slate-300 py-2 px-3 sm:px-5 lg:px-6 font-mono text-[11px] flex flex-wrap items-center justify-between gap-3 font-semibold shadow-md">
+        <div className="flex items-center gap-3 truncate">
+          <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+            <Activity size={12} className="animate-pulse text-emerald-400" /> V2.0 ENGINE ACTIVE
           </span>
           <span className="text-slate-700 hidden sm:inline">|</span>
-          <span className="truncate text-slate-300">
-            <strong className="text-white">{jobs.length}</strong> INDEXED POSITIONS
+          <span className="truncate text-slate-300 text-xs">
+            <strong className="text-white font-black">{jobs.length}</strong> POSITIONS
           </span>
           <span className="text-slate-700 hidden md:inline">|</span>
           
           {/* Location Bound selector */}
           <div className="flex items-center gap-1.5 truncate">
-            <span className="text-slate-500 font-bold hidden lg:inline">LOCATION BASE:</span>
+            <span className="text-slate-500 font-bold hidden lg:inline text-[10px]">BASE:</span>
             {isEditingLocation ? (
               <form onSubmit={handleSaveLocation} className="flex items-center gap-1">
                 <input
                   type="text"
                   value={tempLocationInput}
                   onChange={(e) => setTempLocationInput(e.target.value)}
-                  className="bg-slate-800 border border-indigo-500 text-emerald-300 px-2 py-0.5 rounded text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
+                  className="bg-slate-900 border border-indigo-500 text-emerald-300 px-2 py-0.5 rounded-lg text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
                   placeholder="SUBURB POSTCODE"
                   autoFocus
                 />
-                <button type="submit" className="text-emerald-400 hover:text-emerald-300 font-bold px-1 cursor-pointer">✓</button>
-                <button type="button" onClick={() => setIsEditingLocation(false)} className="text-rose-400 hover:text-rose-300 font-bold px-1 cursor-pointer">✕</button>
+                <button type="submit" className="text-emerald-400 hover:text-emerald-300 font-bold px-1.5 py-0.5 bg-emerald-950/60 rounded border border-emerald-500/40 cursor-pointer">✓</button>
+                <button type="button" onClick={() => setIsEditingLocation(false)} className="text-rose-400 hover:text-rose-300 font-bold px-1.5 py-0.5 bg-rose-950/60 rounded border border-rose-500/40 cursor-pointer">✕</button>
               </form>
             ) : (
               <button 
                 onClick={() => { setTempLocationInput(baseLocation); setIsEditingLocation(true); }}
-                className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700"
+                className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer bg-slate-900/90 px-2.5 py-0.5 rounded-lg border border-slate-700/80 transition-colors"
                 title="Click to change your primary location radius baseline"
               >
                 <MapPin size={11} className="text-indigo-400" />
-                <span className="truncate max-w-[140px] sm:max-w-[200px]">{baseLocation}</span>
+                <span className="truncate max-w-[130px] sm:max-w-[180px]">{baseLocation}</span>
                 <span className="text-[9px] text-slate-400 font-normal">✎</span>
               </button>
             )}
@@ -772,132 +789,178 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
 
-          {/* Intelligence & Analytics Tools Group */}
-          <div className="inline-flex items-center bg-slate-900/90 p-0.5 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setIsRecruiterCrmOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-purple-300 hover:text-white hover:bg-purple-950/70 transition-colors font-bold text-[10px] cursor-pointer"
-              title="Recruiter & Talent Network CRM"
-            >
-              <Users size={12} className="text-purple-400" />
-              <span>CRM</span>
-              {overdueTouchpointCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse">
-                  {overdueTouchpointCount}
-                </span>
-              )}
-            </button>
+          {/* Quick Action: + Custom Job */}
+          <button
+            onClick={() => setIsCustomJobModalOpen(true)}
+            className="flex items-center gap-1 text-purple-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 px-2.5 py-1 rounded-xl shadow-xs"
+            title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
+          >
+            <Sparkles size={11} className="text-purple-400" /> + CUSTOM
+          </button>
 
-            <button
-              onClick={() => setIsFunnelModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-cyan-300 hover:text-white hover:bg-cyan-950/70 transition-colors font-bold text-[10px] cursor-pointer"
-              title="Talent Funnel Intelligence"
-            >
-              <TrendingUp size={12} className="text-cyan-400" />
-              <span>FUNNEL</span>
-            </button>
+          {/* Quick Action: Batch Apply */}
+          <button
+            onClick={() => setIsBatchApplyOpen(true)}
+            className="flex items-center gap-1 text-emerald-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 px-2.5 py-1 rounded-xl shadow-xs"
+            title="Dispatch 1-Click Batch Automated Applications"
+          >
+            <Zap size={11} className="text-emerald-400" /> BATCH
+          </button>
 
-            <button
-              onClick={() => setIsCareerModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-indigo-300 hover:text-white hover:bg-indigo-950/70 transition-colors font-bold text-[10px] cursor-pointer"
-              title="Career Vector Matrix & Roadmap"
-            >
-              <Compass size={12} className="text-indigo-400" />
-              <span>COMPASS</span>
-            </button>
-
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors font-bold text-[10px] cursor-pointer"
-              title="Configure LLM Provider, Model, and API Credentials"
-            >
-              <Settings size={12} className="text-indigo-400" />
-              <span>SETTINGS</span>
-            </button>
-          </div>
-
-          {/* Sync & Auth Group */}
-          {authUser ? (
-            <button
-              onClick={() => setIsGoogleIntegrationOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 hover:text-white hover:bg-emerald-900 transition-colors font-bold text-[10px] shadow-xs cursor-pointer"
-              title="Open Personal Google Sheet Tracker & Gmail Scanner"
-            >
-              <Table size={12} className="text-emerald-400" />
-              <span>TRACKER</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors font-bold text-[10px] cursor-pointer"
-              title="Sign in with Google to sync personal sheets and scan Gmail"
-            >
-              <Lock size={12} className="text-indigo-400" />
-              <span>SIGN IN</span>
-            </button>
-          )}
-
+          {/* Ambient Flow Toggle (Test Compatible) */}
           <button
             onClick={() => setViewMode("ambient")}
-            className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-colors font-bold text-[10px] rounded-xl cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-all font-bold text-[10px] rounded-xl cursor-pointer"
             title="Switch to Cyberpunk Ambient Flow Mode"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             <span>AMBIENT FLOW</span>
           </button>
 
+          {/* Consolidated Intelligence & Tools Dropdown */}
+          <div className="relative" ref={toolsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                isToolsMenuOpen 
+                  ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30' 
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700'
+              }`}
+              title="Intelligence, Analytics & Network Tools"
+            >
+              <Layers size={11} className={isToolsMenuOpen ? 'text-white' : 'text-indigo-400'} />
+              <span>TOOLS</span>
+              {overdueTouchpointCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse">
+                  {overdueTouchpointCount}
+                </span>
+              )}
+              <ChevronDown size={11} className={`transition-transform duration-200 ${isToolsMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isToolsMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-64 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200">
+                <div className="px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                  CAREER SUITE // TOOLS & INTEL
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsRecruiterCrmOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-xl hover:bg-purple-950/70 text-slate-200 hover:text-purple-300 flex items-center justify-between transition-colors text-left cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 font-bold text-[11px]">
+                    <Users size={13} className="text-purple-400" />
+                    <span>Recruiter CRM</span>
+                  </span>
+                  {overdueTouchpointCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse">
+                      {overdueTouchpointCount} due
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsFunnelModalOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-xl hover:bg-cyan-950/70 text-slate-200 hover:text-cyan-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <TrendingUp size={13} className="text-cyan-400" />
+                  <span>Funnel Intelligence</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsCareerModalOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-xl hover:bg-indigo-950/70 text-slate-200 hover:text-indigo-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <Compass size={13} className="text-indigo-400" />
+                  <span>Career Vector Compass</span>
+                </button>
+
+                {authUser ? (
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsGoogleIntegrationOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-xl hover:bg-emerald-950/70 text-slate-200 hover:text-emerald-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Table size={13} className="text-emerald-400" />
+                    <span>Google Sheets Tracker</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsAuthModalOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Lock size={13} className="text-indigo-400" />
+                    <span>Sign in with Google</span>
+                  </button>
+                )}
+
+                {isWorkforceEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsWorkforceModalOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-xl hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Award size={13} className="text-amber-400" />
+                    <span>Workforce Australia</span>
+                  </button>
+                )}
+
+                <div className="pt-1 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsSettingsOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Settings size={13} className="text-indigo-400" />
+                    <span>Settings & LLM Models</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Command Palette (Ctrl+K) */}
+          <button
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950/80 border border-indigo-500/40 px-2 py-1 rounded-xl"
+            title="Open Command Palette (Ctrl+K)"
+          >
+            <Command size={11} /> ⌘K
+          </button>
+
           {/* Provider Mesh Telemetry Desk */}
           <TelemetryDesk />
 
-          {/* Quick Action Pills */}
-          <div className="inline-flex items-center gap-1.5">
-            <button
-              onClick={() => setIsCustomJobModalOpen(true)}
-              className="flex items-center gap-1 text-purple-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-purple-950 border border-purple-500/40 px-2.5 py-1 rounded-xl shadow-xs"
-              title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
-            >
-              <Sparkles size={11} className="text-purple-400" /> + CUSTOM
-            </button>
+          {/* Sync Database Feed */}
+          <button 
+            onClick={refetch}
+            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-slate-900 border border-slate-800"
+            title="Sync Database Feed"
+          >
+            <RefreshCw size={11} />
+          </button>
 
-            <button
-              onClick={() => setIsBatchApplyOpen(true)}
-              className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-emerald-950 border border-emerald-500/40 px-2.5 py-1 rounded-xl shadow-xs"
-              title="Dispatch 1-Click Batch Automated Applications"
-            >
-              <Zap size={11} className="text-emerald-400" /> BATCH
-            </button>
-
-            <button
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950 border border-indigo-500/40 px-2 py-1 rounded-xl"
-              title="Open Command Palette (Ctrl+K)"
-            >
-              <Command size={11} /> ⌘K
-            </button>
-
+          {/* Sign Out */}
+          {onSignOut && (
             <button 
-              onClick={refetch}
-              className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-slate-900 border border-slate-800"
-              title="Sync Database Feed"
+              onClick={() => {
+                logoutUser();
+                onSignOut();
+              }}
+              className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-rose-950/60 border border-rose-500/40"
+              title="Sign Out / Switch User"
             >
-              <RefreshCw size={11} />
+              <LogOut size={11} />
             </button>
-
-            {onSignOut && (
-              <button 
-                onClick={() => {
-                  logoutUser();
-                  onSignOut();
-                }}
-                className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-xl bg-rose-950/60 border border-rose-500/40"
-                title="Sign Out / Switch User"
-              >
-                <LogOut size={11} />
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
+
 
       {/* Location Preset Bar */}
       {isEditingLocation && (
@@ -947,20 +1010,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           </div>
 
           {/* 5-Way Tab View Switcher */}
-          <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 max-w-full overflow-x-auto scrollbar-none shrink-0">
-            <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1.5">
+          <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md p-1 rounded-2xl border border-slate-800/80 max-w-full overflow-x-auto scrollbar-none shrink-0 shadow-inner">
+            <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1">
               <button
                 role="tab"
                 aria-selected={activeSection === 'seeker'}
                 aria-controls="panel-seeker"
                 onClick={() => setActiveSection('seeker')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'seeker' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <LayoutGrid size={14} aria-hidden="true" /> 
+                <LayoutGrid size={13} aria-hidden="true" /> 
                 DISCOVERY STREAM
                 {preparedCount > 0 && (
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40" aria-label={`${preparedCount} prepared`}>
@@ -974,13 +1037,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 aria-selected={activeSection === 'highlights'}
                 aria-controls="panel-highlights"
                 onClick={() => setActiveSection('highlights')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'highlights' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <Zap size={14} className="text-amber-400" aria-hidden="true" /> 
+                <Zap size={13} className="text-amber-400" aria-hidden="true" /> 
                 ACTION QUEUE
               </button>
 
@@ -989,13 +1052,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 aria-selected={activeSection === 'kanban'}
                 aria-controls="panel-kanban"
                 onClick={() => setActiveSection('kanban')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'kanban' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <Sliders size={14} aria-hidden="true" /> 
+                <Sliders size={13} aria-hidden="true" /> 
                 APPLICATION KANBAN
               </button>
 
@@ -1004,13 +1067,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 aria-selected={activeSection === 'remote'}
                 aria-controls="panel-remote"
                 onClick={() => setActiveSection('remote')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'remote' 
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/30 border border-emerald-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <Globe size={14} className={activeSection === 'remote' ? 'text-white' : 'text-emerald-400'} aria-hidden="true" /> 
+                <Globe size={13} className={activeSection === 'remote' ? 'text-white' : 'text-emerald-400'} aria-hidden="true" /> 
                 REMOTE ROLES
                 {remoteJobsCount > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
@@ -1024,13 +1087,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 aria-selected={activeSection === 'market'}
                 aria-controls="panel-market"
                 onClick={() => setActiveSection('market')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'market' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <TrendingUp size={14} aria-hidden="true" /> 
+                <TrendingUp size={13} aria-hidden="true" /> 
                 MARKET INTEL
               </button>
 
@@ -1039,13 +1102,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 aria-selected={activeSection === 'analytics'}
                 aria-controls="panel-analytics"
                 onClick={() => setActiveSection('analytics')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'analytics' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <Target size={14} aria-hidden="true" /> 
+                <Target size={13} aria-hidden="true" /> 
                 ANALYTICS
               </button>
 
@@ -1054,14 +1117,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 aria-selected={activeSection === 'operations'}
                 aria-controls="panel-operations"
                 onClick={() => setActiveSection('operations')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                  activeSection === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'operations' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
                 }`}
               >
-                <CalendarClock size={14} aria-hidden="true" /> OPERATIONS
+                <CalendarClock size={13} aria-hidden="true" /> OPERATIONS
               </button>
             </div>
           </nav>
+
         </div>
       </header>
  

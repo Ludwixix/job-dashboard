@@ -848,40 +848,40 @@ export const JobSeeker = ({
       )}
 
       {/* Top Command Banner with Live Scraper Progress Bar */}
-      <div className="bg-slate-900 rounded-2xl p-6 text-white border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-md relative overflow-hidden">
+      <div className="obsidian-card rounded-2xl p-4 sm:p-5 text-white border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl relative overflow-hidden">
 
         {scraping && (
           <div 
-            className="absolute bottom-0 left-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
+            className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
             style={{ width: `${scrapeProgressPercent}%` }}
           />
         )}
 
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 mb-2">
-            <Sparkles size={12} /> SOURCING & ASSET ENGINE // ACTIVE
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+            <Sparkles size={11} className="text-indigo-400" /> SOURCING & ASSET ENGINE // ACTIVE
           </div>
-          <h2 className="text-xl font-mono font-black tracking-wider uppercase text-white">JOB SEEKER & PREPARATION MATRIX</h2>
-          <p className="text-xs text-slate-300 font-mono mt-1 max-w-2xl">
+          <h2 className="text-lg sm:text-xl font-mono font-black tracking-wider uppercase text-white">JOB SEEKER & PREPARATION MATRIX</h2>
+          <p className="text-[11px] text-slate-400 font-mono max-w-2xl">
             PREPARED OPPORTUNITIES // TAILORED COVER LETTERS, RESUME ASSETS & DIRECT SUBMISSION LINKS
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           {/* Dedicated Filter Button: Only Generated Cover Letter & Resume */}
           <button
             onClick={() => {
               setDocsReadyFilter(!docsReadyFilter);
               setCurrentPage(1);
             }}
-            className={`inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-mono font-black text-xs transition-all cursor-pointer border shadow-sm ${
+            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-mono font-black text-xs transition-all cursor-pointer border shadow-sm active:scale-95 ${
               docsReadyFilter
-                ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50'
+                ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50 shadow-emerald-500/25'
                 : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40'
             }`}
             title="Refine job ads only to positions that have had custom Cover Letter & Resume generated"
           >
-            <FileText size={14} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
+            <FileText size={13} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
             <span>{docsReadyFilter ? "SHOWING GENERATED ONLY" : "GENERATED PACKAGES ONLY"}</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
@@ -893,28 +893,28 @@ export const JobSeeker = ({
           {onOpenBatchApply && (
             <button
               onClick={onOpenBatchApply}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-mono font-black text-xs transition-all cursor-pointer border border-emerald-300 shadow-sm"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-mono font-black text-xs transition-all cursor-pointer border border-emerald-300 shadow-sm active:scale-95"
               title="Open 1-Click Batch Auto-Apply Dispatcher"
             >
-              <Zap size={14} className="text-slate-950 fill-slate-950" />
+              <Zap size={13} className="text-slate-950 fill-slate-950" />
               <span>BATCH APPLY</span>
             </button>
           )}
 
           <button
             onClick={() => setShowSidebar(!showSidebar)}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer active:scale-95"
           >
-            {showSidebar ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
-            {showSidebar ? "HIDE SIDEBAR" : "SHOW SIDEBAR"}
+            {showSidebar ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+            <span>{showSidebar ? "HIDE SIDEBAR" : "SHOW SIDEBAR"}</span>
           </button>
 
           <button
             onClick={handleRunScraper}
             disabled={scraping}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-xs transition-all disabled:opacity-80 cursor-pointer min-w-[220px]"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all disabled:opacity-80 cursor-pointer min-w-[190px] active:scale-95"
           >
-            <RefreshCw size={14} className={scraping ? "animate-spin text-indigo-200" : ""} />
+            <RefreshCw size={13} className={scraping ? "animate-spin text-indigo-200" : ""} />
             {scraping ? (
               <span>SCRAPING... ({scrapeElapsedSeconds}s)</span>
             ) : (
@@ -923,6 +923,7 @@ export const JobSeeker = ({
           </button>
         </div>
       </div>
+
 
       {scrapeSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-mono font-bold flex items-center gap-2 animate-in fade-in duration-200">
@@ -1042,17 +1043,17 @@ export const JobSeeker = ({
             totalJobsCount={unsubmittedJobs.length}
           />
 
-          {/* VS Code Theme Refinement Console */}
-          <div className="bg-[#1e1e2e] p-3.5 sm:p-4 rounded-2xl border border-[#313244] shadow-md space-y-3 font-mono">
+          {/* Obsidian Theme Refinement Console */}
+          <div className="obsidian-card p-3.5 sm:p-4 rounded-2xl border border-slate-800/80 shadow-xl space-y-3 font-mono">
 
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
               {/* Main Keyword Search */}
               <div className="relative flex-1 w-full">
-                <Search size={16} className="absolute left-3.5 top-3 text-purple-400" />
+                <Search size={16} className="absolute left-3.5 top-3 text-indigo-400" />
                 <input
                   type="text"
                   placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
-                  className="w-full pl-10 pr-3 py-2.5 border border-[#313244] rounded-xl bg-[#181825] text-xs font-mono font-semibold text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                  className="w-full pl-10 pr-3 py-2.5 border border-slate-700/80 rounded-xl bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -1064,10 +1065,10 @@ export const JobSeeker = ({
                   setDocsReadyFilter(!docsReadyFilter);
                   setCurrentPage(1);
                 }}
-                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 ${
+                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
                   docsReadyFilter
                     ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md ring-2 ring-emerald-500/40'
-                    : 'bg-[#181825] text-emerald-400 border-emerald-500/40 hover:bg-emerald-950/40'
+                    : 'bg-slate-900/90 text-emerald-400 border-emerald-500/40 hover:bg-emerald-950/40'
                 }`}
                 title="Filter positions where custom ATS Resume and Cover Letter have been generated"
               >
@@ -1086,10 +1087,10 @@ export const JobSeeker = ({
                   setActiveStreamTab(activeStreamTab === 'Custom' ? 'All' : 'Custom');
                   setCurrentPage(1);
                 }}
-                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 ${
+                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
                   activeStreamTab === 'Custom'
                     ? 'bg-purple-600 text-white border-purple-400 shadow-md ring-2 ring-purple-500/40'
-                    : 'bg-[#181825] text-purple-300 border-purple-500/40 hover:bg-purple-950/40'
+                    : 'bg-slate-900/90 text-purple-300 border-purple-500/40 hover:bg-purple-950/40'
                 }`}
                 title="Filter to view all custom generated jobs"
               >
@@ -1103,24 +1104,24 @@ export const JobSeeker = ({
               </button>
 
               {/* Sort By Dropdown (Defaults to Most Recent) */}
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold w-full md:w-auto shrink-0">
-                <ArrowUpDown size={14} className="text-indigo-600 shrink-0" />
-                <span className="text-slate-500 uppercase text-[10px]">SORT:</span>
+              <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 font-bold w-full md:w-auto shrink-0 hover:border-indigo-500/50 transition-colors">
+                <ArrowUpDown size={14} className="text-indigo-400 shrink-0" />
+                <span className="text-slate-400 uppercase text-[10px]">SORT:</span>
                 <select
-                  className="bg-transparent focus:outline-none text-xs font-mono font-bold text-slate-900 cursor-pointer"
+                  className="bg-transparent focus:outline-none text-xs font-mono font-bold text-slate-100 cursor-pointer"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                 >
-                  <option value="date">MOST RECENT (NEWEST FIRST)</option>
-                  <option value="best_and_newest">⭐ BEST & MOST RECENT</option>
-                  <option value="score">MATCH SCORE (HIGH → LOW)</option>
-                  <option value="company">COMPANY (A-Z)</option>
+                  <option className="bg-slate-900 text-slate-200" value="date">MOST RECENT (NEWEST FIRST)</option>
+                  <option className="bg-slate-900 text-slate-200" value="best_and_newest">⭐ BEST & MOST RECENT</option>
+                  <option className="bg-slate-900 text-slate-200" value="score">MATCH SCORE (HIGH → LOW)</option>
+                  <option className="bg-slate-900 text-slate-200" value="company">COMPANY (A-Z)</option>
                 </select>
                 {sortBy === 'date' || sortBy === 'best_and_newest' ? (
                   <button
                     type="button"
                     onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
-                    className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2 py-1 text-[10px] font-black text-indigo-700 hover:bg-indigo-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-indigo-500/40 bg-indigo-950/60 px-2 py-1 text-[10px] font-black text-indigo-300 hover:bg-indigo-900/60 cursor-pointer transition-colors"
                     title={`Reverse posting order: currently ${sortDirection === 'desc' ? 'newest first' : 'oldest first'}`}
                   >
                     {sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑'}
@@ -1130,135 +1131,119 @@ export const JobSeeker = ({
             </div>
 
             {/* Multi-Filter Dropdown Matrix */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-2 border-t border-slate-100">
-              {/* Distance Filter (Balaclava VIC) */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold">
-                <Navigation size={13} className="text-emerald-600 shrink-0" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-2 border-t border-slate-800/80">
+              {/* Distance Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
+                <Navigation size={13} className="text-emerald-400 shrink-0" />
                 <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-900 w-full truncate cursor-pointer"
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
                   value={maxDistanceFilter}
                   onChange={(e) => setMaxDistanceFilter(e.target.value)}
                 >
-                  <option value="All">ALL DISTANCES</option>
-                  <option value="5km">&lt; 5 KM (BALACLAVA &amp; NEIGHBORS)</option>
-                  <option value="5km">&lt; 5 KM ({(currentProfile?.suburb || 'LOCAL').toUpperCase()} &amp; NEIGHBORS)</option>
-                  <option value="10km">&lt; 10 KM (CBD &amp; COMMUTE)</option>
-                  <option value="25km">&lt; 25 KM (METRO MELBOURNE)</option>
+                  <option className="bg-slate-900 text-slate-200" value="All">ALL DISTANCES</option>
+                  <option className="bg-slate-900 text-slate-200" value="5km">&lt; 5 KM (BALACLAVA &amp; NEIGHBORS)</option>
+                  <option className="bg-slate-900 text-slate-200" value="5km">&lt; 5 KM ({(currentProfile?.suburb || 'LOCAL').toUpperCase()} &amp; NEIGHBORS)</option>
+                  <option className="bg-slate-900 text-slate-200" value="10km">&lt; 10 KM (CBD &amp; COMMUTE)</option>
+                  <option className="bg-slate-900 text-slate-200" value="25km">&lt; 25 KM (METRO MELBOURNE)</option>
                 </select>
               </div>
 
-              {/* Strict Max Age Filter (Default: Max 13 Days Old) */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold">
-                <Clock size={13} className="text-indigo-600 shrink-0" />
+              {/* Strict Max Age Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
+                <Clock size={13} className="text-indigo-400 shrink-0" />
                 <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-900 w-full truncate cursor-pointer"
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
                   value={maxAgeFilter}
                   onChange={(e) => setMaxAgeFilter(e.target.value)}
                 >
-                  <option value="13days">MAX 13 DAYS OLD (ACTIVE)</option>
-                  <option value="7days">MAX 7 DAYS OLD</option>
-                  <option value="3days">MAX 3 DAYS OLD</option>
-                  <option value="All">ALL DATES (NO EXPIRY)</option>
+                  <option className="bg-slate-900 text-slate-200" value="13days">MAX 13 DAYS OLD (ACTIVE)</option>
+                  <option className="bg-slate-900 text-slate-200" value="7days">MAX 7 DAYS OLD</option>
+                  <option className="bg-slate-900 text-slate-200" value="3days">MAX 3 DAYS OLD</option>
+                  <option className="bg-slate-900 text-slate-200" value="All">ALL DATES (NO EXPIRY)</option>
                 </select>
               </div>
 
               {/* Source Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold">
+              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
                 <Filter size={13} className="text-slate-400 shrink-0" />
                 <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-900 w-full truncate cursor-pointer"
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
                   value={sourceFilter}
                   onChange={(e) => setSourceFilter(e.target.value)}
                 >
-                  {sources.map(s => <option key={s} value={s}>{s === 'All' ? 'ALL SOURCES' : s.toUpperCase()}</option>)}
+                  {sources.map(s => <option className="bg-slate-900 text-slate-200" key={s} value={s}>{s === 'All' ? 'ALL SOURCES' : s.toUpperCase()}</option>)}
                 </select>
               </div>
 
               {/* Min Score Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold">
-                <Award size={13} className="text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
+                <Award size={13} className="text-emerald-400 shrink-0" />
                 <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-900 w-full truncate cursor-pointer"
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
                   value={minScoreFilter}
                   onChange={(e) => setMinScoreFilter(e.target.value)}
                 >
-                  <option value="All">ALL SCORES</option>
-                  <option value="80+">80%+ HIGH MATCH</option>
-                  <option value="70+">70%+ GOOD MATCH</option>
+                  <option className="bg-slate-900 text-slate-200" value="All">ALL SCORES</option>
+                  <option className="bg-slate-900 text-slate-200" value="80+">80%+ HIGH MATCH</option>
+                  <option className="bg-slate-900 text-slate-200" value="70+">70%+ GOOD MATCH</option>
                 </select>
               </div>
 
               {/* Salary Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold">
-                <DollarSign size={13} className="text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
+                <DollarSign size={13} className="text-emerald-400 shrink-0" />
                 <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-900 w-full truncate cursor-pointer"
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
                   value={minSalaryFilter}
                   onChange={(e) => setMinSalaryFilter(e.target.value)}
                 >
-                  <option value="All">ALL SALARIES</option>
-                  <option value="100k+">$100K+ SALARY</option>
-                  <option value="70k+">$70K+ SALARY</option>
+                  <option className="bg-slate-900 text-slate-200" value="All">ALL SALARIES</option>
+                  <option className="bg-slate-900 text-slate-200" value="100k+">$100K+ SALARY</option>
+                  <option className="bg-slate-900 text-slate-200" value="70k+">$70K+ SALARY</option>
                 </select>
               </div>
 
               {/* Work Mode Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold">
-                <MapPin size={13} className="text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-purple-500/50 transition-colors">
+                <MapPin size={13} className="text-purple-400 shrink-0" />
                 <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-900 w-full truncate cursor-pointer"
+                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
                   value={workModeFilter}
                   onChange={(e) => setWorkModeFilter(e.target.value)}
                 >
-                  <option value="All">ALL WORK MODES</option>
-                  <option value="remote">REMOTE / HYBRID</option>
-                  <option value="onsite">ONSITE</option>
-                </select>
-              </div>
-
-              {/* Intelligent Sort Selector */}
-              <div className="flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-200 rounded-xl px-2.5 py-2 text-xs font-bold">
-                <ArrowUpDown size={13} className="text-indigo-600 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-indigo-950 w-full truncate cursor-pointer"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option value="date">📅 MOST RECENT DATE (NEWEST)</option>
-                  <option value="best_and_newest">⭐ BEST & MOST RECENT</option>
-                  <option value="score">🎯 HIGHEST ATS FIT SCORE</option>
-                  <option value="company">🏢 COMPANY (A-Z)</option>
+                  <option className="bg-slate-900 text-slate-200" value="All">ALL WORK MODES</option>
+                  <option className="bg-slate-900 text-slate-200" value="remote">REMOTE / HYBRID</option>
+                  <option className="bg-slate-900 text-slate-200" value="onsite">ONSITE</option>
                 </select>
               </div>
             </div>
 
-
             {/* Active Filter & Page Size Selector Bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-mono gap-2 pt-1 text-slate-600 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-mono gap-2 pt-2 text-slate-400 border-t border-slate-800/80">
               <div className="flex items-center gap-2">
-                <SlidersHorizontal size={13} className="text-indigo-600" />
-                <span>SHOWING <strong className="text-slate-900">{startJobNum}-{endJobNum}</strong> OF <strong className="text-slate-900">{seekerJobs.length}</strong> PREPARED POSITIONS</span>
+                <SlidersHorizontal size={13} className="text-indigo-400" />
+                <span>SHOWING <strong className="text-white">{startJobNum}-{endJobNum}</strong> OF <strong className="text-white">{seekerJobs.length}</strong> PREPARED POSITIONS</span>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 text-[11px]">
-                  <span className="text-slate-500 uppercase">PAGE SIZE:</span>
+                  <span className="text-slate-400 uppercase">PAGE SIZE:</span>
                   <select
                     value={pageSize}
                     onChange={(e) => { setPageSize(e.target.value); setCurrentPage(1); }}
-                    className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-extrabold text-slate-900 focus:outline-none cursor-pointer"
+                    className="bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-0.5 font-extrabold text-slate-200 focus:outline-none cursor-pointer"
                   >
-                    <option value="24">24 / PAGE</option>
-                    <option value="48">48 / PAGE (DEFAULT)</option>
-                    <option value="96">96 / PAGE</option>
-                    <option value="All">SHOW ALL ({seekerJobs.length})</option>
+                    <option className="bg-slate-900 text-slate-200" value="24">24 / PAGE</option>
+                    <option className="bg-slate-900 text-slate-200" value="48">48 / PAGE (DEFAULT)</option>
+                    <option className="bg-slate-900 text-slate-200" value="96">96 / PAGE</option>
+                    <option className="bg-slate-900 text-slate-200" value="All">SHOW ALL ({seekerJobs.length})</option>
                   </select>
                 </div>
 
                 {isFiltered && (
                   <button
                     onClick={resetAllFilters}
-                    className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-900 font-bold underline cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
                   >
                     <RotateCcw size={12} /> RESET ALL
                   </button>
@@ -1266,6 +1251,7 @@ export const JobSeeker = ({
               </div>
             </div>
           </div>
+
 
           {/* Dynamic & High-Impact Job Cards Grid */}
           {seekerJobs.length === 0 ? (
@@ -1403,20 +1389,20 @@ export const JobSeeker = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         onClick={() => onSelectJob(job)}
-                      className={`rounded-2xl p-5 sm:p-6 transition-all duration-300 flex flex-col justify-between space-y-3.5 group cursor-pointer relative overflow-hidden card-hover-lift ${
+                      className={`rounded-2xl p-5 sm:p-5.5 transition-all duration-300 flex flex-col justify-between space-y-3.5 group cursor-pointer relative overflow-hidden card-hover-lift backdrop-blur-xl ${
                         hasCustomDocs
-                          ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 border-2 border-emerald-500 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-500/30'
+                          ? 'obsidian-card-teal border border-teal-500/50 shadow-lg shadow-teal-950/30 ring-1 ring-teal-500/30'
                           : isGeneratingThisJob
-                          ? 'bg-gradient-to-br from-amber-50/90 via-white to-orange-50/50 border-2 border-amber-500 shadow-xl ring-4 ring-amber-400/40 animate-pulse'
+                          ? 'obsidian-card-amber border border-amber-500/60 shadow-xl shadow-amber-950/40 ring-2 ring-amber-400/40 animate-pulse'
                           : isTopFit
-                          ? 'bg-gradient-to-br from-emerald-50/80 via-white to-indigo-50/50 border-2 border-emerald-500/80 shadow-md shadow-emerald-500/10 ring-2 ring-emerald-500/20'
-                          : 'bg-white border border-slate-200/90 shadow-2xs hover:border-indigo-400 hover:shadow-md'
+                          ? 'obsidian-card-emerald border border-emerald-500/50 shadow-lg shadow-emerald-950/30 ring-1 ring-emerald-500/30'
+                          : 'obsidian-card hover:border-indigo-500/50'
                       }`}
                     >
                       {/* Top Gradient Accent Line */}
                       <div className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl ${
                         hasCustomDocs
-                          ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500'
+                          ? 'bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-500'
                           : isTopFit
                           ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
                           : 'bg-gradient-to-r from-indigo-500 to-purple-500'
@@ -1431,13 +1417,13 @@ export const JobSeeker = ({
                               ⚡ SYNTHESIZING...
                             </div>
                           ) : hasCustomDocs ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-teal-500 text-slate-950 uppercase tracking-wider shadow-2xs">
                               <CheckCircle2 size={12} className="text-slate-950" />
                               ✨ READY (PDFs)
                             </div>
                           ) : isTopFit ? (
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
-                              <Flame size={12} className="text-amber-900 fill-amber-900" />
+                              <Flame size={12} className="text-amber-950 fill-amber-950" />
                               🏆 TOP FIT
                             </div>
                           ) : null}
@@ -1461,10 +1447,10 @@ export const JobSeeker = ({
                           <button
                             type="button"
                             onClick={(e) => toggleStar(job.id || `${job.company}_${job.title}`, e)}
-                            className={`p-1.5 rounded-full transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'}`}
+                            className={`p-1.5 rounded-full transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25' : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'}`}
                             title={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "Remove from Saved" : "Save Job"}
                           >
-                            <Star size={17} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-500" : ""} />
+                            <Star size={16} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-400" : ""} />
                           </button>
 
                           <button
@@ -1474,17 +1460,17 @@ export const JobSeeker = ({
                               const cId = job.id || `${job.company}_${job.title}`;
                               setOpenKebabJobId(prev => prev === cId ? null : cId);
                             }}
-                            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-xl hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                             title="More Actions"
                           >
-                            <MoreVertical size={17} />
+                            <MoreVertical size={16} />
                           </button>
 
                           {/* Kebab Popover Menu */}
                           {openKebabJobId === (job.id || `${job.company}_${job.title}`) && (
                             <div 
                               onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 top-full mt-1 w-60 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200"
+                              className="absolute right-0 top-full mt-1 w-60 bg-slate-900/95 backdrop-blur-xl border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200"
                             >
                               <button
                                 type="button"
@@ -1603,18 +1589,18 @@ export const JobSeeker = ({
                       <div className="flex items-center justify-between gap-2 pt-1 text-xs">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-semibold border ${
                           isTopFit 
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-2xs'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
                             : (job.score || 0) >= 80
-                            ? 'bg-indigo-100 text-indigo-950 border-indigo-300'
-                            : 'bg-slate-100 text-slate-900 border-slate-300'
+                            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                            : 'bg-slate-800/90 text-slate-300 border-slate-700/80'
                         }`}>
-                          <Award size={13} className={isTopFit ? "text-slate-950" : "text-indigo-700"} aria-hidden="true" />
+                          <Award size={13} className={isTopFit ? "text-emerald-400" : "text-indigo-400"} aria-hidden="true" />
                           {job.score || 85}% match
                         </span>
 
-                        <div className="flex items-center gap-2 text-slate-500">
+                        <div className="flex items-center gap-2 text-slate-400">
                           {job.source && (
-                            <span className="type-meta px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="type-meta px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700/80">
                               {job.source}
                             </span>
                           )}
@@ -1637,21 +1623,21 @@ export const JobSeeker = ({
                                   rel="noreferrer"
                                   onClick={(e) => e.stopPropagation()}
                                   aria-label={`${job.title} at ${job.company} — open job posting (new tab)`}
-                                  className="type-heading text-base text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
+                                  className="type-heading text-base text-white hover:text-indigo-400 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
                                 >
                                   <span className="leading-snug">{job.title}</span>
-                                  <ExternalLink size={13} className="text-slate-300 group-hover/title:text-indigo-500 shrink-0 mt-0.5" aria-hidden="true" />
+                                  <ExternalLink size={13} className="text-slate-400 group-hover/title:text-indigo-400 shrink-0 mt-0.5" aria-hidden="true" />
                                 </a>
                               ) : (
-                                <h3 className="type-heading text-base text-slate-900 leading-snug">
+                                <h3 className="type-heading text-base text-white leading-snug">
                                   {job.title}
                                 </h3>
                               )}
 
-                              <p className="type-meta text-slate-500 flex items-center gap-1.5 flex-wrap">
+                              <p className="type-meta text-slate-400 flex items-center gap-1.5 flex-wrap">
                                 <Building2 size={12} className="text-indigo-400 shrink-0" aria-hidden="true" />
-                                <span className="font-semibold text-slate-700">{job.company}</span>
-                                <span className="text-slate-300" aria-hidden="true">•</span>
+                                <span className="font-semibold text-slate-200">{job.company}</span>
+                                <span className="text-slate-600" aria-hidden="true">•</span>
                                 <MapPin size={11} className="text-slate-400 shrink-0" aria-hidden="true" />
                                 <span className="truncate">{job.location || 'Australia'}</span>
                               </p>
@@ -1663,26 +1649,26 @@ export const JobSeeker = ({
                       {/* Salary & Work Arrangement Chips */}
                       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                         {job.salary && (
-                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-300">
-                            <DollarSign size={12} className="text-emerald-600" />
+                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-950/70 text-emerald-300 border border-emerald-500/30">
+                            <DollarSign size={12} className="text-emerald-400" />
                             <span>{job.salary}</span>
                           </div>
                         )}
                         {job.workArrangement && (
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
                             job.workArrangement === 'Remote' 
-                              ? 'bg-purple-50 text-purple-800 border-purple-200'
+                              ? 'bg-purple-950/60 text-purple-300 border-purple-500/30'
                               : job.workArrangement === 'Hybrid'
-                              ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : 'bg-slate-50 text-slate-700 border-slate-200'
+                              ? 'bg-blue-950/60 text-blue-300 border-blue-500/30'
+                              : 'bg-slate-800/80 text-slate-300 border-slate-700/80'
                           }`}>
                             <Building2 size={10} />
                             <span>{job.workArrangement}</span>
                           </div>
                         )}
                         {job.employmentType && (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                            <Briefcase size={10} className="text-indigo-600" />
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-300 border border-slate-700/80">
+                            <Briefcase size={10} className="text-indigo-400" />
                             <span>{job.employmentType}</span>
                           </div>
                         )}
@@ -1700,7 +1686,7 @@ export const JobSeeker = ({
                           );
                         }
                         return (
-                          <div className="p-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono space-y-1">
+                          <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono space-y-1">
                             <div className="flex items-center justify-between text-slate-300 font-bold px-1">
                               <span className="flex items-center gap-1 text-indigo-400">
                                 <Navigation size={10} />
@@ -1726,7 +1712,7 @@ export const JobSeeker = ({
                       })()}
 
                       {/* Streamlined Action Ribbon */}
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 font-mono">
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 font-mono">
                         {hasCustomDocs ? (
                           <>
                             <button
@@ -1744,10 +1730,10 @@ export const JobSeeker = ({
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
-                              className="py-2 px-2.5 rounded-xl font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
+                              className="py-2 px-2.5 rounded-xl font-bold text-xs bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
                               title="Open in AI Studio to customize"
                             >
-                              <Sparkles size={13} className="text-emerald-700" />
+                              <Sparkles size={13} className="text-emerald-400" />
                             </button>
                           </>
                         ) : isGeneratingThisJob ? (
@@ -1780,10 +1766,10 @@ export const JobSeeker = ({
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
-                          className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          className="py-2 px-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-extrabold text-xs transition-colors border border-slate-700/80 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                           title="View Full Details"
                         >
-                          <Eye size={13} className="text-slate-600" />
+                          <Eye size={13} className="text-slate-400" />
                           <span>DETAILS</span>
                         </button>
                       </div>
@@ -1796,15 +1782,15 @@ export const JobSeeker = ({
               )}
               {/* Interactive Pagination Navigation Bar */}
               {pageSize !== 'All' && totalPages > 1 && (
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-600">
-                    <span>PAGE <strong className="text-slate-900">{currentPage}</strong> OF <strong className="text-slate-900">{totalPages}</strong></span>
-                    <span className="text-slate-400">({seekerJobs.length} TOTAL POSITIONS)</span>
+                <div className="obsidian-card rounded-2xl p-4 border border-slate-800/80 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-slate-300">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <span>PAGE <strong className="text-white">{currentPage}</strong> OF <strong className="text-white">{totalPages}</strong></span>
+                    <span className="text-slate-500">({seekerJobs.length} TOTAL POSITIONS)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       disabled={currentPage === 1}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-800 cursor-pointer"
+                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
                       title="First Page"
                     >
                       <ChevronFirst size={15} />
@@ -1813,7 +1799,7 @@ export const JobSeeker = ({
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-800 cursor-pointer"
+                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
                     >
                       <ChevronLeft size={15} />
                     </button>
@@ -1827,13 +1813,13 @@ export const JobSeeker = ({
 
                         return (
                           <React.Fragment key={pageNum}>
-                            {showEllipsis && <span className="px-1 text-slate-400">...</span>}
+                            {showEllipsis && <span className="px-1 text-slate-500">...</span>}
                             <button
                               onClick={() => handlePageChange(pageNum)}
                               className={`px-3 py-1.5 rounded-xl font-extrabold transition-all cursor-pointer ${
                                 currentPage === pageNum
-                                  ? 'bg-indigo-600 text-white shadow-2xs'
-                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/50'
+                                  : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/80'
                               }`}
                             >
                               {pageNum}
@@ -1845,7 +1831,7 @@ export const JobSeeker = ({
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-800 cursor-pointer"
+                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
                       title="Next Page"
                     >
                       <ChevronRight size={15} />
@@ -1854,7 +1840,7 @@ export const JobSeeker = ({
                     <button
                       onClick={() => handlePageChange(totalPages)}
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-800 cursor-pointer"
+                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
                       title="Last Page"
                     >
                       <ChevronLast size={15} />
@@ -1865,13 +1851,14 @@ export const JobSeeker = ({
                   {currentPage < totalPages && (
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
-                      className="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-extrabold border border-indigo-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 font-extrabold border border-indigo-500/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
                     >
-                      <ArrowDown size={14} className="text-indigo-600" />
+                      <ArrowDown size={14} className="text-indigo-400" />
                       LOAD NEXT {Math.min(effectivePageSize, seekerJobs.length - endJobNum)} POSITIONS
                     </button>
                   )}
                 </div>
+
               )}
             </div>
           )}

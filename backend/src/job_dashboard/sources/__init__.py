@@ -46,8 +46,18 @@ from .seek import (
     fetch_seek_job_description,
     extract_seek_job_id,
 )
+from .resilience import (
+    ADAPTIVE_BROWSER_EXTRACTOR_JS,
+    extract_balanced_json,
+    extract_embedded_state_jobs,
+    extract_from_json_ld,
+)
 
 __all__ = [
+    "ADAPTIVE_BROWSER_EXTRACTOR_JS",
+    "extract_balanced_json",
+    "extract_embedded_state_jobs",
+    "extract_from_json_ld",
     "SearchQuery",
     "detect_query_stream",
     "resolve_search_location",

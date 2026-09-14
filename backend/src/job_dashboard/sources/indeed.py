@@ -20,6 +20,11 @@ from .base import (
 )
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
 from .proxy import ProxyRotator, sanitize_proxy_url
+from .resilience import (
+    ADAPTIVE_BROWSER_EXTRACTOR_JS,
+    extract_embedded_state_jobs,
+    extract_from_json_ld,
+)
 
 logger = get_logger("job_dashboard.sources.indeed")
 
@@ -54,7 +59,16 @@ class IndeedJobSpySource:
         except Exception as error:
             logger.warning(f"Indeed JobSpy scraper failed for {query.term}: {error}")
 
-        # Tier 2: Public Embedded JSON
+        # Tier 2: Direct Mobile GraphQL Gateway (Resilient to Cloudflare & DOM changes)
+        try:
+            gql_records = list(self._search_graphql(query))
+            if gql_records:
+                logger.info(f"Indeed mobile GraphQL gateway recovered {len(gql_records)} jobs for {query.term}")
+                return iter(gql_records)
+        except Exception as gql_err:
+            logger.warning(f"Indeed mobile GraphQL gateway failed for {query.term}: {gql_err}")
+
+        # Tier 3: Public Embedded JSON & Adaptive Structured State
         if self.html_fallback:
             try:
                 fallback = list(self._search_embedded_json(query))
@@ -64,7 +78,7 @@ class IndeedJobSpySource:
             except Exception as fallback_error:
                 logger.warning(f"Indeed structured JSON fallback failed for {query.term}: {fallback_error}")
 
-        # Tier 3: Stealth Playwright Browser Fallback
+        # Tier 4: Stealth Playwright Browser Fallback with Adaptive DOM Extractor
         if self.browser_fallback:
             try:
                 browser_jobs = list(self._search_browser(query))
@@ -75,6 +89,151 @@ class IndeedJobSpySource:
                 logger.warning(f"Indeed stealth browser fallback failed for {query.term}: {browser_error}")
 
         return iter(())
+
+    def _search_graphql(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
+        """Direct Indeed Mobile GraphQL Gateway request with resilient error recovery.
+        Uses Indeed's official mobile app GraphQL API which is immune to Cloudflare
+        HTML turnstile challenges and DOM changes.
+        """
+        loc = resolve_search_location(query)
+        is_rem = (
+            "remote" in query.term.lower()
+            or "remote" in query.location.lower()
+            or loc.lower() in ("remote", "australia", "all australia")
+            or str(getattr(query, "stream", "")).lower() == "remote"
+        )
+
+        escaped_term = query.term.replace('\\', '\\\\').replace('"', '\\"')
+        escaped_loc = loc.replace('\\', '\\\\').replace('"', '\\"')
+        limit_val = min(100, max(25, self.results_wanted))
+
+        gql_query = (
+            'query GetJobData {\n'
+            '    jobSearch(\n'
+            f'        what: "{escaped_term}"\n'
+            f'        location: {{where: "{escaped_loc}", radius: 50, radiusUnit: MILES}}\n'
+            f'        limit: {limit_val}\n'
+            '        sort: RELEVANCE\n'
+            '    ) {\n'
+            '        results {\n'
+            '            job {\n'
+            '                key\n'
+            '                title\n'
+            '                datePublished\n'
+            '                dateOnIndeed\n'
+            '                description { html }\n'
+            '                location {\n'
+            '                    city\n'
+            '                    admin1Code\n'
+            '                    formatted { short long }\n'
+            '                }\n'
+            '                employer { name }\n'
+            '                compensation {\n'
+            '                    baseSalary {\n'
+            '                        unitOfWork\n'
+            '                        range {\n'
+            '                            ... on Range { min max }\n'
+            '                        }\n'
+            '                    }\n'
+            '                }\n'
+            '                recruit { viewJobUrl }\n'
+            '            }\n'
+            '        }\n'
+            '    }\n'
+            '}'
+        )
+
+        headers = {
+            "Host": "apis.indeed.com",
+            "Content-Type": "application/json",
+            "indeed-api-key": "161092c2017b5bbab13edb12461a62d5a833871e7cad6d9d475304573de67ac8",
+            "accept": "application/json",
+            "indeed-locale": "en-AU",
+            "indeed-co": "AU",
+            "accept-language": "en-AU,en;q=0.9",
+            "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Indeed App 193.1",
+            "indeed-app-info": "appv=193.1; appid=com.indeed.jobsearch; osv=16.6.1; os=ios; dtype=phone",
+        }
+
+        req = urllib.request.Request(
+            "https://apis.indeed.com/graphql",
+            data=json.dumps({"query": gql_query}).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        proxy_url = self.proxy_rotator.get_proxy()
+        if proxy_url:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+            resp_ctx = opener.open(req, timeout=self.timeout)
+        else:
+            resp_ctx = urllib.request.urlopen(req, timeout=self.timeout)
+
+        with resp_ctx as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        card_results = payload.get("data", {}).get("jobSearch", {}).get("results", [])
+        for item in card_results:
+            job_node = item.get("job") if isinstance(item, dict) else None
+            if not isinstance(job_node, dict):
+                continue
+            key = str(job_node.get("key") or "").strip()
+            title = str(job_node.get("title") or "").strip()
+            if not title:
+                continue
+
+            emp = job_node.get("employer") or {}
+            comp = str(emp.get("name") or "Confidential").strip()
+
+            loc_node = job_node.get("location") or {}
+            formatted_loc = ""
+            if isinstance(loc_node, dict):
+                fmt = loc_node.get("formatted") or {}
+                formatted_loc = str(fmt.get("long") or fmt.get("short") or loc_node.get("city") or "")
+            job_loc = formatted_loc or loc
+
+            desc_node = job_node.get("description") or {}
+            desc_html = str(desc_node.get("html") or "")
+            desc = clean_description(desc_html)
+            if not desc:
+                desc = f"{title} at {comp} in {job_loc}. Full position description and direct application available on Indeed Australia."
+
+            min_salary, max_salary = None, None
+            comp_node = job_node.get("compensation") or {}
+            base_sal = comp_node.get("baseSalary") or {}
+            rng = base_sal.get("range") or {}
+            if isinstance(rng, dict):
+                try:
+                    if rng.get("min"):
+                        min_salary = float(rng.get("min"))
+                    if rng.get("max"):
+                        max_salary = float(rng.get("max"))
+                except (ValueError, TypeError):
+                    pass
+            bracket = parse_salary_bracket("", min_amount=min_salary, max_amount=max_salary)
+            if bracket.min_amount is None and bracket.max_amount is None:
+                bracket = estimate_salary_bracket(title, job_loc)
+
+            raw_date = job_node.get("datePublished") or job_node.get("dateOnIndeed") or "today"
+            url = f"https://au.indeed.com/viewjob?jk={key}" if key else ""
+
+            is_job_remote = is_rem or "remote" in f"{job_loc} {title}".lower() or "wfh" in f"{job_loc} {title}".lower()
+
+            if title and url:
+                yield JobRecord(
+                    id=f"indeed-{key}" if key else None,
+                    provider_job_id=key or url,
+                    provider="indeed",
+                    title=title,
+                    company=comp,
+                    location=job_loc,
+                    work_mode="remote" if is_job_remote else "onsite",
+                    url=url,
+                    raw_description=sanitize_html(desc),
+                    key_requirements=[query.term, query.stream],
+                    salary=bracket,
+                    posted=canonical_posted_date(str(raw_date)),
+                    remote=is_job_remote,
+                )
 
     def _search_jobspy(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         try:
@@ -130,6 +289,54 @@ class IndeedJobSpySource:
         with resp_ctx as response:
             html = response.read(2_000_000).decode("utf-8", errors="replace")
 
+        # 1. Resilient extraction from embedded state (mosaic, Redux, Next.js)
+        state_jobs = extract_embedded_state_jobs(html)
+        if state_jobs:
+            for it in state_jobs[: self.results_wanted]:
+                bracket = parse_salary_bracket(str(it.get("salary") or ""))
+                if bracket.min_amount is None and bracket.max_amount is None:
+                    bracket = estimate_salary_bracket(title=str(it.get("title", "")), location=str(it.get("location", "")))
+                yield JobRecord(
+                    id=it.get("id"),
+                    provider_job_id=it.get("provider_job_id", ""),
+                    provider="indeed",
+                    title=str(it.get("title", "")),
+                    company=str(it.get("company", "")),
+                    location=str(it.get("location", "")),
+                    work_mode="remote" if it.get("remote") else "onsite",
+                    url=str(it.get("url", "")),
+                    raw_description=sanitize_html(clean_description(str(it.get("description", "")))),
+                    key_requirements=[query.term, query.stream],
+                    salary=bracket,
+                    posted=canonical_posted_date("today"),
+                    remote=bool(it.get("remote")),
+                )
+            return
+
+        # 2. Resilient extraction from standard Schema.org JSON-LD
+        ld_jobs = extract_from_json_ld(html)
+        if ld_jobs:
+            for it in ld_jobs[: self.results_wanted]:
+                bracket = parse_salary_bracket(str(it.get("salary") or ""))
+                if bracket.min_amount is None and bracket.max_amount is None:
+                    bracket = estimate_salary_bracket(title=str(it.get("title", "")), location=str(it.get("location", "")))
+                yield JobRecord(
+                    provider_job_id=str(it.get("url", "") or it.get("title", "")),
+                    provider="indeed",
+                    title=str(it.get("title", "")),
+                    company=str(it.get("company", "")),
+                    location=str(it.get("location", "")),
+                    work_mode="remote" if it.get("remote") else "onsite",
+                    url=str(it.get("url", "") or f"https://au.indeed.com/jobs?q={query.term}"),
+                    raw_description=sanitize_html(clean_description(str(it.get("description", "")))),
+                    key_requirements=[query.term, query.stream],
+                    salary=bracket,
+                    posted=canonical_posted_date(str(it.get("posted", "today"))),
+                    remote=bool(it.get("remote")),
+                )
+            return
+
+        # 3. Fallback: manual JSON marker search
         marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]='
         start = html.find(marker)
         payload_text = ""
@@ -177,37 +384,8 @@ class IndeedJobSpySource:
             except Exception as e:
                 logger.debug(f"Indeed structured payload parse failed: {e}")
 
-        # Resilient degradation: fallback to JSON-LD or HTML card regex
-        ld_matches = re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html, re.DOTALL)
-        for raw_ld in ld_matches:
-            try:
-                parsed_ld = json.loads(raw_ld)
-                items = parsed_ld.get("@graph", [parsed_ld]) if isinstance(parsed_ld, dict) else (parsed_ld if isinstance(parsed_ld, list) else [])
-                for it in items:
-                    if isinstance(it, dict) and it.get("@type") == "JobPosting":
-                        title = str(it.get("title", "")).strip()
-                        comp = str(it.get("hiringOrganization", {}).get("name", "") if isinstance(it.get("hiringOrganization"), dict) else "")
-                        loc = str(it.get("jobLocation", {}).get("address", {}).get("addressLocality", "") if isinstance(it.get("jobLocation"), dict) else query.location)
-                        desc = sanitize_html(clean_description(it.get("description", "")))
-                        job_url = str(it.get("url", "") or "")
-                        if title:
-                            yield JobRecord(
-                                provider_job_id=job_url or title,
-                                provider="indeed",
-                                title=title,
-                                company=comp,
-                                location=loc,
-                                work_mode="remote" if "remote" in loc.lower() or "remote" in desc.lower() else "onsite",
-                                url=job_url or f"https://au.indeed.com/jobs?q={query.term}",
-                                raw_description=desc,
-                                key_requirements=[query.term, query.stream],
-                                salary=estimate_salary_bracket(title, loc),
-                            )
-            except Exception:
-                pass
-
     def _search_browser(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
-        """Stealth Playwright browser fallback for Indeed."""
+        """Stealth Playwright browser fallback for Indeed with adaptive DOM extraction."""
         try:
             from playwright.sync_api import sync_playwright
         except ImportError as error:
@@ -228,7 +406,12 @@ class IndeedJobSpySource:
                 if is_challenge_page(page.title()):
                     raise BotBlockedError("Cloudflare challenge encountered on Indeed")
 
-                raw_jobs = page.evaluate(_INDEED_EXTRACTOR)
+                # Strategy 1: Adaptive DOM Extractor (anchor discovery + container climbing)
+                raw_jobs = page.evaluate(ADAPTIVE_BROWSER_EXTRACTOR_JS)
+                # Strategy 2: Legacy class fallback if needed
+                if not raw_jobs:
+                    raw_jobs = page.evaluate(_INDEED_EXTRACTOR)
+
                 for record in raw_jobs:
                     b_desc = clean_description(record.get("description", ""))
                     if not b_desc:
@@ -251,6 +434,8 @@ class IndeedJobSpySource:
                         raw_description=sanitize_html(b_desc),
                         key_requirements=[query.term, query.stream],
                         salary=bracket,
+                        posted=canonical_posted_date(str(record.get("posted", "today"))),
+                        remote=bool(record.get("remote")),
                     )
             finally:
                 browser.close()

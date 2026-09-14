@@ -88,10 +88,27 @@ def test_seek_tier4_cross_source_fallback():
     assert jobs[0]["id"] == "gateway-01"
 
 
+def test_indeed_tier2_graphql_fallback():
+    class GraphqlIndeed(IndeedJobSpySource):
+        def _search_jobspy(self, query):
+            raise RuntimeError("JobSpy 429 rate limit")
+
+        def _search_graphql(self, query):
+            yield {"id": "indeed-gql-01", "title": "GraphQL Indeed Job", "url": "https://au.indeed.com/viewjob?jk=gql1"}
+
+    source = GraphqlIndeed(browser_fallback=True)
+    jobs = list(source.search(SearchQuery("sysadmin")))
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == "indeed-gql-01"
+
+
 def test_indeed_fallback_chain():
     class FallbackIndeed(IndeedJobSpySource):
         def _search_jobspy(self, query):
             raise RuntimeError("JobSpy 429 rate limit")
+
+        def _search_graphql(self, query):
+            raise RuntimeError("GraphQL API offline")
 
         def _search_embedded_json(self, query):
             raise RuntimeError("Cloudflare 403")
@@ -103,3 +120,4 @@ def test_indeed_fallback_chain():
     jobs = list(source.search(SearchQuery("sysadmin")))
     assert len(jobs) == 1
     assert jobs[0]["id"] == "indeed-browser-01"
+

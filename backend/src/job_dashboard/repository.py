@@ -301,7 +301,11 @@ class JobRepository:
                 if scraped_dt.tzinfo is None:
                     scraped_dt = scraped_dt.replace(tzinfo=timezone.utc)
                 age_hours = (datetime.now(timezone.utc) - scraped_dt).total_seconds() / 3600.0
-                return age_hours < ttl_hours
+                result_count = int(row["result_count"] or 0)
+                # If zero jobs were returned previously (e.g. temporary scraper glitch or empty),
+                # allow re-scrape after 5 minutes (0.08 hours) instead of locking out for 12 hours.
+                effective_ttl = 0.08 if result_count <= 0 else ttl_hours
+                return age_hours < effective_ttl
             except Exception:
                 return False
 

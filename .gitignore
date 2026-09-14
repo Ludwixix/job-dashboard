@@ -21,6 +21,10 @@ venv/
 *.sqlite3-journal
 *.sqlite3-wal
 *.sqlite3-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Node / Web
 node_modules/

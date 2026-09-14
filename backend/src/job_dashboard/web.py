@@ -718,25 +718,54 @@ class DashboardApp:
             email_events = stored_job.get("email_events") or raw_memory.get("email_events", [])
             email_id = email_events[-1].get("email_id") if email_events else ""
 
-            # Extract analysis or compute from stored job data
-            analysis = None
-            try:
-                norm_target = dict(stored_job)
-                if not str(norm_target.get("company") or "").strip():
-                    norm_target["company"] = "Confidential"
-                if not str(norm_target.get("title") or "").strip():
-                    norm_target["title"] = "Untitled Position"
-                analysis = self.dashboard.analyse(norm_target)
-            except Exception as e:
-                logger.warning(f"Error analysing stored job {job_id}: {e}")
+            # Check precomputed fields from stored_job or raw_memory or data_json
+            data_json = stored_job.get("data_json")
+            extra = {}
+            if isinstance(data_json, str):
+                try:
+                    extra = json.loads(data_json)
+                except Exception:
+                    extra = {}
+            elif isinstance(data_json, dict):
+                extra = data_json
 
-            fit_val = analysis.score.fit if analysis else "Moderate Match"
-            matched_skills = analysis.score.matched_skills if analysis else []
-            missing_skills = analysis.score.missing_skills if analysis else []
-            dimensions = analysis.score.dimensions if analysis else {}
-            score_val = stored_job.get("score") if stored_job.get("score") is not None else (analysis.score.score if analysis else 70)
-            stream_val = stored_job.get("stream") or (analysis.stream if analysis else "core-it")
-            fit_cat = stored_job.get("fit_category") or (analysis.fit_category if analysis else "Core IT")
+            fit_val = stored_job.get("fit") or extra.get("fit") or raw_memory.get("fit")
+            matched_skills = stored_job.get("matched_skills") or extra.get("matched_skills") or raw_memory.get("matched_skills")
+            missing_skills = stored_job.get("missing_skills") or extra.get("missing_skills") or raw_memory.get("missing_skills")
+            dimensions = stored_job.get("dimensions") or extra.get("dimensions") or raw_memory.get("dimensions")
+            score_val = stored_job.get("score") if stored_job.get("score") is not None else extra.get("score")
+            stream_val = stored_job.get("stream") or extra.get("stream") or raw_memory.get("stream")
+            fit_cat = stored_job.get("fit_category") or extra.get("fit_category") or raw_memory.get("fit_category")
+
+            # Fallback to dynamic analysis ONLY if score was never computed (avoids 40s CPU freeze)
+            if score_val is None or not dimensions:
+                analysis = None
+                try:
+                    norm_target = dict(stored_job)
+                    if not str(norm_target.get("company") or "").strip():
+                        norm_target["company"] = "Confidential"
+                    if not str(norm_target.get("title") or "").strip():
+                        norm_target["title"] = "Untitled Position"
+                    analysis = self.dashboard.analyse(norm_target)
+                except Exception as e:
+                    logger.warning(f"Error analysing stored job {job_id}: {e}")
+
+                if analysis:
+                    fit_val = fit_val or analysis.score.fit
+                    matched_skills = matched_skills or analysis.score.matched_skills
+                    missing_skills = missing_skills or analysis.score.missing_skills
+                    dimensions = dimensions or analysis.score.dimensions
+                    score_val = score_val if score_val is not None else analysis.score.score
+                    stream_val = stream_val or analysis.stream
+                    fit_cat = fit_cat or analysis.fit_category
+
+            fit_val = fit_val or "Moderate Match"
+            matched_skills = matched_skills or []
+            missing_skills = missing_skills or []
+            dimensions = dimensions or {}
+            score_val = 70 if score_val is None else score_val
+            stream_val = stream_val or "core-it"
+            fit_cat = fit_cat or "Core IT"
 
             result.append({
                 "id": job_id,
@@ -851,6 +880,20 @@ class DashboardApp:
 
                     self.jobs = merged_jobs
                     self.save_jobs()
+
+                    # Persist fresh materialized jobs into SQLite repository
+                    try:
+                        self.repository.replace_jobs(fresh_materialized)
+                    except Exception as repo_err:
+                        logger.warning(f"Error persisting fresh jobs to repository: {repo_err}")
+
+                    # Update jobs_combined.json for static client compatibility
+                    try:
+                        combined_path = self.data_dir / "jobs_combined.json"
+                        combined_path.write_text(json.dumps(self.jobs, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    except Exception as comb_err:
+                        logger.warning(f"Error updating jobs_combined.json: {comb_err}")
+
                     from .config import settings
                     if settings.gcs_data_bucket:
                         backup_to_gcs(settings.gcs_data_bucket, self.data_dir)

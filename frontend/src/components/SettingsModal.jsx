@@ -211,8 +211,14 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   const handleAddQuery = () => {
     const term = newQueryTerm.trim();
     if (!term) return;
-    const location = newQueryLocation.trim() || defaultLocation || 'Melbourne, VIC';
-    const updated = [...queries, { term, location, stream: 'core', weight: 1.0, enabled: true }];
+    const isRemote = /remote|wfh|work from home|anywhere in australia/i.test(term);
+    let location = newQueryLocation.trim();
+    if (!location) {
+      location = isRemote ? 'Australia' : (defaultLocation || 'Melbourne, VIC');
+    } else if (isRemote && /melbourne|vic/i.test(location)) {
+      location = 'Australia';
+    }
+    const updated = [...queries, { term, location, stream: isRemote ? 'remote' : 'core', weight: 1.0, enabled: true }];
     setQueries(updated);
     setNewQueryTerm('');
     saveQueries(updated);

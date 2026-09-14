@@ -17,6 +17,7 @@ from .base import (
     clean_description,
     estimate_salary_bracket,
     parse_salary_bracket,
+    resolve_search_location,
     sanitize_html,
 )
 
@@ -44,12 +45,13 @@ class AdzunaApiSource:
         api_key = self.api_key or os.getenv("ADZUNA_API_KEY")
         if not app_id or not api_key:
             return None
+        loc = resolve_search_location(query)
         return {
             "app_id": app_id,
             "app_key": api_key,
             "results_per_page": self.results_wanted,
             "what": query.term,
-            "where": query.location,
+            "where": loc,
             "sort_by": "relevance",
             "content-type": "application/json",
         }

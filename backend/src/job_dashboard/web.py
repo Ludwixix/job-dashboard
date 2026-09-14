@@ -196,32 +196,53 @@ class DashboardApp:
             return list(defaults or [])
         try:
             records = json.loads(self.search_queries_path.read_text(encoding="utf-8"))
-            loaded = [SearchQuery(str(item["term"]).strip(), str(item.get("location", "Melbourne, VIC")).strip(), str(item.get("stream", "core-it")).strip(), str(item.get("group", "")).strip(), float(item.get("weight", 1.0)), tuple(str(term).strip() for term in item.get("exclude_terms", []) if str(term).strip()), bool(item.get("enabled", True))) for item in records if str(item.get("term", "")).strip()]
+            loaded = []
+            for item in records:
+                term = str(item.get("term", "")).strip()
+                if not term:
+                    continue
+                is_remote = any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(item.get("remote"))
+                raw_loc = str(item.get("location") or ("Australia" if is_remote else "Melbourne, VIC")).strip()
+                loc = "Australia" if (is_remote and raw_loc.lower() in ("melbourne, vic", "melbourne", "")) else (raw_loc or "Australia")
+                loaded.append(SearchQuery(
+                    term,
+                    loc,
+                    str(item.get("stream", "core-it")).strip(),
+                    str(item.get("group", "")).strip(),
+                    float(item.get("weight", 1.0)),
+                    tuple(str(t).strip() for t in item.get("exclude_terms", []) if str(t).strip()),
+                    bool(item.get("enabled", True)),
+                ))
             return loaded or list(defaults or DEFAULT_QUERIES)
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return list(defaults or [])
 
     def update_search_queries(self, items):
-        self.search_queries = [
-            SearchQuery(
-                str(item.get("term", "")).strip(),
-                str(item.get("location", "Melbourne, VIC")).strip() or "Melbourne, VIC",
+        updated = []
+        for item in items:
+            term = str(item.get("term", "")).strip()
+            if not term:
+                continue
+            is_remote = any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(item.get("remote"))
+            raw_loc = str(item.get("location") or ("Australia" if is_remote else "Melbourne, VIC")).strip()
+            loc = "Australia" if (is_remote and raw_loc.lower() in ("melbourne, vic", "melbourne", "")) else (raw_loc or "Australia")
+            updated.append(SearchQuery(
+                term,
+                loc,
                 str(item.get("stream", "core-it")).strip().lower() or "core-it",
                 str(item.get("group", "")).strip(),
                 float(item.get("weight", 1.0)),
-                tuple(str(term).strip() for term in item.get("exclude_terms", []) if str(term).strip()),
+                tuple(str(t).strip() for t in item.get("exclude_terms", []) if str(t).strip()),
                 bool(item.get("enabled", True)),
-            )
-            for item in items
-            if str(item.get("term", "")).strip()
-        ]
+            ))
+        self.search_queries = updated
         self.save_search_queries()
         result = []
         for query in self.search_queries:
-            item = {"term": query.term, "location": query.location, "stream": query.stream}
+            entry = {"term": query.term, "location": query.location, "stream": query.stream}
             if query.group or query.weight != 1.0 or query.exclude_terms or not query.enabled:
-                item.update({"group": query.group, "weight": query.weight, "exclude_terms": list(query.exclude_terms), "enabled": query.enabled})
-            result.append(item)
+                entry.update({"group": query.group, "weight": query.weight, "exclude_terms": list(query.exclude_terms), "enabled": query.enabled})
+            result.append(entry)
         return result
 
     def update_status(self, job_id: str, status: str):
@@ -760,22 +781,36 @@ class DashboardApp:
             normalized_queries: list[SearchQuery] = []
             for q in queries:
                 if isinstance(q, SearchQuery):
-                    normalized_queries.append(q)
+                    term = q.term
+                    stream = q.stream
+                    loc = q.location
+                    is_rem = stream.lower() == "remote" or any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                    if is_rem and (not loc or loc.lower() in ("melbourne, vic", "melbourne", "vic")):
+                        loc = "Australia"
+                    normalized_queries.append(SearchQuery(term=term, location=loc or "Australia", stream=stream, group=q.group, weight=q.weight, exclude_terms=q.exclude_terms, enabled=q.enabled))
                 elif isinstance(q, str):
                     if q.strip():
-                        normalized_queries.append(SearchQuery(term=q.strip(), stream=detect_query_stream(q.strip())))
+                        s_term = q.strip()
+                        s_stream = detect_query_stream(s_term)
+                        is_rem = s_stream.lower() == "remote" or any(k in s_term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                        s_loc = "Australia" if is_rem else "Melbourne, VIC"
+                        normalized_queries.append(SearchQuery(term=s_term, location=s_loc, stream=s_stream))
                 elif isinstance(q, dict):
                     term = str(q.get("term") or "").strip()
                     if term:
-                        loc = str(q.get("location") or "Melbourne, VIC").strip()
                         stream = str(q.get("stream") or detect_query_stream(term)).strip()
+                        is_rem = stream.lower() == "remote" or any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(q.get("remote"))
+                        raw_loc = str(q.get("location") or ("Australia" if is_rem else "Melbourne, VIC")).strip()
+                        loc = "Australia" if (is_rem and raw_loc.lower() in ("melbourne, vic", "melbourne", "vic", "")) else (raw_loc or "Australia")
                         enabled = bool(q.get("enabled", True))
                         normalized_queries.append(SearchQuery(term=term, location=loc, stream=stream, enabled=enabled))
                 elif hasattr(q, "term"):
                     term = str(getattr(q, "term", "")).strip()
                     if term:
-                        loc = str(getattr(q, "location", "Melbourne, VIC")).strip()
                         stream = str(getattr(q, "stream", detect_query_stream(term))).strip()
+                        is_rem = stream.lower() == "remote" or any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(getattr(q, "remote", False))
+                        raw_loc = str(getattr(q, "location", "Australia" if is_rem else "Melbourne, VIC")).strip()
+                        loc = "Australia" if (is_rem and raw_loc.lower() in ("melbourne, vic", "melbourne", "vic", "")) else (raw_loc or "Australia")
                         enabled = bool(getattr(q, "enabled", True))
                         normalized_queries.append(SearchQuery(term=term, location=loc, stream=stream, enabled=enabled))
 

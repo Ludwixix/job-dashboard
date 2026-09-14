@@ -35,7 +35,7 @@ def build_sources(names: list[str]) -> list[JobSource]:
 
 def resolve_cli_queries(
     cli_queries: list[str] | None,
-    location: str = "Melbourne, VIC",
+    location: str = "Australia",
     profile_path: Path | None = None,
 ) -> list[SearchQuery]:
     """Resolves search queries dynamically from CLI flags, profile JSON, or discovery defaults."""
@@ -44,7 +44,9 @@ def resolve_cli_queries(
         for q in cli_queries:
             term = str(q).strip()
             if term:
-                queries.append(SearchQuery(term=term, location=location, stream=detect_query_stream(term)))
+                is_remote = any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                loc = "Australia" if is_remote else location
+                queries.append(SearchQuery(term=term, location=loc, stream=detect_query_stream(term)))
         if queries:
             return queries
 
@@ -58,6 +60,11 @@ def resolve_cli_queries(
                 or data.get("profile", {}).get("preferences", {}).get("target_roles")
                 or []
             )
+            is_profile_remote = (
+                bool(data.get("remoteOnly"))
+                or "remote" in str(data.get("workArrangements") or "").lower()
+                or "remote" in str(data.get("preferences", {}).get("work_arrangement") or "").lower()
+            )
             prof_loc = str(
                 data.get("location")
                 or data.get("profile", {}).get("personal", {}).get("location", {}).get("city")
@@ -67,7 +74,9 @@ def resolve_cli_queries(
             for title in target_titles:
                 t = str(title).strip()
                 if t:
-                    queries.append(SearchQuery(term=t, location=prof_loc, stream=detect_query_stream(t)))
+                    is_remote = is_profile_remote or any(k in t.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                    loc = "Australia" if is_remote else prof_loc
+                    queries.append(SearchQuery(term=t, location=loc, stream=detect_query_stream(t)))
             if queries:
                 return queries
         except Exception:

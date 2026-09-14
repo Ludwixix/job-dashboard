@@ -6,7 +6,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from ..logging import get_logger
-from .base import SearchQuery
+from .base import SearchQuery, resolve_search_location
 from .browser import create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
 from .proxy import ProxyRotator
 
@@ -40,11 +40,15 @@ class LinkedInBrowserSource:
             page = context.new_page()
             detail_page = context.new_page()
             try:
+                loc = resolve_search_location(query)
+                encoded_loc = urllib.parse.quote(loc)
+                encoded_term = urllib.parse.quote(query.term)
+                is_remote = "remote" in query.term.lower() or "remote" in loc.lower() or loc.lower() == "australia"
+                remote_filter = "&f_WT=2" if is_remote else ""
                 for page_number in range(self.max_pages):
-                    encoded_term = urllib.parse.quote(query.term)
                     url = (
                         "https://www.linkedin.com/jobs/search/?"
-                        f"keywords={encoded_term}&location=Melbourne%2C%20Victoria%2C%20Australia"
+                        f"keywords={encoded_term}&location={encoded_loc}{remote_filter}"
                         f"&f_TPR=r1209600&start={page_number * self.results_per_query}"
                     )
                     page.goto(url, wait_until="domcontentloaded", timeout=30000)

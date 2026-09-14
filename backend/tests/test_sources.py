@@ -272,3 +272,69 @@ def test_remote_ok_api_source_filters_jobs(monkeypatch):
     assert records[0]["title"] == "Azure Cloud Engineer"
     assert records[0]["source"] == "RemoteOK"
     assert records[0]["remote"] is True
+
+
+def test_resolve_search_location_nationwide():
+    from job_dashboard.sources.base import resolve_search_location, SearchQuery
+
+    # Default local query
+    local_q = SearchQuery(term="DevOps Engineer", location="Melbourne, VIC")
+    assert resolve_search_location(local_q) == "Melbourne, VIC"
+
+    # Query with "remote" in term
+    rem_term_q = SearchQuery(term="Remote React Developer", location="Melbourne, VIC")
+    assert resolve_search_location(rem_term_q) == "Australia"
+
+    # Query with "wfh" in term
+    wfh_q = SearchQuery(term="Python Developer WFH", location="Melbourne, VIC")
+    assert resolve_search_location(wfh_q) == "Australia"
+
+    # Query with "anywhere in australia"
+    aus_q = SearchQuery(term="Data Analyst anywhere in Australia", location="Melbourne, VIC")
+    assert resolve_search_location(aus_q) == "Australia"
+
+    # Query with stream="remote"
+    rem_stream_q = SearchQuery(term="Full Stack Engineer", location="Melbourne, VIC", stream="remote")
+    assert resolve_search_location(rem_stream_q) == "Australia"
+
+    # Explicit non-Melbourne city preserved if not remote
+    syd_q = SearchQuery(term="DevOps Engineer", location="Sydney, NSW")
+    assert resolve_search_location(syd_q) == "Sydney, NSW"
+
+
+def test_score_awards_full_points_for_australia_and_remote():
+    from job_dashboard.score import score_job
+    from job_dashboard.models import Job
+
+    profile = {
+        "targetTitles": ["Cloud Engineer"],
+        "coreSkills": ["Azure", "PowerShell"],
+        "industries": ["Technology & IT"],
+    }
+
+    job_remote_aus = Job(
+        id="job-1",
+        title="Cloud Engineer",
+        company="Tech Corp",
+        location="Australia",
+        url="https://example.com/1",
+        source="SEEK",
+        remote=False,
+        description="Azure powershell cloud infrastructure",
+    )
+    result = score_job(job_remote_aus, profile)
+    assert result.dimensions["location_fit"] == 100
+
+    job_remote_flag = Job(
+        id="job-2",
+        title="Cloud Engineer",
+        company="Tech Corp",
+        location="Brisbane, QLD",
+        url="https://example.com/2",
+        source="Indeed",
+        remote=True,
+        description="Azure powershell cloud infrastructure",
+    )
+    result_flag = score_job(job_remote_flag, profile)
+    assert result_flag.dimensions["location_fit"] == 100
+

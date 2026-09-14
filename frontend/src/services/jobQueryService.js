@@ -299,6 +299,7 @@ const SKILL_INFERENCE_MAP = {
 export const extractLocationForQuery = (profile) => {
   const raw = (profile?.location || profile?.suburb || '').trim();
   if (!raw) return 'Melbourne, VIC';
+  if (/remote|wfh|anywhere|australia/i.test(raw)) return 'Australia';
   const stateMatch = raw.match(/([A-Za-z\s]+),?\s*(VIC|NSW|QLD|WA|SA|TAS|ACT|NT)/i);
   if (stateMatch) return `${stateMatch[1].trim()}, ${stateMatch[2].toUpperCase()}`;
   return raw.split('(')[0].trim() || 'Melbourne, VIC';
@@ -325,7 +326,9 @@ export const buildQueriesFromProfile = (profile) => {
     const key = term.toLowerCase().trim();
     if (!key || seen.has(key)) return;
     seen.add(key);
-    queries.push({ term: term.trim(), location, stream, weight });
+    const isRemote = stream === 'remote' || /remote|wfh|work from home|anywhere in australia/i.test(key) || Boolean(profile.remoteOnly);
+    const queryLoc = isRemote ? 'Australia' : location;
+    queries.push({ term: term.trim(), location: queryLoc, stream: isRemote ? 'remote' : stream, weight });
   };
 
   // Keep one refresh bounded: sources are queried serially and a broad,
@@ -335,6 +338,9 @@ export const buildQueriesFromProfile = (profile) => {
   // 1. Explicit target titles — highest priority
   for (const title of (profile.targetTitles || [])) {
     add(title, 'core', 1.5);
+    if ((profile.openToRemote || profile.includeRemote) && queries.length < maxQueries) {
+      add(`${title} Remote`, 'remote', 1.2);
+    }
     if (queries.length >= maxQueries) break;
   }
 

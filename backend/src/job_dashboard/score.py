@@ -239,7 +239,7 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
         )
         skill_match = matched_weight / total_weight if total_weight else 0.0
         experience = {"junior": 0.7, "mid": 1.0, "senior": 0.9, "executive": 0.3}[_experience_level(job)]
-        location = 1.0 if job.remote or re.search(r"remote|melbourne|vic", job.location, re.IGNORECASE) else 0.5
+        location = 1.0 if job.remote or re.search(r"remote|australia|melbourne|vic", job.location, re.IGNORECASE) else 0.5
         company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.IGNORECASE) else 0.7
         growth = 0.9 if re.search(r"trainee|graduate|junior|entry[- ]level", job.text(), re.IGNORECASE) else 0.8 if re.search(r"training|mentorship|development|progression|leadership|upskill|cloud|azure|devops", job.text(), re.IGNORECASE) else 0.5
         seniority_penalty = _seniority_penalty(job)

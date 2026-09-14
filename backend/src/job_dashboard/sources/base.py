@@ -44,9 +44,26 @@ def detect_query_stream(term: str) -> str:
         return "technology"
     if re.search(r"legal|lawyer|counsel|paralegal|solicitor|barrister|litigat|compliance", lower):
         return "legal"
-    if re.search(r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend", lower):
-        return "technology"
     return "general"
+
+
+def resolve_search_location(query: SearchQuery, default_country: str = "Australia") -> str:
+    """Resolve the effective search location for a query.
+    If the query term or location indicates a remote / WFH position, or if the
+    location is generic/nationwide, return nationwide 'Australia' so searches are
+    never artificially constrained to Melbourne or a single metropolitan area.
+    """
+    term_lower = str(query.term or "").lower()
+    loc_clean = str(query.location or "").strip()
+    loc_lower = loc_clean.lower()
+    is_remote = (
+        str(getattr(query, "stream", "")).lower() == "remote"
+        or any(k in term_lower for k in ("remote", "wfh", "work from home", "anywhere in australia", "telecommute"))
+        or any(k in loc_lower for k in ("remote", "wfh", "anywhere in australia", "anywhere", "all australia", "australia", "nationwide"))
+    )
+    if is_remote:
+        return "Australia"
+    return loc_clean or default_country
 
 
 class JobSource(Protocol):

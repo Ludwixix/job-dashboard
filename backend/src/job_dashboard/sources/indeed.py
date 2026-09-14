@@ -15,6 +15,7 @@ from .base import (
     clean_description,
     estimate_salary_bracket,
     parse_salary_bracket,
+    resolve_search_location,
     sanitize_html,
 )
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
@@ -87,11 +88,14 @@ class IndeedJobSpySource:
         if self.multi_board:
             sites.extend(["zip_recruiter", "glassdoor"])
 
+        loc = resolve_search_location(query)
+        is_rem = "remote" in query.term.lower() or "remote" in query.location.lower() or loc.lower() in ("remote", "australia", "all australia")
         results = scrape_jobs(
             site_name=sites,
             search_term=query.term,
-            location=query.location,
+            location=loc,
             country_indeed="australia",
+            is_remote=is_rem,
             results_wanted=self.results_wanted,
             hours_old=self.hours_old,
             description_format="markdown",
@@ -106,7 +110,8 @@ class IndeedJobSpySource:
 
     def _search_embedded_json(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         """Parse Indeed's public embedded job-card JSON without anti-bot bypasses."""
-        params = urllib.parse.urlencode({"q": query.term, "l": query.location, "filter": 0, "start": 0})
+        loc = resolve_search_location(query)
+        params = urllib.parse.urlencode({"q": query.term, "l": loc, "filter": 0, "start": 0})
         request = urllib.request.Request(
             f"https://au.indeed.com/jobs?{params}",
             headers={
@@ -213,7 +218,8 @@ class IndeedJobSpySource:
             browser, context = create_stealth_browser(playwright, headless=True, proxy=playwright_proxy)
             page = context.new_page()
             try:
-                params = urllib.parse.urlencode({"q": query.term, "l": query.location})
+                loc = resolve_search_location(query)
+                params = urllib.parse.urlencode({"q": query.term, "l": loc})
                 url = f"https://au.indeed.com/jobs?{params}"
                 page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 wait_for_challenge_clearance(page, max_wait_seconds=5.0)

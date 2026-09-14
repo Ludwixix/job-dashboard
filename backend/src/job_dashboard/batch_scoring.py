@@ -71,7 +71,7 @@ def _score_single_job_fast(job: Job, profile_skills: Dict[str, str]) -> ScoreRes
     # Calculate other factors
     experience_level = _experience_level(job)
     experience = {"junior": 0.7, "mid": 1.0, "senior": 0.9, "executive": 0.3}[experience_level]
-    location = 1.0 if job.remote or re.search(r"remote|melbourne|vic", job.location, re.I) else 0.5
+    location = 1.0 if job.remote or re.search(r"remote|australia|melbourne|vic", job.location, re.I) else 0.5
     company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.I) else 0.7
     growth = 0.9 if re.search(r"trainee|graduate|junior|training", job.text(), re.I) else 0.8 if re.search(r"cloud|azure|devops", job.text(), re.I) else 0.5
     seniority_penalty = _seniority_penalty(job)

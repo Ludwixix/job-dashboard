@@ -21,6 +21,7 @@ from .base import (
     estimate_salary_bracket,
     is_recent,
     parse_salary_bracket,
+    resolve_search_location,
     sanitize_html,
 )
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
@@ -115,12 +116,14 @@ class SeekApiSource:
         page = 0
         collected = 0
         proxy_url = self.proxy_rotator.get_proxy()
+        loc = resolve_search_location(query)
+        where_val = "All Australia" if loc.lower() in ("australia", "all australia", "remote", "anywhere in australia", "anywhere") else loc
         while True:
             if page >= self.max_pages or collected >= self.max_results:
                 return
             params = urllib.parse.urlencode({
                 "siteKey": "AU-Main",
-                "where": query.location,
+                "where": where_val,
                 "keywords": query.term,
                 "pageSize": self.page_size,
                 "page": page,
@@ -189,7 +192,12 @@ class SeekApiSource:
             page = context.new_page()
             try:
                 slug = query.term.replace(" ", "-")
-                url = f"https://www.seek.com.au/{slug}-jobs/in-All-Melbourne-VIC?daterange=14"
+                loc = resolve_search_location(query)
+                if loc.lower() in ("australia", "all australia", "remote", "anywhere in australia", "anywhere"):
+                    url = f"https://www.seek.com.au/{slug}-jobs/in-All-Australia?daterange=14"
+                else:
+                    loc_slug = re.sub(r"[^a-zA-Z0-9]+", "-", loc.strip()).strip("-")
+                    url = f"https://www.seek.com.au/{slug}-jobs/in-All-{loc_slug}?daterange=14"
                 page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 wait_for_challenge_clearance(page, max_wait_seconds=5.0)
                 page.wait_for_timeout(2500)
@@ -271,11 +279,15 @@ class SeekApiSource:
 
         proxy_url = self.proxy_rotator.get_proxy()
         proxies_arg = [proxy_url] if proxy_url else None
+        loc = resolve_search_location(query)
+        is_rem = "remote" in query.term.lower() or loc.lower() in ("remote", "australia", "all australia")
         try:
             results = scrape_jobs(
                 site_name=["zip_recruiter", "glassdoor"],
                 search_term=query.term,
-                location=query.location,
+                location=loc,
+                is_remote=is_rem,
+                country_indeed="australia",
                 results_wanted=min(20, self.max_results),
                 hours_old=336,
                 description_format="markdown",

@@ -383,7 +383,7 @@ export const getAllProfiles = getProfiles;
 /**
  * Saves and updates the single logged-in user profile, synchronizing all storage keys.
  */
-export const saveProfile = (updatedProfile) => {
+export const saveProfile = (updatedProfile, options = {}) => {
   if (!updatedProfile || typeof updatedProfile !== 'object') return DEFAULT_USER_PROFILE;
 
   let sessionUserId = null;
@@ -395,7 +395,8 @@ export const saveProfile = (updatedProfile) => {
   const profile = {
     ...DEFAULT_USER_PROFILE,
     ...updatedProfile,
-    id: updatedProfile.id || sessionUserId || DEFAULT_USER_PROFILE.id
+    id: updatedProfile.id || sessionUserId || DEFAULT_USER_PROFILE.id,
+    updatedAt: updatedProfile.updatedAt || new Date().toISOString()
   };
 
   try {
@@ -417,8 +418,10 @@ export const saveProfile = (updatedProfile) => {
       window.dispatchEvent(new CustomEvent('profile-updated', { detail: profile }));
     }
 
-    // Persist to backend database asynchronously
-    saveProfileToBackend(profile).catch(() => {});
+    // Persist to backend database asynchronously unless explicitly bypassed
+    if (options.syncToBackend !== false) {
+      saveProfileToBackend(profile).catch(() => {});
+    }
   } catch (e) {
     console.error('Error saving profile:', e);
   }
@@ -466,7 +469,7 @@ export const saveProfileToBackend = async (profile) => {
 };
 
 /**
- * Fetches user profile from backend SQLite database with local storage fallback.
+ * Fetches user profile from backend SQLite database with local storage fallback and LWW reconciliation.
  */
 export const fetchProfileFromBackend = async (userId, userEmail) => {
   const resolvedUserId = userId || getActiveProfile()?.id;
@@ -503,8 +506,23 @@ export const fetchProfileFromBackend = async (userId, userEmail) => {
     if (res.ok) {
       const data = await res.json();
       if (data && data.profile && Object.keys(data.profile).length > 0) {
-        saveProfile(data.profile);
-        return data.profile;
+        const localProfile = getActiveProfile();
+        const remoteProfile = data.profile;
+
+        // Parse timestamps for Last-Write-Wins (LWW) conflict resolution
+        const remoteTimestamp = new Date(remoteProfile.updatedAt || remoteProfile.updated_at || 0).getTime();
+        const localTimestamp = new Date(localProfile?.updatedAt || localProfile?.updated_at || 0).getTime();
+
+        // If local profile has newer edits, do NOT clobber with older remote snapshot.
+        // Instead, automatically heal the backend with the newer local profile!
+        if (localProfile && localTimestamp > remoteTimestamp && localProfile.name) {
+          saveProfileToBackend(localProfile).catch(() => {});
+          return localProfile;
+        }
+
+        // Remote is newer or equal: persist remote profile locally without an echo-sync loop
+        saveProfile(remoteProfile, { syncToBackend: false });
+        return remoteProfile;
       }
     }
   } catch (e) {

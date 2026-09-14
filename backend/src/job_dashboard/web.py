@@ -116,6 +116,61 @@ logger = get_logger("job_dashboard.web")
 TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
 
 
+def _persist_profile_to_all_sinks(app: Any, user_id: str, profile_data: dict[str, Any]) -> dict[str, Any]:
+    """Persist candidate profile across SQLite, in-memory dashboard, local JSON files, WAL checkpoint, and GCS."""
+    from datetime import datetime, timezone
+    profile_data["id"] = user_id
+    if "updatedAt" not in profile_data and "updated_at" not in profile_data:
+        profile_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+    res = app.repository.upsert_user_profile(user_id, profile_data)
+    email = str(profile_data.get("email") or "").strip().lower()
+    if email and email != user_id:
+        try:
+            app.repository.upsert_user_profile(email, profile_data)
+        except Exception:
+            pass
+    for prefix in ("user_", "prof_"):
+        if user_id.startswith(prefix):
+            clean_id = user_id[len(prefix):]
+            try:
+                app.repository.upsert_user_profile(clean_id, profile_data)
+            except Exception:
+                pass
+
+    # 1. Update in-memory dashboard profile so subsequent scoring and tools use the live profile
+    if hasattr(app, "dashboard") and app.dashboard:
+        app.dashboard.profile = res
+
+    # 2. Write to data_dir / job_profile.json for persistent state
+    if hasattr(app, "data_dir") and app.data_dir:
+        data_profile_path = Path(app.data_dir) / "job_profile.json"
+        try:
+            data_profile_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(data_profile_path, "w", encoding="utf-8") as f:
+                json.dump(res, f, indent=2, ensure_ascii=False)
+        except Exception as file_err:
+            logger.debug(f"Could not write profile to {data_profile_path}: {file_err}")
+
+    # 3. Checkpoint SQLite WAL so changes are fully committed to main database file
+    try:
+        from .db_pool import get_db_connection
+        with get_db_connection(app.repository.path) as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception as cp_err:
+        logger.debug(f"WAL checkpoint warning on profile save: {cp_err}")
+
+    # 4. Trigger asynchronous backup to GCS
+    from .config import settings
+    if settings.gcs_data_bucket and hasattr(app, "data_dir") and app.data_dir:
+        def _bg_backup():
+            try:
+                backup_to_gcs(settings.gcs_data_bucket, Path(app.data_dir))
+            except Exception as b_err:
+                logger.warning(f"GCS backup failed on profile persist: {b_err}")
+        threading.Thread(target=_bg_backup, daemon=True).start()
+
+    return res
 
 
 class DashboardApp:
@@ -136,6 +191,12 @@ class DashboardApp:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_path = self.data_dir / "jobs.json"
         self.search_queries_path = self.data_dir / "search_queries.json"
+        self.profile_path = self.data_dir / "job_profile.json"
+        if (not profile or not self.dashboard.profile) and self.profile_path.exists():
+            try:
+                self.dashboard.profile = json.loads(self.profile_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
         self.search_queries = self._load_search_queries(search_queries)
         self.jobs: list[dict] = self._load_jobs()
         self.repository = repository or JobRepository(self.data_dir / "jobs.sqlite3")
@@ -1477,7 +1538,30 @@ def make_handler(app: DashboardApp):
                 prof = app.repository.get_user_profile(user_id)
                 if not prof and query_params and "email" in query_params:
                     prof = app.repository.get_user_profile(query_params["email"][0])
-                self.send_json(200, {"success": True, "profile": prof})
+                if not prof:
+                    # Check if ANY user profile exists in database
+                    try:
+                        from .db_pool import get_db_connection
+                        with get_db_connection(app.repository.path) as conn:
+                            row = conn.execute("SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1").fetchone()
+                            if row and row[0]:
+                                prof = json.loads(row[0])
+                    except Exception:
+                        pass
+                if not prof:
+                    # Check in-memory dashboard profile
+                    if hasattr(app, "dashboard") and getattr(app.dashboard, "profile", None):
+                        prof = app.dashboard.profile
+                if not prof:
+                    # Check data_dir / job_profile.json
+                    data_file = Path(app.data_dir) / "job_profile.json" if hasattr(app, "data_dir") and app.data_dir else None
+                    if data_file and data_file.exists():
+                        try:
+                            with open(data_file, "r", encoding="utf-8") as f:
+                                prof = json.load(f)
+                        except Exception:
+                            pass
+                self.send_json(200, {"success": True, "profile": prof or {}})
                 return
 
             if path == "/api/preferences":
@@ -2400,24 +2484,7 @@ def make_handler(app: DashboardApp):
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    body["id"] = user_id
-                    res = app.repository.upsert_user_profile(user_id, body)
-                    email = str(body.get("email") or "").strip().lower()
-                    if email and email != user_id:
-                        try:
-                            app.repository.upsert_user_profile(email, body)
-                        except Exception:
-                            pass
-                    for prefix in ("user_", "prof_"):
-                        if user_id.startswith(prefix):
-                            clean_id = user_id[len(prefix):]
-                            try:
-                                app.repository.upsert_user_profile(clean_id, body)
-                            except Exception:
-                                pass
-                    from .config import settings
-                    if settings.gcs_data_bucket:
-                        threading.Thread(target=backup_to_gcs, args=(settings.gcs_data_bucket, app.data_dir), daemon=True).start()
+                    res = _persist_profile_to_all_sinks(app, user_id, body)
                     self.send_json(200, {"success": True, "profile": res})
                     return
 
@@ -2437,8 +2504,7 @@ def make_handler(app: DashboardApp):
                     
                     profile = build_candidate_profile(raw_input)
                     if user_id and body.get("save", True):
-                        profile["id"] = user_id
-                        app.repository.upsert_user_profile(user_id, profile)
+                        profile = _persist_profile_to_all_sinks(app, user_id, profile)
                     self.send_json(200, {"success": True, "profile": profile})
                     return
 

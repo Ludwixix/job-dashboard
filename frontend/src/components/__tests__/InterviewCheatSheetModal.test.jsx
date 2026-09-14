@@ -105,3 +105,4 @@ describe('InterviewCheatSheetModal Component', () => {
     expect(onCloseMock).toHaveBeenCalled();
   });
 });
+

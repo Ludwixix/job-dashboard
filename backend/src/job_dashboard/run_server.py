@@ -39,17 +39,6 @@ def main():
     host = os.environ.get("HOST") or args.host or "0.0.0.0"
 
 
-    # Resolve job profile path across Docker container (/app) and local repository
-    profile_candidates = [
-        args.profile,
-        Path("job_profile.json"),
-        Path("/app/job_profile.json"),
-        PROJECT_ROOT / "job_profile.json",
-        PROJECT_ROOT.parent / "job_profile.json",
-    ]
-    profile_path = next((p for p in profile_candidates if p and Path(p).exists()), None)
-    profile = load_profile(profile_path) if profile_path else {}
-
     # Validate and warn about missing credentials
     from .logging import get_logger
     startup_logger = get_logger("job_dashboard.startup")
@@ -68,14 +57,51 @@ def main():
         startup_logger.warning("OpenRouter API key not found (set JOB_DASHBOARD_OPENROUTER_API_KEY)")
 
     # Cloud Run's filesystem is ephemeral: restore the last known-good index
-    # from GCS before anything opens the local SQLite file, so scraped jobs
-    # survive cold starts and redeploys instead of resetting every time.
+    # and profile data from GCS BEFORE loading the profile or opening SQLite,
+    # so scraped jobs and candidate intelligence survive cold starts and redeploys.
     if settings.gcs_data_bucket:
         from .gcs_backup import restore_from_gcs
         is_cloud_prod = bool(os.getenv("K_SERVICE") or os.getenv("ENVIRONMENT") == "production")
         restore_from_gcs(settings.gcs_data_bucket, args.data_dir, force=is_cloud_prod)
     else:
         startup_logger.warning("JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts")
+
+    # Resolve job profile path across persistent data dir, Docker container (/app), and local repository
+    profile_candidates = [
+        args.profile,
+        args.data_dir / "job_profile.json",
+        Path("job_profile.json"),
+        Path("/app/job_profile.json"),
+        PROJECT_ROOT / "job_profile.json",
+        PROJECT_ROOT.parent / "job_profile.json",
+    ]
+    profile_path = next((p for p in profile_candidates if p and Path(p).exists()), None)
+    profile = load_profile(profile_path) if profile_path else {}
+
+    # Dual-sink check: if jobs.sqlite3 has an updated user profile in user_profiles, prefer it
+    try:
+        from .db_pool import get_db_connection
+        db_path = args.data_dir / "jobs.sqlite3"
+        if db_path.exists():
+            with get_db_connection(db_path) as conn:
+                row = conn.execute("SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1").fetchone()
+                if row and row[0]:
+                    import json
+                    db_profile = json.loads(row[0])
+                    if isinstance(db_profile, dict) and db_profile.get("name"):
+                        profile = {**profile, **db_profile}
+                        startup_logger.info(f"Loaded persistent user profile from database: {profile.get('name')} ({profile.get('id')})")
+                        # Sync back to data_dir / job_profile.json if missing
+                        data_profile_file = args.data_dir / "job_profile.json"
+                        if not data_profile_file.exists():
+                            try:
+                                args.data_dir.mkdir(parents=True, exist_ok=True)
+                                with open(data_profile_file, "w", encoding="utf-8") as f:
+                                    json.dump(profile, f, indent=2, ensure_ascii=False)
+                            except Exception:
+                                pass
+    except Exception as db_prof_err:
+        startup_logger.warning(f"Could not check user_profiles database table on startup: {db_prof_err}")
 
     sources = [IndeedJobSpySource(
         proxy=settings.proxy_url,

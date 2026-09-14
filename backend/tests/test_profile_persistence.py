@@ -144,3 +144,78 @@ def test_auth_profile_persistence_lifecycle(test_app_and_handler):
     session_data2 = parse_response(session_handler2)
     assert session_data2["has_profile"] is True
     assert session_data2["profile"]["title"] == "Lead Software Architect"
+
+
+def test_gcs_backup_includes_profile_and_query_files():
+    from job_dashboard.gcs_backup import BACKUP_FILENAMES
+    assert "job_profile.json" in BACKUP_FILENAMES
+    assert "search_queries.json" in BACKUP_FILENAMES
+    assert "jobs.sqlite3" in BACKUP_FILENAMES
+
+
+def test_profile_multi_sink_persistence(test_app_and_handler):
+    app, handler_cls = test_app_and_handler
+    user_id = "sam_ludwig"
+
+    profile_data = {
+        "id": user_id,
+        "name": "Sam Ludwig",
+        "title": "Principal Cloud Architect",
+        "industry": "Technology",
+        "coreSkills": ["Kubernetes", "Azure", "Terraform", "Python"]
+    }
+
+    handler = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/profile",
+        body=profile_data,
+        headers={"X-User-Id": user_id}
+    )
+    handler.do_POST()
+    assert handler.send_response.call_args[0][0] == 200
+    res = parse_response(handler)
+    assert res["success"] is True
+    assert res["profile"]["title"] == "Principal Cloud Architect"
+
+    # Verify sink 1: SQLite database
+    persisted_db = app.repository.get_user_profile(user_id)
+    assert persisted_db["title"] == "Principal Cloud Architect"
+    assert "Terraform" in persisted_db["coreSkills"]
+
+    # Verify sink 2: in-memory dashboard profile
+    assert app.dashboard.profile["title"] == "Principal Cloud Architect"
+
+    # Verify sink 3: data_dir / job_profile.json file on disk
+    json_path = Path(app.data_dir) / "job_profile.json"
+    assert json_path.exists()
+    disk_profile = json.loads(json_path.read_text(encoding="utf-8"))
+    assert disk_profile["title"] == "Principal Cloud Architect"
+    assert disk_profile["name"] == "Sam Ludwig"
+
+
+def test_get_profile_fallback_cascade(test_app_and_handler):
+    app, handler_cls = test_app_and_handler
+
+    # Seed the database with an active profile
+    app.repository.upsert_user_profile("candidate_user", {
+        "name": "Sam Ludwig",
+        "title": "Enterprise Cloud Engineer",
+        "industry": "Cloud Infrastructure"
+    })
+
+    # Query with a different user_id that doesn't exist yet
+    handler = create_mock_handler(
+        handler_cls,
+        "GET",
+        "/api/profile",
+        headers={"X-User-Id": "new_unmatched_user"}
+    )
+    handler.do_GET()
+    assert handler.send_response.call_args[0][0] == 200
+    res = parse_response(handler)
+    assert res["success"] is True
+    # Falls back to latest database profile
+    assert res["profile"]["name"] == "Sam Ludwig"
+    assert res["profile"]["title"] == "Enterprise Cloud Engineer"
+

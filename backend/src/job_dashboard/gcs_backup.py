@@ -22,7 +22,7 @@ from .logging import get_logger
 
 logger = get_logger("job_dashboard.gcs_backup")
 
-# Keep SQLite files as opaque objects; do not mount the bucket as a filesystem.
+# Keep SQLite files and persistent configuration as opaque objects; do not mount the bucket as a filesystem.
 BACKUP_FILENAMES = (
     "jobs.sqlite3",
     "jobs.sqlite3-wal",
@@ -31,6 +31,8 @@ BACKUP_FILENAMES = (
     "health.sqlite3-wal",
     "health.sqlite3-shm",
     "jobs.json",
+    "job_profile.json",
+    "search_queries.json",
 )
 
 

@@ -153,6 +153,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     }
   }, [isToolsMenuOpen]);
 
+  // Synchronize state immediately whenever profile is updated across any component or engine
+  useEffect(() => {
+    const handleProfileUpdate = (e) => {
+      if (e?.detail && typeof e.detail === 'object') {
+        setActiveProfile(e.detail);
+      }
+    };
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    window.addEventListener('candidate-profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+      window.removeEventListener('candidate-profile-updated', handleProfileUpdate);
+    };
+  }, []);
+
 
   // Single Dashboard Mode vs Minimalist Cyberpunk Ambient Flow Mode
   const [viewMode, setViewMode] = useState(() => {

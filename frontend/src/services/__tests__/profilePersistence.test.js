@@ -109,3 +109,4 @@ describe('Profile Persistence & LWW Conflict Reconciliation', () => {
     expect(active.title).toBe('Newest Title from Cloud');
   });
 });
+

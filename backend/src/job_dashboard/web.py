@@ -160,14 +160,20 @@ def _persist_profile_to_all_sinks(app: Any, user_id: str, profile_data: dict[str
     except Exception as cp_err:
         logger.debug(f"WAL checkpoint warning on profile save: {cp_err}")
 
-    # 4. Trigger asynchronous backup to GCS
+    # 4. Immediate backup of job_profile.json to GCS (guarantees completion before Cloud Run throttles CPU)
     from .config import settings
     if settings.gcs_data_bucket and hasattr(app, "data_dir") and app.data_dir:
+        try:
+            backup_to_gcs(settings.gcs_data_bucket, Path(app.data_dir), filenames=("job_profile.json",))
+        except Exception as b_err:
+            logger.warning(f"Immediate GCS profile backup warning: {b_err}")
+
+        # Also trigger background backup for the larger sqlite database
         def _bg_backup():
             try:
-                backup_to_gcs(settings.gcs_data_bucket, Path(app.data_dir))
+                backup_to_gcs(settings.gcs_data_bucket, Path(app.data_dir), filenames=("jobs.sqlite3", "jobs.sqlite3-wal"))
             except Exception as b_err:
-                logger.warning(f"GCS backup failed on profile persist: {b_err}")
+                logger.warning(f"GCS database backup failed on profile persist: {b_err}")
         threading.Thread(target=_bg_backup, daemon=True).start()
 
     return res

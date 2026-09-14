@@ -82,7 +82,11 @@ def restore_from_gcs(bucket_name: str | None, data_dir: Path, force: bool = Fals
     return restored
 
 
-def backup_to_gcs(bucket_name: str | None, data_dir: Path) -> int:
+def backup_to_gcs(
+    bucket_name: str | None,
+    data_dir: Path,
+    filenames: tuple[str, ...] | list[str] | None = None,
+) -> int:
     """Upload the current index to GCS so it survives the next cold start. Returns files uploaded."""
     if not bucket_name:
         return 0
@@ -90,10 +94,11 @@ def backup_to_gcs(bucket_name: str | None, data_dir: Path) -> int:
     if client is None:
         return 0
 
+    target_files = filenames if filenames is not None else BACKUP_FILENAMES
     uploaded = 0
     try:
         bucket = client.bucket(bucket_name)
-        for filename in BACKUP_FILENAMES:
+        for filename in target_files:
             local_path = data_dir / filename
             if local_path.exists():
                 blob = bucket.blob(filename)

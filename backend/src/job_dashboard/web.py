@@ -193,7 +193,14 @@ class DashboardApp:
     def _load_search_queries(self, defaults=None):
 
         if not self.search_queries_path.exists():
-            return list(defaults or [])
+            resolved_defaults = list(defaults or [])
+            if resolved_defaults:
+                try:
+                    self.search_queries = resolved_defaults
+                    self.save_search_queries()
+                except Exception as err:
+                    logger.warning(f"Could not persist default search queries: {err}")
+            return resolved_defaults
         try:
             records = json.loads(self.search_queries_path.read_text(encoding="utf-8"))
             loaded = []

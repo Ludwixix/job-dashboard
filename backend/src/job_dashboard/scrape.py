@@ -19,12 +19,32 @@ from .sources import (
 )
 
 
+from .config import settings
+
+
 def build_sources(names: list[str]) -> list[JobSource]:
     factories = {
-        "indeed": IndeedJobSpySource,
-        "seek": SeekApiSource,
-        "linkedin": LinkedInBrowserSource,
-        "adzuna": AdzunaApiSource,
+        "indeed": lambda: IndeedJobSpySource(
+            browser_fallback=settings.stealth_browser_enabled,
+            multi_board=settings.multi_board_enabled,
+            proxy=settings.proxy_url,
+        ),
+        "seek": lambda: SeekApiSource(
+            max_pages=settings.seek_max_pages,
+            max_results=settings.seek_max_results,
+            pause_seconds=settings.seek_pause_seconds,
+            endpoint=settings.seek_api_endpoint,
+            allow_browser_fallback=settings.seek_browser_fallback and settings.stealth_browser_enabled,
+            cache_path=settings.seek_cache_path,
+            allow_cache_fallback=settings.seek_cache_fallback,
+            allow_cross_source_fallback=settings.multi_board_enabled,
+            proxy=settings.proxy_url,
+        ),
+        "linkedin": lambda: LinkedInBrowserSource(proxy=settings.proxy_url),
+        "adzuna": lambda: AdzunaApiSource(
+            app_id=settings.adzuna_app_id,
+            api_key=settings.adzuna_api_key,
+        ),
         "remoteok": RemoteOkApiSource,
     }
     unknown = sorted(set(names) - set(factories))

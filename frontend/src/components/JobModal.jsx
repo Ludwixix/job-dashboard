@@ -17,14 +17,16 @@ import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { ModalSkeleton } from './SkeletonLoaders';
 
 const PsychologyDecoderModal = lazy(() => import('./PsychologyDecoderModal').then(m => ({ default: m.PsychologyDecoderModal })));
+const InterviewCheatSheetModal = lazy(() => import('./InterviewCheatSheetModal'));
 import { cleanDescriptionText, fetchDetailedJobDescription, downloadAtsDocxResume } from '../services/dataService';
 import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
 
-export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, onOpenScreeningSolver, onOpenKscGenerator, onOpenSeekPass, userProfile }) => {
+export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, onOpenScreeningSolver, onOpenKscGenerator, onOpenSeekPass, onOpenCheatSheet, userProfile }) => {
   const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
   const jobId = job?.id || `${job?.company}_${job?.title}`;
+  const [isCheatSheetOpen, setIsCheatSheetOpen] = useState(false);
   const initialPrefs = getUserPreferences();
   const [prefStatus, setPrefStatus] = useState(() => {
     if (initialPrefs.promotedJobIds?.includes(jobId)) return 'promoted';
@@ -330,7 +332,7 @@ ${candidatePhone}`;
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 lg:p-8 animate-in fade-in zoom-in-95 duration-200">
       <div 
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl xl:max-w-5xl 2xl:max-w-6xl overflow-hidden border border-slate-700/40 transform transition-all font-sans text-slate-900 max-h-[92vh] flex flex-col"
+        className="bg-[#0b0f19] rounded-2xl shadow-2xl w-full max-w-4xl xl:max-w-5xl 2xl:max-w-6xl overflow-hidden border border-slate-800 transform transition-all font-sans text-slate-100 max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sleek Dark Header */}
@@ -465,7 +467,7 @@ ${candidatePhone}`;
         </div>
 
         {/* Modal Sub-Navigation Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100/80 px-6 pt-2 font-mono text-xs font-bold gap-2 relative z-30 overflow-visible">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-[#080d1a] px-6 pt-2 font-mono text-xs font-bold gap-2 relative z-30 overflow-visible">
           {/* Left: Scrollable Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 min-w-0">
             {isOffer && (
@@ -486,11 +488,11 @@ ${candidatePhone}`;
               onClick={() => setActiveTab('fit')}
               className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === 'fit'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                  ? 'bg-indigo-600/90 text-white shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
               }`}
             >
-              <Award size={15} className={activeTab === 'fit' ? "text-emerald-400" : "text-slate-500"} />
+              <Award size={15} className={activeTab === 'fit' ? "text-emerald-400" : "text-slate-400"} />
               FIT & AI AUDIT
             </button>
 
@@ -498,11 +500,11 @@ ${candidatePhone}`;
               onClick={() => setActiveTab('description')}
               className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === 'description'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                  ? 'bg-indigo-600/90 text-white shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
               }`}
             >
-              <FileText size={15} className={activeTab === 'description' ? "text-indigo-400" : "text-slate-500"} />
+              <FileText size={15} className={activeTab === 'description' ? "text-indigo-400" : "text-slate-400"} />
               JOB DESCRIPTION
             </button>
 
@@ -510,11 +512,11 @@ ${candidatePhone}`;
               onClick={() => setActiveTab('assets')}
               className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === 'assets'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                  ? 'bg-indigo-600/90 text-white shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
               }`}
             >
-              <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-500"} />
+              <Sparkles size={15} className={activeTab === 'assets' ? "text-purple-400" : "text-slate-400"} />
               ASSETS & ACTIONS {hasGeneratedApplicationDocs(job) && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-0.5" />}
             </button>
           </div>
@@ -595,6 +597,18 @@ ${candidatePhone}`;
                     </div>
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setIsIntelMenuOpen(false); setIsCheatSheetOpen(true); if (onOpenCheatSheet) onOpenCheatSheet(job); }}
+                  className="w-full px-3 py-2 rounded-xl hover:bg-cyan-950/60 text-slate-200 hover:text-cyan-300 text-xs font-semibold flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                  role="menuitem"
+                >
+                  <Sparkles size={14} className="text-cyan-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Interview Master Cheat Sheet</div>
+                    <div className="text-[10px] text-slate-400 font-sans">3-column command center &amp; 90s timer</div>
+                  </div>
+                </button>
                 {onOpenAtsDiagnostic && (
                   <button
                     type="button"
@@ -713,7 +727,7 @@ ${candidatePhone}`;
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1 font-sans">
+        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1 font-sans bg-[#070a13]">
           {/* Prominent Custom Documents Ready Banner */}
           {hasGeneratedApplicationDocs(job) && (
             <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white border-2 border-emerald-500 shadow-md font-mono space-y-3 animate-in fade-in duration-300">
@@ -1417,50 +1431,50 @@ ${candidatePhone}`;
             <div className="space-y-6 animate-in fade-in duration-200">
               {/* Info Chips Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                  <Clock size={15} className="text-indigo-600 shrink-0" />
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-200">
+                  <Clock size={15} className="text-indigo-400 shrink-0" />
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">POSTED</div>
-                    <div className="font-extrabold text-slate-900">{formatJobPostedAge(job.date)}</div>
+                    <div className="font-extrabold text-slate-100">{formatJobPostedAge(job.date)}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                  <MapPin size={15} className="text-indigo-600 shrink-0" />
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-200">
+                  <MapPin size={15} className="text-indigo-400 shrink-0" />
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">LOCATION</div>
-                    <div className="font-extrabold text-slate-900 truncate">{job.location || 'Melbourne, VIC'}</div>
+                    <div className="font-extrabold text-slate-100 truncate">{job.location || 'Melbourne, VIC'}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300">
-                  <DollarSign size={15} className="text-emerald-600 shrink-0" />
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-950/40 text-emerald-200 border border-emerald-500/40">
+                  <DollarSign size={15} className="text-emerald-400 shrink-0" />
                   <div>
-                    <div className="text-[9px] text-emerald-800 font-bold uppercase">REMUNERATION</div>
+                    <div className="text-[9px] text-emerald-400/80 font-bold uppercase">REMUNERATION</div>
                     <div className="font-extrabold">{job.salary || 'Market Rate'}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                  <Briefcase size={15} className="text-indigo-600 shrink-0" />
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-200">
+                  <Briefcase size={15} className="text-indigo-400 shrink-0" />
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">WORK MODE</div>
-                    <div className="font-extrabold text-slate-900">{job.workArrangement || (job.remote ? 'Remote' : 'Hybrid')} • {job.employmentType || 'Full-time'}</div>
+                    <div className="font-extrabold text-slate-100">{job.workArrangement || (job.remote ? 'Remote' : 'Hybrid')} • {job.employmentType || 'Full-time'}</div>
                   </div>
                 </div>
               </div>
 
               {/* Structured Key Responsibilities */}
               {job.keyResponsibilities && job.keyResponsibilities.length > 0 && (
-                <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200 space-y-2 font-mono">
-                  <div className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-2">
-                    <CheckCircle2 size={14} className="text-indigo-600" />
+                <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2 font-mono">
+                  <div className="text-xs font-black text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-indigo-400" />
                     KEY RESPONSIBILITIES &amp; DELIVERABLES ({job.keyResponsibilities.length})
                   </div>
                   <ul className="space-y-1.5 pt-1">
                     {job.keyResponsibilities.map((resp, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-slate-800 font-sans">
-                        <span className="text-indigo-600 font-black shrink-0">•</span>
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-300 font-sans">
+                        <span className="text-indigo-400 font-black shrink-0">•</span>
                         <span>{resp}</span>
                       </li>
                     ))}
@@ -1470,15 +1484,15 @@ ${candidatePhone}`;
 
               {/* Structured Requirements & Qualifications */}
               {job.requirements && job.requirements.length > 0 && (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 font-mono">
-                  <div className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <Award size={14} className="text-indigo-600" />
+                <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2 font-mono">
+                  <div className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <Award size={14} className="text-indigo-400" />
                     REQUIRED QUALIFICATIONS &amp; EXPERIENCE ({job.requirements.length})
                   </div>
                   <ul className="space-y-1.5 pt-1">
                     {job.requirements.map((req, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-slate-800 font-sans">
-                        <span className="text-emerald-600 font-black shrink-0">✓</span>
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-300 font-sans">
+                        <span className="text-emerald-400 font-black shrink-0">✓</span>
                         <span>{req}</span>
                       </li>
                     ))}
@@ -1488,15 +1502,15 @@ ${candidatePhone}`;
 
               {/* Structured Benefits & Perks */}
               {job.benefits && job.benefits.length > 0 && (
-                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2 font-mono">
-                  <div className="text-xs font-black text-emerald-950 uppercase tracking-wider flex items-center gap-2">
-                    <Sparkles size={14} className="text-emerald-600" />
+                <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-2 font-mono">
+                  <div className="text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles size={14} className="text-emerald-400" />
                     BENEFITS &amp; CULTURE ({job.benefits.length})
                   </div>
                   <ul className="space-y-1.5 pt-1">
                     {job.benefits.map((ben, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-emerald-900 font-sans">
-                        <span className="text-emerald-600 font-black shrink-0">★</span>
+                      <li key={i} className="flex items-start gap-2 text-xs text-emerald-200 font-sans">
+                        <span className="text-emerald-400 font-black shrink-0">★</span>
                         <span>{ben}</span>
                       </li>
                     ))}
@@ -1507,12 +1521,12 @@ ${candidatePhone}`;
               {/* Expandable Formatted Job Description */}
               {currentDescription ? (
                 <div className="space-y-3 font-mono">
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest flex-wrap gap-2">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <FileText size={14} className="text-slate-400" /> FULL JOB ADVERTISEMENT TEXT
                       {isEnrichingDescription && (
-                        <span className="flex items-center gap-1 text-[9px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-sans font-bold animate-pulse">
-                          <Loader2 size={10} className="animate-spin text-indigo-600" /> Enriching ad...
+                        <span className="flex items-center gap-1 text-[9px] text-indigo-300 bg-indigo-950/60 border border-indigo-500/40 px-2 py-0.5 rounded-full font-sans font-bold animate-pulse">
+                          <Loader2 size={10} className="animate-spin text-indigo-400" /> Enriching ad...
                         </span>
                       )}
                     </div>
@@ -1520,7 +1534,7 @@ ${candidatePhone}`;
                       <button
                         onClick={handleManualEnrich}
                         disabled={isEnrichingDescription}
-                        className="text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-md font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                        className="text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 px-2.5 py-1 rounded-md font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
                         title="Fetch full ad text from source"
                       >
                         <RefreshCw size={11} className={isEnrichingDescription ? 'animate-spin' : ''} />
@@ -1529,7 +1543,7 @@ ${candidatePhone}`;
                       {isLongText && (
                         <button
                           onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                          className="text-indigo-600 hover:text-indigo-900 font-extrabold flex items-center gap-1 cursor-pointer"
+                          className="text-indigo-400 hover:text-indigo-300 font-extrabold flex items-center gap-1 cursor-pointer"
                         >
                           {isDescriptionExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           {isDescriptionExpanded ? 'COLLAPSE DESCRIPTION' : 'SHOW FULL DESCRIPTION'}
@@ -1539,15 +1553,15 @@ ${candidatePhone}`;
                   </div>
                   
                   <div className="relative">
-                    <div className={`p-5 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs transition-all duration-300 ${
+                    <div className={`p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-md text-slate-200 transition-all duration-300 ${
                       !isDescriptionExpanded && isLongText ? 'max-h-[280px] overflow-hidden' : 'max-h-[70vh] overflow-y-auto'
                     }`}>
                       {renderFormattedDescription(currentDescription)}
                     </div>
 
                     {!isDescriptionExpanded && isLongText && (
-                      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 to-transparent rounded-b-2xl flex items-end justify-center pb-2 pointer-events-none">
-                        <span className="text-[10px] font-extrabold text-indigo-700 bg-white/90 px-3 py-1 rounded-full border border-indigo-200 shadow-xs pointer-events-auto cursor-pointer" onClick={() => setIsDescriptionExpanded(true)}>
+                      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#0b0f19] to-transparent rounded-b-2xl flex items-end justify-center pb-2 pointer-events-none">
+                        <span className="text-[10px] font-extrabold text-indigo-300 bg-slate-800 px-3 py-1 rounded-full border border-indigo-500/40 shadow-xs pointer-events-auto cursor-pointer" onClick={() => setIsDescriptionExpanded(true)}>
                           + SHOW FULL DESCRIPTION
                         </span>
                       </div>
@@ -1555,16 +1569,16 @@ ${candidatePhone}`;
                   </div>
                 </div>
               ) : isEnrichingDescription ? (
-                <div className="p-8 text-center bg-indigo-50/50 rounded-2xl border border-indigo-200 font-mono text-xs text-indigo-700 flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={24} className="animate-spin text-indigo-600" />
+                <div className="p-8 text-center bg-indigo-950/40 rounded-2xl border border-indigo-500/40 font-mono text-xs text-indigo-300 flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={24} className="animate-spin text-indigo-400" />
                   <p className="font-bold">FETCHING DETAILED ADVERTISEMENT FROM SOURCE...</p>
                 </div>
               ) : (
-                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 font-mono text-xs text-slate-500 space-y-3">
+                <div className="p-8 text-center bg-slate-900/60 rounded-2xl border border-slate-800 font-mono text-xs text-slate-400 space-y-3">
                   <p>NO JOB DESCRIPTION AVAILABLE FOR THIS POSITION.</p>
                   <button
                     onClick={handleManualEnrich}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs inline-flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs inline-flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
                   >
                     <RefreshCw size={13} /> FETCH FROM SOURCE
                   </button>
@@ -1912,21 +1926,21 @@ ${data.pipeline_result?.cover_text || ''}`;
               </div>
 
               {/* Tailored Asset Generation Suite Options */}
-              <div className="space-y-3 pt-2 border-t border-slate-200">
-                <div className="text-[10px] font-mono font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <Sparkles size={14} className="text-indigo-600 animate-spin-slow" /> TAILORED ASSET GENERATION SUITE
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <div className="text-[10px] font-mono font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-indigo-400 animate-spin-slow" /> TAILORED ASSET GENERATION SUITE
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
                   {/* Resume Generation Option */}
                   <button
                     onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
-                    className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 border border-emerald-300 hover:border-emerald-500 text-left transition-all cursor-pointer group shadow-2xs"
+                    className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-slate-900/80 border border-emerald-500/40 hover:border-emerald-400 text-left transition-all cursor-pointer group shadow-lg"
                   >
-                    <div className="flex items-center gap-2 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
-                      <FileUser size={16} className="text-emerald-600" /> GENERATE TAILORED RESUME
+                    <div className="flex items-center gap-2 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
+                      <FileUser size={16} className="text-emerald-400" /> GENERATE TAILORED RESUME
                     </div>
-                    <p className="text-[11px] font-semibold text-slate-600 mt-1 leading-relaxed">
+                    <p className="text-[11px] font-medium text-slate-400 mt-1 leading-relaxed">
                       Explicitly customizes {activeProfile?.name ? `${activeProfile.name}'s` : 'candidate'}{' '}
                       {activeProfile?.industry || 'professional'} credentials for {job.company}.
                     </p>
@@ -1935,12 +1949,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {/* Cover Letter Generation Option */}
                   <button
                     onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
-                    className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 border border-indigo-300 hover:border-indigo-500 text-left transition-all cursor-pointer group shadow-2xs"
+                    className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-slate-900/80 border border-indigo-500/40 hover:border-indigo-400 text-left transition-all cursor-pointer group shadow-lg"
                   >
-                    <div className="flex items-center gap-2 text-xs font-black text-indigo-950 group-hover:text-indigo-700">
-                      <FileText size={16} className="text-indigo-600" /> GENERATE IMPACT COVER LETTER
+                    <div className="flex items-center gap-2 text-xs font-black text-indigo-300 group-hover:text-indigo-200">
+                      <FileText size={16} className="text-indigo-400" /> GENERATE IMPACT COVER LETTER
                     </div>
-                    <p className="text-[11px] font-semibold text-slate-600 mt-1 leading-relaxed">
+                    <p className="text-[11px] font-medium text-slate-400 mt-1 leading-relaxed">
                       Drafts a high-impact executive cover letter targeting selection criteria for {job.title}.
                     </p>
                   </button>
@@ -1950,24 +1964,24 @@ ${data.pipeline_result?.cover_text || ''}`;
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 font-mono pt-1">
                   <button
                     onClick={() => { onClose(); if (onOpenRecruiterCrm) onOpenRecruiterCrm(job); }}
-                    className="p-3 rounded-2xl bg-purple-50/80 hover:bg-purple-100/90 border border-purple-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    className="p-3 rounded-2xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 text-left transition-all cursor-pointer group shadow-xs"
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-black text-purple-950 group-hover:text-purple-700">
-                      <Users size={14} className="text-purple-600" /> RECRUITER CRM
+                    <div className="flex items-center gap-1.5 text-xs font-black text-purple-300 group-hover:text-purple-200">
+                      <Users size={14} className="text-purple-400" /> RECRUITER CRM
                     </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                       Link talent partners &amp; manage cadence.
                     </p>
                   </button>
 
                   <button
                     onClick={() => { onClose(); if (onOpenExecutiveDossier) onOpenExecutiveDossier(job); }}
-                    className="p-3 rounded-2xl bg-cyan-50/80 hover:bg-cyan-100/90 border border-cyan-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    className="p-3 rounded-2xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-left transition-all cursor-pointer group shadow-xs"
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-black text-cyan-950 group-hover:text-cyan-700">
-                      <Building2 size={14} className="text-cyan-600" /> EXECUTIVE DOSSIER
+                    <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300 group-hover:text-cyan-200">
+                      <Building2 size={14} className="text-cyan-400" /> EXECUTIVE DOSSIER
                     </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                       90-day plan, leadership alignment &amp; pain points.
                     </p>
                   </button>
@@ -1975,12 +1989,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenInfluenceHub && (
                     <button
                       onClick={() => { onClose(); onOpenInfluenceHub(job); }}
-                      className="p-3 rounded-2xl bg-amber-50/80 hover:bg-amber-100/90 border border-amber-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 group-hover:text-amber-700">
-                        <ShieldCheck size={14} className="text-amber-600" /> INFLUENCE &amp; DEBRIEF
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
+                        <ShieldCheck size={14} className="text-amber-400" /> INFLUENCE &amp; DEBRIEF
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Objection overcoming &amp; referee briefing.
                       </p>
                     </button>
@@ -1989,12 +2003,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenAtsDiagnostic && (
                     <button
                       onClick={() => { onClose(); onOpenAtsDiagnostic(job); }}
-                      className="p-3 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
-                        <ShieldCheck size={14} className="text-emerald-600" /> ATS SENTINEL
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
+                        <ShieldCheck size={14} className="text-emerald-400" /> ATS SENTINEL
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Workday &amp; STAR parser simulation.
                       </p>
                     </button>
@@ -2003,12 +2017,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenLinkedInInbound && (
                     <button
                       onClick={() => { onClose(); onOpenLinkedInInbound(job); }}
-                      className="p-3 rounded-2xl bg-blue-50/80 hover:bg-blue-100/90 border border-blue-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-blue-950/40 hover:bg-blue-900/60 border border-blue-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-blue-950 group-hover:text-blue-700">
-                        <Search size={14} className="text-blue-600" /> LINKEDIN INBOUND
+                      <div className="flex items-center gap-1.5 text-xs font-black text-blue-300 group-hover:text-blue-200">
+                        <Search size={14} className="text-blue-400" /> LINKEDIN INBOUND
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Recruiter Boolean indexing &amp; headlines.
                       </p>
                     </button>
@@ -2017,12 +2031,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenCoverLetterPolarizer && (
                     <button
                       onClick={() => { onClose(); onOpenCoverLetterPolarizer(job); }}
-                      className="p-3 rounded-2xl bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-rose-950 group-hover:text-rose-700">
-                        <Flame size={14} className="text-rose-600" /> CL POLARIZER
+                      <div className="flex items-center gap-1.5 text-xs font-black text-rose-300 group-hover:text-rose-200">
+                        <Flame size={14} className="text-rose-400" /> CL POLARIZER
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Swappability audit &amp; anti-template rewrites.
                       </p>
                     </button>
@@ -2031,12 +2045,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenScreeningSolver && (
                     <button
                       onClick={() => { onClose(); onOpenScreeningSolver(job); }}
-                      className="p-3 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
-                        <ClipboardCheck size={14} className="text-emerald-600" /> SCREENING SOLVER
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
+                        <ClipboardCheck size={14} className="text-emerald-400" /> SCREENING SOLVER
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Auto-solve portal questionnaires &amp; compliance.
                       </p>
                     </button>
@@ -2045,12 +2059,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenCareerCompass && (
                     <button
                       onClick={() => { onClose(); onOpenCareerCompass(); }}
-                      className="p-3 rounded-2xl bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-indigo-950 group-hover:text-indigo-700">
-                        <Compass size={14} className="text-indigo-600" /> CAREER COMPASS
+                      <div className="flex items-center gap-1.5 text-xs font-black text-indigo-300 group-hover:text-indigo-200">
+                        <Compass size={14} className="text-indigo-400" /> CAREER COMPASS
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Strategic matrix &amp; progression roadmap.
                       </p>
                     </button>
@@ -2059,12 +2073,12 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenKscGenerator && (
                     <button
                       onClick={() => { onClose(); onOpenKscGenerator(job); }}
-                      className="p-3 rounded-2xl bg-teal-50/80 hover:bg-teal-100/90 border border-teal-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-teal-950 group-hover:text-teal-700">
-                        <BookOpen size={14} className="text-teal-600" /> KSC GENERATOR
+                      <div className="flex items-center gap-1.5 text-xs font-black text-teal-300 group-hover:text-teal-200">
+                        <BookOpen size={14} className="text-teal-400" /> KSC GENERATOR
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         APS &amp; VPS capability criteria responses.
                       </p>
                     </button>
@@ -2073,49 +2087,61 @@ ${data.pipeline_result?.cover_text || ''}`;
                   {onOpenSeekPass && (
                     <button
                       onClick={() => { onClose(); onOpenSeekPass(job); }}
-                      className="p-3 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                      className="p-3 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group shadow-xs"
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 group-hover:text-emerald-700">
-                        <ShieldCheck size={14} className="text-emerald-600" /> SEEK PASS AUDIT
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
+                        <ShieldCheck size={14} className="text-emerald-400" /> SEEK PASS AUDIT
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                         Pre-qualification knockout radar.
                       </p>
                     </button>
                   )}
 
                   <button
-                    onClick={() => { onClose(); if (onOpenInterviewPrep) onOpenInterviewPrep(job); }}
-                    className="p-3 rounded-2xl bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    onClick={() => { setIsCheatSheetOpen(true); if (onOpenCheatSheet) onOpenCheatSheet(job); }}
+                    className="p-3 rounded-2xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-left transition-all cursor-pointer group shadow-xs"
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-black text-indigo-950 group-hover:text-indigo-700">
-                      <Target size={14} className="text-indigo-600" /> STAR PREP GUIDE
+                    <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300 group-hover:text-cyan-200">
+                      <Sparkles size={14} className="text-cyan-400" /> MASTER CHEAT SHEET
                     </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      3-column cockpit with 90s pacing timer.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => { onClose(); if (onOpenInterviewPrep) onOpenInterviewPrep(job); }}
+                    className="p-3 rounded-2xl bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-500/30 text-left transition-all cursor-pointer group shadow-xs"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-black text-indigo-300 group-hover:text-indigo-200">
+                      <Target size={14} className="text-indigo-400" /> STAR PREP GUIDE
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                       Sector-grounded question strategy &amp; talking points.
                     </p>
                   </button>
 
                   <button
                     onClick={() => { onClose(); if (onOpenMockInterview) onOpenMockInterview(job); }}
-                    className="p-3 rounded-2xl bg-amber-50/80 hover:bg-amber-100/90 border border-amber-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    className="p-3 rounded-2xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group shadow-xs"
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 group-hover:text-amber-700">
-                      <Zap size={14} className="text-amber-600" /> AI MOCK INTERVIEW
+                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
+                      <Zap size={14} className="text-amber-400" /> AI MOCK INTERVIEW
                     </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                       Live simulated interview with rubric scoring.
                     </p>
                   </button>
 
                   <button
                     onClick={() => { onClose(); if (onOpenOutreach) onOpenOutreach(job); }}
-                    className="p-3 rounded-2xl bg-teal-50/80 hover:bg-teal-100/90 border border-teal-200/80 text-left transition-all cursor-pointer group shadow-2xs"
+                    className="p-3 rounded-2xl bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-left transition-all cursor-pointer group shadow-xs"
                   >
-                    <div className="flex items-center gap-1.5 text-xs font-black text-teal-950 group-hover:text-teal-700">
-                      <Mail size={14} className="text-teal-600" /> RECRUITER OUTREACH
+                    <div className="flex items-center gap-1.5 text-xs font-black text-teal-300 group-hover:text-teal-200">
+                      <Mail size={14} className="text-teal-400" /> RECRUITER OUTREACH
                     </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
                       Follow-up, cold pitch, or post-interview notes.
                     </p>
                   </button>
@@ -2124,20 +2150,20 @@ ${data.pipeline_result?.cover_text || ''}`;
 
               {/* 1-Click Copy Reference Subject */}
               {job.emailSubject && (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 font-mono space-y-2">
+                <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 font-mono space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       <Mail size={14} className="text-slate-400" /> EMAIL REFERENCE SUBJECT
                     </div>
                     <button
                       onClick={handleCopySubject}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-900 cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer"
                     >
-                      {copiedSubject ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                      {copiedSubject ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                       {copiedSubject ? 'COPIED TO CLIPBOARD!' : 'COPY SUBJECT'}
                     </button>
                   </div>
-                  <div className="text-xs font-extrabold text-slate-900 bg-white p-3 rounded-xl border border-slate-200">
+                  <div className="text-xs font-extrabold text-slate-100 bg-slate-950 p-3 rounded-xl border border-slate-800">
                     {job.emailSubject}
                   </div>
                 </div>
@@ -2147,7 +2173,7 @@ ${data.pipeline_result?.cover_text || ''}`;
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-100 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between font-mono shrink-0">
+        <div className="bg-[#080d1a] px-6 py-3.5 border-t border-slate-800 flex items-center justify-between font-mono shrink-0">
           {isOffer ? (
             <div className="flex items-center gap-2">
               <button
@@ -2187,7 +2213,7 @@ ${data.pipeline_result?.cover_text || ''}`;
 
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 font-extrabold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 font-extrabold text-xs hover:bg-slate-700 transition-colors cursor-pointer"
           >
             CLOSE MODAL
           </button>
@@ -2205,6 +2231,18 @@ ${data.pipeline_result?.cover_text || ''}`;
                   onJobStatusUpdate(id, job.status || 'Discovered', { psychologyInsights: insights });
                 }
               }}
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+      {isCheatSheetOpen && (
+        <SafeErrorBoundary sectionName="Interview Cheat Sheet" onClose={() => setIsCheatSheetOpen(false)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <InterviewCheatSheetModal
+              isOpen={isCheatSheetOpen}
+              onClose={() => setIsCheatSheetOpen(false)}
+              job={job}
+              userProfile={activeProfile}
             />
           </Suspense>
         </SafeErrorBoundary>

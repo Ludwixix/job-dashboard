@@ -12,6 +12,10 @@ import {
   getCachedPsychology, setCachedPsychology, 
   getPendingPsychologyPromise, setPendingPsychologyPromise 
 } from '../services/psychologyService';
+import { 
+  generateInterviewCheatSheetHtml, 
+  openCheatSheetInNewTab 
+} from '../services/interviewCheatSheetService';
 
 export const InterviewSuiteModal = ({ 
   job, 
@@ -418,6 +422,18 @@ ${fullJobText}`;
             }`}
           >
             <MessageSquare size={14} /> Live AI Simulator
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const html = generateInterviewCheatSheetHtml(job);
+              openCheatSheetInNewTab(html, `${job.company} Master Cheat Sheet`);
+            }}
+            className="py-1.5 px-3 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition-all flex items-center gap-1.5 cursor-pointer ml-auto shrink-0"
+            title="Launch 3-Column Master Interview Cockpit in new tab"
+          >
+            <Sparkles size={13} className="text-cyan-400" />
+            <span>Master Cheat Sheet &rarr;</span>
           </button>
         </div>
 

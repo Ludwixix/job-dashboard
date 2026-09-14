@@ -151,6 +151,7 @@ class IndeedJobSpySource:
                     bracket = parse_salary_bracket(salary_raw)
                     if bracket.min_amount is None and bracket.max_amount is None:
                         bracket = estimate_salary_bracket(title=title, location=location)
+                    is_remote = bool(item.get("remoteLocation")) or "remote" in f"{location} {title}".lower()
                     if title and url:
                         yield JobRecord(
                             id=f"indeed-{job_key}" if job_key else None,
@@ -159,11 +160,13 @@ class IndeedJobSpySource:
                             title=title,
                             company=company,
                             location=location,
-                            work_mode="remote" if item.get("remoteLocation") else "onsite",
+                            work_mode="remote" if is_remote else "onsite",
                             url=url,
                             raw_description=sanitize_html(description),
                             key_requirements=[query.term, query.stream],
                             salary=bracket,
+                            posted=canonical_posted_date("today"),
+                            remote=is_remote,
                         )
                 return
             except Exception as e:
@@ -303,7 +306,8 @@ def _indeed_record(row: Any, query: SearchQuery) -> JobRecord:
     bracket = parse_salary_bracket(salary_raw, min_amount=min_amount, max_amount=max_amount)
     if bracket.min_amount is None and bracket.max_amount is None:
         bracket = estimate_salary_bracket(title=title, location=location)
-    is_rem = bool(row.get("is_remote", False))
+    is_rem = bool(row.get("is_remote", False)) or "remote" in f"{location} {title}".lower() or "wfh" in f"{location} {title}".lower()
+    raw_date = row.get("date_posted") or row.get("date") or ""
 
     return JobRecord(
         id=job_id if job_id else None,
@@ -317,6 +321,8 @@ def _indeed_record(row: Any, query: SearchQuery) -> JobRecord:
         raw_description=sanitize_html(desc),
         key_requirements=[query.term, query.stream],
         salary=bracket,
+        posted=canonical_posted_date(raw_date) if raw_date else None,
+        remote=is_rem,
     )
 
 

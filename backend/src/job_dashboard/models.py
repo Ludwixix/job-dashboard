@@ -26,6 +26,8 @@ class JobRecord(BaseModel):
     key_requirements: List[str] = Field(default_factory=list)
     salary: Optional[SalaryBracket] = None
     scraped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    posted: Optional[str] = None
+    remote: Optional[bool] = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert JobRecord to dictionary format compatible with scoring and repository layers."""
@@ -37,6 +39,14 @@ class JobRecord(BaseModel):
             "remoteok": "RemoteOK",
             "manual": "Manual",
         }
+        is_remote_detected = (
+            self.remote if self.remote is not None else (
+                self.work_mode in ("remote", "hybrid")
+                or "remote" in f"{self.title} {self.location}".lower()
+                or "wfh" in f"{self.title} {self.location}".lower()
+                or "work from home" in f"{self.title} {self.location}".lower()
+            )
+        )
         return {
             "id": job_id,
             "title": self.title,
@@ -45,16 +55,16 @@ class JobRecord(BaseModel):
             "description": self.raw_description,
             "source": source_map.get(self.provider, self.provider),
             "url": self.url,
-            "remote": self.work_mode in ("remote", "hybrid"),
+            "remote": bool(is_remote_detected),
             "salary": self.salary.raw_text if self.salary and self.salary.raw_text else "",
             "salary_min": self.salary.min_amount if self.salary else None,
             "salary_max": self.salary.max_amount if self.salary else None,
             "salary_bracket": self.salary.model_dump() if self.salary else None,
             "salary_estimated": self.salary.estimated if self.salary else False,
             "key_requirements": self.key_requirements,
-            "tags": list(self.key_requirements) + [self.provider],
+            "tags": list(self.key_requirements) + [self.provider] + (["remote"] if is_remote_detected else []),
             "application_route": self.url,
-            "posted": self.scraped_at.isoformat(),
+            "posted": self.posted or self.scraped_at.isoformat(),
         }
 
     def __getitem__(self, key: str) -> Any:
@@ -65,6 +75,18 @@ class JobRecord(BaseModel):
 
     def __contains__(self, key: str) -> bool:
         return key in self.to_dict()
+
+    def __iter__(self):
+        return iter(self.to_dict().items())
+
+    def keys(self):
+        return self.to_dict().keys()
+
+    def values(self):
+        return self.to_dict().values()
+
+    def items(self):
+        return self.to_dict().items()
 
 
 

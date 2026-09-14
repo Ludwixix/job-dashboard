@@ -25,6 +25,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from xml.sax.saxutils import escape
 
+from .config import settings
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -118,6 +120,15 @@ TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
 
 class DashboardApp:
     def __init__(self, profile=None, sources=None, data_dir: str | Path = "data", document_generator=None, search_queries=None, repository=None):
+        if isinstance(profile, (str, Path)):
+            p = Path(profile)
+            if p.exists() and p.is_file():
+                try:
+                    profile = json.loads(p.read_text(encoding="utf-8"))
+                except Exception:
+                    profile = {}
+            else:
+                profile = {}
         self.dashboard = JobDashboard(profile or {})
         self.sources = sources or []
         self.document_generator = document_generator
@@ -531,7 +542,7 @@ class DashboardApp:
         return []
 
     def save_jobs(self):
-        self.jobs_path.write_text(json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        self.jobs_path.write_text(json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
         self.repository.replace_jobs(self.jobs)
 
     def materialize_jobs(self, jobs):
@@ -541,9 +552,13 @@ class DashboardApp:
             # Confidential/blank-company ads are still valid postings — coerce
             # rather than reject, since a single unnormalizable job previously
             # raised and aborted materialization for the entire batch.
-            candidate = dict(raw)
+            candidate = raw.to_dict() if hasattr(raw, "to_dict") else dict(raw)
             if not str(candidate.get("company") or "").strip():
                 candidate["company"] = "Confidential"
+            if isinstance(candidate.get("salary"), dict) and "raw_text" in candidate["salary"]:
+                candidate["salary"] = candidate["salary"]["raw_text"]
+            elif hasattr(candidate.get("salary"), "raw_text"):
+                candidate["salary"] = candidate["salary"].raw_text
             try:
                 job = normalize_job(candidate)
                 analysis = self.dashboard.analyse(candidate)
@@ -736,12 +751,40 @@ class DashboardApp:
     def refresh(self, queries, force: bool = False, ttl_hours: float = 12.0, on_progress=None):
         self.db_ready_event.wait(timeout=5.0)
         with self.lock:
+            if not queries:
+                queries = list(self.search_queries or [])
+            if not queries:
+                from .scrape import resolve_cli_queries
+                queries = resolve_cli_queries(None)
+
+            normalized_queries: list[SearchQuery] = []
+            for q in queries:
+                if isinstance(q, SearchQuery):
+                    normalized_queries.append(q)
+                elif isinstance(q, str):
+                    if q.strip():
+                        normalized_queries.append(SearchQuery(term=q.strip(), stream=detect_query_stream(q.strip())))
+                elif isinstance(q, dict):
+                    term = str(q.get("term") or "").strip()
+                    if term:
+                        loc = str(q.get("location") or "Melbourne, VIC").strip()
+                        stream = str(q.get("stream") or detect_query_stream(term)).strip()
+                        enabled = bool(q.get("enabled", True))
+                        normalized_queries.append(SearchQuery(term=term, location=loc, stream=stream, enabled=enabled))
+                elif hasattr(q, "term"):
+                    term = str(getattr(q, "term", "")).strip()
+                    if term:
+                        loc = str(getattr(q, "location", "Melbourne, VIC")).strip()
+                        stream = str(getattr(q, "stream", detect_query_stream(term))).strip()
+                        enabled = bool(getattr(q, "enabled", True))
+                        normalized_queries.append(SearchQuery(term=term, location=loc, stream=stream, enabled=enabled))
+
             queries_to_scrape = []
             cached_query_terms = []
 
-            for q in queries:
-                term = q.term if hasattr(q, "term") else str(q.get("term", ""))
-                loc = q.location if hasattr(q, "location") else str(q.get("location", ""))
+            for q in normalized_queries:
+                term = q.term
+                loc = q.location
 
                 if not force and self.repository.is_query_cached(term, loc, ttl_hours=ttl_hours):
                     cached_query_terms.append(term)

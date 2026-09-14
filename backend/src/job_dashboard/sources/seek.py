@@ -321,9 +321,10 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
     raw_desc = str(job.get("teaser") or job.get("description") or "")
     sanitized_desc = sanitize_html(raw_desc) if "<" in raw_desc else clean_description(raw_desc)
     raw_salary = str(job.get("salary") or job.get("salaryLabel", "") or "")
-    salary_bracket = parse_salary_bracket(raw_salary)
-    if salary_bracket.min_amount is None and salary_bracket.max_amount is None:
-        salary_bracket = estimate_salary_bracket(title=str(job.get("title", "")), location=location)
+    salary_bracket = parse_salary_bracket(raw_salary, title=str(job.get("title", "")), estimate_if_missing=True)
+    raw_posted = str(job.get("listingDate") or job.get("listingDateDisplay") or job.get("posted") or "")
+    posted_date = canonical_posted_date(raw_posted) if raw_posted else None
+    is_remote = is_remote or "remote" in f"{location} {job.get('title', '')}".lower() or "wfh" in f"{location} {job.get('title', '')}".lower()
 
     return JobRecord(
         id=f"seek-{stable_id}" if stable_id else None,
@@ -337,6 +338,8 @@ def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
         raw_description=sanitized_desc,
         key_requirements=[query.term, query.stream],
         salary=salary_bracket,
+        posted=posted_date,
+        remote=is_remote,
     )
 
 

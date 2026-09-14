@@ -144,4 +144,6 @@ def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
         raw_description=sanitized_desc,
         key_requirements=[query.term, query.stream],
         salary=salary_bracket,
+        posted=canonical_posted_date(created) or created,
+        remote=remote_value,
     )

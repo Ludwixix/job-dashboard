@@ -74,16 +74,30 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
     useSensor(KeyboardSensor)
   );
 
-  // Derived state: Only display active pipeline stages and starred wishlist items
+  // Derived state: Only display active pipeline stages and starred wishlist items (deduplicated)
   const activeJobs = useMemo(() => {
+    const seenIds = new Set();
+    const seenCompanyTitles = new Set();
+
     return jobs.filter(j => {
       const stage = getJobStage(j, starredSet);
       if (!stage) return false;
       if (statusFilter !== 'All' && stage !== statusFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        return (j.title?.toLowerCase().includes(q) || j.company?.toLowerCase().includes(q) || j.notes?.toLowerCase().includes(q));
+        const match = (j.title?.toLowerCase().includes(q) || j.company?.toLowerCase().includes(q) || j.notes?.toLowerCase().includes(q));
+        if (!match) return false;
       }
+
+      // Deduplicate: prevent duplicate cards from appearing in the Kanban
+      const idStr = String(j.id || '').trim();
+      if (idStr && seenIds.has(idStr)) return false;
+
+      const compTitle = `${String(j.company || '').trim().toLowerCase()}:::${String(j.title || '').trim().toLowerCase()}`;
+      if (compTitle !== ':::' && seenCompanyTitles.has(compTitle)) return false;
+
+      if (idStr) seenIds.add(idStr);
+      if (compTitle !== ':::') seenCompanyTitles.add(compTitle);
       return true;
     });
   }, [jobs, searchQuery, statusFilter, starredSet]);

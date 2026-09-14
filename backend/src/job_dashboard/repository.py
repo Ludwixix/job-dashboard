@@ -513,7 +513,15 @@ class JobRepository:
             description = str(job.get("description") or job.get("notes") or "").strip()
             from .sources import canonical_posted_date
             posted = canonical_posted_date(job.get("posted") or job.get("date") or "")
-            remote = 1 if bool(job.get("remote", False)) or "remote" in location.lower() else 0
+            is_remote_flag = (
+                bool(job.get("remote", False))
+                or str(job.get("work_mode", "")).lower() in ("remote", "hybrid")
+                or "remote" in f"{location} {title}".lower()
+                or "wfh" in f"{location} {title}".lower()
+                or "work from home" in f"{location} {title}".lower()
+                or any("remote" in str(t).lower() for t in (job.get("tags") or ()))
+            )
+            remote = 1 if is_remote_flag else 0
             stream = str(job.get("stream") or job.get("industry") or "core-it").strip()
             score = int(job.get("score") or 0)
             
@@ -527,7 +535,7 @@ class JobRepository:
             clean_job["portalLink"] = url
             clean_job["date"] = posted
             clean_job["posted"] = posted
-            clean_job["remote"] = bool(remote)
+            clean_job["remote"] = bool(is_remote_flag)
             clean_job["stream"] = stream
             clean_job["score"] = score
             clean_job["description"] = description
@@ -681,6 +689,16 @@ class JobRepository:
         if not text:
             return None
         import re
+        if text in ("today", "posted today", "just now"):
+            return datetime.now(timezone.utc).timestamp()
+        if text in ("yesterday", "posted yesterday"):
+            return datetime.now(timezone.utc).timestamp() - 86400
+        hour_match = re.search(r"(\d+)\s*h(?:ours?)?\s*ago", text)
+        if hour_match:
+            return datetime.now(timezone.utc).timestamp() - int(hour_match.group(1)) * 3600
+        minute_match = re.search(r"(\d+)\s*m(?:in(?:utes?)?)?\s*ago", text)
+        if minute_match:
+            return datetime.now(timezone.utc).timestamp() - int(minute_match.group(1)) * 60
         relative = re.fullmatch(r"(\d+)\s*d(?:ays?)?\s*ago(?:\s*[•|].*)?", text)
         if relative:
             return datetime.now(timezone.utc).timestamp() - int(relative.group(1)) * 86400
@@ -690,7 +708,11 @@ class JobRepository:
             try:
                 parsed = datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
             except ValueError:
-                return None
+                try:
+                    from dateutil import parser as dt_parser
+                    parsed = dt_parser.parse(text)
+                except Exception:
+                    return None
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc).timestamp()
@@ -712,6 +734,8 @@ class JobRepository:
             """, (user_id,)).fetchall()
             
         results = []
+        seen_ids = set()
+        seen_company_titles = set()
         for row in rows:
             d = dict(row)
             try:
@@ -722,6 +746,21 @@ class JobRepository:
                             d[k] = v
             except Exception:
                 pass
+
+            jid = str(d.get("job_id") or d.get("id") or "").strip()
+            comp = str(d.get("company") or "").strip().lower()
+            title = str(d.get("title") or "").strip().lower()
+            comp_key = f"{comp}:::{title}"
+
+            if jid and jid in seen_ids:
+                continue
+            if comp and title and comp_key in seen_company_titles:
+                continue
+
+            if jid:
+                seen_ids.add(jid)
+            if comp and title:
+                seen_company_titles.add(comp_key)
             results.append(d)
         return results
 

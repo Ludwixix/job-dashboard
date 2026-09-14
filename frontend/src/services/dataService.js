@@ -668,8 +668,12 @@ export const fetchJobsData = async () => {
         customJobs.forEach((customJob, idx) => {
           const parsed = parseMetadata(customJob, customJob.id || `custom_${idx}`);
           parsed.isCustom = true;
+          const customNormKey = normalizeJobKey(parsed.company, parsed.title);
+          if (customNormKey && customNormKey !== '__' && seenNormKeys.has(customNormKey)) return;
+          if (customNormKey && customNormKey !== '__') seenNormKeys.add(customNormKey);
+
           // Apply any user applications state if present
-          const userApp = userAppsMap.get(String(parsed.id));
+          const userApp = userAppsMap.get(String(parsed.id)) || userAppsMap.get(customNormKey);
           if (userApp) {
             parsed.status = userApp.status || parsed.status;
             parsed.resumeText = userApp.resume_text || userApp.resumeText || parsed.resumeText;

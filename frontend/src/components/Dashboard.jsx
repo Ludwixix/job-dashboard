@@ -42,6 +42,7 @@ const CoverLetterPolarizerModal = lazy(() => import('./CoverLetterPolarizerModal
 const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m => ({ default: m.ScreeningSolverModal })));
 const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ default: m.KscGeneratorModal })));
 const SeekPassModal = lazy(() => import('./SeekPassModal').then(m => ({ default: m.SeekPassModal })));
+const RemoteRolesSection = lazy(() => import('./RemoteRolesSection').then(m => ({ default: m.RemoteRolesSection })));
 
 import { TelemetryDesk } from './TelemetryDesk';
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
@@ -64,7 +65,7 @@ import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../se
 import { 
   Terminal, Sparkles, Cpu, Activity, RefreshCw, 
   MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe
 } from 'lucide-react';
 
 
@@ -577,6 +578,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     ).length;
   }, [jobs]);
 
+  const remoteJobsCount = useMemo(() => {
+    return (jobs || []).filter(j => {
+      if (j.remote === true || j.remote === 1 || j.remote === 'true') return true;
+      const wm = String(j.work_mode || '').toLowerCase();
+      if (wm === 'remote' || wm === 'hybrid') return true;
+      const combined = `${j.title || ''} ${j.location || ''} ${(j.tags || []).join(' ')}`.toLowerCase();
+      return combined.includes('remote') || combined.includes('wfh') || combined.includes('work from home');
+    }).length;
+  }, [jobs]);
+
   const handleExportCSV = () => {
     if (!jobs || jobs.length === 0) return;
 
@@ -990,6 +1001,26 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
               <button
                 role="tab"
+                aria-selected={activeSection === 'remote'}
+                aria-controls="panel-remote"
+                onClick={() => setActiveSection('remote')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                  activeSection === 'remote' 
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Globe size={14} className={activeSection === 'remote' ? 'text-white' : 'text-emerald-400'} aria-hidden="true" /> 
+                REMOTE ROLES
+                {remoteJobsCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                    {remoteJobsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                role="tab"
                 aria-selected={activeSection === 'market'}
                 aria-controls="panel-market"
                 onClick={() => setActiveSection('market')}
@@ -1150,6 +1181,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
                   onOpenGenerator={(j) => setSelectedForGenerator(j)}
                 />
+              </SafeErrorBoundary>
+            )}
+
+            {activeSection === 'remote' && (
+              <SafeErrorBoundary sectionName="Remote Roles Command Hub">
+                <Suspense fallback={<DashboardGridSkeleton count={6} />}>
+                  <RemoteRolesSection
+                    jobs={jobs}
+                    onSelectJob={(j) => setSelectedJob(j)}
+                    onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                    onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                  />
+                </Suspense>
               </SafeErrorBoundary>
             )}
 

@@ -107,7 +107,9 @@ def main():
         api_key=settings.openrouter_api_key,
         examples_dir=args.examples_dir
     )
-    app = DashboardApp(profile, sources, args.data_dir, generator, DEFAULT_QUERIES)
+    from .scrape import resolve_cli_queries
+    initial_queries = resolve_cli_queries(None, profile_path=profile_path)
+    app = DashboardApp(profile, sources, args.data_dir, generator, initial_queries)
 
     def synchronize():
         try:

@@ -51,8 +51,18 @@ def resolve_cli_queries(
     if profile_path and profile_path.is_file():
         try:
             data = json.loads(profile_path.read_text(encoding="utf-8"))
-            target_titles = data.get("targetTitles") or data.get("target_titles") or []
-            prof_loc = str(data.get("location") or location).strip() or location
+            target_titles = (
+                data.get("targetTitles")
+                or data.get("target_titles")
+                or data.get("preferences", {}).get("target_roles")
+                or data.get("profile", {}).get("preferences", {}).get("target_roles")
+                or []
+            )
+            prof_loc = str(
+                data.get("location")
+                or data.get("profile", {}).get("personal", {}).get("location", {}).get("city")
+                or location
+            ).strip() or location
             queries = []
             for title in target_titles:
                 t = str(title).strip()

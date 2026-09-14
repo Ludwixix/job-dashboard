@@ -46,6 +46,8 @@ def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, st
     profile = json.loads(profile_data)
     if isinstance(profile, Mapping) and "profile" in profile and isinstance(profile["profile"], Mapping):
         profile = profile["profile"]
+    if not isinstance(profile, Mapping):
+        return {}
     raw = profile.get("skills", {})
     values: dict[str, str] = {}
     if isinstance(raw, Mapping):
@@ -82,7 +84,7 @@ def _profile_skills(profile: Mapping[str, Any]) -> dict[str, str]:
     try:
         import hashlib
         import json
-        profile_json = json.dumps(profile, sort_keys=True)
+        profile_json = json.dumps(profile, sort_keys=True, default=str)
         profile_hash = hashlib.md5(profile_json.encode()).hexdigest()[:16]
         return _profile_skills_cached(profile_hash, profile_json)
     except Exception as e:

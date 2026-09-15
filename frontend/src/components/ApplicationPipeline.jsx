@@ -181,14 +181,14 @@ export const ApplicationPipeline = ({
  placeholder="SEARCH APPLICATIONS..." 
  value={searchQuery}
  onChange={(e) => setSearchQuery(e.target.value)}
- className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-sm pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors placeholder-slate-600"
+ className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-sm pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-500 transition-colors placeholder-slate-600"
  />
  </div>
  <div className="relative hidden sm:block">
  <select
  value={statusFilter}
  onChange={(e) => setStatusFilter(e.target.value)}
- className="appearance-none bg-slate-950 border border-slate-700 text-slate-300 rounded-sm pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+ className="appearance-none bg-slate-950 border border-slate-700 text-slate-300 rounded-sm pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-amber-500 cursor-pointer font-bold"
  >
  <option value="All">ALL STAGES ({activeJobs.length})</option>
  {PIPELINE_STAGES.map(s => {
@@ -218,7 +218,7 @@ export const ApplicationPipeline = ({
  </button>
  <button
  onClick={() => fileInputRef.current?.click()}
- className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-xs font-bold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
+ className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-xs font-bold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600 hover:text-white transition-colors cursor-pointer"
  title="Import JSON/CSV"
  >
  <Upload size={13} /> Import
@@ -231,7 +231,7 @@ export const ApplicationPipeline = ({
  <button
  onClick={() => setViewMode('kanban')}
  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm transition-all cursor-pointer ${
- viewMode === 'kanban' ? 'bg-indigo-600 text-white ' : 'text-slate-400 hover:text-slate-200'
+ viewMode === 'kanban' ? 'bg-amber-600 text-white ' : 'text-slate-400 hover:text-slate-200'
  }`}
  >
  <LayoutGrid size={14} /> <span>KANBAN</span>
@@ -239,7 +239,7 @@ export const ApplicationPipeline = ({
  <button
  onClick={() => setViewMode('table')}
  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm transition-all cursor-pointer ${
- viewMode === 'table' ? 'bg-indigo-600 text-white ' : 'text-slate-400 hover:text-slate-200'
+ viewMode === 'table' ? 'bg-amber-600 text-white ' : 'text-slate-400 hover:text-slate-200'
  }`}
  >
  <List size={14} /> <span>TABLE</span>
@@ -272,7 +272,7 @@ export const ApplicationPipeline = ({
  onClick={() => setMobileActiveStage(stage.id)}
  className={`px-3 py-1.5 rounded-sm font-bold shrink-0 transition-all cursor-pointer ${
  isActive
- ? 'bg-indigo-600 text-white shadow-xs'
+ ? 'bg-amber-600 text-white -xs'
  : 'bg-slate-900 text-slate-400 border border-slate-800'
  }`}
  >

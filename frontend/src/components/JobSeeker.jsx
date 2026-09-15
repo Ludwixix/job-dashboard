@@ -822,15 +822,15 @@ export const JobSeeker = ({
  <div className="space-y-6 font-sans">
  {/* Ambient Live Background Scraper Progress Notification */}
  {scrapeProgress?.isActive && seekerJobs.length > 0 && (
- <div className="bg-slate-900 border-2 border-indigo-500/60 rounded-sm p-4 text-white font-mono flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
+ <div className="bg-slate-900 border-2 border-amber-500/60 rounded-sm p-4 text-white font-mono flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
  <div className="flex items-center gap-3">
- <div className="p-2.5 bg-indigo-600/30 text-indigo-300 rounded-sm border border-indigo-400/50 animate-pulse shrink-0">
- <RefreshCw size={18} className="animate-spin text-indigo-400" />
+ <div className="p-2.5 bg-amber-600/30 text-amber-300 rounded-sm border border-amber-400/50 animate-pulse shrink-0">
+ <RefreshCw size={18} className="animate-spin text-amber-400" />
  </div>
  <div>
  <div className="text-xs font-black text-white flex items-center gap-2">
  <span>⚡ LIVE BACKGROUND SCRAPER ACTIVE</span>
- <span className="text-[10px] px-2 py-0.5 rounded-sm bg-indigo-950 text-indigo-300 border border-indigo-500/40">
+ <span className="text-[10px] px-2 py-0.5 rounded-sm bg-amber-950 text-amber-300 border border-amber-500/40">
  {seekerJobs.length} CACHED ROLES READY
  </span>
  </div>
@@ -843,7 +843,7 @@ export const JobSeeker = ({
  <div className="w-full md:w-72 space-y-1.5 shrink-0">
  <div className="flex justify-between text-[10px] text-slate-400 font-bold">
  <span>DISCOVERY PROGRESS</span>
- <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
+ <span className="text-amber-400 font-black">{scrapeProgress.percent}%</span>
  </div>
  <div className="w-full h-2.5 bg-slate-950 rounded-sm overflow-hidden border border-slate-800 p-0.5">
  <div 
@@ -888,7 +888,7 @@ export const JobSeeker = ({
  }}
  className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-sm font-mono font-black text-xs transition-all cursor-pointer border active:scale-95 ${
  docsReadyFilter
- ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50 shadow-emerald-500/25'
+ ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50 -emerald-500/25'
  : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40'
  }`}
  title="Refine job ads only to positions that have had custom Cover Letter & Resume generated"
@@ -924,9 +924,9 @@ export const JobSeeker = ({
  <button
  onClick={handleRunScraper}
  disabled={scraping}
- className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-indigo-600/30 border border-indigo-400/40 transition-all disabled:opacity-80 cursor-pointer min-w-[190px] active:scale-95"
+ className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:bg-amber-700 text-white font-mono font-bold text-xs -indigo-600/30 border border-amber-400/40 transition-all disabled:opacity-80 cursor-pointer min-w-[190px] active:scale-95"
  >
- <RefreshCw size={13} className={scraping ? "animate-spin text-indigo-200" : ""} />
+ <RefreshCw size={13} className={scraping ? "animate-spin text-amber-200" : ""} />
  {scraping ? (
  <span>SCRAPING... ({scrapeElapsedSeconds}s)</span>
  ) : (
@@ -972,14 +972,14 @@ export const JobSeeker = ({
  onClick={() => handleSelectStreamTab(tab.id)}
  className={`px-3.5 py-2 rounded-sm text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
  isActive
- ? 'bg-indigo-600 text-white border border-indigo-400/50'
+ ? 'bg-amber-600 text-white border border-amber-400/50'
  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
  }`}
  >
- <TabIcon size={14} className={isActive ? "text-white" : "text-indigo-400"} /> 
+ <TabIcon size={14} className={isActive ? "text-white" : "text-amber-400"} /> 
  <span>{tab.name}</span>
  <span className={`px-2 py-0.5 rounded-sm text-[10px] ${
- isActive ? 'bg-white text-indigo-900 font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'
+ isActive ? 'bg-white text-amber-900 font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'
  }`}>
  {count}
  </span>
@@ -990,10 +990,10 @@ export const JobSeeker = ({
 
  {/* Active Recommendation Rules Feedback Bar */}
  {(userPrefs?.boostedTerms?.length > 0 || userPrefs?.demotedTerms?.length > 0 || userPrefs?.boostedCompanies?.length > 0 || userPrefs?.demotedCompanies?.length > 0) && (
- <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-sm bg-indigo-950/60 border border-indigo-500/40 text-xs font-mono text-indigo-200 ">
+ <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-sm bg-amber-950/60 border border-amber-500/40 text-xs font-mono text-amber-200 ">
  <div className="flex flex-wrap items-center gap-2">
- <span className="font-black text-indigo-300 flex items-center gap-1.5 text-[11px]">
- <Sparkles size={13} className="text-indigo-400" /> ACTIVE PREFERENCES:
+ <span className="font-black text-amber-300 flex items-center gap-1.5 text-[11px]">
+ <Sparkles size={13} className="text-amber-400" /> ACTIVE PREFERENCES:
  </span>
  {userPrefs.boostedCompanies?.slice(0, 3).map((c, i) => (
  <span key={`bc-${i}`} className="px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
@@ -1032,8 +1032,8 @@ export const JobSeeker = ({
 
  {/* Toast Notification */}
  {prefToast && (
- <div className="fixed bottom-6 right-6 z-50 p-4 rounded-sm bg-slate-900 text-white border border-indigo-500 flex items-center gap-3 font-mono text-xs font-bold animate-in fade-in slide-in-from-bottom duration-200">
- <Sparkles size={16} className="text-indigo-400 animate-pulse" />
+ <div className="fixed bottom-6 right-6 z-50 p-4 rounded-sm bg-slate-900 text-white border border-amber-500 flex items-center gap-3 font-mono text-xs font-bold animate-in fade-in slide-in-from-bottom duration-200">
+ <Sparkles size={16} className="text-amber-400 animate-pulse" />
  <span>{prefToast}</span>
  </div>
  )}
@@ -1061,11 +1061,11 @@ export const JobSeeker = ({
  <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
  {/* Main Keyword Search */}
  <div className="relative flex-1 w-full">
- <Search size={16} className="absolute left-3.5 top-3 text-indigo-400" />
+ <Search size={16} className="absolute left-3.5 top-3 text-amber-400" />
  <input
  type="text"
  placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
- className="w-full pl-10 pr-3 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+ className="w-full pl-10 pr-3 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all"
  value={search}
  onChange={(e) => setSearch(e.target.value)}
  />
@@ -1116,8 +1116,8 @@ export const JobSeeker = ({
  </button>
 
  {/* Sort By Dropdown (Defaults to Most Recent) */}
- <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-sm px-3 py-2 text-xs text-slate-200 font-bold w-full md:w-auto shrink-0 hover:border-indigo-500/50 transition-colors">
- <ArrowUpDown size={14} className="text-indigo-400 shrink-0" />
+ <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-sm px-3 py-2 text-xs text-slate-200 font-bold w-full md:w-auto shrink-0 hover:border-amber-500/50 transition-colors">
+ <ArrowUpDown size={14} className="text-amber-400 shrink-0" />
  <span className="text-slate-400 uppercase text-[10px]">SORT:</span>
  <select
  className="bg-transparent focus:outline-none text-xs font-mono font-bold text-slate-100 cursor-pointer"
@@ -1133,7 +1133,7 @@ export const JobSeeker = ({
  <button
  type="button"
  onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
- className="inline-flex items-center gap-1 rounded-sm border border-indigo-500/40 bg-indigo-950/60 px-2 py-1 text-[10px] font-black text-indigo-300 hover:bg-indigo-900/60 cursor-pointer transition-colors"
+ className="inline-flex items-center gap-1 rounded-sm border border-amber-500/40 bg-amber-950/60 px-2 py-1 text-[10px] font-black text-amber-300 hover:bg-amber-900/60 cursor-pointer transition-colors"
  title={`Reverse posting order: currently ${sortDirection === 'desc' ? 'newest first' : 'oldest first'}`}
  >
  {sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑'}
@@ -1160,8 +1160,8 @@ export const JobSeeker = ({
  </div>
 
  {/* Strict Max Age Filter */}
- <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
- <Clock size={13} className="text-indigo-400 shrink-0" />
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-amber-500/50 transition-colors">
+ <Clock size={13} className="text-amber-400 shrink-0" />
  <select
  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={maxAgeFilter}
@@ -1175,7 +1175,7 @@ export const JobSeeker = ({
  </div>
 
  {/* Source Filter */}
- <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-amber-500/50 transition-colors">
  <Filter size={13} className="text-slate-400 shrink-0" />
  <select
  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
@@ -1232,7 +1232,7 @@ export const JobSeeker = ({
  {/* Active Filter & Page Size Selector Bar */}
  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-mono gap-2 pt-2 text-slate-400 border-t border-slate-800/80">
  <div className="flex items-center gap-2">
- <SlidersHorizontal size={13} className="text-indigo-400" />
+ <SlidersHorizontal size={13} className="text-amber-400" />
  <span>SHOWING <strong className="text-white">{startJobNum}-{endJobNum}</strong> OF <strong className="text-white">{seekerJobs.length}</strong> PREPARED POSITIONS</span>
  </div>
 
@@ -1254,7 +1254,7 @@ export const JobSeeker = ({
  {isFiltered && (
  <button
  onClick={resetAllFilters}
- className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
+ className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
  >
  <RotateCcw size={12} /> RESET ALL
  </button>
@@ -1267,16 +1267,16 @@ export const JobSeeker = ({
  {/* Dynamic & High-Impact Job Cards Grid */}
  {seekerJobs.length === 0 ? (
  scrapeProgress?.isActive ? (
- <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-sm p-8 sm:p-12 text-center text-white space-y-6 font-mono animate-in fade-in duration-300">
- <div className="w-16 h-16 mx-auto rounded-sm bg-indigo-600/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center ">
- <RefreshCw size={28} className="animate-spin text-indigo-400" />
+ <div className="bg-slate-900 border-2 border-amber-500/50 rounded-sm p-8 sm:p-12 text-center text-white space-y-6 font-mono animate-in fade-in duration-300">
+ <div className="w-16 h-16 mx-auto rounded-sm bg-amber-600/20 text-amber-400 border border-amber-400/40 flex items-center justify-center ">
+ <RefreshCw size={28} className="animate-spin text-amber-400" />
  </div>
  <div className="space-y-2">
  <h2 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">
  SCANNING LIVE EMPLOYMENT GATEWAYS
  </h2>
  <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
- Autonomous scrapers are indexing positions tailored to your profile (<span className="text-indigo-300 font-bold">{currentProfile?.industry || 'Technology'}</span>). Matching opportunities will appear below immediately upon completion.
+ Autonomous scrapers are indexing positions tailored to your profile (<span className="text-amber-300 font-bold">{currentProfile?.industry || 'Technology'}</span>). Matching opportunities will appear below immediately upon completion.
  </p>
  </div>
 
@@ -1287,7 +1287,7 @@ export const JobSeeker = ({
  <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse shrink-0" />
  <span className="truncate">{scrapeProgress.stage || 'Scanning Gateways...'}</span>
  </span>
- <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
+ <span className="text-amber-400 font-black">{scrapeProgress.percent}%</span>
  </div>
  <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden border border-slate-800 p-0.5">
  <div 
@@ -1302,7 +1302,7 @@ export const JobSeeker = ({
  </div>
  </div>
  ) : (
- <div className="bg-white rounded-sm p-8 border border-amber-200 bg-amber-50/40 text-amber-950 font-mono shadow-2xs space-y-4 animate-in fade-in duration-200">
+ <div className="bg-white rounded-sm p-8 border border-amber-200 bg-amber-50/40 text-amber-950 font-mono -2xs space-y-4 animate-in fade-in duration-200">
  <div className="flex items-start gap-3">
  <div className="p-2.5 bg-amber-100 text-amber-800 rounded-sm shrink-0 border border-amber-300">
  <AlertCircle size={20} />
@@ -1357,7 +1357,7 @@ export const JobSeeker = ({
 
  <button
  onClick={resetAllFilters}
- className="px-3.5 py-1.5 rounded-sm bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors cursor-pointer ml-auto"
+ className="px-3.5 py-1.5 rounded-sm bg-slate-900 hover:bg-slate-800 text-white -xs transition-colors cursor-pointer ml-auto"
  >
  <RotateCcw size={12} className="inline mr-1" /> RESET ALL FILTERS
  </button>
@@ -1377,7 +1377,7 @@ export const JobSeeker = ({
  <button
  type="button"
  onClick={resetAllFilters}
- className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-sm text-xs font-bold font-mono transition-colors shadow-xs"
+ className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-sm text-xs font-bold font-mono transition-colors -xs"
  >
  Reset All Filters
  </button>
@@ -1402,11 +1402,11 @@ export const JobSeeker = ({
  onClick={() => onSelectJob(job)}
  className={`rounded-sm p-5 sm:p-5.5 transition-all duration-300 flex flex-col justify-between space-y-3.5 group cursor-pointer relative overflow-hidden card-hover-lift backdrop-blur-xl ${
  hasCustomDocs
- ? 'obsidian-card-teal border border-teal-500/50 shadow-teal-950/30 ring-1 ring-teal-500/30'
+ ? 'obsidian-card-teal border border-teal-500/50 -teal-950/30 ring-1 ring-teal-500/30'
  : isGeneratingThisJob
- ? 'obsidian-card-amber border border-amber-500/60 shadow-amber-950/40 ring-2 ring-amber-400/40 animate-pulse'
+ ? 'obsidian-card-amber border border-amber-500/60 -amber-950/40 ring-2 ring-amber-400/40 animate-pulse'
  : isTopFit
- ? 'obsidian-card-emerald border border-emerald-500/50 shadow-emerald-950/30 ring-1 ring-emerald-500/30'
+ ? 'obsidian-card-emerald border border-emerald-500/50 -emerald-950/30 ring-1 ring-emerald-500/30'
  : 'obsidian-card hover:border-amber-500/50'
  }`}
  >
@@ -1428,24 +1428,24 @@ export const JobSeeker = ({
  ⚡ SYNTHESIZING...
  </div>
  ) : hasCustomDocs ? (
- <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-black bg-teal-500 text-slate-950 uppercase tracking-wider shadow-2xs">
+ <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-black bg-teal-500 text-slate-950 uppercase tracking-wider -2xs">
  <CheckCircle2 size={12} className="text-slate-950" />
  ✨ READY (PDFs)
  </div>
  ) : isTopFit ? (
- <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
+ <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider -2xs animate-pulse">
  <Flame size={12} className="text-amber-950 fill-amber-950" />
  🏆 TOP FIT
  </div>
  ) : null}
 
  {isQuickApplyEligible(job) && (
- <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-sm text-[9px] font-mono font-black uppercase tracking-wider border shadow-2xs ${
+ <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-sm text-[9px] font-mono font-black uppercase tracking-wider border -2xs ${
  (job.source || '').toLowerCase().includes('linkedin') || (job.link || '').toLowerCase().includes('linkedin')
  ? 'bg-sky-950 text-sky-300 border-sky-500/50'
  : (job.source || '').toLowerCase().includes('seek') || (job.link || '').toLowerCase().includes('seek')
  ? 'bg-rose-950 text-rose-300 border-rose-500/50'
- : 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
+ : 'bg-amber-950 text-amber-300 border-amber-500/50'
  }`}>
  <Zap size={10} className="text-amber-400 fill-amber-400 animate-pulse" />
  <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
@@ -1489,7 +1489,7 @@ export const JobSeeker = ({
  setOpenKebabJobId(null);
  setSelectedAutoApplyJob(job);
  }}
- className="w-full px-3 py-2 rounded-sm hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+ className="w-full px-3 py-2 rounded-sm hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
  >
  <Zap size={14} className="text-amber-400 shrink-0" />
  <span>Launch Auto-Apply</span>
@@ -1540,9 +1540,9 @@ export const JobSeeker = ({
  setOpenKebabJobId(null);
  downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
  }}
- className="w-full px-3 py-2 rounded-sm hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+ className="w-full px-3 py-2 rounded-sm hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
  >
- <Download size={14} className="text-indigo-400 shrink-0" />
+ <Download size={14} className="text-amber-400 shrink-0" />
  <span>Download Cover (PDF)</span>
  </button>
  </>
@@ -1614,7 +1614,7 @@ export const JobSeeker = ({
  <div className="flex items-center justify-between gap-2 pt-1 text-xs">
  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-sm font-semibold border ${
  isTopFit 
- ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
+ ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 -xs'
  : (job.score || 0) >= 80
  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
  : 'bg-stone-900/90 text-stone-300 border-stone-800'
@@ -1684,7 +1684,7 @@ export const JobSeeker = ({
  job.workArrangement === 'Remote' 
  ? 'bg-purple-950/60 text-purple-300 border-purple-500/30'
  : job.workArrangement === 'Hybrid'
- ? 'bg-blue-950/60 text-blue-300 border-blue-500/30'
+ ? 'bg-amber-950/60 text-amber-300 border-amber-500/30'
  : 'bg-slate-800/80 text-slate-300 border-slate-700/80'
  }`}>
  <Building2 size={10} />
@@ -1693,7 +1693,7 @@ export const JobSeeker = ({
  )}
  {job.employmentType && (
  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold bg-slate-800/80 text-slate-300 border border-slate-700/80">
- <Briefcase size={10} className="text-indigo-400" />
+ <Briefcase size={10} className="text-amber-400" />
  <span>{job.employmentType}</span>
  </div>
  )}
@@ -1713,7 +1713,7 @@ export const JobSeeker = ({
  return (
  <div className="p-2 rounded-sm bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono space-y-1">
  <div className="flex items-center justify-between text-slate-300 font-bold px-1">
- <span className="flex items-center gap-1 text-indigo-400">
+ <span className="flex items-center gap-1 text-amber-400">
  <Navigation size={10} />
  {commute.distanceKm}KM COMMUTE:
  </span>
@@ -1722,7 +1722,7 @@ export const JobSeeker = ({
  </span>
  </div>
  <div className="grid grid-cols-3 gap-1 text-[9px] text-center">
- <span className="p-1 rounded bg-slate-900 border border-slate-800 text-indigo-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
+ <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
  <Train size={9} /> {commute.transit.durationMin}m Train
  </span>
  <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5">
@@ -1746,7 +1746,7 @@ export const JobSeeker = ({
  e.stopPropagation(); 
  dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
  }}
- className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-emerald-500/20 active:scale-95"
+ className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 -emerald-500/20 active:scale-95"
  title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
  >
  <CheckCircle2 size={13} className="text-emerald-200" /> 
@@ -1780,7 +1780,7 @@ export const JobSeeker = ({
  setSelectedForGenerator(job);
  }
  }}
- className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 shadow-amber-950/40 tracking-wide uppercase active:scale-95"
+ className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 -amber-950/40 tracking-wide uppercase active:scale-95"
  title="Generate Tailored Resume & Cover Letter"
  >
  <Sparkles size={12} className="text-slate-950" />
@@ -1844,7 +1844,7 @@ export const JobSeeker = ({
  onClick={() => handlePageChange(pageNum)}
  className={`px-3 py-1.5 rounded-sm font-extrabold transition-all cursor-pointer ${
  currentPage === pageNum
- ? 'bg-indigo-600 text-white shadow-indigo-600/30 border border-indigo-400/50'
+ ? 'bg-amber-600 text-white -indigo-600/30 border border-amber-400/50'
  : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/80'
  }`}
  >
@@ -1877,9 +1877,9 @@ export const JobSeeker = ({
  {currentPage < totalPages && (
  <button
  onClick={() => handlePageChange(currentPage + 1)}
- className="px-4 py-2 rounded-sm bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 font-extrabold border border-indigo-500/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+ className="px-4 py-2 rounded-sm bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-extrabold border border-amber-500/40 transition-colors flex items-center gap-1.5 cursor-pointer -xs active:scale-95"
  >
- <ArrowDown size={14} className="text-indigo-400" />
+ <ArrowDown size={14} className="text-amber-400" />
  LOAD NEXT {Math.min(effectivePageSize, seekerJobs.length - endJobNum)} POSITIONS
  </button>
  )}

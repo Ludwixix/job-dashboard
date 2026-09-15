@@ -263,24 +263,24 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  return (
  <aside className="w-full lg:w-80 xl:w-88 2xl:w-[380px] 3xl:w-[420px] shrink-0 space-y-3 font-sans">
  {/* FEATURED INSIGHTS 1: LIVE POINTS OF INTEREST (Real-Time Telemetry HUD) */}
- <div className="bg-slate-900 text-white rounded-sm p-3.5 border border-indigo-500/40 font-mono relative overflow-hidden">
+ <div className="bg-slate-900 text-white rounded-sm p-3.5 border border-amber-500/40 font-mono relative overflow-hidden">
  <div 
  onClick={() => setShowLiveInsights(!showLiveInsights)}
  className="flex items-center justify-between cursor-pointer select-none group"
  >
  <div className="flex items-center gap-2">
- <div className="p-1 bg-indigo-500/20 text-indigo-300 rounded border border-indigo-400/30">
- <Activity size={14} className="animate-pulse text-indigo-400" />
+ <div className="p-1 bg-amber-500/20 text-amber-300 rounded border border-amber-400/30">
+ <Activity size={14} className="animate-pulse text-amber-400" />
  </div>
  <div>
- <h3 className="font-extrabold text-xs text-indigo-300 uppercase tracking-wider group-hover:text-white transition-colors">
+ <h3 className="font-extrabold text-xs text-amber-300 uppercase tracking-wider group-hover:text-white transition-colors">
  LIVE POINTS OF INTEREST
  </h3>
  <div className="text-[9px] text-slate-400 font-bold">REAL-TIME DATA TELEMETRY</div>
  </div>
  </div>
  <div className="flex items-center gap-1.5">
- <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-500 text-white">
+ <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500 text-white">
  LIVE
  </span>
  <button className="text-slate-400 hover:text-white p-0.5">
@@ -306,14 +306,14 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  {liveInsights.topEmployer && (
  <div 
  onClick={() => onSelectJob(liveInsights.topEmployer)}
- className="p-2.5 rounded-sm bg-slate-950/70 border border-slate-800 hover:border-indigo-500 transition-colors cursor-pointer group"
+ className="p-2.5 rounded-sm bg-slate-950/70 border border-slate-800 hover:border-amber-500 transition-colors cursor-pointer group"
  >
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-2">
- <Award size={13} className="text-indigo-400 shrink-0" />
+ <Award size={13} className="text-amber-400 shrink-0" />
  <div>
  <div className="text-[9px] text-slate-400 uppercase font-bold">TOP MATCH OPPORTUNITY</div>
- <div className="text-xs font-black text-white group-hover:text-indigo-300 truncate max-w-[140px]">
+ <div className="text-xs font-black text-white group-hover:text-amber-300 truncate max-w-[140px]">
  {liveInsights.topEmployer.company}
  </div>
  </div>
@@ -402,7 +402,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
 
  <button
  onClick={(e) => { e.stopPropagation(); onOpenGenerator(highlightedLocalJob); }}
- className="w-full py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+ className="w-full py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs -xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
  >
  PACK LOCAL ASSETS <ArrowRight size={12} />
  </button>
@@ -472,7 +472,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <button
  type="button"
  onClick={handleCycleWildCard}
- className="flex-1 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-extrabold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-500/30"
+ className="flex-1 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-extrabold text-xs -xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-500/30"
  >
  <Dices size={13} className="text-cyan-400" />
  <span>RE-ROLL DISCOVERY ({wildCardIndex + 1}/{coolWildCardJobs.length})</span>
@@ -481,7 +481,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <button
  type="button"
  onClick={(e) => { e.stopPropagation(); onOpenGenerator(activeWildCardJob); }}
- className="py-1.5 px-3 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+ className="py-1.5 px-3 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs -xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
  >
  PACK <Sparkles size={12} />
  </button>
@@ -525,7 +525,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  whileHover={{ scale: 1.02, x: 2 }}
  key={job.id} 
  onClick={() => onSelectJob(job)}
- className="p-3 rounded-sm bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/50 transition-all cursor-pointer group shadow-xs"
+ className="p-3 rounded-sm bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/50 transition-all cursor-pointer group -xs"
  >
  <div className="flex justify-between items-start mb-1">
  <span className="text-xs font-extrabold text-white group-hover:text-cyan-300 transition-colors leading-snug truncate pr-2">
@@ -588,7 +588,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <div 
  key={job.id || `${job.company}_${job.title}_${idx}`} 
  onClick={() => onSelectJob(job)}
- className="p-3 rounded-sm bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-rose-500/50 transition-all cursor-pointer group shadow-xs"
+ className="p-3 rounded-sm bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-rose-500/50 transition-all cursor-pointer group -xs"
  >
  <div className="flex justify-between items-start mb-1 gap-2">
  <div className="flex items-center gap-2 truncate">
@@ -631,24 +631,24 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
 
 
  {/* Widget 6: Most Likely to Get (Sleek Dark Cyberpunk HUD) */}
- <div className="bg-slate-900 text-white rounded-sm p-3.5 border border-indigo-500/40 font-mono">
+ <div className="bg-slate-900 text-white rounded-sm p-3.5 border border-amber-500/40 font-mono">
  <div 
  onClick={() => setShowMostLikely(!showMostLikely)}
  className="flex items-center justify-between cursor-pointer select-none group"
  >
  <div className="flex items-center gap-2">
- <div className="p-1 bg-indigo-500/20 text-indigo-300 rounded border border-indigo-400/30">
- <Sparkles size={14} className="text-indigo-400" />
+ <div className="p-1 bg-amber-500/20 text-amber-300 rounded border border-amber-400/30">
+ <Sparkles size={14} className="text-amber-400" />
  </div>
  <div>
- <h3 className="font-extrabold text-xs text-indigo-300 uppercase tracking-wider group-hover:text-white transition-colors">
+ <h3 className="font-extrabold text-xs text-amber-300 uppercase tracking-wider group-hover:text-white transition-colors">
  MOST LIKELY TO GET
  </h3>
  <div className="text-[9px] text-slate-400 font-bold">MAXIMUM ALIGNMENT & FIT</div>
  </div>
  </div>
  <div className="flex items-center gap-1.5">
- <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-500/50">
+ <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200 border border-amber-500/50">
  HIGH FIT
  </span>
  <button className="text-slate-400 hover:text-white p-0.5">
@@ -663,10 +663,10 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <div 
  key={job.id} 
  onClick={() => onSelectJob(job)}
- className="p-3 rounded-sm bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 transition-all cursor-pointer group shadow-xs"
+ className="p-3 rounded-sm bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/50 transition-all cursor-pointer group -xs"
  >
  <div className="flex justify-between items-start mb-1">
- <span className="text-xs font-extrabold text-white group-hover:text-indigo-300 transition-colors leading-snug truncate pr-2">
+ <span className="text-xs font-extrabold text-white group-hover:text-amber-300 transition-colors leading-snug truncate pr-2">
  {job.company}
  </span>
  <span className="px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-black shrink-0">
@@ -683,14 +683,14 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  target="_blank"
  rel="noopener noreferrer"
  onClick={(e) => e.stopPropagation()}
- className="text-indigo-300 hover:text-white font-bold flex items-center gap-0.5 bg-indigo-950/60 hover:bg-indigo-900 px-2 py-0.5 rounded border border-indigo-500/30 transition-colors"
+ className="text-amber-300 hover:text-white font-bold flex items-center gap-0.5 bg-amber-950/60 hover:bg-amber-900 px-2 py-0.5 rounded border border-amber-500/30 transition-colors"
  >
  APPLY <ExternalLink size={10} />
  </a>
  ) : (
  <button
  onClick={(e) => { e.stopPropagation(); onOpenGenerator(job); }}
- className="text-indigo-300 hover:text-white font-bold flex items-center gap-0.5 cursor-pointer bg-indigo-950/60 hover:bg-indigo-900 px-2 py-0.5 rounded border border-indigo-500/30 transition-colors"
+ className="text-amber-300 hover:text-white font-bold flex items-center gap-0.5 cursor-pointer bg-amber-950/60 hover:bg-amber-900 px-2 py-0.5 rounded border border-amber-500/30 transition-colors"
  >
  PACK <ArrowRight size={10} />
  </button>

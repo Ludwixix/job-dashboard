@@ -12,65 +12,137 @@ export const STORAGE_KEY_PROFILES = 'job_dashboard_profiles';
 export const STORAGE_KEY_ACTIVE_PROFILE_ID = 'job_dashboard_active_profile_id';
 export const STORAGE_KEY_CANDIDATE_PROFILE = 'candidate_profile';
 
-// Canonical Default Profile for the Logged-In User
+// Canonical Default Profile for the Logged-In User (Sam Ludwig)
 export const DEFAULT_USER_PROFILE = {
   id: 'sam_ludwig',
   name: 'Sam Ludwig',
-  title: 'Senior Systems & Infrastructure Engineer',
+  title: 'Senior Infrastructure & M365 Engineer',
   industry: 'Technology & IT',
   seniorityLevel: 'Senior / Lead',
-  yearsOfExperience: 12,
-  marketArchetype: 'Hybrid Cloud & Enterprise Infrastructure Transformation Specialist',
+  yearsOfExperience: 10,
+  marketArchetype: 'Hybrid Cloud, M365 Architecture & Enterprise Automation Specialist',
   email: 'sam.ludwig@gmail.com',
   phone: '0405 993 245',
-  location: 'Balaclava VIC 3183',
+  location: 'Melbourne, VIC (Balaclava 3183)',
   suburb: 'Balaclava',
+  state: 'VIC',
+  country: 'Australia',
   workRights: 'Australian Citizen (Unrestricted)',
   clearance: 'Australian Citizen (Baseline / NV1 Eligible)',
   targetSalary: '$140,000 - $165,000 + Super',
+  salaryExpectations: {
+    min: 140000,
+    max: 165000,
+    preferred: 150000,
+    currency: 'AUD',
+    period: 'annual'
+  },
+  linkedin: 'https://linkedin.com/in/sam-ludwig',
+  portfolio: 'https://samludwig.au',
+  github: 'https://github.com/Ludwixix',
   keyStrengths: [
-    'Zero-downtime multi-cloud migrations (AWS, Azure, M365)',
-    'Enterprise PowerShell & Infrastructure-as-Code automation',
-    'High-security government & healthcare compliance frameworks'
+    'Southern Hemisphere scale: Managed 660,000+ users & 1,000+ sites across SharePoint farm with 99.9% uptime at Dept. of Education VIC',
+    'Enterprise automation: Engineered custom PowerShell runbooks, ServiceNow keystroke injection, and Python diagnostic GUIs reducing processing time by 87%',
+    'Healthcare & clinical endpoint migrations: Directed 100+ clinical endpoint Windows 11 Autopilot migrations at St John of God Health Care with zero patient care disruption',
+    'Hybrid cloud identity & compliance: Tri-platform synchronization (AD, Entra ID, Google Workspace) aligned with ACSC Essential 8 and ISO 27001'
   ],
   managementStyle: 'Player-Coach / Hands-On Technical Mentor',
   targetTitles: [
     'Senior Systems Engineer',
-    'Cloud Infrastructure Engineer',
-    'M365 / Endpoint Engineer',
-    'Infrastructure Architect',
-    'Platform Engineer',
-    'IT Operations Lead'
+    'Senior Infrastructure Engineer',
+    'Senior M365 Engineer',
+    'Cloud Infrastructure Specialist',
+    'Endpoint / EUC Engineer',
+    'L3 Systems / Operations Lead',
+    'SharePoint & Modern Workplace Architect',
+    'Automation & DevOps Engineer'
   ],
   coreSkills: [
-    'Microsoft 365', 'Azure Cloud', 'PowerShell Automation', 'Active Directory / Entra ID',
-    'VMware ESXi', 'AWS Cloud', 'Terraform', 'Intune / MDM', 'Exchange Online',
-    'SharePoint Online', 'Windows Server', 'Linux (RHEL/Ubuntu)', 'CI/CD Pipelines',
-    'Security Hardening', 'Disaster Recovery', 'ITIL Service Management'
+    'Microsoft 365', 'SharePoint Online / Server', 'Exchange Hybrid / Online', 'Microsoft Teams',
+    'Entra ID (Azure AD)', 'Azure Cloud (VMs, Functions, Automation)', 'PowerShell 5.1/7 & PnP',
+    'Microsoft Intune (MDM/MAM)', 'Windows Autopilot', 'Active Directory Domain Services',
+    'ACSC Essential 8 & ISO 27001', 'ServiceNow (Advanced)', 'Windows Server (2012R2–2022)',
+    'VMware vSphere (ESXi)', 'Python Automation', 'Azure DevOps CI/CD', 'ITIL 4 Service Management',
+    'Microsoft Graph API', 'Layer 1 Infrastructure (Fibre / Copper)'
   ],
   certifications: [
-    'Microsoft Certified: Azure Administrator Associate (AZ-104)',
-    'Microsoft 365 Certified: Enterprise Administrator Expert (MS-102)',
-    'ITIL v4 Foundation'
+    'Microsoft Certified: Azure Administrator Associate (AZ-104, 2025)',
+    'ITIL 4 Foundation (AXELOS, 2025)',
+    'Microsoft Certified: Azure Fundamentals (AZ-900, 2022)',
+    'Certified Scrum Master (CSM)',
+    'Diploma of Information Technology (Coder Academy, 2019)',
+    'Web Development Fast Track Bootcamp (Coder Academy, 2018)'
+  ],
+  projects: [
+    {
+      name: 'YellowSnow (ServiceNow UI & Workload Distribution Engine)',
+      description: 'Client-side browser extension suite integrating live SharePoint Online presence data with ServiceNow ticket queues to eliminate manual triage and prevent SLA breaches.',
+      url: 'https://github.com/Ludwixix/YellowSnow'
+    },
+    {
+      name: 'PySPO Tool (M365 Diagnostic GUI)',
+      description: 'Python GUI application (Tkinter) empowering Tier-1 support staff to safely execute advanced PowerShell diagnostics against M365 without CLI access.',
+      url: 'https://github.com/Ludwixix/pyspo-tool'
+    },
+    {
+      name: 'JobGobblin Browser Automation',
+      description: 'Python and Selenium WebDriver web scraping engine extracting requisition data with custom Boolean search parameters.',
+      url: 'https://github.com/Ludwixix/JobGobblin'
+    },
+    {
+      name: 'MFA Compliance Automation',
+      description: 'Automated PnP PowerShell discovery and audit across 200+ sensitive SharePoint sites at Department of Education VIC, eliminating month-long manual audit cycles.'
+    }
   ],
   interviewTalkingPoints: [
-    'Automated tenant migration for 660,000+ users with zero unplanned downtime using custom PowerShell runbooks.',
-    'Designed and deployed hybrid Azure-on-prem infrastructure achieving 99.99% uptime for mission-critical health services.',
-    'Cut server provisioning time by 85% through modular Terraform and Ansible templates.'
+    'Maintained 99.9% uptime across the Southern Hemisphere\'s largest SharePoint farm (660,000+ users, 1,000+ sites) at Dept. of Education Victoria.',
+    'Engineered dynamic PnP PowerShell MFA compliance audit across 200+ sensitive SharePoint sites, replacing a month-long manual review with automated reporting.',
+    'Reduced cloud migration processing time by 87% (2 hours to 15 minutes per batch) using custom PowerShell automation at Knosys.',
+    'Led Windows 11 enterprise migration across 100+ clinical endpoints at St John of God Health Care with 100% Autopilot adherence and zero patient care disruption.',
+    'Developed custom keystroke injection automation within ServiceNow at Australia Post, eliminating hundreds of hours of manual ticket entry under tight system controls.',
+    'Built Azure DevOps CI/CD pipelines at Engage Squared, reducing solution deployment cycles by 25% for Victoria Police and Transurban.'
   ],
-  workHistorySummary: 'Experienced Senior Infrastructure & Systems Engineer with 12+ years optimizing enterprise hybrid cloud environments, automating workflows via PowerShell, and leading complex cloud migration programs across government, education, and private sectors.',
-  fullWorkExperienceText: `SENIOR SYSTEMS & INFRASTRUCTURE ENGINEER — Capgemini / Department of Education (2021 – Present)
-- Led migration of 660k+ user identities to Azure Entra ID and Exchange Online with custom automation.
-- Engineered hybrid cloud backup and disaster recovery architecture meeting strict Victorian Government standards.
+  workHistorySummary: 'Senior Infrastructure & M365 Consultant with 10+ years bridging physical infrastructure, enterprise hybrid cloud, and automation. Proven authority managing 660,000+ user environments (Southern Hemisphere\'s largest SharePoint farm), leading Tier-3 M365/Entra ID escalations, orchestrating zero-downtime clinical hospital migrations (St John of God), and engineering custom PowerShell/Python automation that eliminates manual toil.',
+  fullWorkExperienceText: `SENIOR MANAGED SERVICES ENGINEER — Capgemini / Dept. of Education Victoria (Dec 2021 – Present)
+- Managed the largest SharePoint farm in the Southern Hemisphere (660,000+ active users, 1,000+ sites), consistently achieving 99.9% uptime under state government SLA requirements.
+- Served near the top of Tier-3 escalation for M365 (SharePoint Online, Exchange Online, Teams, Google Workspace), achieving a documented 15% reduction in repeat incidents through systematic Root Cause Analysis (RCA).
+- Engineered PnP PowerShell automation auditing and enforcing MFA compliance dynamically across 200+ sensitive SharePoint sites, eliminating month-long manual audits.
+- Managed tri-platform identity synchronisation (On-Premises AD, Entra ID, Google Workspace) and resolved complex mail-flow and federation issues.
+- Spearheaded Azure cloud adoption, migrating legacy on-premise workloads to Azure IaaS/PaaS aligned with ACSC Essential 8 maturity model.
+- Built client-side workload distribution engine (YellowSnow) integrating M365 presence data into ServiceNow, eliminating manual ticket triage.
+- Managed 40+ concurrent tickets in high-volume government queue, consistently maintaining >90% resolution within contractual SLA targets.
 
-INFRASTRUCTURE CONSULTANT — Datacom Systems (2017 – 2021)
-- Delivered high-availability virtualization and storage solutions for tier-1 healthcare and enterprise clients.
-- Automated endpoint provisioning for 2,500+ endpoints using Microsoft Intune and Autopilot.
+L2/L3 TECHNICAL SUPPORT ENGINEER & AUTOMATION — Australia Post via Capgemini (2023 – 2024 / Feb 2026 – Jun 2026)
+- Delivered face-to-endpoint and remote support within the MyITHub service centre, managing hardware diagnostics, OS reimaging, and endpoint provisioning.
+- Engineered novel keystroke injection automation in ServiceNow, programmatically managing ITSM tickets and saving hundreds of hours of manual entry per month under restrictive security controls.
+- Managed full endpoint lifecycle for enterprise fleet: Windows 10/11 SOE builds, Autopilot/UEM enrolment, and NIST-compliant sanitisation.
+- Supported rollout of staff self-help kiosk programme for knowledge base access, password resets, and ticket logging.
 
-SYSTEMS ADMINISTRATOR — Dimension Data (2013 – 2017)
-- Administered multi-site Windows Server, VMware ESXi, and Active Directory environments.`
+ENDPOINT MIGRATION ENGINEER — St John of God Health Care (2023 / Oct 2025 – Jan 2026)
+- Led Windows 11 enterprise migration across 100+ clinical endpoints in live hospital environments with 100% Autopilot and SOE compliance.
+- Delivered intensive hypercare support resolving compatibility issues with EMR systems, PACS diagnostic imaging, and patient monitoring tools with zero patient care disruption.
+- Served as primary technical liaison between clinical healthcare staff and engineering teams.
+
+APPLICATION SUPPORT ENGINEER — Knosys (Dec 2020 – Dec 2021)
+- Delivered expert L3 support for GreenOrbit enterprise intranet platform, achieving a 95% SLA resolution rate for Cotton On, Harvey Norman, and Healthscope.
+- Engineered PowerShell automation cutting cloud migration batch processing by 87% (2 hours to 15 minutes per batch), saving 10+ hours per month.
+- Developed Python and PowerShell scripts to automate system patching procedures, reducing manual effort by 20%.
+
+SHAREPOINT DEVELOPER & MODERN WORKPLACE CONSULTANT — Engage Squared (Mar 2018 – Dec 2020)
+- Architected and delivered 5+ bespoke SharePoint Online intranet solutions for Victoria Police, Transurban, and Cimic Group using SPFx, React, and TypeScript.
+- Implemented Azure DevOps CI/CD pipelines, automating build and release cycles to achieve a 25% reduction in deployment time.
+- Led legacy-to-M365 migrations using Sharegate and SPMT under ISO 27001 compliance and governance frameworks.
+- Facilitated client technical workshops driving a 20% increase in M365 feature adoption.
+
+TELECOMMUNICATIONS TECHNICIAN — National Broadband Network (NBN) (Oct 2016 – Nov 2017)
+- Deployed Layer 1 telecommunications infrastructure, running structured fibre optic and copper cabling across residential and commercial environments.
+- Conducted physical and data-link fault-finding, installing and diagnosing NTDs and network routing equipment.
+
+HVAC & MECHANICAL SERVICE TECHNICIAN — PolaAir (Jan 2017 – Oct 2017)
+- Installed and serviced commercial HVAC systems; developed diagnostic troubleshooting methodologies and root-cause analysis in time-critical environments.`
 };
 
+export const SAM_LUDWIG_PROFILE = DEFAULT_USER_PROFILE;
 export const CANDIDATE_PROFILE = DEFAULT_USER_PROFILE;
 
 export const HEALTHCARE_PROFILE = {

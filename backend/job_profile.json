@@ -1,67 +1,284 @@
 {
+  "id": "sam_ludwig",
+  "name": "Sam Ludwig",
+  "title": "Senior Infrastructure & M365 Engineer",
+  "industry": "Technology & IT",
+  "seniorityLevel": "Senior / Lead",
+  "yearsOfExperience": 10,
+  "marketArchetype": "Hybrid Cloud, M365 Architecture & Enterprise Automation Specialist",
+  "email": "sam.ludwig@gmail.com",
+  "phone": "0405 993 245",
+  "location": "Melbourne, VIC (Balaclava 3183)",
+  "suburb": "Balaclava",
+  "state": "VIC",
+  "country": "Australia",
+  "workRights": "Australian Citizen (Unrestricted)",
+  "clearance": "Australian Citizen (Baseline / NV1 Eligible)",
+  "targetSalary": "$140,000 - $165,000 + Super",
+  "salaryExpectations": {
+    "min": 140000,
+    "max": 165000,
+    "preferred": 150000,
+    "currency": "AUD",
+    "period": "annual"
+  },
+  "linkedin": "https://linkedin.com/in/sam-ludwig",
+  "portfolio": "https://samludwig.au",
+  "github": "https://github.com/Ludwixix",
+  "preferredEngagement": [
+    "Permanent",
+    "Contract",
+    "Fixed-Term"
+  ],
+  "workArrangement": [
+    "remote",
+    "hybrid",
+    "on-site"
+  ],
+  "keyStrengths": [
+    "Southern Hemisphere scale: Managed 660,000+ users & 1,000+ sites across SharePoint farm with 99.9% uptime at Dept. of Education VIC",
+    "Enterprise automation: Engineered custom PowerShell runbooks, ServiceNow keystroke injection, and Python diagnostic GUIs reducing processing time by 87%",
+    "Healthcare & clinical endpoint migrations: Directed 100+ clinical endpoint Windows 11 Autopilot migrations at St John of God Health Care with zero patient care disruption",
+    "Hybrid cloud identity & compliance: Tri-platform synchronization (AD, Entra ID, Google Workspace) aligned with ACSC Essential 8 and ISO 27001"
+  ],
+  "managementStyle": "Player-Coach / Hands-On Technical Mentor",
+  "targetTitles": [
+    "Senior Systems Engineer",
+    "Senior Infrastructure Engineer",
+    "Senior M365 Engineer",
+    "Cloud Infrastructure Specialist",
+    "Endpoint / EUC Engineer",
+    "L3 Systems / Operations Lead",
+    "SharePoint & Modern Workplace Architect",
+    "Automation & DevOps Engineer"
+  ],
+  "coreSkills": [
+    "Microsoft 365",
+    "SharePoint Online / Server",
+    "Exchange Hybrid / Online",
+    "Microsoft Teams",
+    "Entra ID (Azure AD)",
+    "Azure Cloud (VMs, Functions, Automation)",
+    "PowerShell 5.1/7 & PnP",
+    "Microsoft Intune (MDM/MAM)",
+    "Windows Autopilot",
+    "Active Directory Domain Services",
+    "ACSC Essential 8 & ISO 27001",
+    "ServiceNow (Advanced)",
+    "Windows Server (2012R2–2022)",
+    "VMware vSphere (ESXi)",
+    "Python Automation",
+    "Azure DevOps CI/CD",
+    "ITIL 4 Service Management",
+    "Microsoft Graph API",
+    "Layer 1 Infrastructure (Fibre / Copper)"
+  ],
+  "certifications": [
+    "Microsoft Certified: Azure Administrator Associate (AZ-104, 2025)",
+    "ITIL 4 Foundation (AXELOS, 2025)",
+    "Microsoft Certified: Azure Fundamentals (AZ-900, 2022)",
+    "Certified Scrum Master (CSM)",
+    "Diploma of Information Technology (Coder Academy, 2019)",
+    "Web Development Fast Track Bootcamp (Coder Academy, 2018)"
+  ],
+  "education": [
+    {
+      "institution": "Coder Academy",
+      "credential": "Diploma of Information Technology",
+      "year": "2019",
+      "location": "Melbourne, VIC"
+    },
+    {
+      "institution": "Coder Academy",
+      "credential": "Web Development Fast Track Bootcamp",
+      "year": "2018",
+      "location": "Melbourne, VIC"
+    }
+  ],
+  "projects": [
+    {
+      "name": "ServiceNow UI & Workload Distribution Engine (YellowSnow)",
+      "description": "Client-side browser extension suite integrating live SharePoint Online presence data with ServiceNow ticket queues to eliminate manual triage and prevent SLA breaches.",
+      "url": "https://github.com/Ludwixix/YellowSnow"
+    },
+    {
+      "name": "M365 Diagnostic GUI (PySPO Tool)",
+      "description": "Python GUI application (Tkinter) empowering Tier-1 support staff to safely execute advanced PowerShell diagnostics against M365 without CLI access.",
+      "url": "https://github.com/Ludwixix/pyspo-tool"
+    },
+    {
+      "name": "JobGobblin Browser Automation",
+      "description": "Python and Selenium WebDriver web scraping engine extracting requisition data with custom Boolean search parameters.",
+      "url": "https://github.com/Ludwixix/JobGobblin"
+    },
+    {
+      "name": "MFA Compliance Automation",
+      "description": "Automated PnP PowerShell discovery and audit across 200+ sensitive SharePoint sites at Department of Education VIC, eliminating month-long manual audit cycles."
+    }
+  ],
+  "interviewTalkingPoints": [
+    "Maintained 99.9% uptime across the Southern Hemisphere's largest SharePoint farm (660,000+ users, 1,000+ sites) at Dept. of Education Victoria.",
+    "Engineered dynamic PnP PowerShell MFA compliance audit across 200+ sensitive SharePoint sites, replacing a month-long manual review with automated reporting.",
+    "Reduced cloud migration processing time by 87% (2 hours to 15 minutes per batch) using custom PowerShell automation at Knosys.",
+    "Led Windows 11 enterprise migration across 100+ clinical endpoints at St John of God Health Care with 100% Autopilot adherence and zero patient care disruption.",
+    "Developed custom keystroke injection automation within ServiceNow at Australia Post, eliminating hundreds of hours of manual ticket entry under tight system controls.",
+    "Built Azure DevOps CI/CD pipelines at Engage Squared, reducing solution deployment cycles by 25% for Victoria Police and Transurban."
+  ],
+  "workHistorySummary": "Senior Infrastructure & M365 Consultant with 10+ years bridging physical infrastructure, enterprise hybrid cloud, and automation. Proven authority managing 660,000+ user environments (Southern Hemisphere's largest SharePoint farm), leading Tier-3 M365/Entra ID escalations, orchestrating zero-downtime clinical hospital migrations (St John of God), and engineering custom PowerShell/Python automation that eliminates manual toil.",
+  "fullWorkExperienceText": "SENIOR MANAGED SERVICES ENGINEER — Capgemini / Dept. of Education Victoria (Dec 2021 – Present)\n- Managed the largest SharePoint farm in the Southern Hemisphere (660,000+ active users, 1,000+ sites), consistently achieving 99.9% uptime under state government SLA requirements.\n- Served near the top of Tier-3 escalation for M365 (SharePoint Online, Exchange Online, Teams, Google Workspace), achieving a documented 15% reduction in repeat incidents through systematic Root Cause Analysis (RCA).\n- Engineered PnP PowerShell automation auditing and enforcing MFA compliance dynamically across 200+ sensitive SharePoint sites, eliminating month-long manual audits.\n- Managed tri-platform identity synchronisation (On-Premises AD, Entra ID, Google Workspace) and resolved complex mail-flow and federation issues.\n- Spearheaded Azure cloud adoption, migrating legacy on-premise workloads to Azure IaaS/PaaS aligned with ACSC Essential 8 maturity model.\n- Built client-side workload distribution engine (YellowSnow) integrating M365 presence data into ServiceNow, eliminating manual ticket triage.\n- Managed 40+ concurrent tickets in high-volume government queue, consistently maintaining >90% resolution within contractual SLA targets.\n\nL2/L3 TECHNICAL SUPPORT ENGINEER & AUTOMATION — Australia Post via Capgemini (2023 – 2024 / Feb 2026 – Jun 2026)\n- Delivered face-to-endpoint and remote support within the MyITHub service centre, managing hardware diagnostics, OS reimaging, and endpoint provisioning.\n- Engineered novel keystroke injection automation in ServiceNow, programmatically managing ITSM tickets and saving hundreds of hours of manual entry per month under restrictive security controls.\n- Managed full endpoint lifecycle for enterprise fleet: Windows 10/11 SOE builds, Autopilot/UEM enrolment, and NIST-compliant sanitisation.\n- Supported rollout of staff self-help kiosk programme for knowledge base access, password resets, and ticket logging.\n\nENDPOINT MIGRATION ENGINEER — St John of God Health Care (2023 / Oct 2025 – Jan 2026)\n- Led Windows 11 enterprise migration across 100+ clinical endpoints in live hospital environments with 100% Autopilot and SOE compliance.\n- Delivered intensive hypercare support resolving compatibility issues with EMR systems, PACS diagnostic imaging, and patient monitoring tools with zero patient care disruption.\n- Served as primary technical liaison between clinical healthcare staff and engineering teams.\n\nAPPLICATION SUPPORT ENGINEER — Knosys (Dec 2020 – Dec 2021)\n- Delivered expert L3 support for GreenOrbit enterprise intranet platform, achieving a 95% SLA resolution rate for Cotton On, Harvey Norman, and Healthscope.\n- Engineered PowerShell automation cutting cloud migration batch processing by 87% (2 hours to 15 minutes per batch), saving 10+ hours per month.\n- Developed Python and PowerShell scripts to automate system patching procedures, reducing manual effort by 20%.\n\nSHAREPOINT DEVELOPER & MODERN WORKPLACE CONSULTANT — Engage Squared (Mar 2018 – Dec 2020)\n- Architected and delivered 5+ bespoke SharePoint Online intranet solutions for Victoria Police, Transurban, and Cimic Group using SPFx, React, and TypeScript.\n- Implemented Azure DevOps CI/CD pipelines, automating build and release cycles to achieve a 25% reduction in deployment time.\n- Led legacy-to-M365 migrations using Sharegate and SPMT under ISO 27001 compliance and governance frameworks.\n- Facilitated client technical workshops driving a 20% increase in M365 feature adoption.\n\nTELECOMMUNICATIONS TECHNICIAN — National Broadband Network (NBN) (Oct 2016 – Nov 2017)\n- Deployed Layer 1 telecommunications infrastructure, running structured fibre optic and copper cabling across residential and commercial environments.\n- Conducted physical and data-link fault-finding, installing and diagnosing NTDs and network routing equipment.\n\nHVAC & MECHANICAL SERVICE TECHNICIAN — PolaAir (Jan 2017 – Oct 2017)\n- Installed and serviced commercial HVAC systems; developed diagnostic troubleshooting methodologies and root-cause analysis in time-critical environments.",
+  "experience": [
+    {
+      "title": "Senior Managed Services Engineer",
+      "company": "Capgemini (Dept. of Education Victoria)",
+      "period": "Dec 2021 – Present",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Managed largest SharePoint farm in Southern Hemisphere: 660,000+ users, 1,000+ sites, 99.9% uptime",
+        "Lead Tier-3 escalation point across M365/SharePoint Online and Google Workspace, achieving documented 15% reduction in repeat incidents",
+        "Engineered PnP PowerShell to audit and enforce MFA compliance across 200+ SharePoint sites with automated reporting",
+        "Administered Exchange Hybrid and Teams, resolving complex mail-flow, calendar, and federation issues",
+        "Oversaw tri-platform AD / Entra ID / Google Workspace sync, resolving identity conflicts for seamless SSO",
+        "Spearheaded Azure cloud adoption and legacy application remediation, aligned with ACSC Essential 8",
+        "Built ServiceNow integration with M365 presence data and algorithmic workload engine eliminating manual triage",
+        "Produced RCA reports and operational runbooks reducing resolution time and improving team onboarding",
+        "Managed 40+ concurrent tickets in high-volume government service queue, consistently achieving >90% SLA resolution"
+      ]
+    },
+    {
+      "title": "L2/L3 Technical Support Engineer & Automation Specialist",
+      "company": "Australia Post (via Capgemini)",
+      "period": "2023 – 2024 / Feb 2026 – Jun 2026",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Delivered comprehensive L1/L2 face-to-endpoint and remote technical support within national MyITHub service centre",
+        "Engineered custom keystroke injection automation in ServiceNow, programmatically creating/modifying tickets and saving hundreds of hours of manual entry per month under restrictive security controls",
+        "Managed enterprise fleet endpoint lifecycle: Windows 10/11 SOE builds, Autopilot/UEM enrolment, and NIST-compliant sanitisation",
+        "Supported rollout of staff self-help kiosk programme for knowledge base access, password resets, and ticket logging, reducing walk-in volume",
+        "Escalation point for complex infrastructure faults near the top of Level 2/3, collaborating with cloud engineering teams for permanent resolution"
+      ]
+    },
+    {
+      "title": "Endpoint Migration Engineer",
+      "company": "St John of God Health Care",
+      "period": "2023 / Oct 2025 – Jan 2026",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Led Windows 11 enterprise migration across 100+ clinical endpoints with 100% Autopilot adherence and SOE compliance in live hospital environment",
+        "Managed full endpoint lifecycle: hardware preparation, Autopilot enrolment, Intune policy application, post-deployment validation",
+        "Primary technical liaison between clinical end-users and engineering team, resolving EMR and diagnostic tool compatibility issues",
+        "Provided hypercare support to medical staff post-migration, ensuring zero disruption to patient care"
+      ]
+    },
+    {
+      "title": "Application Support Engineer",
+      "company": "Knosys",
+      "period": "Dec 2020 – Dec 2021",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Delivered expert L3 support for GreenOrbit intranet platform, maintaining 95% SLA resolution for Cotton On, Harvey Norman, and Healthscope",
+        "PowerShell automation reducing migration processing by 87% (2 hours to 15 minutes), saving 10+ hours/month",
+        "Python/PowerShell patching scripts reducing manual effort by 20% and improving patch-cycle consistency",
+        "Authored RCA documentation that permanently resolved recurring version conflicts and became reference guide for future migration cycles"
+      ]
+    },
+    {
+      "title": "SharePoint Developer & Modern Workplace Consultant",
+      "company": "Engage Squared",
+      "period": "Mar 2018 – Dec 2020",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Delivered 5+ bespoke enterprise SharePoint intranets for Victoria Police, Transurban, Cimic Group using SPFx/React/TypeScript",
+        "CI/CD via Azure DevOps reducing deployment cycles by 25%, adhering to ISO 27001 governance frameworks",
+        "Client technical workshops driving 20% increase in M365 platform adoption",
+        "Led end-to-end migration of legacy on-premises SharePoint intranets to M365 via Sharegate and SPMT"
+      ]
+    },
+    {
+      "title": "Telecommunications Technician",
+      "company": "National Broadband Network (NBN)",
+      "period": "Oct 2016 – Nov 2017",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Layer 1 infrastructure deployments, physical structured cabling (fibre and copper), and fault-finding across residential and commercial environments",
+        "Diagnosed network connectivity at physical and data-link layers; installed and maintained NTDs and routing infrastructure"
+      ]
+    },
+    {
+      "title": "HVAC & Mechanical Service Technician",
+      "company": "PolaAir",
+      "period": "Jan 2017 – Oct 2017",
+      "location": "Melbourne, VIC",
+      "achievements": [
+        "Installed and serviced commercial HVAC systems; developed diagnostic troubleshooting methodologies and root-cause analysis in time-critical environments"
+      ]
+    }
+  ],
+  "updatedAt": "2026-09-15T04:46:33.644771+00:00",
   "profile": {
     "personal": {
       "full_name": "Sam Ludwig",
-      "title": "Infrastructure & M365 Engineer",
+      "title": "Senior Infrastructure & M365 Engineer",
       "email": "sam.ludwig@gmail.com",
       "phone": "+61 405 993 245",
       "location": {
         "city": "Melbourne",
         "state": "VIC",
-        "country": "Australia"
+        "country": "Australia",
+        "suburb": "Balaclava"
       },
       "linkedin_url": "https://linkedin.com/in/sam-ludwig",
       "portfolio_url": "https://samludwig.au",
       "github_url": "https://github.com/Ludwixix"
     },
-    
     "work_authorization": {
       "authorized_to_work_australia": true,
       "requires_visa_sponsorship": false,
-      "open_to_remote": true
+      "open_to_remote": true,
+      "citizenship": "Australian Citizen",
+      "security_clearance": "Baseline / NV1 Eligible"
     },
-    
-    "professional_summary": "Infrastructure and M365 Engineer with 6+ years bridging physical infrastructure and large-scale cloud environments. Specialist in Microsoft 365 (Exchange, Intune, SharePoint, Teams, Entra ID), PowerShell automation, and endpoint management across environments supporting 660,000+ users. Solidly Mid-Level Engineer focused on delivering automated outcomes, resolving L3 escalations, and managing enterprise projects through deployment and remediation.",
-    
+    "professional_summary": "Senior Infrastructure and M365 Engineer with 10+ years bridging physical infrastructure, enterprise hybrid cloud environments, and enterprise automation. Proven authority managing 660,000+ user environments (Southern Hemisphere's largest SharePoint farm), leading Tier-3 M365/Entra ID escalations, orchestrating zero-downtime clinical hospital migrations (St John of God), and engineering custom PowerShell/Python automation that eliminates manual toil.",
     "experience": [
       {
         "title": "Senior Managed Services Engineer",
-        "company": "CapGemini (Dept. of Education Victoria)",
+        "company": "Capgemini (Dept. of Education Victoria)",
         "period": "Dec 2021 – Present",
         "location": "Melbourne, VIC",
         "achievements": [
           "Managed largest SharePoint farm in Southern Hemisphere: 660,000+ users, 1,000+ sites, 99.9% uptime",
-          "Ultimate Tier-3 escalation point across M365/SharePoint Online and Google Workspace, 15% reduction in repeat incidents",
+          "Lead Tier-3 escalation point across M365/SharePoint Online and Google Workspace, achieving documented 15% reduction in repeat incidents",
           "Engineered PnP PowerShell to audit and enforce MFA compliance across 200+ SharePoint sites with automated reporting",
           "Administered Exchange Hybrid and Teams, resolving complex mail-flow, calendar, and federation issues",
-          "Oversaw AD/Entra ID/Google Workspace sync, resolving identity conflicts for seamless SSO",
+          "Oversaw tri-platform AD / Entra ID / Google Workspace sync, resolving identity conflicts for seamless SSO",
           "Spearheaded Azure cloud adoption and legacy application remediation, aligned with ACSC Essential 8",
           "Built ServiceNow integration with M365 presence data and algorithmic workload engine eliminating manual triage",
-          "Produced RCA reports and knowledge base reducing resolution time and improving team onboarding"
+          "Produced RCA reports and operational runbooks reducing resolution time and improving team onboarding",
+          "Managed 40+ concurrent tickets in high-volume government service queue, consistently achieving >90% SLA resolution"
         ]
       },
       {
-        "title": "L2/L3 Technical Support Engineer",
-        "company": "Australia Post (via CapGemini)",
-        "period": "2023 – 2024",
+        "title": "L2/L3 Technical Support Engineer & Automation Specialist",
+        "company": "Australia Post (via Capgemini)",
+        "period": "2023 – 2024 / Feb 2026 – Jun 2026",
         "location": "Melbourne, VIC",
         "achievements": [
-          "Delivered L1/L2 support at MyITHub: device repair, OS reimaging, provisioning, loan device management",
-          "Engineered keystroke injection automation to fully automate ITSM ticket workflows in ServiceNow",
-          "Managed endpoint lifecycle: OS migrations, Autopilot/UEM enrolment, compliant disposal",
-          "Supported self-help kiosk rollout for Knowledge Base, password resets, and ticket logging"
+          "Delivered comprehensive L1/L2 face-to-endpoint and remote technical support within national MyITHub service centre",
+          "Engineered custom keystroke injection automation in ServiceNow, programmatically creating/modifying tickets and saving hundreds of hours of manual entry per month under restrictive security controls",
+          "Managed enterprise fleet endpoint lifecycle: Windows 10/11 SOE builds, Autopilot/UEM enrolment, and NIST-compliant sanitisation",
+          "Supported rollout of staff self-help kiosk programme for knowledge base access, password resets, and ticket logging, reducing walk-in volume",
+          "Escalation point for complex infrastructure faults near the top of Level 2/3, collaborating with cloud engineering teams for permanent resolution"
         ]
       },
       {
         "title": "Endpoint Migration Engineer",
         "company": "St John of God Health Care",
-        "period": "2023",
+        "period": "2023 / Oct 2025 – Jan 2026",
         "location": "Melbourne, VIC",
         "achievements": [
-          "Led Windows 11 enterprise migration across 100+ clinical endpoints with 100% Autopilot adherence in live hospital environment",
+          "Led Windows 11 enterprise migration across 100+ clinical endpoints with 100% Autopilot adherence and SOE compliance in live hospital environment",
           "Managed full endpoint lifecycle: hardware preparation, Autopilot enrolment, Intune policy application, post-deployment validation",
-          "Primary liaison between clinical end-users and engineering team, resolving EMR and diagnostic tool compatibility issues",
-          "Provided hypercare support to medical staff post-migration, minimising disruption to patient care"
+          "Primary technical liaison between clinical end-users and engineering team, resolving EMR and diagnostic tool compatibility issues",
+          "Provided hypercare support to medical staff post-migration, ensuring zero disruption to patient care"
         ]
       },
       {
@@ -70,64 +287,116 @@
         "period": "Dec 2020 – Dec 2021",
         "location": "Melbourne, VIC",
         "achievements": [
-          "Expert L3 support for GreenOrbit intranet platform, 95% SLA resolution for Cotton On, Harvey Norman, Healthscope",
+          "Delivered expert L3 support for GreenOrbit intranet platform, maintaining 95% SLA resolution for Cotton On, Harvey Norman, and Healthscope",
           "PowerShell automation reducing migration processing by 87% (2 hours to 15 minutes), saving 10+ hours/month",
           "Python/PowerShell patching scripts reducing manual effort by 20% and improving patch-cycle consistency",
-          "Authored RCA documentation that became the reference guide for future migration cycles"
+          "Authored RCA documentation that permanently resolved recurring version conflicts and became reference guide for future migration cycles"
         ]
       },
       {
-        "title": "SharePoint Developer",
+        "title": "SharePoint Developer & Modern Workplace Consultant",
         "company": "Engage Squared",
         "period": "Mar 2018 – Dec 2020",
         "location": "Melbourne, VIC",
         "achievements": [
-          "Delivered 5+ enterprise SharePoint intranets for Victoria Police, Transurban, Cimic Group using SPFx/React/TypeScript",
-          "CI/CD via Azure DevOps reducing deployment cycles by 25%, ISO 27001 governance frameworks",
-          "Client workshops driving 20% increase in M365 platform adoption",
-          "Led end-to-end migration of legacy on-premise SharePoint intranets to M365"
+          "Delivered 5+ bespoke enterprise SharePoint intranets for Victoria Police, Transurban, Cimic Group using SPFx/React/TypeScript",
+          "CI/CD via Azure DevOps reducing deployment cycles by 25%, adhering to ISO 27001 governance frameworks",
+          "Client technical workshops driving 20% increase in M365 platform adoption",
+          "Led end-to-end migration of legacy on-premises SharePoint intranets to M365 via Sharegate and SPMT"
         ]
       },
       {
         "title": "Telecommunications Technician",
-        "company": "NBN",
+        "company": "National Broadband Network (NBN)",
         "period": "Oct 2016 – Nov 2017",
         "location": "Melbourne, VIC",
         "achievements": [
-          "Layer 1 infrastructure deployments, physical cabling, fault-finding across residential and commercial environments"
+          "Layer 1 infrastructure deployments, physical structured cabling (fibre and copper), and fault-finding across residential and commercial environments",
+          "Diagnosed network connectivity at physical and data-link layers; installed and maintained NTDs and routing infrastructure"
+        ]
+      },
+      {
+        "title": "HVAC & Mechanical Service Technician",
+        "company": "PolaAir",
+        "period": "Jan 2017 – Oct 2017",
+        "location": "Melbourne, VIC",
+        "achievements": [
+          "Installed and serviced commercial HVAC systems; developed diagnostic troubleshooting methodologies and root-cause analysis in time-critical environments"
         ]
       }
     ],
-    
     "technical_expertise": {
-      "m365_cloud": ["SharePoint Online", "Exchange Hybrid", "Teams", "OneDrive", "Entra ID", "Azure Functions", "Power Automate", "Defender", "Purview"],
-      "identity_security": ["Conditional Access", "MFA enforcement", "hybrid AD/Azure AD sync", "ACSC Essential 8", "compliance scripting"],
-      "endpoint_management": ["Intune (MDM/MAM)", "Windows Autopilot", "SCCM", "Windows 10/11 enterprise", "SOE design", "device lifecycle"],
-      "automation_devops": ["PowerShell (advanced/PnP)", "Python", "JavaScript/TypeScript", "React", "SPFx", "Azure DevOps CI/CD", "Git"],
-      "infrastructure": ["Layer 1 troubleshooting", "hardware provisioning", "VMware", "Hyper-V", "Windows Server", "Active Directory"],
-      "service_management": ["ITIL 4", "ServiceNow", "Zendesk", "incident/problem management", "SLA management", "RCA documentation"]
+      "m365_cloud": [
+        "SharePoint Online",
+        "Exchange Hybrid",
+        "Teams",
+        "OneDrive",
+        "Entra ID",
+        "Azure Functions",
+        "Power Automate",
+        "Defender",
+        "Purview"
+      ],
+      "identity_security": [
+        "Conditional Access",
+        "MFA enforcement",
+        "hybrid AD/Azure AD sync",
+        "ACSC Essential 8",
+        "compliance scripting",
+        "Zero Trust"
+      ],
+      "endpoint_management": [
+        "Intune (MDM/MAM)",
+        "Windows Autopilot",
+        "SCCM",
+        "Windows 10/11 enterprise",
+        "SOE design",
+        "device lifecycle"
+      ],
+      "automation_devops": [
+        "PowerShell 5.1/7 (PnP)",
+        "Python",
+        "JavaScript/TypeScript",
+        "React",
+        "SPFx",
+        "Azure DevOps CI/CD",
+        "Git"
+      ],
+      "infrastructure": [
+        "Layer 1 troubleshooting",
+        "hardware provisioning",
+        "VMware vSphere",
+        "Hyper-V",
+        "Windows Server",
+        "Active Directory"
+      ],
+      "service_management": [
+        "ITIL 4",
+        "ServiceNow",
+        "Zendesk",
+        "incident/problem management",
+        "SLA management",
+        "RCA documentation"
+      ]
     },
-    
     "certifications": [
       "Microsoft Certified: Azure Administrator Associate (AZ-104)",
       "Microsoft Certified: Azure Fundamentals (AZ-900)",
       "ITIL 4 Foundation",
       "Certified Scrum Master (CSM)"
     ],
-    
     "education": [
       "Coder Academy – Web Development Fast Track Bootcamp (2018)",
-      "Diploma of Information Technology"
+      "Diploma of Information Technology (2019)"
     ],
-    
     "projects": [
       {
-        "name": "ServiceNow UI Engine",
+        "name": "ServiceNow UI Engine (YellowSnow)",
         "description": "Client-side browser extension integrating M365 presence data with ServiceNow ticket queues",
         "url": "https://github.com/Ludwixix/YellowSnow"
       },
       {
-        "name": "M365 Diagnostic GUI",
+        "name": "M365 Diagnostic GUI (PySPO)",
         "description": "Python tool enabling L1 staff to run PowerShell diagnostics against Exchange/Teams",
         "url": "https://github.com/Ludwixix/pyspo-tool"
       },
@@ -137,20 +406,26 @@
         "url": "https://github.com/Ludwixix/JobGobblin"
       }
     ],
-    
     "preferences": {
       "target_roles": [
-        "Infrastructure & M365 Engineer",
-        "Microsoft 365 Engineer",
-        "Cloud Engineer",
-        "SharePoint Administrator",
-        "Modern Workplace Engineer",
-        "Endpoint Engineer",
-        "Technical Support Engineer"
+        "Senior Systems Engineer",
+        "Senior Infrastructure Engineer",
+        "Senior M365 Engineer",
+        "Cloud Infrastructure Specialist",
+        "Endpoint / EUC Engineer",
+        "L3 Systems / Operations Lead",
+        "SharePoint & Modern Workplace Architect",
+        "Automation & DevOps Engineer"
       ],
-      "work_arrangement": ["remote", "hybrid", "on-site"],
+      "work_arrangement": [
+        "remote",
+        "hybrid",
+        "on-site"
+      ],
       "salary_expectations": {
-        "preferred_aud": 120000,
+        "min": 140000,
+        "max": 165000,
+        "preferred_aud": 150000,
         "currency": "AUD",
         "period": "annual"
       }

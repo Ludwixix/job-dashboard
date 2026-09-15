@@ -5,6 +5,8 @@
  * by analyzing Google user metadata, scanned Gmail application emails, and matched job ads.
  */
 
+import { DEFAULT_USER_PROFILE } from './profileService';
+
 const INDUSTRY_SKILL_MAP = {
   'Technology & IT': [
     'Microsoft 365', 'Azure', 'Entra ID', 'Intune', 'Autopilot', 'PowerShell',
@@ -171,6 +173,38 @@ export const synthesizeUserProfile = ({
   const name = googleUser.name || existingProfile?.name || 'Candidate';
   const email = googleUser.email || existingProfile?.email || 'candidate@gmail.com';
   const profileId = email ? `prof_${email.replace(/[^a-zA-Z0-9]/g, '_')}` : (existingProfile?.id || 'default_candidate');
+
+  const isSamLudwig = (email && email.toLowerCase() === 'sam.ludwig@gmail.com') ||
+                      (name && name.toLowerCase().includes('sam') && name.toLowerCase().includes('ludwig'));
+
+  if (isSamLudwig) {
+    return {
+      ...DEFAULT_USER_PROFILE,
+      ...(existingProfile || {}),
+      id: profileId,
+      name: 'Sam Ludwig',
+      email: 'sam.ludwig@gmail.com',
+      avatarUrl: googleUser.picture || existingProfile?.avatarUrl || DEFAULT_USER_PROFILE.avatarUrl || '',
+      title: existingProfile?.title || DEFAULT_USER_PROFILE.title,
+      fullWorkExperienceText: (existingProfile?.fullWorkExperienceText && !existingProfile.fullWorkExperienceText.includes('Datacom Systems') && existingProfile.fullWorkExperienceText.includes('Capgemini')) 
+        ? existingProfile.fullWorkExperienceText 
+        : DEFAULT_USER_PROFILE.fullWorkExperienceText,
+      workHistorySummary: (existingProfile?.workHistorySummary && existingProfile.workHistorySummary.length > 50) 
+        ? existingProfile.workHistorySummary 
+        : DEFAULT_USER_PROFILE.workHistorySummary,
+      projects: (existingProfile?.projects && existingProfile.projects.length >= 3)
+        ? existingProfile.projects
+        : DEFAULT_USER_PROFILE.projects,
+      certifications: (existingProfile?.certifications && existingProfile.certifications.length >= 4)
+        ? existingProfile.certifications
+        : DEFAULT_USER_PROFILE.certifications,
+      interviewTalkingPoints: (existingProfile?.interviewTalkingPoints && existingProfile.interviewTalkingPoints.length >= 4)
+        ? existingProfile.interviewTalkingPoints
+        : DEFAULT_USER_PROFILE.interviewTalkingPoints,
+      updatedAt: new Date().toISOString(),
+      isAuthenticMasterResume: true
+    };
+  }
 
   const industry = inferPrimaryIndustry(gmailApplications);
   const title = inferCandidateTitle(gmailApplications, existingProfile?.title || 'Senior IT Systems & Infrastructure Engineer');

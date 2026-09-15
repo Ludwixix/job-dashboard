@@ -133,5 +133,42 @@ describe('JobSeeker Default Role Targeting', () => {
     fireEvent.click(document.body);
     expect(screen.queryByText('Launch Auto-Apply')).toBeNull();
   });
+
+  it('safely handles search query with null notes and company without throwing error', () => {
+    const edgeJobs = [
+      {
+        id: 'job_null_fields',
+        title: 'Platform Engineer',
+        company: null,
+        location: null,
+        notes: null,
+        tags: ['Kubernetes', 'Go'],
+        date: '2026-09-10',
+        isComplete: true,
+        score: 88
+      }
+    ];
+
+    render(
+      <JobSeeker
+        jobs={edgeJobs}
+        onUpdateJob={vi.fn()}
+        onGenerateDocs={vi.fn()}
+        currentProfile={itProfile}
+      />
+    );
+
+    const showAllBtn = screen.getByRole('button', { name: /SHOW ALL/i });
+    fireEvent.click(showAllBtn);
+
+    const searchInput = screen.getByPlaceholderText(/SEARCH BY ROLE/i);
+    // Searching for something matching tags
+    fireEvent.change(searchInput, { target: { value: 'Kubernetes' } });
+    expect(screen.getByText('Platform Engineer')).toBeDefined();
+
+    // Searching for something non-existent
+    fireEvent.change(searchInput, { target: { value: 'NonExistentXYZ' } });
+    expect(screen.queryByText('Platform Engineer')).toBeNull();
+  });
 });
 

@@ -92,8 +92,12 @@ export const ApplicationPipeline = ({
       if (!stage) return false;
       if (statusFilter !== 'All' && stage !== statusFilter) return false;
       if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const match = (j.title?.toLowerCase().includes(q) || j.company?.toLowerCase().includes(q) || j.notes?.toLowerCase().includes(q));
+        const q = searchQuery.toLowerCase().trim();
+        const tit = (j.title || '').toLowerCase();
+        const comp = (j.company || '').toLowerCase();
+        const notes = (j.notes || '').toLowerCase();
+        const loc = (j.location || '').toLowerCase();
+        const match = tit.includes(q) || comp.includes(q) || notes.includes(q) || loc.includes(q);
         if (!match) return false;
       }
 
@@ -109,6 +113,19 @@ export const ApplicationPipeline = ({
       return true;
     });
   }, [jobs, searchQuery, statusFilter, starredSet]);
+
+  const handleMoveStage = (jobId, targetStage) => {
+    const stageStatuses = {
+      'Wishlist': 'Discovered',
+      'Applied': 'Applied',
+      'Interviewing': 'Interviewing',
+      'Offer': 'Offer Received',
+      'Rejected': 'Rejected'
+    };
+    if (onUpdateStatus && stageStatuses[targetStage]) {
+      onUpdateStatus(jobId, stageStatuses[targetStage]);
+    }
+  };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
@@ -131,16 +148,7 @@ export const ApplicationPipeline = ({
     const currentStage = currentJob ? getJobStage(currentJob, starredSet) : null;
 
     if (targetStage && currentStage !== targetStage) {
-      const stageStatuses = {
-        'Wishlist': 'Discovered',
-        'Applied': 'Applied',
-        'Interviewing': 'Interviewing',
-        'Offer': 'Offer Received',
-        'Rejected': 'Rejected'
-      };
-      if (onUpdateStatus && stageStatuses[targetStage]) {
-        onUpdateStatus(jobId, stageStatuses[targetStage]);
-      }
+      handleMoveStage(jobId, targetStage);
     }
   };
 
@@ -282,6 +290,7 @@ export const ApplicationPipeline = ({
                     jobs={activeJobs.filter(j => getJobStage(j, starredSet) === stage.id)} 
                     onSelectJob={(job) => setSelectedJob(job)}
                     onOpenCheatSheet={onOpenCheatSheet}
+                    onMoveStage={handleMoveStage}
                     className={mobileActiveStage === stage.id ? 'flex' : 'hidden md:flex'}
                   />
                 ))}

@@ -52,6 +52,7 @@ import { recordJobInteraction, generateSmartJobSuggestions } from '../services/p
 import { EmptyState } from './ui/EmptyState';
 
 import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
+import { matchesSalaryThreshold } from '../utils/salaryUtils';
 
 
 // Categorize jobs into expanded multi-industry streams
@@ -465,7 +466,7 @@ export const JobSeeker = ({
     const counts = { 
       All: completeJobs.length,
       Custom: completeJobs.filter(j => j.isCustom || String(j.id || '').startsWith('custom_')).length,
-      Starred: completeJobs.filter(j => starredJobIds.includes(j.id || `${j.company}_${j.title}`)).length,
+      Starred: completeJobs.filter(j => starredJobIds.some(id => String(id) === String(j.id) || String(id) === `${j.company}_${j.title}`)).length,
       TopFit: 0,
       SmartSuggestions: completeJobs.filter(j => (j.score || 0) >= 70).length,
 
@@ -525,10 +526,13 @@ export const JobSeeker = ({
     });
 
     const filtered = enrichedPool.filter(job => {
-      const matchesSearch = job.company.toLowerCase().includes(search.toLowerCase()) || 
-                            job.title.toLowerCase().includes(search.toLowerCase()) ||
-                            job.notes.toLowerCase().includes(search.toLowerCase()) ||
-                            job.location.toLowerCase().includes(search.toLowerCase());
+      const q = (search || '').toLowerCase().trim();
+      const comp = (job.company || '').toLowerCase();
+      const tit = (job.title || '').toLowerCase();
+      const nts = (job.notes || '').toLowerCase();
+      const loc = (job.location || '').toLowerCase();
+      const tags = Array.isArray(job.tags) ? job.tags.join(' ').toLowerCase() : '';
+      const matchesSearch = !q || comp.includes(q) || tit.includes(q) || nts.includes(q) || loc.includes(q) || tags.includes(q);
       
       const matchesSource = sourceFilter === 'All' || (job.source || '').toLowerCase() === sourceFilter.toLowerCase();
       // Stream Tab filter
@@ -536,12 +540,11 @@ export const JobSeeker = ({
       if (activeStreamTab === 'Custom') {
         matchesStream = Boolean(job.isCustom || String(job.id || '').startsWith('custom_'));
       } else if (activeStreamTab === 'TopFit') {
+        matchesStream = (job.score || 0) >= 85;
       } else if (activeStreamTab === 'SmartSuggestions') {
         matchesStream = (job.score || 0) >= 70 || Boolean(job.learnedMatch);
-
-        matchesStream = (job.score || 0) >= 85;
       } else if (activeStreamTab === 'Starred') {
-        matchesStream = starredJobIds.includes(job.id);
+        matchesStream = starredJobIds.some(id => String(id) === String(job.id) || String(id) === `${job.company}_${job.title}`);
       } else if (activeStreamTab === 'QuickApply') {
         matchesStream = isQuickApplyEligible(job);
       } else if (activeStreamTab === 'ReadyForSubmission') {
@@ -561,12 +564,7 @@ export const JobSeeker = ({
       }
 
       // Salary filter
-      let matchesSalary = true;
-      if (minSalaryFilter === '100k+') {
-        matchesSalary = job.salary && (job.salary.includes('100') || job.salary.includes('110') || job.salary.includes('115') || job.salary.includes('120') || job.salary.includes('130'));
-      } else if (minSalaryFilter === '70k+') {
-        matchesSalary = job.salary && (job.salary.includes('70') || job.salary.includes('75') || job.salary.includes('80') || job.salary.includes('90') || job.salary.includes('100') || job.salary.includes('115'));
-      }
+      let matchesSalary = matchesSalaryThreshold(job, minSalaryFilter);
 
       // Score filter
       let matchesScore = true;
@@ -586,7 +584,8 @@ export const JobSeeker = ({
 
       // Distance Filter (Relative to Candidate Profile Location)
       let matchesDistance = true;
-      const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, currentProfile.location);
+      const candLoc = currentProfile?.location || baseLocation;
+      const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, candLoc);
       if (maxDistanceFilter === '5km') {
         matchesDistance = distKm <= 5;
       } else if (maxDistanceFilter === '10km') {
@@ -654,6 +653,18 @@ export const JobSeeker = ({
   // Paginated Sliced Jobs
   const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
   const totalPages = Math.max(1, Math.ceil(seekerJobs.length / (effectivePageSize || 1)));
+
+  // Reset pagination to page 1 whenever filters or search criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sourceFilter, activeStreamTab, docsReadyFilter, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, selectedRoleIds]);
+
+  // Ensure currentPage does not exceed totalPages when result count drops
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
 
   const paginatedJobs = useMemo(() => {
     if (pageSize === 'All') return seekerJobs;
@@ -1142,7 +1153,6 @@ export const JobSeeker = ({
                   onChange={(e) => setMaxDistanceFilter(e.target.value)}
                 >
                   <option className="bg-slate-900 text-slate-200" value="All">ALL DISTANCES</option>
-                  <option className="bg-slate-900 text-slate-200" value="5km">&lt; 5 KM (BALACLAVA &amp; NEIGHBORS)</option>
                   <option className="bg-slate-900 text-slate-200" value="5km">&lt; 5 KM ({(currentProfile?.suburb || 'LOCAL').toUpperCase()} &amp; NEIGHBORS)</option>
                   <option className="bg-slate-900 text-slate-200" value="10km">&lt; 10 KM (CBD &amp; COMMUTE)</option>
                   <option className="bg-slate-900 text-slate-200" value="25km">&lt; 25 KM (METRO MELBOURNE)</option>
@@ -1366,7 +1376,7 @@ export const JobSeeker = ({
                   action={
                     <button
                       type="button"
-                      onClick={handleResetFilters}
+                      onClick={resetAllFilters}
                       className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold font-mono transition-colors shadow-xs"
                     >
                       Reset All Filters
@@ -1804,6 +1814,7 @@ export const JobSeeker = ({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
+                      onClick={() => handlePageChange(1)}
                       disabled={currentPage === 1}
                       className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
                       title="First Page"

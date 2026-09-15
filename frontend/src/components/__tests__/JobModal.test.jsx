@@ -122,4 +122,35 @@ describe('JobModal Component', () => {
     fireEvent.mouseDown(document.body);
     expect(screen.queryByText('Funnel Intelligence')).not.toBeInTheDocument();
   });
+
+  it('renders Candidate Notes tab and allows saving notes', async () => {
+    const onJobStatusUpdate = vi.fn();
+    render(
+      <JobModal
+        job={mockJob}
+        onClose={vi.fn()}
+        onJobStatusUpdate={onJobStatusUpdate}
+      />
+    );
+
+    // Click MY NOTES tab
+    const notesTab = screen.getByRole('button', { name: /MY NOTES/i });
+    fireEvent.click(notesTab);
+
+    expect(screen.getByText(/CANDIDATE NOTES & FOLLOW-UP SCRATCHPAD/i)).toBeInTheDocument();
+    const textarea = screen.getByPlaceholderText(/Type private notes/i);
+    expect(textarea).toBeInTheDocument();
+
+    // Type notes and click SAVE NOTES
+    fireEvent.change(textarea, { target: { value: 'Spoke with hiring manager John - 2nd round scheduled' } });
+    const saveBtn = screen.getByRole('button', { name: /SAVE NOTES/i });
+    fireEvent.click(saveBtn);
+
+    expect(onJobStatusUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '123',
+        notes: 'Spoke with hiring manager John - 2nd round scheduled'
+      })
+    );
+  });
 });

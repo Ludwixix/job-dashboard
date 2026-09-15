@@ -2,12 +2,12 @@ import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Building2, MapPin, Clock, Compass } from 'lucide-react';
+import { Building2, MapPin, Clock, Compass, ArrowRight } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { Badge } from './ui/Badge';
 import { statusBadgeClass, statusDotClass } from '../utils/statusStyles';
 
-const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet }) => {
+const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet, onMoveStage }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
     id: String(job.id), 
     data: { ...job, stage: job.stage } 
@@ -33,6 +33,12 @@ const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet }) => {
 
   const s = (job.status || '').toLowerCase();
   const needsFollowUp = daysAgo > 7 && (s.includes('applied') || s.includes('interview'));
+
+  const nextStageConfig = {
+    'Wishlist': { target: 'Applied', label: 'Mark Applied' },
+    'Applied': { target: 'Interviewing', label: 'Invite Received' },
+    'Interviewing': { target: 'Offer', label: 'Offer Received' }
+  }[stage?.id];
 
   return (
     <div
@@ -96,11 +102,30 @@ const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet }) => {
           </button>
         </div>
       )}
+
+      {/* Quick 1-Click Stage Advancement */}
+      {nextStageConfig && onMoveStage && (
+        <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center justify-between">
+          <span className="text-[9px] font-mono uppercase text-slate-400">STAGE</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveStage(job.id, nextStageConfig.target);
+            }}
+            className="px-2 py-1 rounded-md bg-slate-700/70 hover:bg-indigo-600 text-slate-200 hover:text-white text-[10px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer"
+            title={`Advance to ${nextStageConfig.label}`}
+          >
+            <span>{nextStageConfig.label}</span>
+            <ArrowRight size={10} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
-export const KanbanColumn = ({ stage, jobs = [], onSelectJob, onOpenCheatSheet, className = '' }) => {
+export const KanbanColumn = ({ stage, jobs = [], onSelectJob, onOpenCheatSheet, onMoveStage, className = '' }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
     data: { type: 'column', stage: stage.id }
@@ -147,6 +172,7 @@ export const KanbanColumn = ({ stage, jobs = [], onSelectJob, onOpenCheatSheet, 
               stage={stage} 
               onSelectJob={onSelectJob} 
               onOpenCheatSheet={onOpenCheatSheet} 
+              onMoveStage={onMoveStage}
             />
           ))}
         </SortableContext>

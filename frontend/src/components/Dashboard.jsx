@@ -1364,11 +1364,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onClose={() => setSelectedJob(null)} 
               onOpenGenerator={(j) => setSelectedForGenerator(j)}
               onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
-              onJobStatusUpdate={(updated) => {
-                updateJobStatus(updated.id || updated.title, updated.status, updated);
-                setSelectedJob(updated);
-                addToast(`Status updated: ${updated.status}`, 'success');
-                announce(`Job status updated to ${updated.status}`);
+              onJobStatusUpdate={(target, status, extra) => {
+                if (typeof target === 'object' && target !== null) {
+                  const updated = target;
+                  updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
+                  setSelectedJob(updated);
+                  addToast(`Status updated: ${updated.status || 'Updated'}`, 'success');
+                  announce(`Job status updated to ${updated.status || 'Updated'}`);
+                } else {
+                  const jobId = target;
+                  const updated = updateJobStatus(jobId, status, extra);
+                  if (updated) setSelectedJob(updated);
+                  addToast(`Status updated: ${status || 'Updated'}`, 'success');
+                  announce(`Job status updated to ${status || 'Updated'}`);
+                }
               }}
               onRejectJob={(id) => {
                 rejectJob(id);

@@ -727,7 +727,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  }
 
  return (
- <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-indigo-600 selection:text-white">
+ <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-amber-600 selection:text-white">
  {/* Screen-reader live announcement region */}
  <div
  role="status"
@@ -778,7 +778,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  type="text"
  value={tempLocationInput}
  onChange={(e) => setTempLocationInput(e.target.value)}
- className="bg-slate-900 border border-indigo-500 text-emerald-300 px-2 py-0.5 rounded-sm text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
+ className="bg-slate-900 border border-amber-500 text-emerald-300 px-2 py-0.5 rounded-sm text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
  placeholder="SUBURB POSTCODE"
  autoFocus
  />
@@ -791,7 +791,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer bg-slate-900/90 px-2.5 py-0.5 rounded-sm border border-slate-700/80 transition-colors"
  title="Click to change your primary location radius baseline"
  >
- <MapPin size={11} className="text-indigo-400" />
+ <MapPin size={11} className="text-amber-400" />
  <span className="truncate max-w-[130px] sm:max-w-[180px]">{baseLocation}</span>
  <span className="text-[9px] text-slate-400 font-normal">✎</span>
  </button>
@@ -819,7 +819,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  {/* Quick Action: + Custom Job */}
  <button
  onClick={() => setIsCustomJobModalOpen(true)}
- className="flex items-center gap-1 text-purple-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 px-2.5 py-1 rounded-sm shadow-xs"
+ className="flex items-center gap-1 text-purple-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 px-2.5 py-1 rounded-sm -xs"
  title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
  >
  <Sparkles size={11} className="text-purple-400" /> + CUSTOM
@@ -828,7 +828,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  {/* Quick Action: Batch Apply */}
  <button
  onClick={() => setIsBatchApplyOpen(true)}
- className="flex items-center gap-1 text-emerald-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 px-2.5 py-1 rounded-sm shadow-xs"
+ className="flex items-center gap-1 text-emerald-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 px-2.5 py-1 rounded-sm -xs"
  title="Dispatch 1-Click Batch Automated Applications"
  >
  <Zap size={11} className="text-emerald-400" /> BATCH
@@ -851,12 +851,12 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase transition-all cursor-pointer ${
  isToolsMenuOpen 
- ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-600/30' 
+ ? 'bg-amber-600 text-white border-amber-400 -indigo-600/30' 
  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700'
  }`}
  title="Intelligence, Analytics & Network Tools"
  >
- <Layers size={11} className={isToolsMenuOpen ? 'text-white' : 'text-indigo-400'} />
+ <Layers size={11} className={isToolsMenuOpen ? 'text-white' : 'text-amber-400'} />
  <span>TOOLS</span>
  {overdueTouchpointCount > 0 && (
  <span className="px-1.5 py-0.2 rounded-sm bg-rose-500 text-white text-[9px] font-black animate-pulse">
@@ -900,9 +900,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <button
  type="button"
  onClick={() => { setIsToolsMenuOpen(false); setIsCareerModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-indigo-950/70 text-slate-200 hover:text-indigo-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
  >
- <Compass size={13} className="text-indigo-400" />
+ <Compass size={13} className="text-amber-400" />
  <span>Career Vector Compass</span>
  </button>
 
@@ -921,7 +921,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => { setIsToolsMenuOpen(false); setIsAuthModalOpen(true); }}
  className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
  >
- <Lock size={13} className="text-indigo-400" />
+ <Lock size={13} className="text-amber-400" />
  <span>Sign in with Google</span>
  </button>
  )}
@@ -943,7 +943,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => { setIsToolsMenuOpen(false); setIsSettingsOpen(true); }}
  className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
  >
- <Settings size={13} className="text-indigo-400" />
+ <Settings size={13} className="text-amber-400" />
  <span>Settings & LLM Models</span>
  </button>
  </div>
@@ -954,7 +954,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  {/* Command Palette (Ctrl+K) */}
  <button
  onClick={() => setIsCommandPaletteOpen(true)}
- className="flex items-center gap-1 text-indigo-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-indigo-950/80 border border-indigo-500/40 px-2 py-1 rounded-sm"
+ className="flex items-center gap-1 text-amber-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-amber-950/80 border border-amber-500/40 px-2 py-1 rounded-sm"
  title="Open Command Palette (Ctrl+K)"
  >
  <Command size={11} /> ⌘K
@@ -1046,7 +1046,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('seeker')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'seeker' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-amber-950/40 border border-amber-300/50' 
+ ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1066,7 +1066,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('highlights')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'highlights' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-amber-950/40 border border-amber-300/50' 
+ ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1081,7 +1081,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('kanban')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'kanban' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-amber-950/40 border border-amber-300/50' 
+ ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1096,7 +1096,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('remote')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'remote' 
- ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-900/30 border border-emerald-400/30' 
+ ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white -emerald-900/30 border border-emerald-400/30' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1116,7 +1116,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('market')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'market' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-amber-950/40 border border-amber-300/50' 
+ ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1131,7 +1131,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('analytics')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'analytics' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-amber-950/40 border border-amber-300/50' 
+ ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1146,7 +1146,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onClick={() => setActiveSection('operations')}
  className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
  activeSection === 'operations' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-amber-950/40 border border-amber-300/50' 
+ ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
  : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
  }`}
  >
@@ -1163,7 +1163,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-3 sm:px-5 lg:px-6 py-2.5 animate-in slide-in-from-top-2 duration-300 font-mono text-xs ">
  <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
  <div className="flex items-center gap-3 flex-wrap">
- <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-black uppercase tracking-wider industry-accent-badge shadow-xs">
+ <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-black uppercase tracking-wider industry-accent-badge -xs">
  <span className="w-2 h-2 rounded-sm animate-pulse" style={{ backgroundColor: currentIndustryTheme.accent }} />
  {currentIndustryTheme.name}
  </span>
@@ -1179,7 +1179,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <button
  key={title}
  onClick={() => handleAddSuggestedTitle(title)}
- className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-slate-950/80 hover:bg-slate-800 border border-slate-700 hover:border-indigo-400 text-slate-300 hover:text-white transition-all cursor-pointer font-bold group"
+ className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-slate-950/80 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-slate-300 hover:text-white transition-all cursor-pointer font-bold group"
  title={`Add "${title}" to target titles`}
  >
  <span>+ {title}</span>

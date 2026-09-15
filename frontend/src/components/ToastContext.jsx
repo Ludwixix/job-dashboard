@@ -4,81 +4,81 @@ import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
 const ToastContext = createContext(null);
 
 export const ToastProvider = ({ children }) => {
-  const [toasts, setToasts] = useState([]);
+ const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = 'info', duration = 3000) => {
-    const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    setToasts((prev) => [...prev, { id, message, type }]);
+ const addToast = useCallback((message, type = 'info', duration = 3000) => {
+ const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+ setToasts((prev) => [...prev, { id, message, type }]);
 
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-    }
-  }, []);
+ if (duration > 0) {
+ setTimeout(() => {
+ setToasts((prev) => prev.filter((t) => t.id !== id));
+ }, duration);
+ }
+ }, []);
 
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+ const removeToast = useCallback((id) => {
+ setToasts((prev) => prev.filter((t) => t.id !== id));
+ }, []);
 
-  return (
-    <ToastContext.Provider value={{ addToast, removeToast }}>
-      {children}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        aria-label="Notifications"
-        className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full font-mono"
-      >
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`flex items-start gap-3 p-3.5 rounded-2xl shadow-2xl animate-in slide-in-from-bottom duration-300 ${
-              toast.type === 'success'
-                ? 'bg-slate-900 border-2 border-emerald-500 text-white'
-                : toast.type === 'error'
-                ? 'bg-rose-950 border-2 border-rose-500 text-rose-100'
-                : 'bg-slate-800 border-2 border-indigo-500 text-white'
-            }`}
-          >
-            <div
-              aria-hidden="true"
-              className={`p-2 rounded-xl shrink-0 ${
-                toast.type === 'success'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : toast.type === 'error'
-                  ? 'bg-rose-500/20 text-rose-400'
-                  : 'bg-indigo-500/20 text-indigo-400'
-              }`}
-            >
-              {toast.type === 'success' ? <CheckCircle2 size={18} /> : toast.type === 'error' ? <XCircle size={18} /> : <Info size={18} />}
-            </div>
-            <div className="flex-1 mt-0.5">
-              <p className="text-xs font-bold leading-relaxed">{toast.message}</p>
-            </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              aria-label="Dismiss notification"
-              className="text-slate-400 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
-            >
-              <X size={16} aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
-  );
+ return (
+ <ToastContext.Provider value={{ addToast, removeToast }}>
+ {children}
+ <div
+ role="status"
+ aria-live="polite"
+ aria-atomic="true"
+ aria-label="Notifications"
+ className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full font-mono"
+ >
+ {toasts.map((toast) => (
+ <div
+ key={toast.id}
+ className={`flex items-start gap-3 p-3.5 rounded-sm animate-in slide-in-from-bottom duration-300 ${
+ toast.type === 'success'
+ ? 'bg-slate-900 border-2 border-emerald-500 text-white'
+ : toast.type === 'error'
+ ? 'bg-rose-950 border-2 border-rose-500 text-rose-100'
+ : 'bg-slate-800 border-2 border-amber-500 text-white'
+ }`}
+ >
+ <div
+ aria-hidden="true"
+ className={`p-2 rounded-sm shrink-0 ${
+ toast.type === 'success'
+ ? 'bg-emerald-500/20 text-emerald-400'
+ : toast.type === 'error'
+ ? 'bg-rose-500/20 text-rose-400'
+ : 'bg-amber-500/20 text-amber-400'
+ }`}
+ >
+ {toast.type === 'success' ? <CheckCircle2 size={18} /> : toast.type === 'error' ? <XCircle size={18} /> : <Info size={18} />}
+ </div>
+ <div className="flex-1 mt-0.5">
+ <p className="text-xs font-bold leading-relaxed">{toast.message}</p>
+ </div>
+ <button
+ onClick={() => removeToast(toast.id)}
+ aria-label="Dismiss notification"
+ className="text-slate-400 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 rounded"
+ >
+ <X size={16} aria-hidden="true" />
+ </button>
+ </div>
+ ))}
+ </div>
+ </ToastContext.Provider>
+ );
 };
 
 export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    // Outside ToastProvider (e.g. unit tests) — return safe no-ops
-    return {
-      addToast: () => {},
-      removeToast: () => {},
-    };
-  }
-  return context;
+ const context = useContext(ToastContext);
+ if (!context) {
+ // Outside ToastProvider (e.g. unit tests) — return safe no-ops
+ return {
+ addToast: () => {},
+ removeToast: () => {},
+ };
+ }
+ return context;
 };

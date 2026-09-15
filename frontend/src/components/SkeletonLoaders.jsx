@@ -1,105 +1,105 @@
 import React from 'react';
 
 export const CardSkeleton = () => (
-  <div className="rounded-2xl p-5 border border-slate-800/80 bg-slate-900/75 backdrop-blur-md shadow-md flex flex-col justify-between space-y-4 animate-pulse h-[340px]">
-    <div className="space-y-4">
-      <div className="flex justify-between items-start">
-        <div className="flex gap-2">
-          <div className="h-6 w-16 bg-slate-800/80 rounded-full"></div>
-          <div className="h-6 w-24 bg-slate-800/80 rounded-full"></div>
-        </div>
-        <div className="h-8 w-8 bg-slate-800/80 rounded-full"></div>
-      </div>
-      
-      <div className="space-y-2 pt-2">
-        <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
-        <div className="h-3 w-1/2 bg-slate-800/70 rounded"></div>
-      </div>
-      
-      <div className="space-y-2 pt-2">
-        <div className="h-2 w-full bg-slate-800/60 rounded"></div>
-        <div className="h-2 w-full bg-slate-800/60 rounded"></div>
-        <div className="h-2 w-2/3 bg-slate-800/60 rounded"></div>
-      </div>
-    </div>
-    
-    <div className="space-y-3">
-      <div className="flex gap-2">
-        <div className="h-5 w-16 bg-slate-800/70 rounded"></div>
-        <div className="h-5 w-16 bg-slate-800/70 rounded"></div>
-        <div className="h-5 w-16 bg-slate-800/70 rounded"></div>
-      </div>
-      
-      <div className="flex justify-between border-t border-slate-800/80 pt-3">
-        <div className="h-6 w-20 bg-slate-800 rounded-lg"></div>
-        <div className="h-6 w-24 bg-slate-800 rounded-lg"></div>
-      </div>
-    </div>
-  </div>
+ <div className="rounded-sm p-5 border border-slate-800/80 bg-slate-900/75 backdrop-blur-md flex flex-col justify-between space-y-4 animate-pulse h-[340px]">
+ <div className="space-y-4">
+ <div className="flex justify-between items-start">
+ <div className="flex gap-2">
+ <div className="h-6 w-16 bg-slate-800/80 rounded-sm"></div>
+ <div className="h-6 w-24 bg-slate-800/80 rounded-sm"></div>
+ </div>
+ <div className="h-8 w-8 bg-slate-800/80 rounded-sm"></div>
+ </div>
+ 
+ <div className="space-y-2 pt-2">
+ <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
+ <div className="h-3 w-1/2 bg-slate-800/70 rounded"></div>
+ </div>
+ 
+ <div className="space-y-2 pt-2">
+ <div className="h-2 w-full bg-slate-800/60 rounded"></div>
+ <div className="h-2 w-full bg-slate-800/60 rounded"></div>
+ <div className="h-2 w-2/3 bg-slate-800/60 rounded"></div>
+ </div>
+ </div>
+ 
+ <div className="space-y-3">
+ <div className="flex gap-2">
+ <div className="h-5 w-16 bg-slate-800/70 rounded"></div>
+ <div className="h-5 w-16 bg-slate-800/70 rounded"></div>
+ <div className="h-5 w-16 bg-slate-800/70 rounded"></div>
+ </div>
+ 
+ <div className="flex justify-between border-t border-slate-800/80 pt-3">
+ <div className="h-6 w-20 bg-slate-800 rounded-sm"></div>
+ <div className="h-6 w-24 bg-slate-800 rounded-sm"></div>
+ </div>
+ </div>
+ </div>
 );
 
 export const TableSkeleton = () => (
-  <div className="w-full bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden shadow-md animate-pulse">
-    <div className="bg-slate-950/80 border-b border-slate-800 px-6 py-4 flex gap-4">
-      <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
-      <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
-      <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
-      <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
-    </div>
-    {[...Array(5)].map((_, i) => (
-      <div key={i} className="px-6 py-4 flex gap-4 border-b border-slate-850 last:border-0">
-        <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
-        <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
-        <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
-        <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
-      </div>
-    ))}
-  </div>
+ <div className="w-full bg-slate-900/80 rounded-sm border border-slate-800 overflow-hidden animate-pulse">
+ <div className="bg-slate-950/80 border-b border-slate-800 px-6 py-4 flex gap-4">
+ <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
+ <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
+ <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
+ <div className="h-4 w-1/4 bg-slate-800 rounded"></div>
+ </div>
+ {[...Array(5)].map((_, i) => (
+ <div key={i} className="px-6 py-4 flex gap-4 border-b border-slate-850 last:border-0">
+ <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
+ <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
+ <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
+ <div className="h-4 w-1/4 bg-slate-800/60 rounded"></div>
+ </div>
+ ))}
+ </div>
 );
 
 export const KanbanColumnSkeleton = () => (
-  <div className="flex-1 min-w-[300px] flex flex-col gap-3 animate-pulse bg-slate-900/40 rounded-2xl p-3 border border-slate-800/70">
-    <div className="flex justify-between items-center px-1 mb-2">
-      <div className="h-5 w-32 bg-slate-800 rounded-lg"></div>
-      <div className="h-5 w-8 bg-slate-800 rounded-full"></div>
-    </div>
-    {[...Array(3)].map((_, i) => (
-      <div key={i} className="bg-slate-950/70 rounded-xl p-4 border border-slate-800/80 shadow-xs h-32 flex flex-col gap-3 justify-center">
-        <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
-        <div className="h-3 w-1/2 bg-slate-850 rounded"></div>
-        <div className="flex justify-between mt-auto">
-          <div className="h-4 w-16 bg-slate-800/60 rounded"></div>
-          <div className="h-4 w-12 bg-slate-800/60 rounded"></div>
-        </div>
-      </div>
-    ))}
-  </div>
+ <div className="flex-1 min-w-[300px] flex flex-col gap-3 animate-pulse bg-slate-900/40 rounded-sm p-3 border border-slate-800/70">
+ <div className="flex justify-between items-center px-1 mb-2">
+ <div className="h-5 w-32 bg-slate-800 rounded-sm"></div>
+ <div className="h-5 w-8 bg-slate-800 rounded-sm"></div>
+ </div>
+ {[...Array(3)].map((_, i) => (
+ <div key={i} className="bg-slate-950/70 rounded-sm p-4 border border-slate-800/80 -xs h-32 flex flex-col gap-3 justify-center">
+ <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
+ <div className="h-3 w-1/2 bg-slate-850 rounded"></div>
+ <div className="flex justify-between mt-auto">
+ <div className="h-4 w-16 bg-slate-800/60 rounded"></div>
+ <div className="h-4 w-12 bg-slate-800/60 rounded"></div>
+ </div>
+ </div>
+ ))}
+ </div>
 );
 
 export const DashboardGridSkeleton = () => (
-  <div className="w-full px-2 sm:px-4 lg:px-6 py-2.5 space-y-3.5">
-    <div className="h-14 w-full bg-slate-800 rounded-2xl animate-pulse mb-4 border border-slate-700"></div>
-    <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 4xl:grid-cols-8">
-      {[...Array(12)].map((_, i) => (
-        <CardSkeleton key={i} />
-      ))}
-    </div>
-  </div>
+ <div className="w-full px-2 sm:px-4 lg:px-6 py-2.5 space-y-3.5">
+ <div className="h-14 w-full bg-slate-800 rounded-sm animate-pulse mb-4 border border-slate-700"></div>
+ <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 4xl:grid-cols-8">
+ {[...Array(12)].map((_, i) => (
+ <CardSkeleton key={i} />
+ ))}
+ </div>
+ </div>
 );
 
 export const ModalSkeleton = () => (
-  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150">
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4 animate-pulse">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-        <div className="h-6 w-48 bg-slate-800 rounded"></div>
-        <div className="h-6 w-6 bg-slate-800 rounded-full"></div>
-      </div>
-      <div className="space-y-3 py-4">
-        <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
-        <div className="h-4 w-1/2 bg-slate-800 rounded"></div>
-        <div className="h-32 w-full bg-slate-800/60 rounded-xl"></div>
-      </div>
-    </div>
-  </div>
+ <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150">
+ <div className="bg-slate-900 border border-slate-800 rounded-sm p-6 max-w-2xl w-full space-y-4 animate-pulse">
+ <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+ <div className="h-6 w-48 bg-slate-800 rounded"></div>
+ <div className="h-6 w-6 bg-slate-800 rounded-sm"></div>
+ </div>
+ <div className="space-y-3 py-4">
+ <div className="h-4 w-3/4 bg-slate-800 rounded"></div>
+ <div className="h-4 w-1/2 bg-slate-800 rounded"></div>
+ <div className="h-32 w-full bg-slate-800/60 rounded-sm"></div>
+ </div>
+ </div>
+ </div>
 );
 

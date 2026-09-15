@@ -200,7 +200,7 @@ export default function PrimeTargetSpotlight({
  {/* Main Prime Target Slab */}
  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
  {/* Left Hero Opportunity Card (7 cols) */}
- <div className="lg:col-span-7 bg-slate-800/40 rounded-sm p-4 border border-slate-700/60 relative overflow-hidden group hover:border-indigo-500/50 transition-all">
+ <div className="lg:col-span-7 bg-slate-800/40 rounded-sm p-4 border border-slate-700/60 relative overflow-hidden group hover:border-amber-500/50 transition-all">
  <div className="flex items-start justify-between gap-4 mb-2">
  <div>
  <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -208,7 +208,7 @@ export default function PrimeTargetSpotlight({
  ★ TOP OPPORTUNITY
  </span>
  {primeJob.stream && (
- <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-indigo-950/80 text-indigo-300 border border-indigo-500/30">
+ <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-amber-950/80 text-amber-300 border border-amber-500/30">
  {primeJob.stream}
  </span>
  )}
@@ -218,7 +218,7 @@ export default function PrimeTargetSpotlight({
  </div>
  <h3 
  onClick={() => onOpenJobModal && onOpenJobModal(primeJob)}
- className="text-lg font-black text-white hover:text-indigo-400 cursor-pointer transition-colors leading-snug"
+ className="text-lg font-black text-white hover:text-amber-400 cursor-pointer transition-colors leading-snug"
  >
  {primeJob.title}
  </h3>
@@ -228,7 +228,7 @@ export default function PrimeTargetSpotlight({
  <>
  <span className="text-slate-600">•</span>
  <span className="text-xs text-slate-400 flex items-center gap-1">
- <MapPin size={12} className="text-indigo-400" /> {primeJob.location}
+ <MapPin size={12} className="text-amber-400" /> {primeJob.location}
  </span>
  </>
  )}
@@ -259,7 +259,7 @@ export default function PrimeTargetSpotlight({
  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-700/50 font-mono text-xs font-bold">
  <button
  onClick={() => onOpenJobModal && onOpenJobModal(primeJob)}
- className="px-3.5 py-1.5 rounded-sm bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 transition-all cursor-pointer"
+ className="px-3.5 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 transition-all cursor-pointer"
  >
  <span>VIEW FULL INTEL</span>
  <ArrowUpRight size={13} />
@@ -330,7 +330,7 @@ export default function PrimeTargetSpotlight({
  className="flex items-center justify-between px-3 py-2 rounded-sm bg-slate-850 hover:bg-slate-800 border border-slate-750 hover:border-slate-600 transition-all cursor-pointer group"
  >
  <div className="truncate pr-2">
- <div className="text-xs font-bold text-slate-200 group-hover:text-indigo-300 truncate">
+ <div className="text-xs font-bold text-slate-200 group-hover:text-amber-300 truncate">
  {job.title}
  </div>
  <div className="text-[10px] text-slate-400 truncate">
@@ -354,7 +354,7 @@ export default function PrimeTargetSpotlight({
  <div className="bg-slate-900 border border-slate-700 rounded-sm max-w-2xl w-full p-6 space-y-4 font-sans max-h-[85vh] flex flex-col">
  <div className="flex items-start justify-between border-b border-slate-800 pb-3">
  <div>
- <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-indigo-500/20 text-indigo-300 uppercase">
+ <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 uppercase">
  {activeModal.type === 'doc' ? 'TAILORED APPLICATION PREVIEW' : 'EMPLOYER PSYCHOLOGY & COVERT PAIN POINTS'}
  </span>
  <h4 className="text-lg font-bold text-white mt-1">{activeModal.job.company} — {activeModal.job.title}</h4>
@@ -375,7 +375,7 @@ export default function PrimeTargetSpotlight({
  <p className="whitespace-pre-line text-slate-300 font-sans text-xs leading-relaxed">{activeModal.resume}</p>
  </div>
  <div className="p-3 bg-slate-950/80 rounded-sm border border-slate-800 space-y-1">
- <div className="text-indigo-400 font-bold uppercase text-[10px]">Cover Letter Executive Summary</div>
+ <div className="text-amber-400 font-bold uppercase text-[10px]">Cover Letter Executive Summary</div>
  <p className="whitespace-pre-line text-slate-300 font-sans text-xs leading-relaxed">{activeModal.coverLetter}</p>
  </div>
  </>

@@ -1009,35 +1009,35 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         </div>
       )}
 
-      {/* Technocratic Header & Top Navigation */}
-      <header className="bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 sticky top-[33px] z-30 shadow-xl font-mono">
+      {/* Humanist Atelier Header & Top Navigation */}
+      <header className="bg-[#12141c]/95 backdrop-blur-xl border-b border-amber-500/15 sticky top-[33px] z-30 shadow-xl font-mono">
         <div className="w-full px-3 sm:px-5 lg:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md border border-indigo-400/40">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 shadow-md border border-amber-300/50">
               <Terminal size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-black tracking-wider uppercase text-white">
-                  CAREER.AGENT // V2.0
+                <h1 className="text-base font-editorial font-bold tracking-tight text-[#fbf9f4]">
+                  CAREER.AGENT <span className="text-[10px] font-mono font-bold tracking-widest text-amber-400/90 px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-500/30 ml-1">ATELIER</span>
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-400/30">
-                  <Sparkles size={11} className="text-indigo-400" /> SUPER INTELLIGENCE
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-400/30">
+                  <Sparkles size={11} className="text-amber-400" /> BESPOKE INTELLIGENCE
                 </span>
                 {(currentUser?.isDemoUser || currentUser?.authProvider === 'demo') && (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-400/30">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-stone-900 text-amber-300 border border-amber-400/30">
                     <Activity size={11} className="text-amber-400" /> DEMO MODE
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">
-                AUTONOMOUS APPLICATION DISPATCHER & CAREER ACCELERATOR
+              <p className="text-[11px] text-stone-400 font-humanist font-medium tracking-wide">
+                HUMAN-CENTRIC DISCOVERY & AUTONOMOUS APPLICATION DISPATCHER
               </p>
             </div>
           </div>
 
           {/* 5-Way Tab View Switcher */}
-          <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md p-1 rounded-2xl border border-slate-800/80 max-w-full overflow-x-auto scrollbar-none shrink-0 shadow-inner">
+          <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-[#0a0c10]/90 backdrop-blur-md p-1 rounded-2xl border border-amber-500/15 max-w-full overflow-x-auto scrollbar-none shrink-0 shadow-inner">
             <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1">
               <button
                 role="tab"
@@ -1046,14 +1046,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 onClick={() => setActiveSection('seeker')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'seeker' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-950/40 border border-amber-300/50' 
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
                 <LayoutGrid size={13} aria-hidden="true" /> 
                 DISCOVERY STREAM
                 {preparedCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40" aria-label={`${preparedCount} prepared`}>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-950 text-amber-300 border border-amber-500/40" aria-label={`${preparedCount} prepared`}>
                     {preparedCount}
                   </span>
                 )}
@@ -1066,11 +1066,11 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 onClick={() => setActiveSection('highlights')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'highlights' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-950/40 border border-amber-300/50' 
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
-                <Zap size={13} className="text-amber-400" aria-hidden="true" /> 
+                <Zap size={13} className={activeSection === 'highlights' ? 'text-slate-950' : 'text-amber-400'} aria-hidden="true" /> 
                 ACTION QUEUE
               </button>
 
@@ -1081,8 +1081,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 onClick={() => setActiveSection('kanban')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'kanban' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-950/40 border border-amber-300/50' 
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
                 <Sliders size={13} aria-hidden="true" /> 
@@ -1097,7 +1097,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'remote' 
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/30 border border-emerald-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
                 <Globe size={13} className={activeSection === 'remote' ? 'text-white' : 'text-emerald-400'} aria-hidden="true" /> 
@@ -1116,8 +1116,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 onClick={() => setActiveSection('market')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'market' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-950/40 border border-amber-300/50' 
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
                 <TrendingUp size={13} aria-hidden="true" /> 
@@ -1131,8 +1131,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 onClick={() => setActiveSection('analytics')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'analytics' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-950/40 border border-amber-300/50' 
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
                 <Target size={13} aria-hidden="true" /> 
@@ -1146,8 +1146,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 onClick={() => setActiveSection('operations')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
                   activeSection === 'operations' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/25 border border-indigo-400/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-950/40 border border-amber-300/50' 
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
                 }`}
               >
                 <CalendarClock size={13} aria-hidden="true" /> OPERATIONS

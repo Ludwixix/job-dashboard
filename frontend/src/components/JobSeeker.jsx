@@ -870,12 +870,12 @@ export const JobSeeker = ({
         )}
 
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-            <Sparkles size={11} className="text-indigo-400" /> SOURCING & ASSET ENGINE // ACTIVE
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-500/30">
+            <Sparkles size={11} className="text-amber-400" /> SOURCING & ASSET ATELIER // ACTIVE
           </div>
-          <h2 className="text-lg sm:text-xl font-mono font-black tracking-wider uppercase text-white">JOB SEEKER & PREPARATION MATRIX</h2>
-          <p className="text-[11px] text-slate-400 font-mono max-w-2xl">
-            PREPARED OPPORTUNITIES // TAILORED COVER LETTERS, RESUME ASSETS & DIRECT SUBMISSION LINKS
+          <h2 className="text-lg sm:text-xl font-editorial font-bold tracking-tight text-[#fbf9f4]">Curated Opportunities & Application Folios</h2>
+          <p className="text-[11px] text-stone-400 font-humanist max-w-2xl">
+            Bespoke cover letters, tailored resumes, and direct 1-click submission channels.
           </p>
         </div>
 
@@ -1407,16 +1407,16 @@ export const JobSeeker = ({
                           ? 'obsidian-card-amber border border-amber-500/60 shadow-xl shadow-amber-950/40 ring-2 ring-amber-400/40 animate-pulse'
                           : isTopFit
                           ? 'obsidian-card-emerald border border-emerald-500/50 shadow-lg shadow-emerald-950/30 ring-1 ring-emerald-500/30'
-                          : 'obsidian-card hover:border-indigo-500/50'
+                          : 'obsidian-card hover:border-amber-500/50'
                       }`}
                     >
                       {/* Top Gradient Accent Line */}
-                      <div className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl ${
+                      <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${
                         hasCustomDocs
-                          ? 'bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-500'
+                          ? 'bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-500'
                           : isTopFit
-                          ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
-                          : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                          ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400'
+                          : 'bg-gradient-to-r from-amber-600/70 via-stone-600/50 to-amber-700/70'
                       }`} />
 
                       {/* Top Header: Badges + Star + Kebab Action Menu */}
@@ -1616,20 +1616,20 @@ export const JobSeeker = ({
                           isTopFit 
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
                             : (job.score || 0) >= 80
-                            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                            : 'bg-slate-800/90 text-slate-300 border-slate-700/80'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            : 'bg-stone-900/90 text-stone-300 border-stone-800'
                         }`}>
-                          <Award size={13} className={isTopFit ? "text-emerald-400" : "text-indigo-400"} aria-hidden="true" />
+                          <Award size={13} className={isTopFit ? "text-emerald-400" : "text-amber-400"} aria-hidden="true" />
                           {job.score || 85}% match
                         </span>
 
-                        <div className="flex items-center gap-2 text-slate-400">
+                        <div className="flex items-center gap-2 text-stone-400">
                           {job.source && (
-                            <span className="type-meta px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700/80">
+                            <span className="type-meta px-2 py-0.5 rounded-full bg-stone-900/80 text-stone-300 border border-stone-800">
                               {job.source}
                             </span>
                           )}
-                          <span className="type-meta text-slate-400 flex items-center gap-1">
+                          <span className="type-meta text-stone-400 flex items-center gap-1">
                             <Clock size={11} aria-hidden="true" /> {formatJobPostedAge(job.date)}
                           </span>
                         </div>
@@ -1648,22 +1648,22 @@ export const JobSeeker = ({
                                   rel="noreferrer"
                                   onClick={(e) => e.stopPropagation()}
                                   aria-label={`${job.title} at ${job.company} — open job posting (new tab)`}
-                                  className="type-heading text-base text-white hover:text-indigo-400 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
+                                  className="type-heading text-base text-[#fbf9f4] hover:text-amber-400 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
                                 >
                                   <span className="leading-snug">{job.title}</span>
-                                  <ExternalLink size={13} className="text-slate-400 group-hover/title:text-indigo-400 shrink-0 mt-0.5" aria-hidden="true" />
+                                  <ExternalLink size={13} className="text-stone-400 group-hover/title:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
                                 </a>
                               ) : (
-                                <h3 className="type-heading text-base text-white leading-snug">
+                                <h3 className="type-heading text-base text-[#fbf9f4] leading-snug">
                                   {job.title}
                                 </h3>
                               )}
 
-                              <p className="type-meta text-slate-400 flex items-center gap-1.5 flex-wrap">
-                                <Building2 size={12} className="text-indigo-400 shrink-0" aria-hidden="true" />
-                                <span className="font-semibold text-slate-200">{job.company}</span>
-                                <span className="text-slate-600" aria-hidden="true">•</span>
-                                <MapPin size={11} className="text-slate-400 shrink-0" aria-hidden="true" />
+                              <p className="type-meta text-stone-400 flex items-center gap-1.5 flex-wrap">
+                                <Building2 size={12} className="text-amber-400/80 shrink-0" aria-hidden="true" />
+                                <span className="font-semibold text-stone-200">{job.company}</span>
+                                <span className="text-stone-600" aria-hidden="true">•</span>
+                                <MapPin size={11} className="text-stone-400 shrink-0" aria-hidden="true" />
                                 <span className="truncate">{job.location || 'Australia'}</span>
                               </p>
                             </>
@@ -1780,10 +1780,10 @@ export const JobSeeker = ({
                                 setSelectedForGenerator(job);
                               }
                             }}
-                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-500 shadow-md hover:shadow-indigo-500/20 tracking-wide uppercase active:scale-95"
+                            className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 shadow-md shadow-amber-950/40 tracking-wide uppercase active:scale-95"
                             title="Generate Tailored Resume & Cover Letter"
                           >
-                            <Sparkles size={12} className="text-amber-300" />
+                            <Sparkles size={12} className="text-slate-950" />
                             <span>PREP DOCS</span>
                           </button>
                         )}
@@ -1791,10 +1791,10 @@ export const JobSeeker = ({
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
-                          className="py-2 px-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-extrabold text-xs transition-colors border border-slate-700/80 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          className="py-2 px-3.5 rounded-xl bg-stone-900/80 hover:bg-stone-800 text-stone-200 font-extrabold text-xs transition-colors border border-amber-500/20 hover:border-amber-500/40 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                           title="View Full Details"
                         >
-                          <Eye size={13} className="text-slate-400" />
+                          <Eye size={13} className="text-stone-400" />
                           <span>DETAILS</span>
                         </button>
                       </div>

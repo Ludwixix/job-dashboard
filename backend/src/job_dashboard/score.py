@@ -41,29 +41,29 @@ _IT_TITLE_TERMS = (
 
 @lru_cache(maxsize=128)
 def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, str]:
-    """Cached version of profile skills extraction."""
+    """Cached version of profile skills extraction supporting both flat and nested profiles."""
     import json
-    profile = json.loads(profile_data)
-    if isinstance(profile, Mapping) and "profile" in profile and isinstance(profile["profile"], Mapping):
-        profile = profile["profile"]
-    if not isinstance(profile, Mapping):
+    data = json.loads(profile_data)
+    if not isinstance(data, Mapping):
         return {}
-    raw = profile.get("skills", {})
+    nested = data.get("profile") if isinstance(data.get("profile"), Mapping) else {}
+
     values: dict[str, str] = {}
-    if isinstance(raw, Mapping):
-        values.update({str(name).lower(): str(value).lower() for name, value in raw.items()})
-    elif raw:
-        values.update({str(skill).lower(): "intermediate" for skill in raw})
-    for group in profile.get("technical_expertise", {}).values():
-        values.update({str(skill).lower(): "intermediate" for skill in group})
-    # coreSkills is the field the live product actually stores resume-derived
-    # skills under (any industry, not just the curated IT alias list below);
-    # without this, scoring never sees a candidate's own skills at all for
-    # profiles created via the current resume-parsing/onboarding flow.
-    for skill in profile.get("coreSkills", []) or []:
-        key = str(skill).strip().lower()
-        if key and key not in values:
-            values[key] = "intermediate"
+    for source in (data, nested):
+        raw = source.get("skills", {})
+        if isinstance(raw, Mapping):
+            values.update({str(name).lower(): str(value).lower() for name, value in raw.items()})
+        elif raw and isinstance(raw, (list, tuple)):
+            values.update({str(skill).lower(): "intermediate" for skill in raw})
+        tech_exp = source.get("technical_expertise", {})
+        if isinstance(tech_exp, Mapping):
+            for group in tech_exp.values():
+                if isinstance(group, (list, tuple)):
+                    values.update({str(skill).lower(): "intermediate" for skill in group})
+        for skill in source.get("coreSkills", []) or []:
+            key = str(skill).strip().lower()
+            if key and key not in values:
+                values[key] = "intermediate"
 
     canonical: dict[str, str] = {}
     for skill, aliases in SKILL_ALIASES.items():
@@ -136,11 +136,107 @@ def _experience_level(job: Job) -> str:
     return "mid"
 
 
-def _seniority_penalty(job: Job) -> float:
-    level = _experience_level(job)
-    if level in {"senior", "executive"}:
+def _extract_profile_target_titles(profile: Mapping[str, Any]) -> list[str]:
+    """Extract target titles from both top-level and nested profile dictionaries."""
+    if not isinstance(profile, Mapping):
+        return []
+    titles: list[str] = []
+    nested = profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    for source in (profile, nested):
+        raw = source.get("targetTitles") or []
+        if isinstance(raw, (list, tuple)):
+            for t in raw:
+                cleaned = str(t).lower().strip()
+                if cleaned and cleaned not in titles:
+                    titles.append(cleaned)
+    return titles
+
+
+def _candidate_seniority(profile: Mapping[str, Any]) -> str:
+    """Determine candidate's seniority level ('junior', 'mid', 'senior', 'executive').
+    Defaults to 'mid' for backward compatibility when unspecified.
+    """
+    if not isinstance(profile, Mapping):
+        return "mid"
+    nested = profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+
+    # 1. Explicit seniority level field
+    for source in (nested, profile):
+        raw_level = str(source.get("seniorityLevel") or source.get("seniority") or "").lower().strip()
+        if raw_level in {"senior", "lead", "principal", "staff", "architect"}:
+            return "senior"
+        if raw_level in {"executive", "director", "vp", "head of", "c-level"}:
+            return "executive"
+        if raw_level in {"junior", "entry", "graduate", "trainee", "associate"}:
+            return "junior"
+        if raw_level in {"mid", "intermediate"}:
+            return "mid"
+
+    # 2. Years of experience check
+    for source in (nested, profile):
+        yoe = source.get("yearsOfExperience") or source.get("experienceYears")
+        if yoe is not None:
+            try:
+                years = float(yoe)
+                if years >= 7:
+                    return "senior"
+                if years <= 2:
+                    return "junior"
+                return "mid"
+            except (ValueError, TypeError):
+                pass
+
+    # 3. Check target titles
+    target_titles = _extract_profile_target_titles(profile)
+    for t in target_titles:
+        if any(kw in t for kw in ("senior", "lead", "principal", "architect")):
+            return "senior"
+        if any(kw in t for kw in ("director", "head of", "vp", "cto", "cio")):
+            return "executive"
+        if any(kw in t for kw in ("junior", "graduate", "trainee")):
+            return "junior"
+
+    return "mid"
+
+
+def _seniority_penalty(job: Job, candidate_level: str = "mid") -> float:
+    """Calculate seniority misalignment penalty between job requirements and candidate level."""
+    job_level = _experience_level(job)
+    if candidate_level == "senior":
+        if job_level == "senior":
+            return 0.0
+        if job_level == "mid":
+            return 0.04
+        if job_level == "junior":
+            return 0.18
+        if job_level == "executive":
+            return 0.10
+        return 0.0
+
+    if candidate_level == "executive":
+        if job_level == "executive":
+            return 0.0
+        if job_level == "senior":
+            return 0.04
+        if job_level == "mid":
+            return 0.18
+        if job_level == "junior":
+            return 0.25
+        return 0.0
+
+    if candidate_level == "junior":
+        if job_level == "junior":
+            return 0.0
+        if job_level == "mid":
+            return 0.08
+        if job_level in {"senior", "executive"}:
+            return 0.22
+        return 0.0
+
+    # Default / 'mid' candidate level (legacy backward compatible)
+    if job_level in {"senior", "executive"}:
         return 0.18
-    if level == "junior":
+    if job_level == "junior":
         return 0.04
     return 0.0
 
@@ -168,11 +264,13 @@ def _title_category(job: Job, profile: Mapping[str, Any]) -> float:
     2. If the profile provides no title hints, fall back to the original IT-specific
        heuristic so existing IT users are unaffected.
     """
-    target_titles = [str(t).lower().strip() for t in (profile.get("targetTitles") or []) if t]
+    target_titles = _extract_profile_target_titles(profile)
+    nested = profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    exp_list = profile.get("experience") or nested.get("experience") or []
     exp_titles = [
         str(e.get("title", "")).lower().strip()
-        for e in (profile.get("experience") or [])
-        if e.get("title")
+        for e in exp_list
+        if isinstance(e, Mapping) and e.get("title")
     ]
     candidate_titles = set(target_titles + exp_titles)
 
@@ -238,11 +336,23 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
             for skill in matched
         )
         skill_match = matched_weight / total_weight if total_weight else 0.0
-        experience = {"junior": 0.7, "mid": 1.0, "senior": 0.9, "executive": 0.3}[_experience_level(job)]
+
+        cand_level = _candidate_seniority(profile)
+        job_level = _experience_level(job)
+        if cand_level == "senior":
+            exp_table = {"senior": 1.0, "mid": 0.85, "executive": 0.7, "junior": 0.5}
+        elif cand_level == "executive":
+            exp_table = {"executive": 1.0, "senior": 0.85, "mid": 0.5, "junior": 0.3}
+        elif cand_level == "junior":
+            exp_table = {"junior": 1.0, "mid": 0.75, "senior": 0.4, "executive": 0.2}
+        else:  # "mid" default
+            exp_table = {"mid": 1.0, "senior": 0.9, "junior": 0.7, "executive": 0.3}
+        experience = exp_table.get(job_level, 0.8)
+
         location = 1.0 if job.remote or re.search(r"remote|australia|melbourne|vic", job.location, re.IGNORECASE) else 0.5
         company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.IGNORECASE) else 0.7
         growth = 0.9 if re.search(r"trainee|graduate|junior|entry[- ]level", job.text(), re.IGNORECASE) else 0.8 if re.search(r"training|mentorship|development|progression|leadership|upskill|cloud|azure|devops", job.text(), re.IGNORECASE) else 0.5
-        seniority_penalty = _seniority_penalty(job)
+        seniority_penalty = _seniority_penalty(job, cand_level)
         title_category = _title_category(job, profile)
         recency = 1.0 if getattr(job, "posted", "") else 0.5
         dimensions = {"skill_match": round(skill_match * 100), "title_category_match": round(title_category * 100), "location_fit": round(location * 100), "recency_weight": round(recency * 100), "experience_fit": round(experience * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}

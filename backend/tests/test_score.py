@@ -158,3 +158,80 @@ def test_universal_documents_generation_non_it():
     assert "enterprise delivery and infrastructure discipline" not in cover
     assert "Alfred Health" in cover
     assert "Sarah Jenkins" in cover
+
+
+def test_senior_candidate_scores_senior_role_without_penalty():
+    """Senior candidate (e.g. 10 years exp / senior level) should not be penalised on senior roles."""
+    senior_profile = {
+        "seniorityLevel": "senior",
+        "yearsOfExperience": 10,
+        "targetTitles": ["Senior Systems Engineer", "Lead Systems Administrator"],
+        "coreSkills": ["Linux", "AWS", "Python", "Docker", "Kubernetes", "Bash"],
+    }
+    senior_job = Job(
+        id="job-senior-1",
+        title="Senior Linux & AWS Systems Administrator",
+        company="Enterprise Tech",
+        location="Melbourne, VIC",
+        tags=["Linux", "AWS", "Docker", "Kubernetes"],
+        posted="2026-09-14",
+        description="Senior systems administrator role overseeing Linux and AWS infrastructure with Docker and Kubernetes automation.",
+    )
+
+    result = score_job(senior_job, senior_profile)
+    assert result.dimensions["experience_fit"] == 100
+    assert result.score >= 85
+    assert result.fit == "Excellent fit"
+
+
+def test_senior_candidate_prefers_senior_over_junior():
+    """Senior candidate should receive higher score for senior role than junior/trainee role."""
+    senior_profile = {
+        "seniorityLevel": "senior",
+        "yearsOfExperience": 10,
+        "targetTitles": ["Senior Systems Engineer"],
+        "coreSkills": ["Linux", "AWS", "Python"],
+    }
+    senior_job = Job(
+        id="job-senior-2",
+        title="Senior Systems Engineer",
+        company="Tech Corp",
+        location="Melbourne, VIC",
+        description="Senior systems engineer driving Linux and AWS cloud solutions.",
+    )
+    junior_job = Job(
+        id="job-junior-1",
+        title="Junior Systems Engineer",
+        company="Tech Corp",
+        location="Melbourne, VIC",
+        description="Junior graduate systems trainee learning Linux and AWS cloud.",
+    )
+
+    senior_res = score_job(senior_job, senior_profile)
+    junior_res = score_job(junior_job, senior_profile)
+    assert senior_res.score > junior_res.score + 10
+
+
+def test_nested_profile_extracts_target_titles_and_skills():
+    """Profile wrapped inside a 'profile' sub-dict should still have targetTitles and coreSkills extracted properly."""
+    nested_profile = {
+        "id": "prof_123",
+        "profile": {
+            "targetTitles": ["Lead Cloud Architect"],
+            "coreSkills": ["Terraform", "Kubernetes", "GCP"],
+            "seniorityLevel": "senior",
+        }
+    }
+    job = Job(
+        id="job-arch-1",
+        title="Lead Cloud Architect",
+        company="Cloud Services",
+        location="Melbourne, VIC",
+        description="Lead cloud architect designing Terraform and Kubernetes platforms on GCP.",
+    )
+
+    assert _title_category(job, nested_profile) == 1.0
+    result = score_job(job, nested_profile)
+    assert result.dimensions["title_category_match"] == 100
+    assert "terraform" in result.matched_skills
+

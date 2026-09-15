@@ -88,7 +88,7 @@ const CANDIDATE_SKILLS = [
   { term: 'active directory', weight: 8 }
 ];
 
-export const calculateCandidateMatchScore = (row) => {
+export const calculateCandidateMatchScore = (row, profile = null) => {
   if (row['score'] !== undefined && row['score'] !== null && row['score'] !== '') {
     const val = Number(row['score']);
     if (!isNaN(val) && val > 0) return Math.round(val);
@@ -99,15 +99,63 @@ export const calculateCandidateMatchScore = (row) => {
     if (!isNaN(val) && val > 0) return Math.round(val);
   }
 
+  let activeProfile = profile;
+  if (!activeProfile && typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('job_dashboard_candidate_profile');
+      if (stored) activeProfile = JSON.parse(stored);
+    } catch {
+      // ignore
+    }
+  }
+
   // Calculate dynamic keyword match score against Candidate Profile
-  const text = `${row['Job Title'] || row['title'] || ''} ${row['Company'] || row['company'] || ''} ${row['Notes & Next Steps'] || row['notes'] || row['description'] || ''}`.toLowerCase();
+  const jobTitle = String(row['Job Title'] || row['title'] || '').toLowerCase();
+  const text = `${jobTitle} ${row['Company'] || row['company'] || ''} ${row['Notes & Next Steps'] || row['notes'] || row['description'] || ''}`.toLowerCase();
   
+  // Extract candidate skills dynamically if profile is available
+  const skillsToMatch = [];
+  if (activeProfile) {
+    const core = activeProfile.coreSkills || (activeProfile.profile && activeProfile.profile.coreSkills) || [];
+    if (Array.isArray(core) && core.length > 0) {
+      core.forEach(s => {
+        const term = String(s).toLowerCase().trim();
+        if (term.length > 1) skillsToMatch.push({ term, weight: 8 });
+      });
+    }
+  }
+
+  const activeSkills = skillsToMatch.length > 0 ? skillsToMatch : CANDIDATE_SKILLS;
+
   let matchScore = 65;
-  CANDIDATE_SKILLS.forEach(skill => {
+  activeSkills.forEach(skill => {
     if (text.includes(skill.term)) {
-      matchScore += skill.weight;
+      matchScore += (skill.weight || 8);
     }
   });
+
+  // Target title alignment bonus
+  if (activeProfile) {
+    const targetTitles = activeProfile.targetTitles || (activeProfile.profile && activeProfile.profile.targetTitles) || [];
+    if (Array.isArray(targetTitles)) {
+      const matchesTitle = targetTitles.some(t => {
+        const words = String(t).toLowerCase().split(/\W+/).filter(w => w.length > 3);
+        return words.some(w => jobTitle.includes(w));
+      });
+      if (matchesTitle) matchScore += 10;
+    }
+
+    // Seniority alignment
+    const seniority = String(activeProfile.seniorityLevel || (activeProfile.profile && activeProfile.profile.seniorityLevel) || '').toLowerCase();
+    const isSeniorCandidate = seniority.includes('senior') || seniority.includes('lead') || Number(activeProfile.yearsOfExperience || (activeProfile.profile && activeProfile.profile.yearsOfExperience) || 0) >= 7;
+    const isSeniorJob = /\b(senior|lead|principal|architect)\b/i.test(jobTitle);
+    const isJuniorJob = /\b(junior|graduate|trainee|apprentice)\b/i.test(jobTitle);
+
+    if (isSeniorCandidate) {
+      if (isSeniorJob) matchScore += 6;
+      else if (isJuniorJob) matchScore -= 12;
+    }
+  }
 
   return Math.min(98, Math.max(55, matchScore));
 };

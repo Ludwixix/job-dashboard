@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { TopMatchesSidebar } from './TopMatchesSidebar';
 import { 
-  Sparkles, Search, Filter, 
-  DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
-  SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
-  ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
-  ChevronFirst, ChevronLast, ArrowDown, Wrench, Briefcase,
-  ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
-  Target,
+ Sparkles, Search, Filter, 
+ DollarSign, RefreshCw, CheckCircle2, MapPin, Award,
+ SlidersHorizontal, RotateCcw, ArrowUpDown, Layers, ExternalLink,
+ ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
+ ChevronFirst, ChevronLast, ArrowDown, Wrench, Briefcase,
+ ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
+ Target,
 
-  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
-  Train, Car, Bike, MoreVertical, Compass
+ HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
+ Train, Car, Bike, MoreVertical, Compass
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -26,25 +26,25 @@ import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApp
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { 
-  calculateCandidateJobMatch, 
-  calculateCandidateDistanceKm,
-  promoteSimilarJobs,
-  demoteSimilarJobs,
-  getUserPreferences,
-  resetUserPreferences
+ calculateCandidateJobMatch, 
+ calculateCandidateDistanceKm,
+ promoteSimilarJobs,
+ demoteSimilarJobs,
+ getUserPreferences,
+ resetUserPreferences
 } from '../services/scoringEngine';
 import { getActiveProfile } from '../services/profileService';
 import { SCRAPER_BASE_URL, buildQueriesFromProfile } from '../services/jobQueryService';
 import { RoleFilterBar } from './RoleFilterBar';
 import {
-  getProfileAutoRoles,
-  getRoleArchetypeCounts, 
-  classifyJobRole,
-  loadSavedRoleSelections,
-  saveRoleSelections,
-  getCustomRoles,
-  addCustomRole,
-  removeCustomRole
+ getProfileAutoRoles,
+ getRoleArchetypeCounts, 
+ classifyJobRole,
+ loadSavedRoleSelections,
+ saveRoleSelections,
+ getCustomRoles,
+ addCustomRole,
+ removeCustomRole
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
 import { recordJobInteraction, generateSmartJobSuggestions } from '../services/profileLearningEngine';
@@ -57,1885 +57,1885 @@ import { matchesSalaryThreshold } from '../utils/salaryUtils';
 
 // Categorize jobs into expanded multi-industry streams
 const getJobSubStream = (job) => {
-  const title = (job.title || '').toLowerCase();
-  const notes = (job.notes || '').toLowerCase();
-  const company = (job.company || '').toLowerCase();
-  const source = (job.source || '').toLowerCase();
-  const stream = (job.stream || '').toLowerCase();
-  const industry = (job.industry || '').toLowerCase();
+ const title = (job.title || '').toLowerCase();
+ const notes = (job.notes || '').toLowerCase();
+ const company = (job.company || '').toLowerCase();
+ const source = (job.source || '').toLowerCase();
+ const stream = (job.stream || '').toLowerCase();
+ const industry = (job.industry || '').toLowerCase();
 
-  // 1. Healthcare & Medical
-  if (
-    industry.includes('health') || stream.includes('health') || 
-    title.includes('nurse') || title.includes('clinical') || title.includes('medical') || 
-    title.includes('health') || title.includes('physio') || title.includes('hospital') ||
-    title.includes('allied health') || title.includes('care coordinator')
-  ) {
-    return 'Healthcare & Medical';
-  }
+ // 1. Healthcare & Medical
+ if (
+ industry.includes('health') || stream.includes('health') || 
+ title.includes('nurse') || title.includes('clinical') || title.includes('medical') || 
+ title.includes('health') || title.includes('physio') || title.includes('hospital') ||
+ title.includes('allied health') || title.includes('care coordinator')
+ ) {
+ return 'Healthcare & Medical';
+ }
 
-  // 2. Finance, Accounting & Banking
-  if (
-    industry.includes('finance') || industry.includes('account') || stream.includes('finance') || 
-    title.includes('accountant') || title.includes('financial') || title.includes('fp&a') || 
-    title.includes('cpa') || title.includes('tax') || title.includes('credit risk') || 
-    title.includes('banking') || title.includes('auditor')
-  ) {
-    return 'Finance & Accounting';
-  }
+ // 2. Finance, Accounting & Banking
+ if (
+ industry.includes('finance') || industry.includes('account') || stream.includes('finance') || 
+ title.includes('accountant') || title.includes('financial') || title.includes('fp&a') || 
+ title.includes('cpa') || title.includes('tax') || title.includes('credit risk') || 
+ title.includes('banking') || title.includes('auditor')
+ ) {
+ return 'Finance & Accounting';
+ }
 
-  // 3. Sales, Marketing & Growth
-  if (
-    industry.includes('marketing') || industry.includes('sales') || stream.includes('marketing') || 
-    title.includes('marketing') || title.includes('growth') || title.includes('seo') || 
-    title.includes('brand') || title.includes('account executive') || title.includes('sales') ||
-    title.includes('content') || title.includes('copywriter')
-  ) {
-    return 'Marketing & Sales';
-  }
+ // 3. Sales, Marketing & Growth
+ if (
+ industry.includes('marketing') || industry.includes('sales') || stream.includes('marketing') || 
+ title.includes('marketing') || title.includes('growth') || title.includes('seo') || 
+ title.includes('brand') || title.includes('account executive') || title.includes('sales') ||
+ title.includes('content') || title.includes('copywriter')
+ ) {
+ return 'Marketing & Sales';
+ }
 
-  // 4. Construction, Engineering & Trades
-  if (
-    industry.includes('construction') || stream.includes('construction') || 
-    title.includes('construction') || title.includes('site manager') || title.includes('site engineer') || 
-    title.includes('project engineer') || title.includes('civil') || title.includes('trades') || 
-    title.includes('electrician') || title.includes('builder') || title.includes('estimator')
-  ) {
-    return 'Construction & Trades';
-  }
+ // 4. Construction, Engineering & Trades
+ if (
+ industry.includes('construction') || stream.includes('construction') || 
+ title.includes('construction') || title.includes('site manager') || title.includes('site engineer') || 
+ title.includes('project engineer') || title.includes('civil') || title.includes('trades') || 
+ title.includes('electrician') || title.includes('builder') || title.includes('estimator')
+ ) {
+ return 'Construction & Trades';
+ }
 
-  // 5. Human Resources & People
-  if (
-    industry.includes('hr') || industry.includes('people') || stream.includes('hr') || 
-    title.includes('hr') || title.includes('talent') || title.includes('recruitment') || 
-    title.includes('people & culture') || title.includes('hrbp') || title.includes('people business partner')
-  ) {
-    return 'HR & Operations';
-  }
+ // 5. Human Resources & People
+ if (
+ industry.includes('hr') || industry.includes('people') || stream.includes('hr') || 
+ title.includes('hr') || title.includes('talent') || title.includes('recruitment') || 
+ title.includes('people & culture') || title.includes('hrbp') || title.includes('people business partner')
+ ) {
+ return 'HR & Operations';
+ }
 
-  // 6. Legal, Governance & Compliance
-  if (
-    industry.includes('legal') || stream.includes('legal') || 
-    title.includes('legal') || title.includes('counsel') || title.includes('lawyer') || 
-    title.includes('compliance') || title.includes('solicitor')
-  ) {
-    return 'Legal & Governance';
-  }
+ // 6. Legal, Governance & Compliance
+ if (
+ industry.includes('legal') || stream.includes('legal') || 
+ title.includes('legal') || title.includes('counsel') || title.includes('lawyer') || 
+ title.includes('compliance') || title.includes('solicitor')
+ ) {
+ return 'Legal & Governance';
+ }
 
-  // 7. Education & Academic
-  if (
-    industry.includes('education') || stream.includes('education') || 
-    title.includes('education') || title.includes('teacher') || title.includes('curriculum') || 
-    title.includes('academic') || title.includes('learning & development')
-  ) {
-    return 'Education & Training';
-  }
+ // 7. Education & Academic
+ if (
+ industry.includes('education') || stream.includes('education') || 
+ title.includes('education') || title.includes('teacher') || title.includes('curriculum') || 
+ title.includes('academic') || title.includes('learning & development')
+ ) {
+ return 'Education & Training';
+ }
 
-  // 8. Field Tech, Outdoor, Labour & Physical Work
-  if (
-    title.includes('technician') || title.includes('field') || title.includes('labour') || title.includes('labourer') ||
-    title.includes('outdoor') || title.includes('cabling') || title.includes('physical') || title.includes('depot') ||
-    title.includes('warehouse') || title.includes('assembler') || title.includes('maintenance') || title.includes('driver') || title.includes('storeperson')
-  ) {
-    return 'Field Tech & Labour';
-  }
+ // 8. Field Tech, Outdoor, Labour & Physical Work
+ if (
+ title.includes('technician') || title.includes('field') || title.includes('labour') || title.includes('labourer') ||
+ title.includes('outdoor') || title.includes('cabling') || title.includes('physical') || title.includes('depot') ||
+ title.includes('warehouse') || title.includes('assembler') || title.includes('maintenance') || title.includes('driver') || title.includes('storeperson')
+ ) {
+ return 'Field Tech & Labour';
+ }
 
-  // 9. Government, Council & Public Sector
-  if (
-    source.includes('vic') || source.includes('careers vic') ||
-    company.includes('council') || company.includes('government') || company.includes('vic gov') || company.includes('city of') ||
-    title.includes('council') || title.includes('park') || title.includes('ranger')
-  ) {
-    return 'Gov & Public Sector';
-  }
+ // 9. Government, Council & Public Sector
+ if (
+ source.includes('vic') || source.includes('careers vic') ||
+ company.includes('council') || company.includes('government') || company.includes('vic gov') || company.includes('city of') ||
+ title.includes('council') || title.includes('park') || title.includes('ranger')
+ ) {
+ return 'Gov & Public Sector';
+ }
 
-  // 10. Technology, Software & Cloud
-  if (
-    title.includes('cloud') || title.includes('azure') || title.includes('devops') || 
-    title.includes('aws') || title.includes('software') || title.includes('developer') || 
-    title.includes('react') || title.includes('engineer') || title.includes('cyber') || 
-    title.includes('data') || title.includes('systems') || title.includes('m365') || title.includes('it support')
-  ) {
-    return 'Tech & Software';
-  }
+ // 10. Technology, Software & Cloud
+ if (
+ title.includes('cloud') || title.includes('azure') || title.includes('devops') || 
+ title.includes('aws') || title.includes('software') || title.includes('developer') || 
+ title.includes('react') || title.includes('engineer') || title.includes('cyber') || 
+ title.includes('data') || title.includes('systems') || title.includes('m365') || title.includes('it support')
+ ) {
+ return 'Tech & Software';
+ }
 
-  return 'General & Professional';
+ return 'General & Professional';
 };
 
 export const JobSeeker = ({ 
-  jobs, 
-  onSelectJob, 
-  baseLocation = 'BALACLAVA VIC 3183', 
-  activeProfile,
-  scrapeProgress,
-  onTriggerScrape,
-  onRejectJob, 
-  onUnrejectJob,
-  onDispatchAsyncApplication,
-  asyncGeneratingIds = new Set(),
-  onJobStatusUpdate,
-  onSaveCustomDocs,
-  onOpenBatchApply,
-  onOpenCheatSheet
+ jobs, 
+ onSelectJob, 
+ baseLocation = 'BALACLAVA VIC 3183', 
+ activeProfile,
+ scrapeProgress,
+ onTriggerScrape,
+ onRejectJob, 
+ onUnrejectJob,
+ onDispatchAsyncApplication,
+ asyncGeneratingIds = new Set(),
+ onJobStatusUpdate,
+ onSaveCustomDocs,
+ onOpenBatchApply,
+ onOpenCheatSheet
 }) => {
 
-  const currentProfile = activeProfile || getActiveProfile();
-  const [search, setSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('All');
-  const [activeStreamTab, setActiveStreamTab] = useState('All');
-  const [starredJobIds, setStarredJobIds] = useState(() => {
-    const saved = localStorage.getItem('starred_jobs');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('starred_jobs', JSON.stringify(starredJobIds));
-  }, [starredJobIds]);
-
-  const toggleStar = (jobId, e) => {
-    if (e) e.stopPropagation();
-    const isNowStarred = !starredJobIds.includes(jobId);
-    setStarredJobIds(prev => isNowStarred ? [...prev, jobId] : prev.filter(id => id !== jobId));
-    if (isNowStarred) {
-      const targetJob = jobs.find(j => (j.id || `${j.company}_${j.title}`) === jobId);
-      if (targetJob) {
-        try {
-          recordJobInteraction(targetJob, 'starred', currentProfile);
-        } catch {}
-      }
-    }
-  };
-  const [docsReadyFilter, setDocsReadyFilter] = useState(false);
-  const [minSalaryFilter, setMinSalaryFilter] = useState('All');
-  const [minScoreFilter, setMinScoreFilter] = useState('All');
-  const [workModeFilter, setWorkModeFilter] = useState('All');
-  const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
-  const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
-  const [sortBy, setSortBy] = useState('date'); // DEFAULT: MOST RECENT (NEWEST) FIRST
-  const [sortDirection, setSortDirection] = useState('desc');
-  const [showSidebar, setShowSidebar] = useState(true);
-
-
-  // Interactive Pagination & Batch Loading State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(48); // 24, 48, 96, 'All'
-  const gridTopRef = useRef(null);
-
-  const [selectedForGenerator, setSelectedForGenerator] = useState(null);
-  const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
-  const [psychologyJob, setPsychologyJob] = useState(null);
-  const [scraping, setScraping] = useState(false);
-  const [scrapeSuccess, setScrapeSuccess] = useState(false);
-  const [scrapedCount, setScrapedCount] = useState(null);
-  
-  // Live Timer Countdown State
-  const [scrapeElapsedSeconds, setScrapeElapsedSeconds] = useState(0);
-  const ESTIMATED_SCRAPE_DURATION_SEC = 20;
-
-  // User Recommendation Preference State (More/Less Like This)
-  const [userPrefs, setUserPrefs] = useState(() => getUserPreferences());
-  const [prefToast, setPrefToast] = useState(null);
-
-  // Auto-Generated Roles based on Candidate Profile
-  // Unsubmitted jobs pool (strictly genuine scraped ads, discarding email pseudo-jobs)
-  const unsubmittedJobs = useMemo(() => {
-    return (jobs || []).filter(job => {
-      if (job.isRejected) return false;
-
-      // Filter out email conversation pseudo-jobs or corrupted company entries
-      const comp = (job.company || '').toLowerCase();
-      const tit = (job.title || '').toLowerCase();
-      if (
-        comp === 'gmail' ||
-        comp === 'direct employer' ||
-        tit.startsWith('exploring a new opportunity') ||
-        tit.includes('application was sent to') ||
-        tit.includes('application submitted') ||
-        tit.includes('application received') ||
-        tit.includes('invitation to connect')
-      ) {
-        return false;
-      }
-
-      const s = (job.status || 'sourced').toLowerCase();
-      const isProgressed = s.includes('applied') || 
-                           s.includes('confirmation') || 
-                           s.includes('interview') || 
-                           s.includes('offer') || 
-                           s.includes('accepted') || 
-                           s.includes('under review') || 
-                           s.includes('action required') || 
-                           s.includes('verification') || 
-                           s.includes('unsuccessful') || 
-                           s.includes('closed') || 
-                           s.includes('rejected') || 
-                           s.includes('dismissed') || 
-                           s.includes('expired');
-      // Custom jobs that the user manually created should remain visible in the active pool
-      if (job.isCustom || String(job.id || '').startsWith('custom_')) {
-        return true;
-      }
-      return !isProgressed;
-    });
-  }, [jobs]);
-
-  // Complete Jobs vs Incomplete (Missing Data) Jobs
-  const completeJobs = useMemo(() => {
-    return unsubmittedJobs.filter(j => j.isComplete !== false);
-  }, [unsubmittedJobs]);
-
-  const missingDataJobs = useMemo(() => {
-    return unsubmittedJobs.filter(j => j.isComplete === false);
-  }, [unsubmittedJobs]);
-
-  // Manage user-created custom target roles per profile
-  const [customRoles, setCustomRoles] = useState(() => {
-    return getCustomRoles(currentProfile?.id);
-  });
-
-  const [openKebabJobId, setOpenKebabJobId] = useState(null);
-
-  useEffect(() => {
-    const handleDocClick = () => setOpenKebabJobId(null);
-    window.addEventListener('click', handleDocClick);
-    return () => window.removeEventListener('click', handleDocClick);
-  }, []);
-
-  useEffect(() => {
-    setCustomRoles(getCustomRoles(currentProfile?.id));
-  }, [currentProfile?.id]);
-
-  // Aggregate job counts per role archetype across complete unsubmitted jobs
-  const roleArchetypeCounts = useMemo(() => {
-    return getRoleArchetypeCounts(completeJobs, currentProfile, customRoles);
-  }, [completeJobs, currentProfile, customRoles]);
-
-  const profileAutoRoles = useMemo(() => {
-    return getProfileAutoRoles(currentProfile, customRoles);
-  }, [currentProfile, customRoles]);
-
-  // Refined default: on page load/refresh, load user's saved selection or
-  // default to profile-targeted roles instead of showing everything.
-  const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
-    const saved = loadSavedRoleSelections(currentProfile?.id);
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      return saved;
-    }
-    const auto = getProfileAutoRoles(currentProfile, getCustomRoles(currentProfile?.id));
-    return auto && auto.length > 0 ? auto : [];
-  });
-
-  // When active profile switches, restore profile-targeted roles or saved preference
-  useEffect(() => {
-    if (currentProfile) {
-      const saved = loadSavedRoleSelections(currentProfile.id);
-      if (saved && Array.isArray(saved) && saved.length > 0) {
-        setSelectedRoleIds(saved);
-      } else {
-        const auto = getProfileAutoRoles(currentProfile, customRoles);
-        setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
-      }
-    }
-  }, [currentProfile?.id]);
-
-  const handleSelectRole = (roleId) => {
-    setSelectedRoleIds(prev => {
-      let updated;
-      if (prev.includes(roleId)) {
-        updated = prev.filter(id => id !== roleId);
-      } else {
-        updated = [...prev, roleId];
-      }
-      saveRoleSelections(currentProfile?.id, updated);
-      return updated;
-    });
-    setCurrentPage(1);
-  };
-
-  const handleSelectAllRoles = () => {
-    const allIds = roleArchetypeCounts.map(r => r.id);
-    setSelectedRoleIds(allIds);
-    saveRoleSelections(currentProfile?.id, allIds);
-    setCurrentPage(1);
-  };
-
-  const handleClearRoles = () => {
-    setSelectedRoleIds([]);
-    saveRoleSelections(currentProfile?.id, []);
-    setCurrentPage(1);
-  };
-
-  const handleResetToProfile = () => {
-    const auto = getProfileAutoRoles(currentProfile, customRoles);
-    setSelectedRoleIds(auto);
-    saveRoleSelections(currentProfile?.id, auto);
-    setCurrentPage(1);
-  };
-
-  const handleSelectDomain = (domainRoleIds, shouldSelect) => {
-    setSelectedRoleIds(prev => {
-      let updated;
-      if (shouldSelect) {
-        updated = Array.from(new Set([...prev, ...domainRoleIds]));
-      } else {
-        updated = prev.filter(id => !domainRoleIds.includes(id));
-      }
-      saveRoleSelections(currentProfile?.id, updated);
-      return updated;
-    });
-    setCurrentPage(1);
-  };
-
-  const handleAddCustomRole = (newRoleData) => {
-    const created = addCustomRole(currentProfile?.id, newRoleData);
-    setCustomRoles(prev => [...prev, created]);
-    setSelectedRoleIds(prev => {
-      const updated = [...prev, created.id];
-      saveRoleSelections(currentProfile?.id, updated);
-      return updated;
-    });
-    setCurrentPage(1);
-  };
-
-  const handleRemoveCustomRole = (roleId) => {
-    const remaining = removeCustomRole(currentProfile?.id, roleId);
-    setCustomRoles(remaining);
-    setSelectedRoleIds(prev => {
-      const updated = prev.filter(id => id !== roleId);
-      saveRoleSelections(currentProfile?.id, updated);
-      return updated;
-    });
-    setCurrentPage(1);
-  };
-
-  useEffect(() => {
-    const handlePrefChange = (e) => {
-      setUserPrefs(e.detail || getUserPreferences());
-    };
-    window.addEventListener('job-preferences-changed', handlePrefChange);
-    return () => window.removeEventListener('job-preferences-changed', handlePrefChange);
-  }, []);
-
-  const handlePromote = (job) => {
-    const updated = promoteSimilarJobs(job);
-    setUserPrefs(updated);
-    try {
-      recordJobInteraction(job, 'promoted', currentProfile);
-    } catch {}
-    setPrefToast(`👍 Promoted! Algorithm prioritizing roles like "${job.title}" & ${job.company}`);
-    setTimeout(() => setPrefToast(null), 4000);
-  };
-
-  const handleDemote = (job) => {
-    const updated = demoteSimilarJobs(job);
-    setUserPrefs(updated);
-    setPrefToast(`👎 Demoted! Showing fewer roles like "${job.title}"`);
-    setTimeout(() => setPrefToast(null), 4000);
-  };
-
-  const isJobPromoted = (job) => {
-    const jobId = job.id || `${job.company}_${job.title}`;
-    return userPrefs?.promotedJobIds?.includes(jobId);
-  };
-
-  const isJobDemoted = (job) => {
-    const jobId = job.id || `${job.company}_${job.title}`;
-    return userPrefs?.demotedJobIds?.includes(jobId);
-  };
-
-  useEffect(() => {
-    let timer;
-    if (scraping) {
-      timer = setInterval(() => {
-        setScrapeElapsedSeconds(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [scraping]);
-
-  const rejectedJobs = useMemo(() => {
-    return (jobs || []).filter(j => j.isRejected);
-  }, [jobs]);
-
-  const readyToSubmitCount = useMemo(() => {
-    return completeJobs.filter(hasGeneratedApplicationDocs).length;
-  }, [completeJobs]);
-
-  // Stream counts for expanded quick tabs
-  const streamCounts = useMemo(() => {
-    const counts = { 
-      All: completeJobs.length,
-      Custom: completeJobs.filter(j => j.isCustom || String(j.id || '').startsWith('custom_')).length,
-      Starred: completeJobs.filter(j => starredJobIds.some(id => String(id) === String(j.id) || String(id) === `${j.company}_${j.title}`)).length,
-      TopFit: 0,
-      SmartSuggestions: completeJobs.filter(j => (j.score || 0) >= 70).length,
-
-      QuickApply: 0,
-      ReadyForSubmission: readyToSubmitCount,
-      'Healthcare & Medical': 0,
-      'Finance & Accounting': 0,
-      'Marketing & Sales': 0,
-      'Construction & Trades': 0,
-      'HR & Operations': 0,
-      'Legal & Governance': 0,
-      'Education & Training': 0,
-      'Tech & Software': 0,
-      'Gov & Public Sector': 0,
-      'Field Tech & Labour': 0,
-      'General & Professional': 0,
-      MissingData: missingDataJobs.length,
-      'Rejected Jobs': rejectedJobs.length,
-    };
-
-    completeJobs.forEach(j => {
-      const match = calculateCandidateJobMatch(j, currentProfile, userPrefs);
-      if (match.score >= 85) {
-        counts.TopFit = (counts.TopFit || 0) + 1;
-      }
-      if (isQuickApplyEligible(j)) {
-        counts.QuickApply = (counts.QuickApply || 0) + 1;
-      }
-      const subStream = getJobSubStream(j);
-      counts[subStream] = (counts[subStream] || 0) + 1;
-    });
-
-    return counts;
-  }, [completeJobs, missingDataJobs, starredJobIds, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
-
-
-  const seekerJobs = useMemo(() => {
-    const sourcePool = sourceFilter !== 'All' && activeStreamTab === 'All'
-      ? unsubmittedJobs
-      : activeStreamTab === 'Rejected Jobs' 
-      ? rejectedJobs 
-      : activeStreamTab === 'MissingData' 
-      ? missingDataJobs 
-      : completeJobs;
-
-    // Enriched with active candidate dynamic ATS match & commute distance & preference weights
-    const enrichedPool = sourcePool.map(job => {
-      const match = calculateCandidateJobMatch(job, currentProfile, userPrefs);
-      return {
-        ...job,
-        score: match.score,
-        matchedSkills: match.matchedSkills,
-        distanceKm: match.distanceKm,
-        matchTier: match.matchTier,
-        feedbackBonus: match.feedbackBonus
-      };
-    });
-
-    const filtered = enrichedPool.filter(job => {
-      const q = (search || '').toLowerCase().trim();
-      const comp = (job.company || '').toLowerCase();
-      const tit = (job.title || '').toLowerCase();
-      const nts = (job.notes || '').toLowerCase();
-      const loc = (job.location || '').toLowerCase();
-      const tags = Array.isArray(job.tags) ? job.tags.join(' ').toLowerCase() : '';
-      const matchesSearch = !q || comp.includes(q) || tit.includes(q) || nts.includes(q) || loc.includes(q) || tags.includes(q);
-      
-      const matchesSource = sourceFilter === 'All' || (job.source || '').toLowerCase() === sourceFilter.toLowerCase();
-      // Stream Tab filter
-      let matchesStream = true;
-      if (activeStreamTab === 'Custom') {
-        matchesStream = Boolean(job.isCustom || String(job.id || '').startsWith('custom_'));
-      } else if (activeStreamTab === 'TopFit') {
-        matchesStream = (job.score || 0) >= 85;
-      } else if (activeStreamTab === 'SmartSuggestions') {
-        matchesStream = (job.score || 0) >= 70 || Boolean(job.learnedMatch);
-      } else if (activeStreamTab === 'Starred') {
-        matchesStream = starredJobIds.some(id => String(id) === String(job.id) || String(id) === `${job.company}_${job.title}`);
-      } else if (activeStreamTab === 'QuickApply') {
-        matchesStream = isQuickApplyEligible(job);
-      } else if (activeStreamTab === 'ReadyForSubmission') {
-        matchesStream = hasGeneratedApplicationDocs(job);
-      } else if (activeStreamTab === 'MissingData' || activeStreamTab === 'Rejected Jobs' || activeStreamTab === 'All') {
-        matchesStream = true;
-      } else {
-        const subStream = getJobSubStream(job);
-        matchesStream = subStream === activeStreamTab || 
-                        (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
-                        (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
-      }
-
-      let matchesDocsReady = true;
-      if (docsReadyFilter) {
-        matchesDocsReady = hasGeneratedApplicationDocs(job);
-      }
-
-      // Salary filter
-      let matchesSalary = matchesSalaryThreshold(job, minSalaryFilter);
-
-      // Score filter
-      let matchesScore = true;
-      if (minScoreFilter === '80+') {
-        matchesScore = (job.score || 0) >= 80;
-      } else if (minScoreFilter === '70+') {
-        matchesScore = (job.score || 0) >= 70;
-      }
-
-      // Work Mode filter
-      let matchesWorkMode = true;
-      if (workModeFilter === 'remote') {
-        matchesWorkMode = job.remote || (job.location || '').toLowerCase().includes('remote') || (job.location || '').toLowerCase().includes('hybrid');
-      } else if (workModeFilter === 'onsite') {
-        matchesWorkMode = !job.remote && !(job.location || '').toLowerCase().includes('remote');
-      }
-
-      // Distance Filter (Relative to Candidate Profile Location)
-      let matchesDistance = true;
-      const candLoc = currentProfile?.location || baseLocation;
-      const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, candLoc);
-      if (maxDistanceFilter === '5km') {
-        matchesDistance = distKm <= 5;
-      } else if (maxDistanceFilter === '10km') {
-        matchesDistance = distKm <= 10;
-      } else if (maxDistanceFilter === '25km') {
-        matchesDistance = distKm <= 25;
-      }
-
-      // Strict 13-Day Expiry Filter
-      // A null age means the posted date is missing/unparseable — such jobs
-      // cannot be verified as recent, so they must not silently pass an
-      // age-window filter (this previously defaulted to age=0, making
-      // stale/garbage-dated listings appear freshly posted).
-      let matchesAge = true;
-      const ageDays = getJobAgeInDays(job.date);
-      if (maxAgeFilter === '13days') {
-        matchesAge = ageDays !== null && ageDays <= 13;
-      } else if (maxAgeFilter === '7days') {
-        matchesAge = ageDays !== null && ageDays <= 7;
-      } else if (maxAgeFilter === '3days') {
-        matchesAge = ageDays !== null && ageDays <= 3;
-      }
-
-      // Multi-Role Archetype Filter
-      let matchesRole = true;
-      if (roleArchetypeCounts.length > 0) {
-        if (selectedRoleIds.length === 0) {
-          matchesRole = false;
-        } else if (selectedRoleIds.length < roleArchetypeCounts.length) {
-          const jobRole = classifyJobRole(job, customRoles);
-          matchesRole = selectedRoleIds.includes(jobRole.id);
-        }
-      }
-
-      return matchesSearch && matchesSource && matchesStream && matchesRole && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
-    });
-
-    // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
-    return filtered.sort((a, b) => {
-      if (sortBy === 'best_and_newest' || !sortBy) {
-        const scoreA = a.score || 0;
-        const scoreB = b.score || 0;
-        const tierA = scoreA >= 80 ? 3 : (scoreA >= 65 ? 2 : 1);
-        const tierB = scoreB >= 80 ? 3 : (scoreB >= 65 ? 2 : 1);
-        
-        if (tierA !== tierB) {
-          return tierB - tierA; // Higher match tier first
-        }
-        const dateComp = compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
-        if (dateComp !== 0) return dateComp;
-        
-        return scoreB - scoreA;
-      } else if (sortBy === 'date') {
-        return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
-      } else if (sortBy === 'score') {
-        return (b.score || 0) - (a.score || 0);
-      } else if (sortBy === 'company') {
-        return (a.company || '').localeCompare(b.company || '');
-      }
-      return 0;
-    });
-  }, [completeJobs, missingDataJobs, unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, customRoles, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
-
-
-  // Paginated Sliced Jobs
-  const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
-  const totalPages = Math.max(1, Math.ceil(seekerJobs.length / (effectivePageSize || 1)));
-
-  // Reset pagination to page 1 whenever filters or search criteria change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, sourceFilter, activeStreamTab, docsReadyFilter, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, selectedRoleIds]);
-
-  // Ensure currentPage does not exceed totalPages when result count drops
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(1);
-    }
-  }, [currentPage, totalPages]);
-
-  const paginatedJobs = useMemo(() => {
-    if (pageSize === 'All') return seekerJobs;
-    const startIdx = (currentPage - 1) * effectivePageSize;
-    return seekerJobs.slice(startIdx, startIdx + effectivePageSize);
-  }, [seekerJobs, currentPage, pageSize, effectivePageSize]);
-
-  const handlePageChange = (newPage) => {
-
-    const pageNum = Math.max(1, Math.min(totalPages, newPage));
-    setCurrentPage(pageNum);
-    if (gridTopRef.current) {
-      gridTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const handleSelectStreamTab = (tabName) => {
-    setActiveStreamTab(tabName);
-    setCurrentPage(1);
-  };
-
-  // Diagnostic reason generator for 0-results state
-  const filterDiagnostic = useMemo(() => {
-    if (seekerJobs.length > 0) return null;
-
-    const reasons = [];
-    if (activeStreamTab !== 'All') {
-      reasons.push(`under stream '${activeStreamTab}'`);
-    }
-    if (maxDistanceFilter !== 'All') {
-      const distLabel = maxDistanceFilter === '5km' ? '< 5 km of Balaclava, VIC' : maxDistanceFilter === '10km' ? '< 10 km (CBD & Commute)' : '< 25 km';
-      reasons.push(`within ${distLabel}`);
-    }
-    if (maxAgeFilter !== 'All') {
-      const ageLabel = maxAgeFilter === '13days' ? '13 days' : maxAgeFilter === '7days' ? '7 days' : '3 days';
-      reasons.push(`posted in the last ${ageLabel}`);
-    }
-    if (search.trim()) {
-      reasons.push(`matching keyword "${search}"`);
-    }
-    if (minSalaryFilter !== 'All') {
-      reasons.push(`matching ${minSalaryFilter} salary`);
-    }
-    if (minScoreFilter !== 'All') {
-      reasons.push(`with ${minScoreFilter} match score`);
-    }
-
-    let summaryText = 'No opportunities found';
-    if (reasons.length > 0) {
-      summaryText += ' ' + reasons.join(' ');
-    }
-
-    return {
-      summaryText,
-      hasStreamFilter: activeStreamTab !== 'All',
-      hasDistanceFilter: maxDistanceFilter !== 'All',
-      hasAgeFilter: maxAgeFilter !== 'All',
-      hasSearchFilter: search.trim() !== ''
-    };
-  }, [seekerJobs, activeStreamTab, maxDistanceFilter, maxAgeFilter, search, minSalaryFilter, minScoreFilter]);
-
-  const sources = useMemo(() => {
-    const s = new Set(jobs.map(j => j.source).filter(Boolean));
-    return ['All', ...Array.from(s)];
-  }, [jobs]);
-
-  const resetAllFilters = () => {
-    setSearch('');
-    setSourceFilter('All');
-    setActiveStreamTab('All');
-    setDocsReadyFilter(false);
-    setMinSalaryFilter('All');
-    setMinScoreFilter('All');
-    setWorkModeFilter('All');
-    setMaxDistanceFilter('All');
-    setMaxAgeFilter('13days');
-    setSortBy('date');
-    setCurrentPage(1);
-  };
-
-  const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date' || sortDirection !== 'desc';
-
-  const handleRunScraper = async () => {
-    if (typeof onTriggerScrape === 'function') {
-      onTriggerScrape();
-      return;
-    }
-    setScrapeElapsedSeconds(0);
-    setScraping(true);
-    setScrapeSuccess(false);
-    setScrapedCount(null);
-
-    try {
-      const endpoint = `${SCRAPER_BASE_URL}/api/refresh`;
-      const queries = currentProfile ? buildQueriesFromProfile(currentProfile) : [];
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries, force: true })
-      });
-      const data = await res.json();
-
-      if (data.success || Array.isArray(data.jobs)) {
-        const count = data.jobs ? data.jobs.length : (data.count || 25);
-        setScrapedCount(count);
-        setScrapeSuccess(true);
-        setTimeout(() => setScrapeSuccess(false), 5000);
-      } else {
-        setScrapedCount(22);
-        setScrapeSuccess(true);
-        setTimeout(() => setScrapeSuccess(false), 5000);
-      }
-    } catch (err) {
-      console.warn("Backend scraper call fallback:", err);
-      setScrapedCount(24);
-      setScrapeSuccess(true);
-      setTimeout(() => setScrapeSuccess(false), 4000);
-    } finally {
-      setScraping(false);
-    }
-  };
-
-
-  const scrapeRemainingSec = Math.max(0, ESTIMATED_SCRAPE_DURATION_SEC - scrapeElapsedSeconds);
-  const scrapeProgressPercent = Math.min(95, Math.round((scrapeElapsedSeconds / ESTIMATED_SCRAPE_DURATION_SEC) * 100));
-
-  const startJobNum = seekerJobs.length === 0 ? 0 : (currentPage - 1) * (pageSize === 'All' ? seekerJobs.length : Number(pageSize)) + 1;
-  const endJobNum = pageSize === 'All' ? seekerJobs.length : Math.min(seekerJobs.length, currentPage * Number(pageSize));
-
-  const STREAM_TAB_DEFINITIONS = [
-    { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
-    { id: 'SmartSuggestions', name: '🎯 SMART SUGGESTIONS', icon: Target, color: 'emerald', highlight: true },
-
-    { id: 'Custom', name: '✨ CUSTOM JOBS', icon: Sparkles, color: 'purple', highlight: true },
-    { id: 'Starred', name: '⭐ SAVED', icon: Star, color: 'amber', highlight: true },
-    { id: 'TopFit', name: '🔥 TOP MATCHES', icon: Flame, color: 'rose', highlight: true },
-    { id: 'QuickApply', name: '⚡ AUTO-APPLY (LINKEDIN & SEEK)', icon: Zap, color: 'indigo', highlight: true },
-    { id: 'ReadyForSubmission', name: '📄 GENERATED (CV & COVER LETTER)', icon: FileText, color: 'emerald', highlight: true },
-    { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
-    { id: 'Finance & Accounting', name: 'FINANCE & BANKING', icon: TrendingUp, color: 'emerald' },
-    { id: 'Marketing & Sales', name: 'MARKETING & GROWTH', icon: Megaphone, color: 'amber' },
-    { id: 'Construction & Trades', name: 'CONSTRUCTION & TRADES', icon: HardHat, color: 'orange' },
-    { id: 'HR & Operations', name: 'HR & PEOPLE OPS', icon: Users, color: 'purple' },
-    { id: 'Legal & Governance', name: 'LEGAL & COMPLIANCE', icon: Scale, color: 'blue' },
-    { id: 'Tech & Software', name: 'TECH & SOFTWARE', icon: Server, color: 'sky' },
-    { id: 'Gov & Public Sector', name: 'GOV & PUBLIC SECTOR', icon: Building2, color: 'slate' },
-    { id: 'Field Tech & Labour', name: 'FIELD TECH & LABOUR', icon: Wrench, color: 'teal' },
-    { id: 'Education & Training', name: 'EDUCATION & TRAINING', icon: GraduationCap, color: 'indigo' },
-    { id: 'MissingData', name: '⚠️ MISSING DATA', icon: AlertCircle, color: 'amber', highlight: true },
-    { id: 'Rejected Jobs', name: 'REJECTED JOBS', icon: Trash2, color: 'rose' },
-  ];
-
-
-  return (
-    <div className="space-y-6 font-sans">
-      {/* Ambient Live Background Scraper Progress Notification */}
-      {scrapeProgress?.isActive && seekerJobs.length > 0 && (
-        <div className="bg-slate-900 border-2 border-indigo-500/60 rounded-2xl p-4 text-white shadow-xl font-mono flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-600/30 text-indigo-300 rounded-xl border border-indigo-400/50 animate-pulse shrink-0">
-              <RefreshCw size={18} className="animate-spin text-indigo-400" />
-            </div>
-            <div>
-              <div className="text-xs font-black text-white flex items-center gap-2">
-                <span>⚡ LIVE BACKGROUND SCRAPER ACTIVE</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-500/40">
-                  {seekerJobs.length} CACHED ROLES READY
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                {scrapeProgress.stage || 'Scanning employment boards across SEEK, LinkedIn & Indeed in background...'}
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full md:w-72 space-y-1.5 shrink-0">
-            <div className="flex justify-between text-[10px] text-slate-400 font-bold">
-              <span>DISCOVERY PROGRESS</span>
-              <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
-            </div>
-            <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-              <div 
-                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-300"
-                style={{ width: `${scrapeProgress.percent}%` }}
-              />
-            </div>
-            <div className="text-[9px] text-slate-500 flex justify-between">
-              <span>ELAPSED: {scrapeProgress.elapsedSec}s</span>
-              <span>ESTIMATED: ~15s</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top Command Banner with Live Scraper Progress Bar */}
-      <div className="obsidian-card rounded-2xl p-4 sm:p-5 text-white border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl relative overflow-hidden">
-
-        {scraping && (
-          <div 
-            className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
-            style={{ width: `${scrapeProgressPercent}%` }}
-          />
-        )}
-
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-500/30">
-            <Sparkles size={11} className="text-amber-400" /> SOURCING & ASSET ATELIER // ACTIVE
-          </div>
-          <h2 className="text-lg sm:text-xl font-editorial font-bold tracking-tight text-[#fbf9f4]">Curated Opportunities & Application Folios</h2>
-          <p className="text-[11px] text-stone-400 font-humanist max-w-2xl">
-            Bespoke cover letters, tailored resumes, and direct 1-click submission channels.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {/* Dedicated Filter Button: Only Generated Cover Letter & Resume */}
-          <button
-            onClick={() => {
-              setDocsReadyFilter(!docsReadyFilter);
-              setCurrentPage(1);
-            }}
-            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-mono font-black text-xs transition-all cursor-pointer border shadow-sm active:scale-95 ${
-              docsReadyFilter
-                ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50 shadow-emerald-500/25'
-                : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40'
-            }`}
-            title="Refine job ads only to positions that have had custom Cover Letter & Resume generated"
-          >
-            <FileText size={13} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
-            <span>{docsReadyFilter ? "SHOWING GENERATED ONLY" : "GENERATED PACKAGES ONLY"}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
-            }`}>
-              {readyToSubmitCount}
-            </span>
-          </button>
-
-          {onOpenBatchApply && (
-            <button
-              onClick={onOpenBatchApply}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-mono font-black text-xs transition-all cursor-pointer border border-emerald-300 shadow-sm active:scale-95"
-              title="Open 1-Click Batch Auto-Apply Dispatcher"
-            >
-              <Zap size={13} className="text-slate-950 fill-slate-950" />
-              <span>BATCH APPLY</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer active:scale-95"
-          >
-            {showSidebar ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-            <span>{showSidebar ? "HIDE SIDEBAR" : "SHOW SIDEBAR"}</span>
-          </button>
-
-          <button
-            onClick={handleRunScraper}
-            disabled={scraping}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all disabled:opacity-80 cursor-pointer min-w-[190px] active:scale-95"
-          >
-            <RefreshCw size={13} className={scraping ? "animate-spin text-indigo-200" : ""} />
-            {scraping ? (
-              <span>SCRAPING... ({scrapeElapsedSeconds}s)</span>
-            ) : (
-              <span>RUN SCRAPERS</span>
-            )}
-          </button>
-        </div>
-      </div>
-
-
-      {scrapeSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-mono font-bold flex items-center gap-2 animate-in fade-in duration-200">
-          <CheckCircle2 size={16} className="text-emerald-600" />
-          SCRAPER SUCCESS // FETCHED {scrapedCount || 25} POSTINGS FROM SEEK & TARGET BOARDS.
-        </div>
-      )}
-
-
-      {/* 2-Column Workspace Layout (Left Sidebar + Right Main Grid) */}
-      <div className="flex flex-col lg:flex-row items-start gap-3.5" ref={gridTopRef}>
-        {/* Left Column Sidebar */}
-        {showSidebar && (
-          <TopMatchesSidebar 
-            jobs={jobs} 
-            onSelectJob={onSelectJob} 
-            onOpenGenerator={(job) => setSelectedForGenerator(job)} 
-            baseLocation={baseLocation}
-          />
-        )}
-
-        {/* Right Main Content */}
-        <div className="flex-1 space-y-3.5 w-full">
-          {/* Stream Quick Tabs Container */}
-          <div className="bg-slate-900 p-2.5 sm:p-3 rounded-2xl border-2 border-slate-800 shadow-md font-mono flex flex-wrap items-center gap-2">
-            {STREAM_TAB_DEFINITIONS.map(tab => {
-              const TabIcon = tab.icon;
-              const isActive = activeStreamTab === tab.id;
-              const count = streamCounts[tab.id] || 0;
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleSelectStreamTab(tab.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-md border border-indigo-400/50'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-                  }`}
-                >
-                  <TabIcon size={14} className={isActive ? "text-white" : "text-indigo-400"} /> 
-                  <span>{tab.name}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                    isActive ? 'bg-white text-indigo-900 font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active Recommendation Rules Feedback Bar */}
-          {(userPrefs?.boostedTerms?.length > 0 || userPrefs?.demotedTerms?.length > 0 || userPrefs?.boostedCompanies?.length > 0 || userPrefs?.demotedCompanies?.length > 0) && (
-            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/40 text-xs font-mono text-indigo-200 shadow-md">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-black text-indigo-300 flex items-center gap-1.5 text-[11px]">
-                  <Sparkles size={13} className="text-indigo-400" /> ACTIVE PREFERENCES:
-                </span>
-                {userPrefs.boostedCompanies?.slice(0, 3).map((c, i) => (
-                  <span key={`bc-${i}`} className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
-                    👍 +{c.toUpperCase()}
-                  </span>
-                ))}
-                {userPrefs.boostedTerms?.slice(0, 4).map((t, i) => (
-                  <span key={`bt-${i}`} className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
-                    👍 +{t}
-                  </span>
-                ))}
-                {userPrefs.demotedCompanies?.slice(0, 2).map((c, i) => (
-                  <span key={`dc-${i}`} className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
-                    👎 -{c.toUpperCase()}
-                  </span>
-                ))}
-                {userPrefs.demotedTerms?.slice(0, 3).map((t, i) => (
-                  <span key={`dt-${i}`} className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
-                    👎 -{t}
-                  </span>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  resetUserPreferences();
-                  setUserPrefs(getUserPreferences());
-                  setPrefToast('Preferences reset to default ranking.');
-                  setTimeout(() => setPrefToast(null), 3000);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[10px] border border-slate-700 transition-colors cursor-pointer"
-              >
-                Reset Preferences
-              </button>
-            </div>
-          )}
-
-          {/* Toast Notification */}
-          {prefToast && (
-            <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-slate-900 text-white border border-indigo-500 shadow-2xl flex items-center gap-3 font-mono text-xs font-bold animate-in fade-in slide-in-from-bottom duration-200">
-              <Sparkles size={16} className="text-indigo-400 animate-pulse" />
-              <span>{prefToast}</span>
-            </div>
-          )}
-
-          {/* Role Targeting & Intelligent Multi-Sector Filter Bar */}
-          <RoleFilterBar
-            roleArchetypeCounts={roleArchetypeCounts}
-            selectedRoleIds={selectedRoleIds}
-            onSelectRole={handleSelectRole}
-            onSelectAll={handleSelectAllRoles}
-            onClearRoles={handleClearRoles}
-            onResetToProfile={handleResetToProfile}
-            onSelectDomain={handleSelectDomain}
-            currentProfile={currentProfile}
-            profileAutoRoles={profileAutoRoles}
-            customRoles={customRoles}
-            onAddCustomRole={handleAddCustomRole}
-            onRemoveCustomRole={handleRemoveCustomRole}
-            totalJobsCount={unsubmittedJobs.length}
-          />
-
-          {/* Obsidian Theme Refinement Console */}
-          <div className="obsidian-card p-3.5 sm:p-4 rounded-2xl border border-slate-800/80 shadow-xl space-y-3 font-mono">
-
-            <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-              {/* Main Keyword Search */}
-              <div className="relative flex-1 w-full">
-                <Search size={16} className="absolute left-3.5 top-3 text-indigo-400" />
-                <input
-                  type="text"
-                  placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
-                  className="w-full pl-10 pr-3 py-2.5 border border-slate-700/80 rounded-xl bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-
-              {/* Ready for Submission Filter Toggle */}
-              <button
-                onClick={() => {
-                  setDocsReadyFilter(!docsReadyFilter);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
-                  docsReadyFilter
-                    ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md ring-2 ring-emerald-500/40'
-                    : 'bg-slate-900/90 text-emerald-400 border-emerald-500/40 hover:bg-emerald-950/40'
-                }`}
-                title="Filter positions where custom ATS Resume and Cover Letter have been generated"
-              >
-                <Sparkles size={14} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
-                <span>READY FOR SUBMISSION</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
-                  docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
-                }`}>
-                  {readyToSubmitCount}
-                </span>
-              </button>
-
-              {/* View Custom Jobs Quick Button */}
-              <button
-                onClick={() => {
-                  setActiveStreamTab(activeStreamTab === 'Custom' ? 'All' : 'Custom');
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
-                  activeStreamTab === 'Custom'
-                    ? 'bg-purple-600 text-white border-purple-400 shadow-md ring-2 ring-purple-500/40'
-                    : 'bg-slate-900/90 text-purple-300 border-purple-500/40 hover:bg-purple-950/40'
-                }`}
-                title="Filter to view all custom generated jobs"
-              >
-                <Sparkles size={14} className={activeStreamTab === 'Custom' ? "text-white" : "text-purple-400"} />
-                <span>MY CUSTOM JOBS</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
-                  activeStreamTab === 'Custom' ? 'bg-slate-950 text-purple-300' : 'bg-purple-500/20 text-purple-300 border border-purple-400/40'
-                }`}>
-                  {streamCounts.Custom || 0}
-                </span>
-              </button>
-
-              {/* Sort By Dropdown (Defaults to Most Recent) */}
-              <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 font-bold w-full md:w-auto shrink-0 hover:border-indigo-500/50 transition-colors">
-                <ArrowUpDown size={14} className="text-indigo-400 shrink-0" />
-                <span className="text-slate-400 uppercase text-[10px]">SORT:</span>
-                <select
-                  className="bg-transparent focus:outline-none text-xs font-mono font-bold text-slate-100 cursor-pointer"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option className="bg-slate-900 text-slate-200" value="date">MOST RECENT (NEWEST FIRST)</option>
-                  <option className="bg-slate-900 text-slate-200" value="best_and_newest">⭐ BEST & MOST RECENT</option>
-                  <option className="bg-slate-900 text-slate-200" value="score">MATCH SCORE (HIGH → LOW)</option>
-                  <option className="bg-slate-900 text-slate-200" value="company">COMPANY (A-Z)</option>
-                </select>
-                {sortBy === 'date' || sortBy === 'best_and_newest' ? (
-                  <button
-                    type="button"
-                    onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
-                    className="inline-flex items-center gap-1 rounded-lg border border-indigo-500/40 bg-indigo-950/60 px-2 py-1 text-[10px] font-black text-indigo-300 hover:bg-indigo-900/60 cursor-pointer transition-colors"
-                    title={`Reverse posting order: currently ${sortDirection === 'desc' ? 'newest first' : 'oldest first'}`}
-                  >
-                    {sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑'}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Multi-Filter Dropdown Matrix */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-2 border-t border-slate-800/80">
-              {/* Distance Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
-                <Navigation size={13} className="text-emerald-400 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
-                  value={maxDistanceFilter}
-                  onChange={(e) => setMaxDistanceFilter(e.target.value)}
-                >
-                  <option className="bg-slate-900 text-slate-200" value="All">ALL DISTANCES</option>
-                  <option className="bg-slate-900 text-slate-200" value="5km">&lt; 5 KM ({(currentProfile?.suburb || 'LOCAL').toUpperCase()} &amp; NEIGHBORS)</option>
-                  <option className="bg-slate-900 text-slate-200" value="10km">&lt; 10 KM (CBD &amp; COMMUTE)</option>
-                  <option className="bg-slate-900 text-slate-200" value="25km">&lt; 25 KM (METRO MELBOURNE)</option>
-                </select>
-              </div>
-
-              {/* Strict Max Age Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
-                <Clock size={13} className="text-indigo-400 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
-                  value={maxAgeFilter}
-                  onChange={(e) => setMaxAgeFilter(e.target.value)}
-                >
-                  <option className="bg-slate-900 text-slate-200" value="13days">MAX 13 DAYS OLD (ACTIVE)</option>
-                  <option className="bg-slate-900 text-slate-200" value="7days">MAX 7 DAYS OLD</option>
-                  <option className="bg-slate-900 text-slate-200" value="3days">MAX 3 DAYS OLD</option>
-                  <option className="bg-slate-900 text-slate-200" value="All">ALL DATES (NO EXPIRY)</option>
-                </select>
-              </div>
-
-              {/* Source Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
-                <Filter size={13} className="text-slate-400 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
-                  value={sourceFilter}
-                  onChange={(e) => setSourceFilter(e.target.value)}
-                >
-                  {sources.map(s => <option className="bg-slate-900 text-slate-200" key={s} value={s}>{s === 'All' ? 'ALL SOURCES' : s.toUpperCase()}</option>)}
-                </select>
-              </div>
-
-              {/* Min Score Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
-                <Award size={13} className="text-emerald-400 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
-                  value={minScoreFilter}
-                  onChange={(e) => setMinScoreFilter(e.target.value)}
-                >
-                  <option className="bg-slate-900 text-slate-200" value="All">ALL SCORES</option>
-                  <option className="bg-slate-900 text-slate-200" value="80+">80%+ HIGH MATCH</option>
-                  <option className="bg-slate-900 text-slate-200" value="70+">70%+ GOOD MATCH</option>
-                </select>
-              </div>
-
-              {/* Salary Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
-                <DollarSign size={13} className="text-emerald-400 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
-                  value={minSalaryFilter}
-                  onChange={(e) => setMinSalaryFilter(e.target.value)}
-                >
-                  <option className="bg-slate-900 text-slate-200" value="All">ALL SALARIES</option>
-                  <option className="bg-slate-900 text-slate-200" value="100k+">$100K+ SALARY</option>
-                  <option className="bg-slate-900 text-slate-200" value="70k+">$70K+ SALARY</option>
-                </select>
-              </div>
-
-              {/* Work Mode Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold hover:border-purple-500/50 transition-colors">
-                <MapPin size={13} className="text-purple-400 shrink-0" />
-                <select
-                  className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
-                  value={workModeFilter}
-                  onChange={(e) => setWorkModeFilter(e.target.value)}
-                >
-                  <option className="bg-slate-900 text-slate-200" value="All">ALL WORK MODES</option>
-                  <option className="bg-slate-900 text-slate-200" value="remote">REMOTE / HYBRID</option>
-                  <option className="bg-slate-900 text-slate-200" value="onsite">ONSITE</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Active Filter & Page Size Selector Bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-mono gap-2 pt-2 text-slate-400 border-t border-slate-800/80">
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal size={13} className="text-indigo-400" />
-                <span>SHOWING <strong className="text-white">{startJobNum}-{endJobNum}</strong> OF <strong className="text-white">{seekerJobs.length}</strong> PREPARED POSITIONS</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-[11px]">
-                  <span className="text-slate-400 uppercase">PAGE SIZE:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => { setPageSize(e.target.value); setCurrentPage(1); }}
-                    className="bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-0.5 font-extrabold text-slate-200 focus:outline-none cursor-pointer"
-                  >
-                    <option className="bg-slate-900 text-slate-200" value="24">24 / PAGE</option>
-                    <option className="bg-slate-900 text-slate-200" value="48">48 / PAGE (DEFAULT)</option>
-                    <option className="bg-slate-900 text-slate-200" value="96">96 / PAGE</option>
-                    <option className="bg-slate-900 text-slate-200" value="All">SHOW ALL ({seekerJobs.length})</option>
-                  </select>
-                </div>
-
-                {isFiltered && (
-                  <button
-                    onClick={resetAllFilters}
-                    className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
-                  >
-                    <RotateCcw size={12} /> RESET ALL
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-
-          {/* Dynamic & High-Impact Job Cards Grid */}
-          {seekerJobs.length === 0 ? (
-            scrapeProgress?.isActive ? (
-              <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-8 sm:p-12 text-center text-white space-y-6 shadow-2xl font-mono animate-in fade-in duration-300">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center shadow-lg">
-                  <RefreshCw size={28} className="animate-spin text-indigo-400" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">
-                    SCANNING LIVE EMPLOYMENT GATEWAYS
-                  </h2>
-                  <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                    Autonomous scrapers are indexing positions tailored to your profile (<span className="text-indigo-300 font-bold">{currentProfile?.industry || 'Technology'}</span>). Matching opportunities will appear below immediately upon completion.
-                  </p>
-                </div>
-
-                {/* Active Progress Bar */}
-                <div className="max-w-md mx-auto space-y-2.5 bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-inner">
-                  <div className="flex justify-between text-xs text-slate-300 font-bold">
-                    <span className="flex items-center gap-1.5 truncate max-w-[280px]">
-                      <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse shrink-0" />
-                      <span className="truncate">{scrapeProgress.stage || 'Scanning Gateways...'}</span>
-                    </span>
-                    <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
-                  </div>
-                  <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                    <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-300"
-                      style={{ width: `${scrapeProgress.percent}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-slate-500 flex justify-between">
-                    <span>ELAPSED: {scrapeProgress.elapsedSec}s</span>
-                    <span>ESTIMATED DURATION: ~15s</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl p-8 border border-amber-200 bg-amber-50/40 text-amber-950 font-mono shadow-2xs space-y-4 animate-in fade-in duration-200">
-                <div className="flex items-start gap-3">
-                  <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0 border border-amber-300">
-                    <AlertCircle size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-extrabold uppercase tracking-wider text-amber-950">FILTER DIAGNOSTIC // 0 MATCHES RETURNED</h4>
-                    <p className="text-xs font-bold text-amber-900 mt-1 leading-relaxed">
-                      {filterDiagnostic?.summaryText}.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 1-Click Quick Resolution Buttons */}
-                <div className="pt-3 border-t border-amber-200/80 flex flex-wrap items-center gap-2 text-xs font-bold">
-                  <span className="text-[11px] text-amber-800 uppercase tracking-wider font-extrabold mr-1">QUICK RESOLUTIONS:</span>
-                  
-                  {filterDiagnostic?.hasDistanceFilter && (
-                    <button
-                      onClick={() => setMaxDistanceFilter('10km')}
-                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                    >
-                      WIDEN DISTANCE TO &lt; 10 KM
-                    </button>
-                  )}
-
-                  {filterDiagnostic?.hasStreamFilter && (
-                    <button
-                      onClick={() => setActiveStreamTab('All')}
-                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                    >
-                      SWITCH TO ALL STREAMS
-                    </button>
-                  )}
-
-                  {filterDiagnostic?.hasAgeFilter && (
-                    <button
-                      onClick={() => setMaxAgeFilter('All')}
-                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                    >
-                      SHOW ALL DATES (NO 13-DAY LIMIT)
-                    </button>
-                  )}
-
-                  {filterDiagnostic?.hasSearchFilter && (
-                    <button
-                      onClick={() => setSearch('')}
-                      className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
-                    >
-                      CLEAR SEARCH KEYWORD
-                    </button>
-                  )}
-
-                  <button
-                    onClick={resetAllFilters}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors cursor-pointer ml-auto"
-                  >
-                    <RotateCcw size={12} className="inline mr-1" /> RESET ALL FILTERS
-                  </button>
-                </div>
-              </div>
-            )
-          ) : (
-
-            <div className="space-y-6">
-              {paginatedJobs.length === 0 ? (
-                <EmptyState
-                  icon={Bot}
-                  title="No jobs found in this view"
-                  description="Try adjusting your filters, selecting a different tab, or running the scraper to find new opportunities."
-                  className="bg-white/50 dark:bg-slate-900/40 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800"
-                  action={
-                    <button
-                      type="button"
-                      onClick={resetAllFilters}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold font-mono transition-colors shadow-xs"
-                    >
-                      Reset All Filters
-                    </button>
-                  }
-                />
-              ) : (
-                <div className={`grid gap-4 sm:gap-5 ${showSidebar ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-4 4xl:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6'}`}>
-                  {paginatedJobs.map(job => {
-                    const isGeneratingThisJob = Boolean(
-                      asyncGeneratingIds?.has?.(job.id) || 
-                      asyncGeneratingIds?.has?.(String(job.id)) || 
-                      asyncGeneratingIds?.has?.(`${job.company}_${job.title}`)
-                    );
-                    const hasCustomDocs = hasGeneratedApplicationDocs(job);
-                    const isTopFit = (job.score || 0) >= 85;
-
-                    return (
-                      <motion.div
-                        key={job.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onClick={() => onSelectJob(job)}
-                      className={`rounded-2xl p-5 sm:p-5.5 transition-all duration-300 flex flex-col justify-between space-y-3.5 group cursor-pointer relative overflow-hidden card-hover-lift backdrop-blur-xl ${
-                        hasCustomDocs
-                          ? 'obsidian-card-teal border border-teal-500/50 shadow-lg shadow-teal-950/30 ring-1 ring-teal-500/30'
-                          : isGeneratingThisJob
-                          ? 'obsidian-card-amber border border-amber-500/60 shadow-xl shadow-amber-950/40 ring-2 ring-amber-400/40 animate-pulse'
-                          : isTopFit
-                          ? 'obsidian-card-emerald border border-emerald-500/50 shadow-lg shadow-emerald-950/30 ring-1 ring-emerald-500/30'
-                          : 'obsidian-card hover:border-amber-500/50'
-                      }`}
-                    >
-                      {/* Top Gradient Accent Line */}
-                      <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${
-                        hasCustomDocs
-                          ? 'bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-500'
-                          : isTopFit
-                          ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400'
-                          : 'bg-gradient-to-r from-amber-600/70 via-stone-600/50 to-amber-700/70'
-                      }`} />
-
-                      {/* Top Header: Badges + Star + Kebab Action Menu */}
-                      <div className="flex items-start justify-between gap-2 pt-0.5">
-                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                          {isGeneratingThisJob ? (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider shadow-sm animate-pulse">
-                              <RefreshCw size={12} className="animate-spin text-slate-950" />
-                              ⚡ SYNTHESIZING...
-                            </div>
-                          ) : hasCustomDocs ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-teal-500 text-slate-950 uppercase tracking-wider shadow-2xs">
-                              <CheckCircle2 size={12} className="text-slate-950" />
-                              ✨ READY (PDFs)
-                            </div>
-                          ) : isTopFit ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
-                              <Flame size={12} className="text-amber-950 fill-amber-950" />
-                              🏆 TOP FIT
-                            </div>
-                          ) : null}
-
-                          {isQuickApplyEligible(job) && (
-                            <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border shadow-2xs ${
-                              (job.source || '').toLowerCase().includes('linkedin') || (job.link || '').toLowerCase().includes('linkedin')
-                                ? 'bg-sky-950 text-sky-300 border-sky-500/50'
-                                : (job.source || '').toLowerCase().includes('seek') || (job.link || '').toLowerCase().includes('seek')
-                                ? 'bg-rose-950 text-rose-300 border-rose-500/50'
-                                : 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
-                            }`}>
-                              <Zap size={10} className="text-amber-400 fill-amber-400 animate-pulse" />
-                              <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Top Right Cluster: Star + Kebab Menu */}
-                        <div className="flex items-center gap-1 shrink-0 relative">
-                          <button
-                            type="button"
-                            onClick={(e) => toggleStar(job.id || `${job.company}_${job.title}`, e)}
-                            className={`p-1.5 rounded-full transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25' : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'}`}
-                            title={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "Remove from Saved" : "Save Job"}
-                          >
-                            <Star size={16} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-400" : ""} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const cId = job.id || `${job.company}_${job.title}`;
-                              setOpenKebabJobId(prev => prev === cId ? null : cId);
-                            }}
-                            className="p-1.5 rounded-xl hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-                            title="More Actions"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-
-                          {/* Kebab Popover Menu */}
-                          {openKebabJobId === (job.id || `${job.company}_${job.title}`) && (
-                            <div 
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 top-full mt-1 w-60 bg-slate-900/95 backdrop-blur-xl border border-slate-700/90 rounded-2xl shadow-2xl p-1.5 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenKebabJobId(null);
-                                  setSelectedAutoApplyJob(job);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
-                              >
-                                <Zap size={14} className="text-amber-400 shrink-0" />
-                                <span>Launch Auto-Apply</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenKebabJobId(null);
-                                  setPsychologyJob({ ...job, psychologyInsights: getCachedPsychology(job) });
-                                }}
-                                className="w-full px-3 py-2 rounded-xl hover:bg-teal-950 text-slate-200 hover:text-teal-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
-                              >
-                                <Sparkles size={14} className="text-teal-400 shrink-0" />
-                                <span>{getCachedPsychology(job) ? 'View Psychology' : 'Decode Psychology'}</span>
-                              </button>
-
-                              {onOpenCheatSheet && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenKebabJobId(null);
-                                    onOpenCheatSheet(job);
-                                  }}
-                                  className="w-full px-3 py-2 rounded-xl hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
-                                >
-                                  <Compass size={14} className="text-amber-400 shrink-0" />
-                                  <span>Interview Cheat Sheet</span>
-                                </button>
-                              )}
-
-                              {hasCustomDocs && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenKebabJobId(null);
-                                      downloadResumePdf(job.resumeText, job, currentProfile);
-                                    }}
-                                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-950 text-slate-200 hover:text-emerald-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
-                                  >
-                                    <Download size={14} className="text-emerald-400 shrink-0" />
-                                    <span>Download Resume (PDF)</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenKebabJobId(null);
-                                      downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
-                                    }}
-                                    className="w-full px-3 py-2 rounded-xl hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
-                                  >
-                                    <Download size={14} className="text-indigo-400 shrink-0" />
-                                    <span>Download Cover (PDF)</span>
-                                  </button>
-                                </>
-                              )}
-
-                              <div className="pt-1 border-t border-slate-800 space-y-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenKebabJobId(null);
-                                    handlePromote(job);
-                                  }}
-                                  className={`w-full px-3 py-1.5 rounded-xl flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
-                                    isJobPromoted(job) ? 'bg-emerald-950 text-emerald-300 font-bold' : 'hover:bg-slate-800 text-slate-300'
-                                  }`}
-                                >
-                                  <ThumbsUp size={13} className={isJobPromoted(job) ? 'text-emerald-400 fill-emerald-400' : 'text-slate-400'} />
-                                  <span>More Like This</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenKebabJobId(null);
-                                    handleDemote(job);
-                                  }}
-                                  className={`w-full px-3 py-1.5 rounded-xl flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
-                                    isJobDemoted(job) ? 'bg-rose-950 text-rose-300 font-bold' : 'hover:bg-slate-800 text-slate-300'
-                                  }`}
-                                >
-                                  <ThumbsDown size={13} className={isJobDemoted(job) ? 'text-rose-400 fill-rose-400' : 'text-slate-400'} />
-                                  <span>Less Like This</span>
-                                </button>
-                              </div>
-
-                              {(job.portalLink || job.link || job.url) && (
-                                <a
-                                  href={job.portalLink || job.link || job.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={() => setOpenKebabJobId(null)}
-                                  className="w-full px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2.5 transition-colors text-left cursor-pointer border-t border-slate-800"
-                                >
-                                  <ExternalLink size={13} className="text-slate-400 shrink-0" />
-                                  <span>Open Original Listing</span>
-                                </a>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenKebabJobId(null);
-                                  if (job.isRejected) {
-                                    if (onUnrejectJob) onUnrejectJob(job.id || `${job.company}_${job.title}`);
-                                  } else {
-                                    if (onRejectJob) onRejectJob(job.id || `${job.company}_${job.title}`);
-                                  }
-                                }}
-                                className="w-full px-3 py-2 rounded-xl hover:bg-rose-950/60 text-rose-300 flex items-center gap-2.5 transition-colors text-left border-t border-slate-800 cursor-pointer"
-                              >
-                                <Trash2 size={13} className="text-rose-400 shrink-0" />
-                                <span>{job.isRejected ? 'Restore Job' : 'Dismiss / Reject'}</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Score & Source Bar */}
-                      <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-semibold border ${
-                          isTopFit 
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
-                            : (job.score || 0) >= 80
-                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                            : 'bg-stone-900/90 text-stone-300 border-stone-800'
-                        }`}>
-                          <Award size={13} className={isTopFit ? "text-emerald-400" : "text-amber-400"} aria-hidden="true" />
-                          {job.score || 85}% match
-                        </span>
-
-                        <div className="flex items-center gap-2 text-stone-400">
-                          {job.source && (
-                            <span className="type-meta px-2 py-0.5 rounded-full bg-stone-900/80 text-stone-300 border border-stone-800">
-                              {job.source}
-                            </span>
-                          )}
-                          <span className="type-meta text-stone-400 flex items-center gap-1">
-                            <Clock size={11} aria-hidden="true" /> {formatJobPostedAge(job.date)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Title & Company */}
-                      <div className="space-y-1">
-                        {(() => {
-                          const jobUrl = job.portalLink || job.link || job.url;
-                          return (
-                            <>
-                              {jobUrl ? (
-                                <a
-                                  href={jobUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  aria-label={`${job.title} at ${job.company} — open job posting (new tab)`}
-                                  className="type-heading text-base text-[#fbf9f4] hover:text-amber-400 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
-                                >
-                                  <span className="leading-snug">{job.title}</span>
-                                  <ExternalLink size={13} className="text-stone-400 group-hover/title:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-                                </a>
-                              ) : (
-                                <h3 className="type-heading text-base text-[#fbf9f4] leading-snug">
-                                  {job.title}
-                                </h3>
-                              )}
-
-                              <p className="type-meta text-stone-400 flex items-center gap-1.5 flex-wrap">
-                                <Building2 size={12} className="text-amber-400/80 shrink-0" aria-hidden="true" />
-                                <span className="font-semibold text-stone-200">{job.company}</span>
-                                <span className="text-stone-600" aria-hidden="true">•</span>
-                                <MapPin size={11} className="text-stone-400 shrink-0" aria-hidden="true" />
-                                <span className="truncate">{job.location || 'Australia'}</span>
-                              </p>
-                            </>
-                          );
-                        })()}
-                      </div>
-
-                      {/* Salary & Work Arrangement Chips */}
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        {job.salary && (
-                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-950/70 text-emerald-300 border border-emerald-500/30">
-                            <DollarSign size={12} className="text-emerald-400" />
-                            <span>{job.salary}</span>
-                          </div>
-                        )}
-                        {job.workArrangement && (
-                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                            job.workArrangement === 'Remote' 
-                              ? 'bg-purple-950/60 text-purple-300 border-purple-500/30'
-                              : job.workArrangement === 'Hybrid'
-                              ? 'bg-blue-950/60 text-blue-300 border-blue-500/30'
-                              : 'bg-slate-800/80 text-slate-300 border-slate-700/80'
-                          }`}>
-                            <Building2 size={10} />
-                            <span>{job.workArrangement}</span>
-                          </div>
-                        )}
-                        {job.employmentType && (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-300 border border-slate-700/80">
-                            <Briefcase size={10} className="text-indigo-400" />
-                            <span>{job.employmentType}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Commute Summary Pill */}
-                      {(() => {
-                        const commute = getCommuteDetails(baseLocation, job.location);
-                        if (commute.isRemote) {
-                          return (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-[10px] text-emerald-300 font-mono font-bold">
-                              <Sparkles size={11} className="text-emerald-400" />
-                              <span>100% REMOTE • 0 MIN COMMUTE</span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono space-y-1">
-                            <div className="flex items-center justify-between text-slate-300 font-bold px-1">
-                              <span className="flex items-center gap-1 text-indigo-400">
-                                <Navigation size={10} />
-                                {commute.distanceKm}KM COMMUTE:
-                              </span>
-                              <span className={commute.car.tolls.hasTolls ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
-                                {commute.car.tolls.hasTolls ? `Tolls: ${commute.car.tolls.estimatedCost}` : 'Toll-Free'}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1 text-[9px] text-center">
-                              <span className="p-1 rounded bg-slate-900 border border-slate-800 text-indigo-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
-                                <Train size={9} /> {commute.transit.durationMin}m Train
-                              </span>
-                              <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5">
-                                <Car size={9} /> {commute.car.peakMin}m Peak
-                              </span>
-                              <span className="p-1 rounded bg-slate-900 border border-slate-800 text-emerald-300 flex items-center justify-center gap-0.5">
-                                <Bike size={9} /> {commute.bike.durationMin}m Bike
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Streamlined Action Ribbon */}
-                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 font-mono">
-                        {hasCustomDocs ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
-                              }}
-                              className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20 active:scale-95"
-                              title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
-                            >
-                              <CheckCircle2 size={13} className="text-emerald-200" /> 
-                              <span>APPLY</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
-                              className="py-2 px-2.5 rounded-xl font-bold text-xs bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
-                              title="Open in AI Studio to customize"
-                            >
-                              <Sparkles size={13} className="text-emerald-400" />
-                            </button>
-                          </>
-                        ) : isGeneratingThisJob ? (
-                          <button
-                            disabled
-                            className="flex-1 py-2 px-3 rounded-xl font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 shadow-inner cursor-not-allowed font-mono animate-pulse"
-                          >
-                            <RefreshCw size={12} className="animate-spin text-slate-950" />
-                            <span>SYNTHESIZING…</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onDispatchAsyncApplication) {
-                                onDispatchAsyncApplication(job);
-                              } else {
-                                setSelectedForGenerator(job);
-                              }
-                            }}
-                            className="flex-1 py-2 px-3 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 shadow-md shadow-amber-950/40 tracking-wide uppercase active:scale-95"
-                            title="Generate Tailored Resume & Cover Letter"
-                          >
-                            <Sparkles size={12} className="text-slate-950" />
-                            <span>PREP DOCS</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
-                          className="py-2 px-3.5 rounded-xl bg-stone-900/80 hover:bg-stone-800 text-stone-200 font-extrabold text-xs transition-colors border border-amber-500/20 hover:border-amber-500/40 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                          title="View Full Details"
-                        >
-                          <Eye size={13} className="text-stone-400" />
-                          <span>DETAILS</span>
-                        </button>
-                      </div>
-                    </motion.div>
-
-                  );
-                })}
-
-              </div>
-              )}
-              {/* Interactive Pagination Navigation Bar */}
-              {pageSize !== 'All' && totalPages > 1 && (
-                <div className="obsidian-card rounded-2xl p-4 border border-slate-800/80 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-slate-300">
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <span>PAGE <strong className="text-white">{currentPage}</strong> OF <strong className="text-white">{totalPages}</strong></span>
-                    <span className="text-slate-500">({seekerJobs.length} TOTAL POSITIONS)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handlePageChange(1)}
-                      disabled={currentPage === 1}
-                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
-                      title="First Page"
-                    >
-                      <ChevronFirst size={15} />
-                    </button>
-
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
-                    >
-                      <ChevronLeft size={15} />
-                    </button>
-                    {/* Numeric Page Buttons */}
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                      .map((pageNum, idx, arr) => {
-
-                        const prevPage = arr[idx - 1];
-                        const showEllipsis = prevPage && pageNum - prevPage > 1;
-
-                        return (
-                          <React.Fragment key={pageNum}>
-                            {showEllipsis && <span className="px-1 text-slate-500">...</span>}
-                            <button
-                              onClick={() => handlePageChange(pageNum)}
-                              className={`px-3 py-1.5 rounded-xl font-extrabold transition-all cursor-pointer ${
-                                currentPage === pageNum
-                                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/50'
-                                  : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/80'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          </React.Fragment>
-                        );
-                      })}
-
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
-                      title="Next Page"
-                    >
-                      <ChevronRight size={15} />
-                    </button>
-
-                    <button
-                      onClick={() => handlePageChange(totalPages)}
-                      disabled={currentPage === totalPages}
-                      className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
-                      title="Last Page"
-                    >
-                      <ChevronLast size={15} />
-                    </button>
-                  </div>
-
-                  {/* Load More Batch Button */}
-                  {currentPage < totalPages && (
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      className="px-4 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 font-extrabold border border-indigo-500/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-                    >
-                      <ArrowDown size={14} className="text-indigo-400" />
-                      LOAD NEXT {Math.min(effectivePageSize, seekerJobs.length - endJobNum)} POSITIONS
-                    </button>
-                  )}
-                </div>
-
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Generator Modal */}
-      {selectedForGenerator && (
-        <SafeErrorBoundary sectionName="Generator Modal" onClose={() => setSelectedForGenerator(null)}>
-          <Suspense fallback={<ModalSkeleton />}>
-            <GeneratorModal 
-              job={selectedForGenerator} 
-              onClose={() => setSelectedForGenerator(null)} 
-              onSaveCustomDocs={onSaveCustomDocs}
-              onUpdateStatus={onJobStatusUpdate}
-            />
-          </Suspense>
-        </SafeErrorBoundary>
-      )}
-
-      {/* Auto-Apply Engine Modal (LinkedIn Easy Apply & SEEK Quick Apply) */}
-      {selectedAutoApplyJob && (
-        <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
-          <Suspense fallback={<ModalSkeleton />}>
-            <AutoApplyModal 
-              job={selectedAutoApplyJob} 
-              onClose={() => setSelectedAutoApplyJob(null)}
-              onJobStatusUpdated={onJobStatusUpdate}
-            />
-          </Suspense>
-        </SafeErrorBoundary>
-      )}
-
-      {/* Psychological Edge & Covert Subtext Decoder Modal */}
-      {psychologyJob && (
-        <SafeErrorBoundary sectionName="Psychology Decoder" onClose={() => setPsychologyJob(null)}>
-          <Suspense fallback={<ModalSkeleton />}>
-            <PsychologyDecoderModal 
-              job={psychologyJob} 
-              onClose={() => setPsychologyJob(null)}
-              onSaveInsights={(id, insights) => {
-                if (onJobStatusUpdate) {
-                  onJobStatusUpdate(id, psychologyJob.status || 'Discovered', { psychologyInsights: insights });
-                }
-              }}
-            />
-          </Suspense>
-        </SafeErrorBoundary>
-      )}
-    </div>
-  );
+ const currentProfile = activeProfile || getActiveProfile();
+ const [search, setSearch] = useState('');
+ const [sourceFilter, setSourceFilter] = useState('All');
+ const [activeStreamTab, setActiveStreamTab] = useState('All');
+ const [starredJobIds, setStarredJobIds] = useState(() => {
+ const saved = localStorage.getItem('starred_jobs');
+ return saved ? JSON.parse(saved) : [];
+ });
+
+ useEffect(() => {
+ localStorage.setItem('starred_jobs', JSON.stringify(starredJobIds));
+ }, [starredJobIds]);
+
+ const toggleStar = (jobId, e) => {
+ if (e) e.stopPropagation();
+ const isNowStarred = !starredJobIds.includes(jobId);
+ setStarredJobIds(prev => isNowStarred ? [...prev, jobId] : prev.filter(id => id !== jobId));
+ if (isNowStarred) {
+ const targetJob = jobs.find(j => (j.id || `${j.company}_${j.title}`) === jobId);
+ if (targetJob) {
+ try {
+ recordJobInteraction(targetJob, 'starred', currentProfile);
+ } catch {}
+ }
+ }
+ };
+ const [docsReadyFilter, setDocsReadyFilter] = useState(false);
+ const [minSalaryFilter, setMinSalaryFilter] = useState('All');
+ const [minScoreFilter, setMinScoreFilter] = useState('All');
+ const [workModeFilter, setWorkModeFilter] = useState('All');
+ const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
+ const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
+ const [sortBy, setSortBy] = useState('date'); // DEFAULT: MOST RECENT (NEWEST) FIRST
+ const [sortDirection, setSortDirection] = useState('desc');
+ const [showSidebar, setShowSidebar] = useState(true);
+
+
+ // Interactive Pagination & Batch Loading State
+ const [currentPage, setCurrentPage] = useState(1);
+ const [pageSize, setPageSize] = useState(48); // 24, 48, 96, 'All'
+ const gridTopRef = useRef(null);
+
+ const [selectedForGenerator, setSelectedForGenerator] = useState(null);
+ const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
+ const [psychologyJob, setPsychologyJob] = useState(null);
+ const [scraping, setScraping] = useState(false);
+ const [scrapeSuccess, setScrapeSuccess] = useState(false);
+ const [scrapedCount, setScrapedCount] = useState(null);
+ 
+ // Live Timer Countdown State
+ const [scrapeElapsedSeconds, setScrapeElapsedSeconds] = useState(0);
+ const ESTIMATED_SCRAPE_DURATION_SEC = 20;
+
+ // User Recommendation Preference State (More/Less Like This)
+ const [userPrefs, setUserPrefs] = useState(() => getUserPreferences());
+ const [prefToast, setPrefToast] = useState(null);
+
+ // Auto-Generated Roles based on Candidate Profile
+ // Unsubmitted jobs pool (strictly genuine scraped ads, discarding email pseudo-jobs)
+ const unsubmittedJobs = useMemo(() => {
+ return (jobs || []).filter(job => {
+ if (job.isRejected) return false;
+
+ // Filter out email conversation pseudo-jobs or corrupted company entries
+ const comp = (job.company || '').toLowerCase();
+ const tit = (job.title || '').toLowerCase();
+ if (
+ comp === 'gmail' ||
+ comp === 'direct employer' ||
+ tit.startsWith('exploring a new opportunity') ||
+ tit.includes('application was sent to') ||
+ tit.includes('application submitted') ||
+ tit.includes('application received') ||
+ tit.includes('invitation to connect')
+ ) {
+ return false;
+ }
+
+ const s = (job.status || 'sourced').toLowerCase();
+ const isProgressed = s.includes('applied') || 
+ s.includes('confirmation') || 
+ s.includes('interview') || 
+ s.includes('offer') || 
+ s.includes('accepted') || 
+ s.includes('under review') || 
+ s.includes('action required') || 
+ s.includes('verification') || 
+ s.includes('unsuccessful') || 
+ s.includes('closed') || 
+ s.includes('rejected') || 
+ s.includes('dismissed') || 
+ s.includes('expired');
+ // Custom jobs that the user manually created should remain visible in the active pool
+ if (job.isCustom || String(job.id || '').startsWith('custom_')) {
+ return true;
+ }
+ return !isProgressed;
+ });
+ }, [jobs]);
+
+ // Complete Jobs vs Incomplete (Missing Data) Jobs
+ const completeJobs = useMemo(() => {
+ return unsubmittedJobs.filter(j => j.isComplete !== false);
+ }, [unsubmittedJobs]);
+
+ const missingDataJobs = useMemo(() => {
+ return unsubmittedJobs.filter(j => j.isComplete === false);
+ }, [unsubmittedJobs]);
+
+ // Manage user-created custom target roles per profile
+ const [customRoles, setCustomRoles] = useState(() => {
+ return getCustomRoles(currentProfile?.id);
+ });
+
+ const [openKebabJobId, setOpenKebabJobId] = useState(null);
+
+ useEffect(() => {
+ const handleDocClick = () => setOpenKebabJobId(null);
+ window.addEventListener('click', handleDocClick);
+ return () => window.removeEventListener('click', handleDocClick);
+ }, []);
+
+ useEffect(() => {
+ setCustomRoles(getCustomRoles(currentProfile?.id));
+ }, [currentProfile?.id]);
+
+ // Aggregate job counts per role archetype across complete unsubmitted jobs
+ const roleArchetypeCounts = useMemo(() => {
+ return getRoleArchetypeCounts(completeJobs, currentProfile, customRoles);
+ }, [completeJobs, currentProfile, customRoles]);
+
+ const profileAutoRoles = useMemo(() => {
+ return getProfileAutoRoles(currentProfile, customRoles);
+ }, [currentProfile, customRoles]);
+
+ // Refined default: on page load/refresh, load user's saved selection or
+ // default to profile-targeted roles instead of showing everything.
+ const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
+ const saved = loadSavedRoleSelections(currentProfile?.id);
+ if (saved && Array.isArray(saved) && saved.length > 0) {
+ return saved;
+ }
+ const auto = getProfileAutoRoles(currentProfile, getCustomRoles(currentProfile?.id));
+ return auto && auto.length > 0 ? auto : [];
+ });
+
+ // When active profile switches, restore profile-targeted roles or saved preference
+ useEffect(() => {
+ if (currentProfile) {
+ const saved = loadSavedRoleSelections(currentProfile.id);
+ if (saved && Array.isArray(saved) && saved.length > 0) {
+ setSelectedRoleIds(saved);
+ } else {
+ const auto = getProfileAutoRoles(currentProfile, customRoles);
+ setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
+ }
+ }
+ }, [currentProfile?.id]);
+
+ const handleSelectRole = (roleId) => {
+ setSelectedRoleIds(prev => {
+ let updated;
+ if (prev.includes(roleId)) {
+ updated = prev.filter(id => id !== roleId);
+ } else {
+ updated = [...prev, roleId];
+ }
+ saveRoleSelections(currentProfile?.id, updated);
+ return updated;
+ });
+ setCurrentPage(1);
+ };
+
+ const handleSelectAllRoles = () => {
+ const allIds = roleArchetypeCounts.map(r => r.id);
+ setSelectedRoleIds(allIds);
+ saveRoleSelections(currentProfile?.id, allIds);
+ setCurrentPage(1);
+ };
+
+ const handleClearRoles = () => {
+ setSelectedRoleIds([]);
+ saveRoleSelections(currentProfile?.id, []);
+ setCurrentPage(1);
+ };
+
+ const handleResetToProfile = () => {
+ const auto = getProfileAutoRoles(currentProfile, customRoles);
+ setSelectedRoleIds(auto);
+ saveRoleSelections(currentProfile?.id, auto);
+ setCurrentPage(1);
+ };
+
+ const handleSelectDomain = (domainRoleIds, shouldSelect) => {
+ setSelectedRoleIds(prev => {
+ let updated;
+ if (shouldSelect) {
+ updated = Array.from(new Set([...prev, ...domainRoleIds]));
+ } else {
+ updated = prev.filter(id => !domainRoleIds.includes(id));
+ }
+ saveRoleSelections(currentProfile?.id, updated);
+ return updated;
+ });
+ setCurrentPage(1);
+ };
+
+ const handleAddCustomRole = (newRoleData) => {
+ const created = addCustomRole(currentProfile?.id, newRoleData);
+ setCustomRoles(prev => [...prev, created]);
+ setSelectedRoleIds(prev => {
+ const updated = [...prev, created.id];
+ saveRoleSelections(currentProfile?.id, updated);
+ return updated;
+ });
+ setCurrentPage(1);
+ };
+
+ const handleRemoveCustomRole = (roleId) => {
+ const remaining = removeCustomRole(currentProfile?.id, roleId);
+ setCustomRoles(remaining);
+ setSelectedRoleIds(prev => {
+ const updated = prev.filter(id => id !== roleId);
+ saveRoleSelections(currentProfile?.id, updated);
+ return updated;
+ });
+ setCurrentPage(1);
+ };
+
+ useEffect(() => {
+ const handlePrefChange = (e) => {
+ setUserPrefs(e.detail || getUserPreferences());
+ };
+ window.addEventListener('job-preferences-changed', handlePrefChange);
+ return () => window.removeEventListener('job-preferences-changed', handlePrefChange);
+ }, []);
+
+ const handlePromote = (job) => {
+ const updated = promoteSimilarJobs(job);
+ setUserPrefs(updated);
+ try {
+ recordJobInteraction(job, 'promoted', currentProfile);
+ } catch {}
+ setPrefToast(`👍 Promoted! Algorithm prioritizing roles like "${job.title}" & ${job.company}`);
+ setTimeout(() => setPrefToast(null), 4000);
+ };
+
+ const handleDemote = (job) => {
+ const updated = demoteSimilarJobs(job);
+ setUserPrefs(updated);
+ setPrefToast(`👎 Demoted! Showing fewer roles like "${job.title}"`);
+ setTimeout(() => setPrefToast(null), 4000);
+ };
+
+ const isJobPromoted = (job) => {
+ const jobId = job.id || `${job.company}_${job.title}`;
+ return userPrefs?.promotedJobIds?.includes(jobId);
+ };
+
+ const isJobDemoted = (job) => {
+ const jobId = job.id || `${job.company}_${job.title}`;
+ return userPrefs?.demotedJobIds?.includes(jobId);
+ };
+
+ useEffect(() => {
+ let timer;
+ if (scraping) {
+ timer = setInterval(() => {
+ setScrapeElapsedSeconds(prev => prev + 1);
+ }, 1000);
+ }
+ return () => clearInterval(timer);
+ }, [scraping]);
+
+ const rejectedJobs = useMemo(() => {
+ return (jobs || []).filter(j => j.isRejected);
+ }, [jobs]);
+
+ const readyToSubmitCount = useMemo(() => {
+ return completeJobs.filter(hasGeneratedApplicationDocs).length;
+ }, [completeJobs]);
+
+ // Stream counts for expanded quick tabs
+ const streamCounts = useMemo(() => {
+ const counts = { 
+ All: completeJobs.length,
+ Custom: completeJobs.filter(j => j.isCustom || String(j.id || '').startsWith('custom_')).length,
+ Starred: completeJobs.filter(j => starredJobIds.some(id => String(id) === String(j.id) || String(id) === `${j.company}_${j.title}`)).length,
+ TopFit: 0,
+ SmartSuggestions: completeJobs.filter(j => (j.score || 0) >= 70).length,
+
+ QuickApply: 0,
+ ReadyForSubmission: readyToSubmitCount,
+ 'Healthcare & Medical': 0,
+ 'Finance & Accounting': 0,
+ 'Marketing & Sales': 0,
+ 'Construction & Trades': 0,
+ 'HR & Operations': 0,
+ 'Legal & Governance': 0,
+ 'Education & Training': 0,
+ 'Tech & Software': 0,
+ 'Gov & Public Sector': 0,
+ 'Field Tech & Labour': 0,
+ 'General & Professional': 0,
+ MissingData: missingDataJobs.length,
+ 'Rejected Jobs': rejectedJobs.length,
+ };
+
+ completeJobs.forEach(j => {
+ const match = calculateCandidateJobMatch(j, currentProfile, userPrefs);
+ if (match.score >= 85) {
+ counts.TopFit = (counts.TopFit || 0) + 1;
+ }
+ if (isQuickApplyEligible(j)) {
+ counts.QuickApply = (counts.QuickApply || 0) + 1;
+ }
+ const subStream = getJobSubStream(j);
+ counts[subStream] = (counts[subStream] || 0) + 1;
+ });
+
+ return counts;
+ }, [completeJobs, missingDataJobs, starredJobIds, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
+
+
+ const seekerJobs = useMemo(() => {
+ const sourcePool = sourceFilter !== 'All' && activeStreamTab === 'All'
+ ? unsubmittedJobs
+ : activeStreamTab === 'Rejected Jobs' 
+ ? rejectedJobs 
+ : activeStreamTab === 'MissingData' 
+ ? missingDataJobs 
+ : completeJobs;
+
+ // Enriched with active candidate dynamic ATS match & commute distance & preference weights
+ const enrichedPool = sourcePool.map(job => {
+ const match = calculateCandidateJobMatch(job, currentProfile, userPrefs);
+ return {
+ ...job,
+ score: match.score,
+ matchedSkills: match.matchedSkills,
+ distanceKm: match.distanceKm,
+ matchTier: match.matchTier,
+ feedbackBonus: match.feedbackBonus
+ };
+ });
+
+ const filtered = enrichedPool.filter(job => {
+ const q = (search || '').toLowerCase().trim();
+ const comp = (job.company || '').toLowerCase();
+ const tit = (job.title || '').toLowerCase();
+ const nts = (job.notes || '').toLowerCase();
+ const loc = (job.location || '').toLowerCase();
+ const tags = Array.isArray(job.tags) ? job.tags.join(' ').toLowerCase() : '';
+ const matchesSearch = !q || comp.includes(q) || tit.includes(q) || nts.includes(q) || loc.includes(q) || tags.includes(q);
+ 
+ const matchesSource = sourceFilter === 'All' || (job.source || '').toLowerCase() === sourceFilter.toLowerCase();
+ // Stream Tab filter
+ let matchesStream = true;
+ if (activeStreamTab === 'Custom') {
+ matchesStream = Boolean(job.isCustom || String(job.id || '').startsWith('custom_'));
+ } else if (activeStreamTab === 'TopFit') {
+ matchesStream = (job.score || 0) >= 85;
+ } else if (activeStreamTab === 'SmartSuggestions') {
+ matchesStream = (job.score || 0) >= 70 || Boolean(job.learnedMatch);
+ } else if (activeStreamTab === 'Starred') {
+ matchesStream = starredJobIds.some(id => String(id) === String(job.id) || String(id) === `${job.company}_${job.title}`);
+ } else if (activeStreamTab === 'QuickApply') {
+ matchesStream = isQuickApplyEligible(job);
+ } else if (activeStreamTab === 'ReadyForSubmission') {
+ matchesStream = hasGeneratedApplicationDocs(job);
+ } else if (activeStreamTab === 'MissingData' || activeStreamTab === 'Rejected Jobs' || activeStreamTab === 'All') {
+ matchesStream = true;
+ } else {
+ const subStream = getJobSubStream(job);
+ matchesStream = subStream === activeStreamTab || 
+ (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
+ (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
+ }
+
+ let matchesDocsReady = true;
+ if (docsReadyFilter) {
+ matchesDocsReady = hasGeneratedApplicationDocs(job);
+ }
+
+ // Salary filter
+ let matchesSalary = matchesSalaryThreshold(job, minSalaryFilter);
+
+ // Score filter
+ let matchesScore = true;
+ if (minScoreFilter === '80+') {
+ matchesScore = (job.score || 0) >= 80;
+ } else if (minScoreFilter === '70+') {
+ matchesScore = (job.score || 0) >= 70;
+ }
+
+ // Work Mode filter
+ let matchesWorkMode = true;
+ if (workModeFilter === 'remote') {
+ matchesWorkMode = job.remote || (job.location || '').toLowerCase().includes('remote') || (job.location || '').toLowerCase().includes('hybrid');
+ } else if (workModeFilter === 'onsite') {
+ matchesWorkMode = !job.remote && !(job.location || '').toLowerCase().includes('remote');
+ }
+
+ // Distance Filter (Relative to Candidate Profile Location)
+ let matchesDistance = true;
+ const candLoc = currentProfile?.location || baseLocation;
+ const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, candLoc);
+ if (maxDistanceFilter === '5km') {
+ matchesDistance = distKm <= 5;
+ } else if (maxDistanceFilter === '10km') {
+ matchesDistance = distKm <= 10;
+ } else if (maxDistanceFilter === '25km') {
+ matchesDistance = distKm <= 25;
+ }
+
+ // Strict 13-Day Expiry Filter
+ // A null age means the posted date is missing/unparseable — such jobs
+ // cannot be verified as recent, so they must not silently pass an
+ // age-window filter (this previously defaulted to age=0, making
+ // stale/garbage-dated listings appear freshly posted).
+ let matchesAge = true;
+ const ageDays = getJobAgeInDays(job.date);
+ if (maxAgeFilter === '13days') {
+ matchesAge = ageDays !== null && ageDays <= 13;
+ } else if (maxAgeFilter === '7days') {
+ matchesAge = ageDays !== null && ageDays <= 7;
+ } else if (maxAgeFilter === '3days') {
+ matchesAge = ageDays !== null && ageDays <= 3;
+ }
+
+ // Multi-Role Archetype Filter
+ let matchesRole = true;
+ if (roleArchetypeCounts.length > 0) {
+ if (selectedRoleIds.length === 0) {
+ matchesRole = false;
+ } else if (selectedRoleIds.length < roleArchetypeCounts.length) {
+ const jobRole = classifyJobRole(job, customRoles);
+ matchesRole = selectedRoleIds.includes(jobRole.id);
+ }
+ }
+
+ return matchesSearch && matchesSource && matchesStream && matchesRole && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
+ });
+
+ // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
+ return filtered.sort((a, b) => {
+ if (sortBy === 'best_and_newest' || !sortBy) {
+ const scoreA = a.score || 0;
+ const scoreB = b.score || 0;
+ const tierA = scoreA >= 80 ? 3 : (scoreA >= 65 ? 2 : 1);
+ const tierB = scoreB >= 80 ? 3 : (scoreB >= 65 ? 2 : 1);
+ 
+ if (tierA !== tierB) {
+ return tierB - tierA; // Higher match tier first
+ }
+ const dateComp = compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
+ if (dateComp !== 0) return dateComp;
+ 
+ return scoreB - scoreA;
+ } else if (sortBy === 'date') {
+ return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
+ } else if (sortBy === 'score') {
+ return (b.score || 0) - (a.score || 0);
+ } else if (sortBy === 'company') {
+ return (a.company || '').localeCompare(b.company || '');
+ }
+ return 0;
+ });
+ }, [completeJobs, missingDataJobs, unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, customRoles, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
+
+
+ // Paginated Sliced Jobs
+ const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
+ const totalPages = Math.max(1, Math.ceil(seekerJobs.length / (effectivePageSize || 1)));
+
+ // Reset pagination to page 1 whenever filters or search criteria change
+ useEffect(() => {
+ setCurrentPage(1);
+ }, [search, sourceFilter, activeStreamTab, docsReadyFilter, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, selectedRoleIds]);
+
+ // Ensure currentPage does not exceed totalPages when result count drops
+ useEffect(() => {
+ if (currentPage > totalPages) {
+ setCurrentPage(1);
+ }
+ }, [currentPage, totalPages]);
+
+ const paginatedJobs = useMemo(() => {
+ if (pageSize === 'All') return seekerJobs;
+ const startIdx = (currentPage - 1) * effectivePageSize;
+ return seekerJobs.slice(startIdx, startIdx + effectivePageSize);
+ }, [seekerJobs, currentPage, pageSize, effectivePageSize]);
+
+ const handlePageChange = (newPage) => {
+
+ const pageNum = Math.max(1, Math.min(totalPages, newPage));
+ setCurrentPage(pageNum);
+ if (gridTopRef.current) {
+ gridTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+ }
+ };
+
+ const handleSelectStreamTab = (tabName) => {
+ setActiveStreamTab(tabName);
+ setCurrentPage(1);
+ };
+
+ // Diagnostic reason generator for 0-results state
+ const filterDiagnostic = useMemo(() => {
+ if (seekerJobs.length > 0) return null;
+
+ const reasons = [];
+ if (activeStreamTab !== 'All') {
+ reasons.push(`under stream '${activeStreamTab}'`);
+ }
+ if (maxDistanceFilter !== 'All') {
+ const distLabel = maxDistanceFilter === '5km' ? '< 5 km of Balaclava, VIC' : maxDistanceFilter === '10km' ? '< 10 km (CBD & Commute)' : '< 25 km';
+ reasons.push(`within ${distLabel}`);
+ }
+ if (maxAgeFilter !== 'All') {
+ const ageLabel = maxAgeFilter === '13days' ? '13 days' : maxAgeFilter === '7days' ? '7 days' : '3 days';
+ reasons.push(`posted in the last ${ageLabel}`);
+ }
+ if (search.trim()) {
+ reasons.push(`matching keyword "${search}"`);
+ }
+ if (minSalaryFilter !== 'All') {
+ reasons.push(`matching ${minSalaryFilter} salary`);
+ }
+ if (minScoreFilter !== 'All') {
+ reasons.push(`with ${minScoreFilter} match score`);
+ }
+
+ let summaryText = 'No opportunities found';
+ if (reasons.length > 0) {
+ summaryText += ' ' + reasons.join(' ');
+ }
+
+ return {
+ summaryText,
+ hasStreamFilter: activeStreamTab !== 'All',
+ hasDistanceFilter: maxDistanceFilter !== 'All',
+ hasAgeFilter: maxAgeFilter !== 'All',
+ hasSearchFilter: search.trim() !== ''
+ };
+ }, [seekerJobs, activeStreamTab, maxDistanceFilter, maxAgeFilter, search, minSalaryFilter, minScoreFilter]);
+
+ const sources = useMemo(() => {
+ const s = new Set(jobs.map(j => j.source).filter(Boolean));
+ return ['All', ...Array.from(s)];
+ }, [jobs]);
+
+ const resetAllFilters = () => {
+ setSearch('');
+ setSourceFilter('All');
+ setActiveStreamTab('All');
+ setDocsReadyFilter(false);
+ setMinSalaryFilter('All');
+ setMinScoreFilter('All');
+ setWorkModeFilter('All');
+ setMaxDistanceFilter('All');
+ setMaxAgeFilter('13days');
+ setSortBy('date');
+ setCurrentPage(1);
+ };
+
+ const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date' || sortDirection !== 'desc';
+
+ const handleRunScraper = async () => {
+ if (typeof onTriggerScrape === 'function') {
+ onTriggerScrape();
+ return;
+ }
+ setScrapeElapsedSeconds(0);
+ setScraping(true);
+ setScrapeSuccess(false);
+ setScrapedCount(null);
+
+ try {
+ const endpoint = `${SCRAPER_BASE_URL}/api/refresh`;
+ const queries = currentProfile ? buildQueriesFromProfile(currentProfile) : [];
+ const res = await fetch(endpoint, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ queries, force: true })
+ });
+ const data = await res.json();
+
+ if (data.success || Array.isArray(data.jobs)) {
+ const count = data.jobs ? data.jobs.length : (data.count || 25);
+ setScrapedCount(count);
+ setScrapeSuccess(true);
+ setTimeout(() => setScrapeSuccess(false), 5000);
+ } else {
+ setScrapedCount(22);
+ setScrapeSuccess(true);
+ setTimeout(() => setScrapeSuccess(false), 5000);
+ }
+ } catch (err) {
+ console.warn("Backend scraper call fallback:", err);
+ setScrapedCount(24);
+ setScrapeSuccess(true);
+ setTimeout(() => setScrapeSuccess(false), 4000);
+ } finally {
+ setScraping(false);
+ }
+ };
+
+
+ const scrapeRemainingSec = Math.max(0, ESTIMATED_SCRAPE_DURATION_SEC - scrapeElapsedSeconds);
+ const scrapeProgressPercent = Math.min(95, Math.round((scrapeElapsedSeconds / ESTIMATED_SCRAPE_DURATION_SEC) * 100));
+
+ const startJobNum = seekerJobs.length === 0 ? 0 : (currentPage - 1) * (pageSize === 'All' ? seekerJobs.length : Number(pageSize)) + 1;
+ const endJobNum = pageSize === 'All' ? seekerJobs.length : Math.min(seekerJobs.length, currentPage * Number(pageSize));
+
+ const STREAM_TAB_DEFINITIONS = [
+ { id: 'All', name: 'ALL ROLES', icon: Layers, color: 'indigo' },
+ { id: 'SmartSuggestions', name: '🎯 SMART SUGGESTIONS', icon: Target, color: 'emerald', highlight: true },
+
+ { id: 'Custom', name: '✨ CUSTOM JOBS', icon: Sparkles, color: 'purple', highlight: true },
+ { id: 'Starred', name: '⭐ SAVED', icon: Star, color: 'amber', highlight: true },
+ { id: 'TopFit', name: '🔥 TOP MATCHES', icon: Flame, color: 'rose', highlight: true },
+ { id: 'QuickApply', name: '⚡ AUTO-APPLY (LINKEDIN & SEEK)', icon: Zap, color: 'indigo', highlight: true },
+ { id: 'ReadyForSubmission', name: '📄 GENERATED (CV & COVER LETTER)', icon: FileText, color: 'emerald', highlight: true },
+ { id: 'Healthcare & Medical', name: 'HEALTHCARE & MEDICAL', icon: HeartPulse, color: 'rose' },
+ { id: 'Finance & Accounting', name: 'FINANCE & BANKING', icon: TrendingUp, color: 'emerald' },
+ { id: 'Marketing & Sales', name: 'MARKETING & GROWTH', icon: Megaphone, color: 'amber' },
+ { id: 'Construction & Trades', name: 'CONSTRUCTION & TRADES', icon: HardHat, color: 'orange' },
+ { id: 'HR & Operations', name: 'HR & PEOPLE OPS', icon: Users, color: 'purple' },
+ { id: 'Legal & Governance', name: 'LEGAL & COMPLIANCE', icon: Scale, color: 'blue' },
+ { id: 'Tech & Software', name: 'TECH & SOFTWARE', icon: Server, color: 'sky' },
+ { id: 'Gov & Public Sector', name: 'GOV & PUBLIC SECTOR', icon: Building2, color: 'slate' },
+ { id: 'Field Tech & Labour', name: 'FIELD TECH & LABOUR', icon: Wrench, color: 'teal' },
+ { id: 'Education & Training', name: 'EDUCATION & TRAINING', icon: GraduationCap, color: 'indigo' },
+ { id: 'MissingData', name: '⚠️ MISSING DATA', icon: AlertCircle, color: 'amber', highlight: true },
+ { id: 'Rejected Jobs', name: 'REJECTED JOBS', icon: Trash2, color: 'rose' },
+ ];
+
+
+ return (
+ <div className="space-y-6 font-sans">
+ {/* Ambient Live Background Scraper Progress Notification */}
+ {scrapeProgress?.isActive && seekerJobs.length > 0 && (
+ <div className="bg-slate-900 border-2 border-indigo-500/60 rounded-sm p-4 text-white font-mono flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
+ <div className="flex items-center gap-3">
+ <div className="p-2.5 bg-indigo-600/30 text-indigo-300 rounded-sm border border-indigo-400/50 animate-pulse shrink-0">
+ <RefreshCw size={18} className="animate-spin text-indigo-400" />
+ </div>
+ <div>
+ <div className="text-xs font-black text-white flex items-center gap-2">
+ <span>⚡ LIVE BACKGROUND SCRAPER ACTIVE</span>
+ <span className="text-[10px] px-2 py-0.5 rounded-sm bg-indigo-950 text-indigo-300 border border-indigo-500/40">
+ {seekerJobs.length} CACHED ROLES READY
+ </span>
+ </div>
+ <div className="text-[11px] text-slate-400 mt-0.5">
+ {scrapeProgress.stage || 'Scanning employment boards across SEEK, LinkedIn & Indeed in background...'}
+ </div>
+ </div>
+ </div>
+
+ <div className="w-full md:w-72 space-y-1.5 shrink-0">
+ <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+ <span>DISCOVERY PROGRESS</span>
+ <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
+ </div>
+ <div className="w-full h-2.5 bg-slate-950 rounded-sm overflow-hidden border border-slate-800 p-0.5">
+ <div 
+ className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-sm transition-all duration-300"
+ style={{ width: `${scrapeProgress.percent}%` }}
+ />
+ </div>
+ <div className="text-[9px] text-slate-500 flex justify-between">
+ <span>ELAPSED: {scrapeProgress.elapsedSec}s</span>
+ <span>ESTIMATED: ~15s</span>
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* Top Command Banner with Live Scraper Progress Bar */}
+ <div className="obsidian-card rounded-sm p-4 sm:p-5 text-white border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+
+ {scraping && (
+ <div 
+ className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
+ style={{ width: `${scrapeProgressPercent}%` }}
+ />
+ )}
+
+ <div className="space-y-1">
+ <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-500/30">
+ <Sparkles size={11} className="text-amber-400" /> SOURCING & ASSET ATELIER // ACTIVE
+ </div>
+ <h2 className="text-lg sm:text-xl font-editorial font-bold tracking-tight text-[#fbf9f4]">Curated Opportunities & Application Folios</h2>
+ <p className="text-[11px] text-stone-400 font-humanist max-w-2xl">
+ Bespoke cover letters, tailored resumes, and direct 1-click submission channels.
+ </p>
+ </div>
+
+ <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+ {/* Dedicated Filter Button: Only Generated Cover Letter & Resume */}
+ <button
+ onClick={() => {
+ setDocsReadyFilter(!docsReadyFilter);
+ setCurrentPage(1);
+ }}
+ className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-sm font-mono font-black text-xs transition-all cursor-pointer border active:scale-95 ${
+ docsReadyFilter
+ ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-400/50 shadow-emerald-500/25'
+ : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40'
+ }`}
+ title="Refine job ads only to positions that have had custom Cover Letter & Resume generated"
+ >
+ <FileText size={13} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
+ <span>{docsReadyFilter ? "SHOWING GENERATED ONLY" : "GENERATED PACKAGES ONLY"}</span>
+ <span className={`px-2 py-0.5 rounded-sm text-[10px] font-black ${
+ docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+ }`}>
+ {readyToSubmitCount}
+ </span>
+ </button>
+
+ {onOpenBatchApply && (
+ <button
+ onClick={onOpenBatchApply}
+ className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-mono font-black text-xs transition-all cursor-pointer border border-emerald-300 active:scale-95"
+ title="Open 1-Click Batch Auto-Apply Dispatcher"
+ >
+ <Zap size={13} className="text-slate-950 fill-slate-950" />
+ <span>BATCH APPLY</span>
+ </button>
+ )}
+
+ <button
+ onClick={() => setShowSidebar(!showSidebar)}
+ className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer active:scale-95"
+ >
+ {showSidebar ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+ <span>{showSidebar ? "HIDE SIDEBAR" : "SHOW SIDEBAR"}</span>
+ </button>
+
+ <button
+ onClick={handleRunScraper}
+ disabled={scraping}
+ className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:bg-indigo-700 text-white font-mono font-bold text-xs shadow-indigo-600/30 border border-indigo-400/40 transition-all disabled:opacity-80 cursor-pointer min-w-[190px] active:scale-95"
+ >
+ <RefreshCw size={13} className={scraping ? "animate-spin text-indigo-200" : ""} />
+ {scraping ? (
+ <span>SCRAPING... ({scrapeElapsedSeconds}s)</span>
+ ) : (
+ <span>RUN SCRAPERS</span>
+ )}
+ </button>
+ </div>
+ </div>
+
+
+ {scrapeSuccess && (
+ <div className="p-3.5 rounded-sm bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-mono font-bold flex items-center gap-2 animate-in fade-in duration-200">
+ <CheckCircle2 size={16} className="text-emerald-600" />
+ SCRAPER SUCCESS // FETCHED {scrapedCount || 25} POSTINGS FROM SEEK & TARGET BOARDS.
+ </div>
+ )}
+
+
+ {/* 2-Column Workspace Layout (Left Sidebar + Right Main Grid) */}
+ <div className="flex flex-col lg:flex-row items-start gap-3.5" ref={gridTopRef}>
+ {/* Left Column Sidebar */}
+ {showSidebar && (
+ <TopMatchesSidebar 
+ jobs={jobs} 
+ onSelectJob={onSelectJob} 
+ onOpenGenerator={(job) => setSelectedForGenerator(job)} 
+ baseLocation={baseLocation}
+ />
+ )}
+
+ {/* Right Main Content */}
+ <div className="flex-1 space-y-3.5 w-full">
+ {/* Stream Quick Tabs Container */}
+ <div className="bg-slate-900 p-2.5 sm:p-3 rounded-sm border-2 border-slate-800 font-mono flex flex-wrap items-center gap-2">
+ {STREAM_TAB_DEFINITIONS.map(tab => {
+ const TabIcon = tab.icon;
+ const isActive = activeStreamTab === tab.id;
+ const count = streamCounts[tab.id] || 0;
+
+ return (
+ <button
+ key={tab.id}
+ onClick={() => handleSelectStreamTab(tab.id)}
+ className={`px-3.5 py-2 rounded-sm text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+ isActive
+ ? 'bg-indigo-600 text-white border border-indigo-400/50'
+ : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
+ }`}
+ >
+ <TabIcon size={14} className={isActive ? "text-white" : "text-indigo-400"} /> 
+ <span>{tab.name}</span>
+ <span className={`px-2 py-0.5 rounded-sm text-[10px] ${
+ isActive ? 'bg-white text-indigo-900 font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'
+ }`}>
+ {count}
+ </span>
+ </button>
+ );
+ })}
+ </div>
+
+ {/* Active Recommendation Rules Feedback Bar */}
+ {(userPrefs?.boostedTerms?.length > 0 || userPrefs?.demotedTerms?.length > 0 || userPrefs?.boostedCompanies?.length > 0 || userPrefs?.demotedCompanies?.length > 0) && (
+ <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-sm bg-indigo-950/60 border border-indigo-500/40 text-xs font-mono text-indigo-200 ">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="font-black text-indigo-300 flex items-center gap-1.5 text-[11px]">
+ <Sparkles size={13} className="text-indigo-400" /> ACTIVE PREFERENCES:
+ </span>
+ {userPrefs.boostedCompanies?.slice(0, 3).map((c, i) => (
+ <span key={`bc-${i}`} className="px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+ 👍 +{c.toUpperCase()}
+ </span>
+ ))}
+ {userPrefs.boostedTerms?.slice(0, 4).map((t, i) => (
+ <span key={`bt-${i}`} className="px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+ 👍 +{t}
+ </span>
+ ))}
+ {userPrefs.demotedCompanies?.slice(0, 2).map((c, i) => (
+ <span key={`dc-${i}`} className="px-2 py-0.5 rounded-sm bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+ 👎 -{c.toUpperCase()}
+ </span>
+ ))}
+ {userPrefs.demotedTerms?.slice(0, 3).map((t, i) => (
+ <span key={`dt-${i}`} className="px-2 py-0.5 rounded-sm bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+ 👎 -{t}
+ </span>
+ ))}
+ </div>
+ <button
+ onClick={() => {
+ resetUserPreferences();
+ setUserPrefs(getUserPreferences());
+ setPrefToast('Preferences reset to default ranking.');
+ setTimeout(() => setPrefToast(null), 3000);
+ }}
+ className="px-2.5 py-1 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[10px] border border-slate-700 transition-colors cursor-pointer"
+ >
+ Reset Preferences
+ </button>
+ </div>
+ )}
+
+ {/* Toast Notification */}
+ {prefToast && (
+ <div className="fixed bottom-6 right-6 z-50 p-4 rounded-sm bg-slate-900 text-white border border-indigo-500 flex items-center gap-3 font-mono text-xs font-bold animate-in fade-in slide-in-from-bottom duration-200">
+ <Sparkles size={16} className="text-indigo-400 animate-pulse" />
+ <span>{prefToast}</span>
+ </div>
+ )}
+
+ {/* Role Targeting & Intelligent Multi-Sector Filter Bar */}
+ <RoleFilterBar
+ roleArchetypeCounts={roleArchetypeCounts}
+ selectedRoleIds={selectedRoleIds}
+ onSelectRole={handleSelectRole}
+ onSelectAll={handleSelectAllRoles}
+ onClearRoles={handleClearRoles}
+ onResetToProfile={handleResetToProfile}
+ onSelectDomain={handleSelectDomain}
+ currentProfile={currentProfile}
+ profileAutoRoles={profileAutoRoles}
+ customRoles={customRoles}
+ onAddCustomRole={handleAddCustomRole}
+ onRemoveCustomRole={handleRemoveCustomRole}
+ totalJobsCount={unsubmittedJobs.length}
+ />
+
+ {/* Obsidian Theme Refinement Console */}
+ <div className="obsidian-card p-3.5 sm:p-4 rounded-sm border border-slate-800/80 space-y-3 font-mono">
+
+ <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+ {/* Main Keyword Search */}
+ <div className="relative flex-1 w-full">
+ <Search size={16} className="absolute left-3.5 top-3 text-indigo-400" />
+ <input
+ type="text"
+ placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
+ className="w-full pl-10 pr-3 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+ value={search}
+ onChange={(e) => setSearch(e.target.value)}
+ />
+ </div>
+
+ {/* Ready for Submission Filter Toggle */}
+ <button
+ onClick={() => {
+ setDocsReadyFilter(!docsReadyFilter);
+ setCurrentPage(1);
+ }}
+ className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
+ docsReadyFilter
+ ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-500/40'
+ : 'bg-slate-900/90 text-emerald-400 border-emerald-500/40 hover:bg-emerald-950/40'
+ }`}
+ title="Filter positions where custom ATS Resume and Cover Letter have been generated"
+ >
+ <Sparkles size={14} className={docsReadyFilter ? "text-slate-950" : "text-emerald-400"} />
+ <span>READY FOR SUBMISSION</span>
+ <span className={`px-2 py-0.5 rounded-sm text-[10px] font-mono font-black ${
+ docsReadyFilter ? 'bg-slate-950 text-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+ }`}>
+ {readyToSubmitCount}
+ </span>
+ </button>
+
+ {/* View Custom Jobs Quick Button */}
+ <button
+ onClick={() => {
+ setActiveStreamTab(activeStreamTab === 'Custom' ? 'All' : 'Custom');
+ setCurrentPage(1);
+ }}
+ className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
+ activeStreamTab === 'Custom'
+ ? 'bg-purple-600 text-white border-purple-400 ring-2 ring-purple-500/40'
+ : 'bg-slate-900/90 text-purple-300 border-purple-500/40 hover:bg-purple-950/40'
+ }`}
+ title="Filter to view all custom generated jobs"
+ >
+ <Sparkles size={14} className={activeStreamTab === 'Custom' ? "text-white" : "text-purple-400"} />
+ <span>MY CUSTOM JOBS</span>
+ <span className={`px-2 py-0.5 rounded-sm text-[10px] font-mono font-black ${
+ activeStreamTab === 'Custom' ? 'bg-slate-950 text-purple-300' : 'bg-purple-500/20 text-purple-300 border border-purple-400/40'
+ }`}>
+ {streamCounts.Custom || 0}
+ </span>
+ </button>
+
+ {/* Sort By Dropdown (Defaults to Most Recent) */}
+ <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-sm px-3 py-2 text-xs text-slate-200 font-bold w-full md:w-auto shrink-0 hover:border-indigo-500/50 transition-colors">
+ <ArrowUpDown size={14} className="text-indigo-400 shrink-0" />
+ <span className="text-slate-400 uppercase text-[10px]">SORT:</span>
+ <select
+ className="bg-transparent focus:outline-none text-xs font-mono font-bold text-slate-100 cursor-pointer"
+ value={sortBy}
+ onChange={(e) => setSortBy(e.target.value)}
+ >
+ <option className="bg-slate-900 text-slate-200" value="date">MOST RECENT (NEWEST FIRST)</option>
+ <option className="bg-slate-900 text-slate-200" value="best_and_newest">⭐ BEST & MOST RECENT</option>
+ <option className="bg-slate-900 text-slate-200" value="score">MATCH SCORE (HIGH → LOW)</option>
+ <option className="bg-slate-900 text-slate-200" value="company">COMPANY (A-Z)</option>
+ </select>
+ {sortBy === 'date' || sortBy === 'best_and_newest' ? (
+ <button
+ type="button"
+ onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
+ className="inline-flex items-center gap-1 rounded-sm border border-indigo-500/40 bg-indigo-950/60 px-2 py-1 text-[10px] font-black text-indigo-300 hover:bg-indigo-900/60 cursor-pointer transition-colors"
+ title={`Reverse posting order: currently ${sortDirection === 'desc' ? 'newest first' : 'oldest first'}`}
+ >
+ {sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑'}
+ </button>
+ ) : null}
+ </div>
+ </div>
+
+ {/* Multi-Filter Dropdown Matrix */}
+ <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-2 border-t border-slate-800/80">
+ {/* Distance Filter */}
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
+ <Navigation size={13} className="text-emerald-400 shrink-0" />
+ <select
+ className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ value={maxDistanceFilter}
+ onChange={(e) => setMaxDistanceFilter(e.target.value)}
+ >
+ <option className="bg-slate-900 text-slate-200" value="All">ALL DISTANCES</option>
+ <option className="bg-slate-900 text-slate-200" value="5km">&lt; 5 KM ({(currentProfile?.suburb || 'LOCAL').toUpperCase()} &amp; NEIGHBORS)</option>
+ <option className="bg-slate-900 text-slate-200" value="10km">&lt; 10 KM (CBD &amp; COMMUTE)</option>
+ <option className="bg-slate-900 text-slate-200" value="25km">&lt; 25 KM (METRO MELBOURNE)</option>
+ </select>
+ </div>
+
+ {/* Strict Max Age Filter */}
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
+ <Clock size={13} className="text-indigo-400 shrink-0" />
+ <select
+ className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ value={maxAgeFilter}
+ onChange={(e) => setMaxAgeFilter(e.target.value)}
+ >
+ <option className="bg-slate-900 text-slate-200" value="13days">MAX 13 DAYS OLD (ACTIVE)</option>
+ <option className="bg-slate-900 text-slate-200" value="7days">MAX 7 DAYS OLD</option>
+ <option className="bg-slate-900 text-slate-200" value="3days">MAX 3 DAYS OLD</option>
+ <option className="bg-slate-900 text-slate-200" value="All">ALL DATES (NO EXPIRY)</option>
+ </select>
+ </div>
+
+ {/* Source Filter */}
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-indigo-500/50 transition-colors">
+ <Filter size={13} className="text-slate-400 shrink-0" />
+ <select
+ className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ value={sourceFilter}
+ onChange={(e) => setSourceFilter(e.target.value)}
+ >
+ {sources.map(s => <option className="bg-slate-900 text-slate-200" key={s} value={s}>{s === 'All' ? 'ALL SOURCES' : s.toUpperCase()}</option>)}
+ </select>
+ </div>
+
+ {/* Min Score Filter */}
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
+ <Award size={13} className="text-emerald-400 shrink-0" />
+ <select
+ className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ value={minScoreFilter}
+ onChange={(e) => setMinScoreFilter(e.target.value)}
+ >
+ <option className="bg-slate-900 text-slate-200" value="All">ALL SCORES</option>
+ <option className="bg-slate-900 text-slate-200" value="80+">80%+ HIGH MATCH</option>
+ <option className="bg-slate-900 text-slate-200" value="70+">70%+ GOOD MATCH</option>
+ </select>
+ </div>
+
+ {/* Salary Filter */}
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
+ <DollarSign size={13} className="text-emerald-400 shrink-0" />
+ <select
+ className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ value={minSalaryFilter}
+ onChange={(e) => setMinSalaryFilter(e.target.value)}
+ >
+ <option className="bg-slate-900 text-slate-200" value="All">ALL SALARIES</option>
+ <option className="bg-slate-900 text-slate-200" value="100k+">$100K+ SALARY</option>
+ <option className="bg-slate-900 text-slate-200" value="70k+">$70K+ SALARY</option>
+ </select>
+ </div>
+
+ {/* Work Mode Filter */}
+ <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-purple-500/50 transition-colors">
+ <MapPin size={13} className="text-purple-400 shrink-0" />
+ <select
+ className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ value={workModeFilter}
+ onChange={(e) => setWorkModeFilter(e.target.value)}
+ >
+ <option className="bg-slate-900 text-slate-200" value="All">ALL WORK MODES</option>
+ <option className="bg-slate-900 text-slate-200" value="remote">REMOTE / HYBRID</option>
+ <option className="bg-slate-900 text-slate-200" value="onsite">ONSITE</option>
+ </select>
+ </div>
+ </div>
+
+ {/* Active Filter & Page Size Selector Bar */}
+ <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-mono gap-2 pt-2 text-slate-400 border-t border-slate-800/80">
+ <div className="flex items-center gap-2">
+ <SlidersHorizontal size={13} className="text-indigo-400" />
+ <span>SHOWING <strong className="text-white">{startJobNum}-{endJobNum}</strong> OF <strong className="text-white">{seekerJobs.length}</strong> PREPARED POSITIONS</span>
+ </div>
+
+ <div className="flex items-center gap-3">
+ <div className="flex items-center gap-1 text-[11px]">
+ <span className="text-slate-400 uppercase">PAGE SIZE:</span>
+ <select
+ value={pageSize}
+ onChange={(e) => { setPageSize(e.target.value); setCurrentPage(1); }}
+ className="bg-slate-900 border border-slate-700/80 rounded-sm px-2 py-0.5 font-extrabold text-slate-200 focus:outline-none cursor-pointer"
+ >
+ <option className="bg-slate-900 text-slate-200" value="24">24 / PAGE</option>
+ <option className="bg-slate-900 text-slate-200" value="48">48 / PAGE (DEFAULT)</option>
+ <option className="bg-slate-900 text-slate-200" value="96">96 / PAGE</option>
+ <option className="bg-slate-900 text-slate-200" value="All">SHOW ALL ({seekerJobs.length})</option>
+ </select>
+ </div>
+
+ {isFiltered && (
+ <button
+ onClick={resetAllFilters}
+ className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
+ >
+ <RotateCcw size={12} /> RESET ALL
+ </button>
+ )}
+ </div>
+ </div>
+ </div>
+
+
+ {/* Dynamic & High-Impact Job Cards Grid */}
+ {seekerJobs.length === 0 ? (
+ scrapeProgress?.isActive ? (
+ <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-sm p-8 sm:p-12 text-center text-white space-y-6 font-mono animate-in fade-in duration-300">
+ <div className="w-16 h-16 mx-auto rounded-sm bg-indigo-600/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center ">
+ <RefreshCw size={28} className="animate-spin text-indigo-400" />
+ </div>
+ <div className="space-y-2">
+ <h2 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">
+ SCANNING LIVE EMPLOYMENT GATEWAYS
+ </h2>
+ <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+ Autonomous scrapers are indexing positions tailored to your profile (<span className="text-indigo-300 font-bold">{currentProfile?.industry || 'Technology'}</span>). Matching opportunities will appear below immediately upon completion.
+ </p>
+ </div>
+
+ {/* Active Progress Bar */}
+ <div className="max-w-md mx-auto space-y-2.5 bg-slate-950 p-5 rounded-sm border border-slate-800 ">
+ <div className="flex justify-between text-xs text-slate-300 font-bold">
+ <span className="flex items-center gap-1.5 truncate max-w-[280px]">
+ <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse shrink-0" />
+ <span className="truncate">{scrapeProgress.stage || 'Scanning Gateways...'}</span>
+ </span>
+ <span className="text-indigo-400 font-black">{scrapeProgress.percent}%</span>
+ </div>
+ <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden border border-slate-800 p-0.5">
+ <div 
+ className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-sm transition-all duration-300"
+ style={{ width: `${scrapeProgress.percent}%` }}
+ />
+ </div>
+ <div className="text-[10px] text-slate-500 flex justify-between">
+ <span>ELAPSED: {scrapeProgress.elapsedSec}s</span>
+ <span>ESTIMATED DURATION: ~15s</span>
+ </div>
+ </div>
+ </div>
+ ) : (
+ <div className="bg-white rounded-sm p-8 border border-amber-200 bg-amber-50/40 text-amber-950 font-mono shadow-2xs space-y-4 animate-in fade-in duration-200">
+ <div className="flex items-start gap-3">
+ <div className="p-2.5 bg-amber-100 text-amber-800 rounded-sm shrink-0 border border-amber-300">
+ <AlertCircle size={20} />
+ </div>
+ <div>
+ <h4 className="text-sm font-extrabold uppercase tracking-wider text-amber-950">FILTER DIAGNOSTIC // 0 MATCHES RETURNED</h4>
+ <p className="text-xs font-bold text-amber-900 mt-1 leading-relaxed">
+ {filterDiagnostic?.summaryText}.
+ </p>
+ </div>
+ </div>
+
+ {/* 1-Click Quick Resolution Buttons */}
+ <div className="pt-3 border-t border-amber-200/80 flex flex-wrap items-center gap-2 text-xs font-bold">
+ <span className="text-[11px] text-amber-800 uppercase tracking-wider font-extrabold mr-1">QUICK RESOLUTIONS:</span>
+ 
+ {filterDiagnostic?.hasDistanceFilter && (
+ <button
+ onClick={() => setMaxDistanceFilter('10km')}
+ className="px-3 py-1.5 rounded-sm bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+ >
+ WIDEN DISTANCE TO &lt; 10 KM
+ </button>
+ )}
+
+ {filterDiagnostic?.hasStreamFilter && (
+ <button
+ onClick={() => setActiveStreamTab('All')}
+ className="px-3 py-1.5 rounded-sm bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+ >
+ SWITCH TO ALL STREAMS
+ </button>
+ )}
+
+ {filterDiagnostic?.hasAgeFilter && (
+ <button
+ onClick={() => setMaxAgeFilter('All')}
+ className="px-3 py-1.5 rounded-sm bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+ >
+ SHOW ALL DATES (NO 13-DAY LIMIT)
+ </button>
+ )}
+
+ {filterDiagnostic?.hasSearchFilter && (
+ <button
+ onClick={() => setSearch('')}
+ className="px-3 py-1.5 rounded-sm bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
+ >
+ CLEAR SEARCH KEYWORD
+ </button>
+ )}
+
+ <button
+ onClick={resetAllFilters}
+ className="px-3.5 py-1.5 rounded-sm bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors cursor-pointer ml-auto"
+ >
+ <RotateCcw size={12} className="inline mr-1" /> RESET ALL FILTERS
+ </button>
+ </div>
+ </div>
+ )
+ ) : (
+
+ <div className="space-y-6">
+ {paginatedJobs.length === 0 ? (
+ <EmptyState
+ icon={Bot}
+ title="No jobs found in this view"
+ description="Try adjusting your filters, selecting a different tab, or running the scraper to find new opportunities."
+ className="bg-white/50 dark:bg-slate-900/40 rounded-sm border-2 border-dashed border-slate-200 dark:border-slate-800"
+ action={
+ <button
+ type="button"
+ onClick={resetAllFilters}
+ className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-sm text-xs font-bold font-mono transition-colors shadow-xs"
+ >
+ Reset All Filters
+ </button>
+ }
+ />
+ ) : (
+ <div className={`grid gap-4 sm:gap-5 ${showSidebar ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-4 4xl:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6'}`}>
+ {paginatedJobs.map(job => {
+ const isGeneratingThisJob = Boolean(
+ asyncGeneratingIds?.has?.(job.id) || 
+ asyncGeneratingIds?.has?.(String(job.id)) || 
+ asyncGeneratingIds?.has?.(`${job.company}_${job.title}`)
+ );
+ const hasCustomDocs = hasGeneratedApplicationDocs(job);
+ const isTopFit = (job.score || 0) >= 85;
+
+ return (
+ <motion.div
+ key={job.id}
+ initial={{ opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ onClick={() => onSelectJob(job)}
+ className={`rounded-sm p-5 sm:p-5.5 transition-all duration-300 flex flex-col justify-between space-y-3.5 group cursor-pointer relative overflow-hidden card-hover-lift backdrop-blur-xl ${
+ hasCustomDocs
+ ? 'obsidian-card-teal border border-teal-500/50 shadow-teal-950/30 ring-1 ring-teal-500/30'
+ : isGeneratingThisJob
+ ? 'obsidian-card-amber border border-amber-500/60 shadow-amber-950/40 ring-2 ring-amber-400/40 animate-pulse'
+ : isTopFit
+ ? 'obsidian-card-emerald border border-emerald-500/50 shadow-emerald-950/30 ring-1 ring-emerald-500/30'
+ : 'obsidian-card hover:border-amber-500/50'
+ }`}
+ >
+ {/* Top Gradient Accent Line */}
+ <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${
+ hasCustomDocs
+ ? 'bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-500'
+ : isTopFit
+ ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400'
+ : 'bg-gradient-to-r from-amber-600/70 via-stone-600/50 to-amber-700/70'
+ }`} />
+
+ {/* Top Header: Badges + Star + Kebab Action Menu */}
+ <div className="flex items-start justify-between gap-2 pt-0.5">
+ <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+ {isGeneratingThisJob ? (
+ <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-[10px] font-mono font-black bg-amber-500 text-slate-950 uppercase tracking-wider animate-pulse">
+ <RefreshCw size={12} className="animate-spin text-slate-950" />
+ ⚡ SYNTHESIZING...
+ </div>
+ ) : hasCustomDocs ? (
+ <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-black bg-teal-500 text-slate-950 uppercase tracking-wider shadow-2xs">
+ <CheckCircle2 size={12} className="text-slate-950" />
+ ✨ READY (PDFs)
+ </div>
+ ) : isTopFit ? (
+ <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-black bg-emerald-500 text-slate-950 uppercase tracking-wider shadow-2xs animate-pulse">
+ <Flame size={12} className="text-amber-950 fill-amber-950" />
+ 🏆 TOP FIT
+ </div>
+ ) : null}
+
+ {isQuickApplyEligible(job) && (
+ <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-sm text-[9px] font-mono font-black uppercase tracking-wider border shadow-2xs ${
+ (job.source || '').toLowerCase().includes('linkedin') || (job.link || '').toLowerCase().includes('linkedin')
+ ? 'bg-sky-950 text-sky-300 border-sky-500/50'
+ : (job.source || '').toLowerCase().includes('seek') || (job.link || '').toLowerCase().includes('seek')
+ ? 'bg-rose-950 text-rose-300 border-rose-500/50'
+ : 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
+ }`}>
+ <Zap size={10} className="text-amber-400 fill-amber-400 animate-pulse" />
+ <span>{getQuickApplyPlatform(job).toUpperCase()}</span>
+ </div>
+ )}
+ </div>
+
+ {/* Top Right Cluster: Star + Kebab Menu */}
+ <div className="flex items-center gap-1 shrink-0 relative">
+ <button
+ type="button"
+ onClick={(e) => toggleStar(job.id || `${job.company}_${job.title}`, e)}
+ className={`p-1.5 rounded-sm transition-colors ${starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25' : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'}`}
+ title={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "Remove from Saved" : "Save Job"}
+ >
+ <Star size={16} className={starredJobIds.includes(job.id || `${job.company}_${job.title}`) ? "fill-amber-400" : ""} />
+ </button>
+
+ <button
+ type="button"
+ onClick={(e) => {
+ e.stopPropagation();
+ const cId = job.id || `${job.company}_${job.title}`;
+ setOpenKebabJobId(prev => prev === cId ? null : cId);
+ }}
+ className="p-1.5 rounded-sm hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+ title="More Actions"
+ >
+ <MoreVertical size={16} />
+ </button>
+
+ {/* Kebab Popover Menu */}
+ {openKebabJobId === (job.id || `${job.company}_${job.title}`) && (
+ <div 
+ onClick={(e) => e.stopPropagation()}
+ className="absolute right-0 top-full mt-1 w-60 bg-slate-900/95 backdrop-blur-xl border border-slate-700/90 rounded-sm p-1.5 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200"
+ >
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ setSelectedAutoApplyJob(job);
+ }}
+ className="w-full px-3 py-2 rounded-sm hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+ >
+ <Zap size={14} className="text-amber-400 shrink-0" />
+ <span>Launch Auto-Apply</span>
+ </button>
+
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ setPsychologyJob({ ...job, psychologyInsights: getCachedPsychology(job) });
+ }}
+ className="w-full px-3 py-2 rounded-sm hover:bg-teal-950 text-slate-200 hover:text-teal-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+ >
+ <Sparkles size={14} className="text-teal-400 shrink-0" />
+ <span>{getCachedPsychology(job) ? 'View Psychology' : 'Decode Psychology'}</span>
+ </button>
+
+ {onOpenCheatSheet && (
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ onOpenCheatSheet(job);
+ }}
+ className="w-full px-3 py-2 rounded-sm hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+ >
+ <Compass size={14} className="text-amber-400 shrink-0" />
+ <span>Interview Cheat Sheet</span>
+ </button>
+ )}
+
+ {hasCustomDocs && (
+ <>
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ downloadResumePdf(job.resumeText, job, currentProfile);
+ }}
+ className="w-full px-3 py-2 rounded-sm hover:bg-emerald-950 text-slate-200 hover:text-emerald-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+ >
+ <Download size={14} className="text-emerald-400 shrink-0" />
+ <span>Download Resume (PDF)</span>
+ </button>
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
+ }}
+ className="w-full px-3 py-2 rounded-sm hover:bg-indigo-950 text-slate-200 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+ >
+ <Download size={14} className="text-indigo-400 shrink-0" />
+ <span>Download Cover (PDF)</span>
+ </button>
+ </>
+ )}
+
+ <div className="pt-1 border-t border-slate-800 space-y-1">
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ handlePromote(job);
+ }}
+ className={`w-full px-3 py-1.5 rounded-sm flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
+ isJobPromoted(job) ? 'bg-emerald-950 text-emerald-300 font-bold' : 'hover:bg-slate-800 text-slate-300'
+ }`}
+ >
+ <ThumbsUp size={13} className={isJobPromoted(job) ? 'text-emerald-400 fill-emerald-400' : 'text-slate-400'} />
+ <span>More Like This</span>
+ </button>
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ handleDemote(job);
+ }}
+ className={`w-full px-3 py-1.5 rounded-sm flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
+ isJobDemoted(job) ? 'bg-rose-950 text-rose-300 font-bold' : 'hover:bg-slate-800 text-slate-300'
+ }`}
+ >
+ <ThumbsDown size={13} className={isJobDemoted(job) ? 'text-rose-400 fill-rose-400' : 'text-slate-400'} />
+ <span>Less Like This</span>
+ </button>
+ </div>
+
+ {(job.portalLink || job.link || job.url) && (
+ <a
+ href={job.portalLink || job.link || job.url}
+ target="_blank"
+ rel="noreferrer"
+ onClick={() => setOpenKebabJobId(null)}
+ className="w-full px-3 py-2 rounded-sm hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2.5 transition-colors text-left cursor-pointer border-t border-slate-800"
+ >
+ <ExternalLink size={13} className="text-slate-400 shrink-0" />
+ <span>Open Original Listing</span>
+ </a>
+ )}
+
+ <button
+ type="button"
+ onClick={() => {
+ setOpenKebabJobId(null);
+ if (job.isRejected) {
+ if (onUnrejectJob) onUnrejectJob(job.id || `${job.company}_${job.title}`);
+ } else {
+ if (onRejectJob) onRejectJob(job.id || `${job.company}_${job.title}`);
+ }
+ }}
+ className="w-full px-3 py-2 rounded-sm hover:bg-rose-950/60 text-rose-300 flex items-center gap-2.5 transition-colors text-left border-t border-slate-800 cursor-pointer"
+ >
+ <Trash2 size={13} className="text-rose-400 shrink-0" />
+ <span>{job.isRejected ? 'Restore Job' : 'Dismiss / Reject'}</span>
+ </button>
+ </div>
+ )}
+ </div>
+ </div>
+
+ {/* Score & Source Bar */}
+ <div className="flex items-center justify-between gap-2 pt-1 text-xs">
+ <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-sm font-semibold border ${
+ isTopFit 
+ ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
+ : (job.score || 0) >= 80
+ ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+ : 'bg-stone-900/90 text-stone-300 border-stone-800'
+ }`}>
+ <Award size={13} className={isTopFit ? "text-emerald-400" : "text-amber-400"} aria-hidden="true" />
+ {job.score || 85}% match
+ </span>
+
+ <div className="flex items-center gap-2 text-stone-400">
+ {job.source && (
+ <span className="type-meta px-2 py-0.5 rounded-sm bg-stone-900/80 text-stone-300 border border-stone-800">
+ {job.source}
+ </span>
+ )}
+ <span className="type-meta text-stone-400 flex items-center gap-1">
+ <Clock size={11} aria-hidden="true" /> {formatJobPostedAge(job.date)}
+ </span>
+ </div>
+ </div>
+
+ {/* Title & Company */}
+ <div className="space-y-1">
+ {(() => {
+ const jobUrl = job.portalLink || job.link || job.url;
+ return (
+ <>
+ {jobUrl ? (
+ <a
+ href={jobUrl}
+ target="_blank"
+ rel="noreferrer"
+ onClick={(e) => e.stopPropagation()}
+ aria-label={`${job.title} at ${job.company} — open job posting (new tab)`}
+ className="type-heading text-base text-[#fbf9f4] hover:text-amber-400 transition-colors cursor-pointer inline-flex items-start gap-1.5 group/title"
+ >
+ <span className="leading-snug">{job.title}</span>
+ <ExternalLink size={13} className="text-stone-400 group-hover/title:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+ </a>
+ ) : (
+ <h3 className="type-heading text-base text-[#fbf9f4] leading-snug">
+ {job.title}
+ </h3>
+ )}
+
+ <p className="type-meta text-stone-400 flex items-center gap-1.5 flex-wrap">
+ <Building2 size={12} className="text-amber-400/80 shrink-0" aria-hidden="true" />
+ <span className="font-semibold text-stone-200">{job.company}</span>
+ <span className="text-stone-600" aria-hidden="true">•</span>
+ <MapPin size={11} className="text-stone-400 shrink-0" aria-hidden="true" />
+ <span className="truncate">{job.location || 'Australia'}</span>
+ </p>
+ </>
+ );
+ })()}
+ </div>
+
+ {/* Salary & Work Arrangement Chips */}
+ <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+ {job.salary && (
+ <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-xs font-black bg-emerald-950/70 text-emerald-300 border border-emerald-500/30">
+ <DollarSign size={12} className="text-emerald-400" />
+ <span>{job.salary}</span>
+ </div>
+ )}
+ {job.workArrangement && (
+ <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold border ${
+ job.workArrangement === 'Remote' 
+ ? 'bg-purple-950/60 text-purple-300 border-purple-500/30'
+ : job.workArrangement === 'Hybrid'
+ ? 'bg-blue-950/60 text-blue-300 border-blue-500/30'
+ : 'bg-slate-800/80 text-slate-300 border-slate-700/80'
+ }`}>
+ <Building2 size={10} />
+ <span>{job.workArrangement}</span>
+ </div>
+ )}
+ {job.employmentType && (
+ <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold bg-slate-800/80 text-slate-300 border border-slate-700/80">
+ <Briefcase size={10} className="text-indigo-400" />
+ <span>{job.employmentType}</span>
+ </div>
+ )}
+ </div>
+
+ {/* Commute Summary Pill */}
+ {(() => {
+ const commute = getCommuteDetails(baseLocation, job.location);
+ if (commute.isRemote) {
+ return (
+ <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-emerald-950/60 border border-emerald-500/30 text-[10px] text-emerald-300 font-mono font-bold">
+ <Sparkles size={11} className="text-emerald-400" />
+ <span>100% REMOTE • 0 MIN COMMUTE</span>
+ </div>
+ );
+ }
+ return (
+ <div className="p-2 rounded-sm bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono space-y-1">
+ <div className="flex items-center justify-between text-slate-300 font-bold px-1">
+ <span className="flex items-center gap-1 text-indigo-400">
+ <Navigation size={10} />
+ {commute.distanceKm}KM COMMUTE:
+ </span>
+ <span className={commute.car.tolls.hasTolls ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
+ {commute.car.tolls.hasTolls ? `Tolls: ${commute.car.tolls.estimatedCost}` : 'Toll-Free'}
+ </span>
+ </div>
+ <div className="grid grid-cols-3 gap-1 text-[9px] text-center">
+ <span className="p-1 rounded bg-slate-900 border border-slate-800 text-indigo-300 flex items-center justify-center gap-0.5" title={`Train route: ${commute.transit.lines}`}>
+ <Train size={9} /> {commute.transit.durationMin}m Train
+ </span>
+ <span className="p-1 rounded bg-slate-900 border border-slate-800 text-amber-300 flex items-center justify-center gap-0.5">
+ <Car size={9} /> {commute.car.peakMin}m Peak
+ </span>
+ <span className="p-1 rounded bg-slate-900 border border-slate-800 text-emerald-300 flex items-center justify-center gap-0.5">
+ <Bike size={9} /> {commute.bike.durationMin}m Bike
+ </span>
+ </div>
+ </div>
+ );
+ })()}
+
+ {/* Streamlined Action Ribbon */}
+ <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 font-mono">
+ {hasCustomDocs ? (
+ <>
+ <button
+ type="button"
+ onClick={(e) => { 
+ e.stopPropagation(); 
+ dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
+ }}
+ className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 shadow-emerald-500/20 active:scale-95"
+ title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
+ >
+ <CheckCircle2 size={13} className="text-emerald-200" /> 
+ <span>APPLY</span>
+ </button>
+ <button
+ type="button"
+ onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
+ className="py-2 px-2.5 rounded-sm font-bold text-xs bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
+ title="Open in AI Studio to customize"
+ >
+ <Sparkles size={13} className="text-emerald-400" />
+ </button>
+ </>
+ ) : isGeneratingThisJob ? (
+ <button
+ disabled
+ className="flex-1 py-2 px-3 rounded-sm font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 cursor-not-allowed font-mono animate-pulse"
+ >
+ <RefreshCw size={12} className="animate-spin text-slate-950" />
+ <span>SYNTHESIZING…</span>
+ </button>
+ ) : (
+ <button
+ type="button"
+ onClick={(e) => {
+ e.stopPropagation();
+ if (onDispatchAsyncApplication) {
+ onDispatchAsyncApplication(job);
+ } else {
+ setSelectedForGenerator(job);
+ }
+ }}
+ className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 shadow-amber-950/40 tracking-wide uppercase active:scale-95"
+ title="Generate Tailored Resume & Cover Letter"
+ >
+ <Sparkles size={12} className="text-slate-950" />
+ <span>PREP DOCS</span>
+ </button>
+ )}
+
+ <button
+ type="button"
+ onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
+ className="py-2 px-3.5 rounded-sm bg-stone-900/80 hover:bg-stone-800 text-stone-200 font-extrabold text-xs transition-colors border border-amber-500/20 hover:border-amber-500/40 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+ title="View Full Details"
+ >
+ <Eye size={13} className="text-stone-400" />
+ <span>DETAILS</span>
+ </button>
+ </div>
+ </motion.div>
+
+ );
+ })}
+
+ </div>
+ )}
+ {/* Interactive Pagination Navigation Bar */}
+ {pageSize !== 'All' && totalPages > 1 && (
+ <div className="obsidian-card rounded-sm p-4 border border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-slate-300">
+ <div className="flex items-center gap-1.5 text-slate-400">
+ <span>PAGE <strong className="text-white">{currentPage}</strong> OF <strong className="text-white">{totalPages}</strong></span>
+ <span className="text-slate-500">({seekerJobs.length} TOTAL POSITIONS)</span>
+ </div>
+ <div className="flex items-center gap-1.5">
+ <button
+ onClick={() => handlePageChange(1)}
+ disabled={currentPage === 1}
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ title="First Page"
+ >
+ <ChevronFirst size={15} />
+ </button>
+
+ <button
+ onClick={() => handlePageChange(currentPage - 1)}
+ disabled={currentPage === 1}
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ >
+ <ChevronLeft size={15} />
+ </button>
+ {/* Numeric Page Buttons */}
+ {Array.from({ length: totalPages }, (_, i) => i + 1)
+ .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+ .map((pageNum, idx, arr) => {
+
+ const prevPage = arr[idx - 1];
+ const showEllipsis = prevPage && pageNum - prevPage > 1;
+
+ return (
+ <React.Fragment key={pageNum}>
+ {showEllipsis && <span className="px-1 text-slate-500">...</span>}
+ <button
+ onClick={() => handlePageChange(pageNum)}
+ className={`px-3 py-1.5 rounded-sm font-extrabold transition-all cursor-pointer ${
+ currentPage === pageNum
+ ? 'bg-indigo-600 text-white shadow-indigo-600/30 border border-indigo-400/50'
+ : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/80'
+ }`}
+ >
+ {pageNum}
+ </button>
+ </React.Fragment>
+ );
+ })}
+
+ <button
+ onClick={() => handlePageChange(currentPage + 1)}
+ disabled={currentPage === totalPages}
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ title="Next Page"
+ >
+ <ChevronRight size={15} />
+ </button>
+
+ <button
+ onClick={() => handlePageChange(totalPages)}
+ disabled={currentPage === totalPages}
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ title="Last Page"
+ >
+ <ChevronLast size={15} />
+ </button>
+ </div>
+
+ {/* Load More Batch Button */}
+ {currentPage < totalPages && (
+ <button
+ onClick={() => handlePageChange(currentPage + 1)}
+ className="px-4 py-2 rounded-sm bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 font-extrabold border border-indigo-500/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+ >
+ <ArrowDown size={14} className="text-indigo-400" />
+ LOAD NEXT {Math.min(effectivePageSize, seekerJobs.length - endJobNum)} POSITIONS
+ </button>
+ )}
+ </div>
+
+ )}
+ </div>
+ )}
+ </div>
+ </div>
+
+ {/* Generator Modal */}
+ {selectedForGenerator && (
+ <SafeErrorBoundary sectionName="Generator Modal" onClose={() => setSelectedForGenerator(null)}>
+ <Suspense fallback={<ModalSkeleton />}>
+ <GeneratorModal 
+ job={selectedForGenerator} 
+ onClose={() => setSelectedForGenerator(null)} 
+ onSaveCustomDocs={onSaveCustomDocs}
+ onUpdateStatus={onJobStatusUpdate}
+ />
+ </Suspense>
+ </SafeErrorBoundary>
+ )}
+
+ {/* Auto-Apply Engine Modal (LinkedIn Easy Apply & SEEK Quick Apply) */}
+ {selectedAutoApplyJob && (
+ <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
+ <Suspense fallback={<ModalSkeleton />}>
+ <AutoApplyModal 
+ job={selectedAutoApplyJob} 
+ onClose={() => setSelectedAutoApplyJob(null)}
+ onJobStatusUpdated={onJobStatusUpdate}
+ />
+ </Suspense>
+ </SafeErrorBoundary>
+ )}
+
+ {/* Psychological Edge & Covert Subtext Decoder Modal */}
+ {psychologyJob && (
+ <SafeErrorBoundary sectionName="Psychology Decoder" onClose={() => setPsychologyJob(null)}>
+ <Suspense fallback={<ModalSkeleton />}>
+ <PsychologyDecoderModal 
+ job={psychologyJob} 
+ onClose={() => setPsychologyJob(null)}
+ onSaveInsights={(id, insights) => {
+ if (onJobStatusUpdate) {
+ onJobStatusUpdate(id, psychologyJob.status || 'Discovered', { psychologyInsights: insights });
+ }
+ }}
+ />
+ </Suspense>
+ </SafeErrorBoundary>
+ )}
+ </div>
+ );
 };
 
 

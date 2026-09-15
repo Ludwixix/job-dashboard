@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-void: #090a0d;
-  --color-canvas: #101217;
-  --color-surface: #161820;
-  --color-elevated: #1f222c;
-  --color-overlay: #2a2e3b;
-  --color-border-subtle: rgba(229, 169, 93, 0.14);
-  --color-border-strong: rgba(229, 169, 93, 0.28);
+  --color-void: #0a0b0e;
+  --color-canvas: #111318;
+  --color-surface: #151821;
+  --color-elevated: #1d212d;
+  --color-overlay: #1d212d;
+
+  --color-border-subtle: rgba(229, 169, 93, 0.20);
+  --color-border-strong: rgba(229, 169, 93, 0.55);
 
   --color-text-primary: #fbf9f4;
   --color-text-secondary: #e6e2d8;
-  --color-text-muted: #a8a398;
+  --color-text-muted: #94a3b8;
   --color-text-dim: #716c62;
 
   --color-accent-amber: #e5a95d;
@@ -21,8 +22,8 @@
 
   --font-editorial: 'Fraunces', Georgia, Cambria, 'Times New Roman', serif;
   --font-display: 'Fraunces', Georgia, Cambria, serif;
-  --font-humanist: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-humanist: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --z-modal-base: 50;
@@ -37,48 +38,46 @@
     --industry-accent: #e5a95d;
     --industry-accent-rgb: 229, 169, 93;
     --industry-light: #f3c78d;
-    --industry-glow: rgba(229, 169, 93, 0.16);
-    --industry-border: rgba(229, 169, 93, 0.32);
+    --industry-glow: rgba(229, 169, 93, 0.15);
+    --industry-border: rgba(229, 169, 93, 0.20);
+    --industry-border-hover: rgba(229, 169, 93, 0.55);
     --industry-subtle: rgba(229, 169, 93, 0.05);
     --industry-badge-bg: rgba(78, 51, 19, 0.55);
     --industry-badge-text: #fde68a;
 
     /* Canonical Tokens */
-    --bg-void: #090a0d;
-    --bg-canvas: #101217;
-    --bg-surface: #161820;
-    --bg-elevated: #1f222c;
-    --bg-overlay: #2a2e3b;
+    --bg-void: #0a0b0e;
+    --bg-canvas: #111318;
+    --bg-surface: #151821;
+    --bg-elevated: #1d212d;
+    --bg-overlay: #1d212d;
 
     --text-primary: #fbf9f4;
     --text-secondary: #e6e2d8;
-    --text-muted: #a8a398;
+    --text-muted: #94a3b8;
     --text-dim: #716c62;
   }
 
   body {
     margin: 0;
     font-family: var(--font-humanist);
-    background-color: #101217;
-    color: #e6e2d8;
+    background-color: var(--bg-void);
+    color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* Global focus-visible baseline with warm amber aura */
   :focus-visible {
-    outline: 2px solid #e5a95d;
-    outline-offset: 2px;
-    border-radius: 4px;
+    outline: 1px solid var(--color-accent-amber);
+    outline-offset: 1px;
+    border-radius: 2px;
   }
 
-  /* Suppress outline when Tailwind's focus-visible:outline-hidden is applied */
   .focus-visible\:outline-hidden:focus-visible {
     outline: none;
   }
 
-  /* Screen-reader-only utility (supplements Tailwind sr-only) */
   .sr-only {
     position: absolute;
     width: 1px;
@@ -91,45 +90,45 @@
     border-width: 0;
   }
 
-  /* ─── Typography utilities ──────────────────────────────────────────────────── */
-
-  /* Editorial Card/panel heading — job titles, modal section titles */
   .type-heading {
-    font-family: var(--font-editorial);
-    font-weight: 600;
-    letter-spacing: -0.015em;
-    line-height: 1.25;
+    font-family: var(--font-humanist);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
   }
 
-  /* Humanist Body copy — descriptions, notes, paragraphs */
   .type-body {
     font-family: var(--font-humanist);
     font-weight: 400;
     line-height: 1.6;
+    font-size: 13px;
   }
 
-  /* Secondary meta — location, date, salary, tags */
   .type-meta {
     font-family: var(--font-humanist);
     font-weight: 500;
-    font-size: 0.75rem;
-    letter-spacing: 0.01em;
+    font-size: 12px;
+    letter-spacing: 0.02em;
   }
 
-  /* Form and telemetry labels */
   .type-label {
     font-family: var(--font-humanist);
     font-weight: 600;
-    font-size: 0.6875rem;
-    letter-spacing: 0.04em;
+    font-size: 11px;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
+  }
+  
+  .type-code {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
   }
 }
 
-/* Warm Humanist Atelier Ambient Atmosphere */
 .industry-ambient-bg {
   position: relative;
-  background-color: #101217;
+  background-color: var(--bg-void);
   transition: background 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -139,117 +138,117 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 560px;
-  background: radial-gradient(ellipse 90% 60% at 50% -10%, var(--industry-glow, rgba(229, 169, 93, 0.14)), var(--industry-subtle, rgba(229, 169, 93, 0.03)), transparent 75%);
+  height: 100vh;
+  background: radial-gradient(ellipse 90% 60% at 50% -10%, rgba(229, 169, 93, 0.08), transparent 75%);
   pointer-events: none;
   z-index: 0;
   transition: background 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease;
 }
 
-/* Tactile Atelier Glassmorphism Containers */
-.glass-panel {
-  background: rgba(22, 24, 32, 0.82);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(229, 169, 93, 0.16);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+/* Base Terminal Surface */
+.saas-card, .obsidian-card, .atelier-card, .atelier-folio, .glass-card, .glass-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--industry-border);
+  border-radius: 2px;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
 }
 
-.glass-card {
-  background: rgba(22, 24, 32, 0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(229, 169, 93, 0.14);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+.saas-card:hover, .obsidian-card:hover, .atelier-card:hover, .atelier-folio:hover, .glass-card:hover, .glass-panel:hover {
+  background: var(--bg-elevated);
+  border-color: var(--industry-border-hover);
+  box-shadow: none !important;
+  transform: none !important;
 }
 
-.glass-card:hover {
-  background: rgba(31, 34, 44, 0.85);
-  border-color: var(--industry-border, rgba(229, 169, 93, 0.4));
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 16px -3px var(--industry-glow, rgba(229, 169, 93, 0.12));
-  transform: translateY(-2px);
+.obsidian-card-emerald {
+  background: var(--bg-surface);
+  border: 1px solid rgba(82, 183, 136, 0.35);
 }
 
-/* Industry Accent Helpers */
+.obsidian-card-teal {
+  background: var(--bg-surface);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+}
+
+.obsidian-card-amber {
+  background: var(--bg-surface);
+  border: 1px solid rgba(229, 169, 93, 0.45);
+}
+
 .industry-accent-text {
   color: var(--industry-light);
-  transition: color 0.6s ease;
+  transition: color 0.2s ease;
 }
 
 .industry-accent-border {
   border-color: var(--industry-border);
-  transition: border-color 0.6s ease, box-shadow 0.6s ease;
+  transition: border-color 0.2s ease;
 }
 
 .industry-accent-badge {
   background-color: var(--industry-badge-bg);
   color: var(--industry-badge-text);
   border: 1px solid var(--industry-border);
-  transition: all 0.6s ease;
+  transition: all 0.2s ease;
 }
 
 .industry-glow-shadow {
-  box-shadow: 0 0 24px var(--industry-glow);
-  transition: box-shadow 0.6s ease;
+  box-shadow: none !important;
 }
 
-/* Minimalist Warm Slate Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #101217;
+  background: var(--bg-void);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2e3b;
-  border-radius: 9999px;
-  border: 2px solid #101217;
+  background: var(--bg-overlay);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #e5a95d;
+  background: var(--color-accent-amber);
 }
 
-/* Subtle Tactile Blueprint Grid Pattern */
 .bg-tech-grid {
-  background-image: linear-gradient(to right, rgba(229, 169, 93, 0.035) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(229, 169, 93, 0.035) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image: linear-gradient(to right, rgba(229, 169, 93, 0.02) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(229, 169, 93, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-/* Smooth Interactive Card Hover */
 .card-hover-lift {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+  transition: none !important;
 }
 
 .card-hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.5);
+  transform: none !important;
+  box-shadow: none !important;
 }
 
-/* Warm Bioluminescent Pulse Accents */
 .pulse-emerald {
-  box-shadow: 0 0 14px rgba(82, 183, 136, 0.35);
+  border-color: rgba(82, 183, 136, 0.55) !important;
+  box-shadow: none !important;
 }
 
 .pulse-indigo {
-  box-shadow: 0 0 14px rgba(229, 169, 93, 0.35);
+  border-color: rgba(229, 169, 93, 0.55) !important;
+  box-shadow: none !important;
 }
 
 .pulse-amber {
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+  border-color: rgba(245, 158, 11, 0.55) !important;
+  box-shadow: none !important;
 }
 
-/* ==========================================================================
-   Humanist Atelier Rail & Tactile Glassmorphic Surfaces
-   ========================================================================== */
 .obsidian-saas-rail,
 .alien-monolith-rail {
-  background: linear-gradient(180deg, #12141a 0%, #0c0d11 50%, #101217 100%);
-  border-right: 1px solid rgba(229, 169, 93, 0.12);
+  background: var(--bg-void);
+  border-right: 1px solid var(--industry-border);
   position: relative;
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -257,113 +256,28 @@
 
 .obsidian-saas-rail::before,
 .alien-monolith-rail::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1px;
-  background: linear-gradient(180deg, transparent 0%, var(--industry-glow, rgba(229, 169, 93, 0.3)) 25%, var(--industry-border, rgba(229, 169, 93, 0.5)) 50%, var(--industry-glow, rgba(229, 169, 93, 0.3)) 75%, transparent 100%);
-  box-shadow: 0 0 10px var(--industry-glow, rgba(229, 169, 93, 0.25));
-  pointer-events: none;
-  transition: background 0.8s ease, box-shadow 0.8s ease;
+  display: none;
 }
 
 @media (max-width: 767px) {
   .obsidian-saas-rail,
   .alien-monolith-rail {
     border-right: none;
-    border-top: 1px solid rgba(229, 169, 93, 0.12);
-    background: linear-gradient(90deg, #12141a 0%, #0c0d11 50%, #101217 100%);
-  }
-
-  .obsidian-saas-rail::before,
-  .alien-monolith-rail::before {
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: auto;
-    width: 100%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, var(--industry-glow, rgba(229, 169, 93, 0.3)) 25%, var(--industry-border, rgba(229, 169, 93, 0.5)) 50%, var(--industry-glow, rgba(229, 169, 93, 0.3)) 75%, transparent 100%);
-    box-shadow: 0 0 10px var(--industry-glow, rgba(229, 169, 93, 0.25));
-    transition: background 0.8s ease, box-shadow 0.8s ease;
+    border-top: 1px solid var(--industry-border);
+    background: var(--bg-void);
   }
 }
 
 .saas-nav-button,
 .alien-glyph-button {
   position: relative;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  border-radius: 12px;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .saas-nav-button:hover,
 .alien-glyph-button:hover {
-  background: rgba(229, 169, 93, 0.08);
+  background: rgba(229, 169, 93, 0.05);
+  border-color: var(--industry-border-hover);
   color: #fbf9f4;
 }
-
-/* Atelier Hairline Card Surface */
-.saas-card {
-  background: rgba(22, 24, 32, 0.82);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(229, 169, 93, 0.14);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.saas-card:hover {
-  background: rgba(31, 34, 44, 0.9);
-  border-color: var(--industry-border, rgba(229, 169, 93, 0.45));
-  box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.55), 0 0 18px -3px var(--industry-glow, rgba(229, 169, 93, 0.18));
-  transform: translateY(-2px);
-}
-
-/* Atelier Folio Cards (Formerly Obsidian Cards) */
-.obsidian-card,
-.atelier-card {
-  background: rgba(22, 24, 32, 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(229, 169, 93, 0.14);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.obsidian-card:hover,
-.atelier-card:hover {
-  background: rgba(31, 34, 46, 0.92);
-  border-color: rgba(229, 169, 93, 0.45);
-  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.6), 0 0 18px -2px rgba(229, 169, 93, 0.2);
-  transform: translateY(-2px);
-}
-
-.obsidian-card-emerald {
-  background: linear-gradient(135deg, rgba(16, 78, 48, 0.28) 0%, rgba(22, 24, 32, 0.85) 50%, rgba(16, 18, 23, 0.95) 100%);
-  border: 1px solid rgba(82, 183, 136, 0.35);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 16px -4px rgba(82, 183, 136, 0.18);
-}
-
-.obsidian-card-teal {
-  background: linear-gradient(135deg, rgba(20, 80, 85, 0.28) 0%, rgba(22, 24, 32, 0.85) 50%, rgba(16, 18, 23, 0.95) 100%);
-  border: 1px solid rgba(45, 212, 191, 0.35);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 16px -4px rgba(45, 212, 191, 0.18);
-}
-
-.obsidian-card-amber {
-  background: linear-gradient(135deg, rgba(120, 60, 15, 0.28) 0%, rgba(22, 24, 32, 0.85) 50%, rgba(16, 18, 23, 0.95) 100%);
-  border: 1px solid rgba(229, 169, 93, 0.45);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 16px -4px rgba(229, 169, 93, 0.22);
-}
-
-/* Atelier Dossier Folio Card Utility */
-.atelier-folio {
-  background: linear-gradient(180deg, rgba(26, 28, 38, 0.9) 0%, rgba(18, 20, 27, 0.95) 100%);
-  border: 1px solid rgba(229, 169, 93, 0.18);
-  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-}
-
-

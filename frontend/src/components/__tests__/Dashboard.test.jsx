@@ -43,7 +43,7 @@ describe('Dashboard Top-Level Integration', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+      expect(screen.getByText(/CANDIDATE LOGISTICS PORTAL/i)).toBeInTheDocument();
     });
 
     // Integrated Prime Target & Autopilot Telemetry is present
@@ -54,7 +54,7 @@ describe('Dashboard Top-Level Integration', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+      expect(screen.getByText(/CANDIDATE LOGISTICS PORTAL/i)).toBeInTheDocument();
     });
 
     // Click Ambient Flow button
@@ -71,7 +71,7 @@ describe('Dashboard Top-Level Integration', () => {
     fireEvent.click(returnBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+      expect(screen.getByText(/CANDIDATE LOGISTICS PORTAL/i)).toBeInTheDocument();
     });
   });
 
@@ -79,7 +79,7 @@ describe('Dashboard Top-Level Integration', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/CAREER\.AGENT/i)).toBeInTheDocument();
+      expect(screen.getByText(/CANDIDATE LOGISTICS PORTAL/i)).toBeInTheDocument();
     });
 
     // Switch to Highlights section

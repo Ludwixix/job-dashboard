@@ -2,12 +2,12 @@ import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Building2, MapPin, Clock } from 'lucide-react';
+import { Building2, MapPin, Clock, Compass } from 'lucide-react';
 import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { Badge } from './ui/Badge';
 import { statusBadgeClass, statusDotClass } from '../utils/statusStyles';
 
-const KanbanCard = ({ job, onSelectJob }) => {
+const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
     id: String(job.id), 
     data: { ...job, stage: job.stage } 
@@ -77,11 +77,30 @@ const KanbanCard = ({ job, onSelectJob }) => {
           <span>{daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}</span>
         </div>
       </div>
+
+      {/* 1-Click Master Interview Cheat Sheet Cockpit */}
+      {(stage?.id === 'Interviewing' || s.includes('interview')) && onOpenCheatSheet && (
+        <div className="mt-2.5 pt-2 border-t border-slate-700/60">
+          <button
+            type="button"
+            aria-label={`Open Interview Cheat Sheet for ${job.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenCheatSheet(job);
+            }}
+            className="w-full py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 group/btn"
+            title="Open Master Interview Cheat Sheet Cockpit"
+          >
+            <Compass size={12} className="text-amber-400 group-hover/btn:rotate-45 transition-transform" />
+            <span>🎯 CHEAT SHEET</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
-export const KanbanColumn = ({ stage, jobs = [], onSelectJob, className = '' }) => {
+export const KanbanColumn = ({ stage, jobs = [], onSelectJob, onOpenCheatSheet, className = '' }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
     data: { type: 'column', stage: stage.id }
@@ -122,7 +141,13 @@ export const KanbanColumn = ({ stage, jobs = [], onSelectJob, className = '' }) 
       <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar min-h-[200px]">
         <SortableContext items={jobs.map(j => String(j.id))} strategy={verticalListSortingStrategy}>
           {jobs.map(job => (
-            <KanbanCard key={job.id} job={job} onSelectJob={onSelectJob} />
+            <KanbanCard 
+              key={job.id} 
+              job={job} 
+              stage={stage} 
+              onSelectJob={onSelectJob} 
+              onOpenCheatSheet={onOpenCheatSheet} 
+            />
           ))}
         </SortableContext>
         {jobs.length === 0 && (

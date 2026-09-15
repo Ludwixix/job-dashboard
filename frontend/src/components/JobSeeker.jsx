@@ -10,7 +10,7 @@ import {
   Target,
 
   HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
-  Train, Car, Bike, MoreVertical
+  Train, Car, Bike, MoreVertical, Compass
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -174,7 +174,8 @@ export const JobSeeker = ({
   asyncGeneratingIds = new Set(),
   onJobStatusUpdate,
   onSaveCustomDocs,
-  onOpenBatchApply
+  onOpenBatchApply,
+  onOpenCheatSheet
 }) => {
 
   const currentProfile = activeProfile || getActiveProfile();
@@ -1495,6 +1496,20 @@ export const JobSeeker = ({
                                 <Sparkles size={14} className="text-teal-400 shrink-0" />
                                 <span>{getCachedPsychology(job) ? 'View Psychology' : 'Decode Psychology'}</span>
                               </button>
+
+                              {onOpenCheatSheet && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenKebabJobId(null);
+                                    onOpenCheatSheet(job);
+                                  }}
+                                  className="w-full px-3 py-2 rounded-xl hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left font-bold cursor-pointer"
+                                >
+                                  <Compass size={14} className="text-amber-400 shrink-0" />
+                                  <span>Interview Cheat Sheet</span>
+                                </button>
+                              )}
 
                               {hasCustomDocs && (
                                 <>

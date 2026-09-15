@@ -43,6 +43,7 @@ const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m 
 const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ default: m.KscGeneratorModal })));
 const SeekPassModal = lazy(() => import('./SeekPassModal').then(m => ({ default: m.SeekPassModal })));
 const RemoteRolesSection = lazy(() => import('./RemoteRolesSection').then(m => ({ default: m.RemoteRolesSection })));
+const InterviewCheatSheetModal = lazy(() => import('./InterviewCheatSheetModal'));
 
 import { TelemetryDesk } from './TelemetryDesk';
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
@@ -90,6 +91,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   const [selectedForScreeningSolver, setSelectedForScreeningSolver] = useState(null);
   const [selectedForKscGenerator, setSelectedForKscGenerator] = useState(null);
   const [selectedForSeekPass, setSelectedForSeekPass] = useState(null);
+  const [selectedForCheatSheet, setSelectedForCheatSheet] = useState(null);
 
   const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
   const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -600,6 +602,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     return match || selectedForSeekPass;
   }, [selectedForSeekPass, jobs]);
 
+  const liveSelectedForCheatSheet = useMemo(() => {
+    if (!selectedForCheatSheet) return null;
+    const match = jobs.find(j => 
+      (j.id && String(j.id) === String(selectedForCheatSheet.id)) ||
+      `${j.company}_${j.title}` === `${selectedForCheatSheet.company}_${selectedForCheatSheet.title}`
+    );
+    return match || selectedForCheatSheet;
+  }, [selectedForCheatSheet, jobs]);
+
   const preparedCount = useMemo(() => {
     return jobs.filter(j => 
       !j.isRejected && (
@@ -691,6 +702,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
               onOpenKscGenerator={(j) => setSelectedForKscGenerator(j)}
               onOpenSeekPass={(j) => setSelectedForSeekPass(j)}
+              onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
               profile={activeProfile}
               allJobs={jobs}
             />
@@ -1225,6 +1237,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   onOpenBatchApply={() => setIsBatchApplyOpen(true)}
                   onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
                   onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
+                  onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
                   onSaveCustomDocs={(jobId, docData) => {
                     updateJobStatus(jobId, 'Package Prepared / To Submit', {
                       hasCustomDocs: true,
@@ -1244,6 +1257,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   jobs={jobs}
                   onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
                   onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+                  onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
                   onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
                   onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
                   onSelectJob={(j) => setSelectedJob(j)}
@@ -1257,6 +1271,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 <ApplicationPipeline
                   onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
                   onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)} 
+                  onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
                   jobs={jobs} 
                   loading={loading}
                   onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
@@ -1273,6 +1288,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                     onSelectJob={(j) => setSelectedJob(j)}
                     onOpenGenerator={(j) => setSelectedForGenerator(j)}
                     onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                    onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
                   />
                 </Suspense>
               </SafeErrorBoundary>
@@ -1340,6 +1356,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
               onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
               onOpenKscGenerator={(j) => { setSelectedForKscGenerator(j); }}
               onOpenSeekPass={(j) => { setSelectedForSeekPass(j); }}
+              onOpenCheatSheet={(j) => { setSelectedForCheatSheet(j); }}
 
               onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
               onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
@@ -1428,6 +1445,20 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <InterviewPrepModal 
               job={liveSelectedForInterviewPrep} 
               onClose={() => setSelectedForInterviewPrep(null)} 
+            />
+          </Suspense>
+        </SafeErrorBoundary>
+      )}
+
+      {/* Interview Master Cheat Sheet Modal */}
+      {liveSelectedForCheatSheet && (
+        <SafeErrorBoundary sectionName="Interview Master Cheat Sheet" onClose={() => setSelectedForCheatSheet(null)}>
+          <Suspense fallback={<ModalSkeleton />}>
+            <InterviewCheatSheetModal
+              isOpen={Boolean(liveSelectedForCheatSheet)}
+              job={liveSelectedForCheatSheet}
+              userProfile={activeProfile}
+              onClose={() => setSelectedForCheatSheet(null)}
             />
           </Suspense>
         </SafeErrorBoundary>

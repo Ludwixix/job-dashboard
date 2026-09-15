@@ -50,7 +50,15 @@ export const getJobStage = (job, starredSet = new Set()) => {
   return null;
 };
 
-export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator, loading }) => {
+export const ApplicationPipeline = ({ 
+  jobs = [], 
+  onUpdateStatus, 
+  onOpenGenerator, 
+  onOpenCheatSheet,
+  onOpenInterviewPrep,
+  onOpenMockInterview,
+  loading 
+}) => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [viewMode, setViewMode] = useURLState('view', 'kanban'); // 'kanban' or 'table'
   const [searchQuery, setSearchQuery] = useURLState('q', '');
@@ -273,6 +281,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
                     stage={stage} 
                     jobs={activeJobs.filter(j => getJobStage(j, starredSet) === stage.id)} 
                     onSelectJob={(job) => setSelectedJob(job)}
+                    onOpenCheatSheet={onOpenCheatSheet}
                     className={mobileActiveStage === stage.id ? 'flex' : 'hidden md:flex'}
                   />
                 ))}
@@ -291,6 +300,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
                 jobs={activeJobs} 
                 onUpdateStatus={onUpdateStatus} 
                 onSelectJob={(job) => setSelectedJob(job)}
+                onOpenCheatSheet={onOpenCheatSheet}
               />
             )
           )
@@ -303,6 +313,7 @@ export const ApplicationPipeline = ({ jobs = [], onUpdateStatus, onOpenGenerator
           isOpen={!!selectedJob} 
           onClose={() => setSelectedJob(null)} 
           onOpenGenerator={onOpenGenerator}
+          onOpenCheatSheet={onOpenCheatSheet}
           onUpdateStatus={(jobId, newStatus) => {
             if (onUpdateStatus) onUpdateStatus(jobId, newStatus);
             setSelectedJob(prev => prev ? { ...prev, status: newStatus } : null);

@@ -13,7 +13,8 @@ import {
   Wifi, 
   TrendingUp,
   SlidersHorizontal,
-  Briefcase
+  Briefcase,
+  Compass
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { EmptyState } from './ui/EmptyState';
@@ -22,7 +23,8 @@ export const RemoteRolesSection = ({
   jobs = [], 
   onSelectJob, 
   onOpenGenerator, 
-  onOpenMockInterview 
+  onOpenMockInterview,
+  onOpenCheatSheet
 }) => {
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('all'); // 'all', 'au', 'global'
@@ -291,6 +293,17 @@ export const RemoteRolesSection = ({
                       >
                         <Sparkles size={11} />
                         Tailor
+                      </button>
+                    )}
+                    {onOpenCheatSheet && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCheatSheet(job)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 transition-all font-bold cursor-pointer"
+                        title="Interview Master Cheat Sheet"
+                      >
+                        <Compass size={11} />
+                        Cheat Sheet
                       </button>
                     )}
                     {job.portalLink && (

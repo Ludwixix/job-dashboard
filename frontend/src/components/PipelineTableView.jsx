@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowUpDown, Building2, Calendar, MapPin, ExternalLink, Sparkles } from 'lucide-react';
+import { ArrowUpDown, Building2, Calendar, MapPin, ExternalLink, Sparkles, Compass } from 'lucide-react';
 import { parseISO, format, isValid } from 'date-fns';
 
 const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
@@ -13,7 +13,7 @@ const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
   return '-';
 };
 
-export const PipelineTableView = ({ jobs = [], onUpdateStatus, onSelectJob }) => {
+export const PipelineTableView = ({ jobs = [], onUpdateStatus, onSelectJob, onOpenCheatSheet }) => {
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
   const handleSort = (key) => {
@@ -114,17 +114,29 @@ export const PipelineTableView = ({ jobs = [], onUpdateStatus, onSelectJob }) =>
                   </select>
                 </td>
                 <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                  {(job.link || job.url) && (
-                    <a
-                      href={job.link || job.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white inline-flex items-center gap-1 text-xs"
-                      title="Open Job Portal"
-                    >
-                      <ExternalLink size={13} />
-                    </a>
-                  )}
+                  <div className="inline-flex items-center gap-1.5 justify-end">
+                    {onOpenCheatSheet && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCheatSheet(job)}
+                        className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1 text-xs cursor-pointer transition-colors"
+                        title="Open Interview Master Cheat Sheet"
+                      >
+                        <Compass size={13} />
+                      </button>
+                    )}
+                    {(job.link || job.url) && (
+                      <a
+                        href={job.link || job.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white inline-flex items-center gap-1 text-xs"
+                        title="Open Job Portal"
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, ExternalLink, Calendar, MapPin, DollarSign, Building2, UserCircle, 
   Edit3, AlignLeft, Activity, Sparkles, CheckCircle2, FileText, Copy, Check, 
-  Download, Zap, Navigation, Train, Car, Bike, Clock, AlertTriangle
+  Download, Zap, Navigation, Train, Car, Bike, Clock, AlertTriangle, Compass
 } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { getCommuteDetails } from '../services/commuteService';
@@ -18,7 +18,7 @@ const formatDateSafe = (dateStr, formatStr = 'MMM d, yyyy') => {
   return 'Recently';
 };
 
-export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes, onOpenGenerator }) => {
+export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes, onOpenGenerator, onOpenCheatSheet }) => {
   const [notes, setNotes] = useState(job?.notes || '');
   const [docTab, setDocTab] = useState('cover_letter'); // 'cover_letter' or 'resume'
   const [commuteTab, setCommuteTab] = useState('transit'); // 'transit', 'car', 'bike'
@@ -170,6 +170,20 @@ export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes, o
               >
                 <Zap size={13} />
                 <span>{hasCustomDocs ? 'EDIT ASSETS STUDIO' : 'GENERATE ASSETS'}</span>
+              </button>
+            )}
+            {onOpenCheatSheet && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenCheatSheet(job);
+                }}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 rounded-xl transition-all text-xs font-mono font-bold cursor-pointer shadow-xs active:scale-95 group/btn"
+                title="Open Master Interview Cheat Sheet Cockpit"
+              >
+                <Compass size={13} className="text-amber-400 group-hover/btn:rotate-45 transition-transform" />
+                <span>CHEAT SHEET</span>
               </button>
             )}
           </div>

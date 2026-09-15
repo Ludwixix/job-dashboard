@@ -1,11 +1,11 @@
 import React, { lazy, Suspense } from 'react';
-import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles, Scale, Building2 } from 'lucide-react';
+import { AlertCircle, ArrowRight, BookOpen, MessageSquare, Briefcase, ChevronRight, Calendar, CheckCircle2, Sparkles, Scale, Building2, Compass } from 'lucide-react';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { ModalSkeleton } from './SkeletonLoaders';
 
 const PsychologyDecoderModal = lazy(() => import('./PsychologyDecoderModal').then(m => ({ default: m.PsychologyDecoderModal })));
 
-export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onOpenOfferHub, onOpenExecutiveDossier, onSelectJob, onJobStatusUpdate }) => {
+export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPrep, onOpenOfferHub, onOpenExecutiveDossier, onSelectJob, onJobStatusUpdate, onOpenCheatSheet }) => {
   const [psychJob, setPsychJob] = React.useState(null);
   // Filter jobs that need action: Interviewing, Offer, or Package Prepared
   const actionJobs = jobs.filter(j => {
@@ -138,6 +138,15 @@ export const ActionHighlights = ({ jobs, onOpenMockInterview, onOpenInterviewPre
                     >
                       <MessageSquare size={14} /> Simulator
                     </button>
+                    {onOpenCheatSheet && (
+                      <button
+                        onClick={() => onOpenCheatSheet(job)}
+                        className="py-2 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-amber-500/30"
+                        title="Interview Master Cheat Sheet Cockpit"
+                      >
+                        <Compass size={14} />
+                      </button>
+                    )}
                     {onOpenExecutiveDossier && (
                       <button
                         onClick={() => onOpenExecutiveDossier(job)}

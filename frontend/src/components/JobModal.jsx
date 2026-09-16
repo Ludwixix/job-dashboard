@@ -4,7 +4,7 @@ import {
  X, ExternalLink, FileText, DollarSign, Mail, 
  MapPin, Award, CheckCircle2, Zap, FileUser, ShieldCheck, Target,
  Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
- ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
+ ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers,
  RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search, Flame,
  ClipboardCheck, Compass, BookOpen, Edit3
 } from 'lucide-react';
@@ -121,7 +121,6 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
  .then((desc) => {
  if (desc && desc.trim().length > raw.length) {
  setDetailedDescription(desc);
- if (job) job.description = desc;
  }
  })
  .catch((err) => console.warn('Auto enrichment failed:', err))
@@ -139,7 +138,6 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
  const desc = await fetchDetailedJobDescription(job, true);
  if (desc) {
  setDetailedDescription(desc);
- if (job) job.description = desc;
  }
  } catch (err) {
  console.warn('Manual enrichment failed:', err);

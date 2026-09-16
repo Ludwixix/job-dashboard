@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
-from urllib.parse import urljoin
 
 from ..logging import get_logger
 
@@ -92,7 +91,6 @@ def extract_from_json_ld(html: str) -> list[dict[str, Any]]:
 
             # Remote / employment type
             work_mode = "onsite"
-            applicant_loc_req = it.get("applicantLocationRequirements")
             job_loc_type = str(it.get("jobLocationType", "")).upper()
             if job_loc_type == "TELECOMMUTE" or "remote" in location.lower():
                 work_mode = "remote"
@@ -113,18 +111,20 @@ def extract_from_json_ld(html: str) -> list[dict[str, Any]]:
                 elif isinstance(val, (int, float)):
                     salary_text = f"${val:,.0f} {currency}"
 
-            results.append({
-                "title": title,
-                "company": company or "Confidential",
-                "location": location or "Australia",
-                "description": description,
-                "url": url,
-                "posted": date_posted,
-                "salary": salary_text,
-                "remote": work_mode == "remote",
-                "work_mode": work_mode,
-                "source": "Structured JSON-LD",
-            })
+            results.append(
+                {
+                    "title": title,
+                    "company": company or "Confidential",
+                    "location": location or "Australia",
+                    "description": description,
+                    "url": url,
+                    "posted": date_posted,
+                    "salary": salary_text,
+                    "remote": work_mode == "remote",
+                    "work_mode": work_mode,
+                    "source": "Structured JSON-LD",
+                }
+            )
 
     return results
 
@@ -169,7 +169,7 @@ def extract_embedded_state_jobs(html: str) -> list[dict[str, Any]]:
     # 1. Indeed mosaic-provider-jobcards
     markers = [
         'window.mosaic.providerData["mosaic-provider-jobcards"]=',
-        'window.mosaicProviderJobCardsModel=',
+        "window.mosaicProviderJobCardsModel=",
         '"mosaic-provider-jobcards":',
     ]
     for marker in markers:
@@ -179,37 +179,58 @@ def extract_embedded_state_jobs(html: str) -> list[dict[str, Any]]:
             if payload_text:
                 try:
                     payload = json.loads(payload_text)
-                    model = payload.get("metaData", {}).get("mosaicProviderJobCardsModel", {})
-                    card_results = model.get("results", []) or payload.get("results", [])
+                    model = payload.get("metaData", {}).get(
+                        "mosaicProviderJobCardsModel", {}
+                    )
+                    card_results = model.get("results", []) or payload.get(
+                        "results", []
+                    )
                     for item in card_results:
                         if not isinstance(item, dict):
                             continue
-                        job_key = str(item.get("jobkey") or item.get("jobKey") or "").strip()
-                        url = f"https://au.indeed.com/viewjob?jk={job_key}" if job_key else str(item.get("viewJobLink") or "")
-                        title = str(item.get("displayTitle") or item.get("title") or "").strip()
-                        company = str(item.get("company") or item.get("truncatedCompany") or "").strip()
+                        job_key = str(
+                            item.get("jobkey") or item.get("jobKey") or ""
+                        ).strip()
+                        url = (
+                            f"https://au.indeed.com/viewjob?jk={job_key}"
+                            if job_key
+                            else str(item.get("viewJobLink") or "")
+                        )
+                        title = str(
+                            item.get("displayTitle") or item.get("title") or ""
+                        ).strip()
+                        company = str(
+                            item.get("company") or item.get("truncatedCompany") or ""
+                        ).strip()
                         location = str(item.get("formattedLocation") or "").strip()
-                        snippet = str(item.get("snippet") or item.get("jobDescription") or "").strip()
-                        is_remote = bool(item.get("remoteLocation")) or "remote" in f"{location} {title}".lower()
+                        snippet = str(
+                            item.get("snippet") or item.get("jobDescription") or ""
+                        ).strip()
+                        is_remote = (
+                            bool(item.get("remoteLocation"))
+                            or "remote" in f"{location} {title}".lower()
+                        )
                         salary_text = ""
                         sal_snip = item.get("salarySnippet")
                         if isinstance(sal_snip, dict):
                             salary_text = str(sal_snip.get("text") or "")
 
                         if title and (url or job_key):
-                            results.append({
-                                "id": f"indeed-{job_key}" if job_key else None,
-                                "provider_job_id": job_key or url,
-                                "title": title,
-                                "company": company or "Confidential",
-                                "location": location or "Australia",
-                                "description": snippet,
-                                "url": url,
-                                "salary": salary_text,
-                                "remote": is_remote,
-                                "posted": "today",
-                                "source": "Indeed",
-                            })
+                            results.append(
+                                {
+                                    "id": f"indeed-{job_key}" if job_key else None,
+                                    "provider_job_id": job_key or url,
+                                    "title": title,
+                                    "company": company or "Confidential",
+                                    "location": location or "Australia",
+                                    "description": snippet,
+                                    "url": url,
+                                    "salary": salary_text,
+                                    "remote": is_remote,
+                                    "posted": "today",
+                                    "source": "Indeed",
+                                }
+                            )
                     if results:
                         return results
                 except Exception:
@@ -363,4 +384,3 @@ ADAPTIVE_BROWSER_EXTRACTOR_JS = """() => {
     return results;
 };
 """
-

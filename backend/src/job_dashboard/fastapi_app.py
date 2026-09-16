@@ -17,10 +17,10 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Literal, Optional
+from typing import Any, AsyncGenerator, Dict, Literal, Optional
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,7 +28,6 @@ from pydantic import BaseModel, Field
 
 from .config import settings
 from .logging import get_logger
-from .models import JobRecord, SalaryBracket
 from .repository import JobRepository
 
 logger = get_logger("job_dashboard.fastapi")

@@ -19,7 +19,7 @@ from .base import (
     sanitize_html,
 )
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
-from .proxy import ProxyRotator, sanitize_proxy_url
+from .proxy import ProxyRotator
 from .resilience import (
     ADAPTIVE_BROWSER_EXTRACTOR_JS,
     extract_embedded_state_jobs,

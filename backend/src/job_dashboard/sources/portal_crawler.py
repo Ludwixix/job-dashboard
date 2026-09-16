@@ -14,7 +14,6 @@ from __future__ import annotations
 import re
 import urllib.parse
 import urllib.request
-from typing import Any
 
 from ..logging import get_logger
 from ..models import Job

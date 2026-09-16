@@ -7,7 +7,7 @@ industry standards (Technology, Healthcare, Finance, Trades, Legal), and compute
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
@@ -90,7 +90,13 @@ def _get_job_stage(status_val: Any) -> str:
         return "accepted"
     if status in ("offer", "offered"):
         return "offer"
-    if status in ("interviewing", "interview", "screening", "technical_interview", "final_interview"):
+    if status in (
+        "interviewing",
+        "interview",
+        "screening",
+        "technical_interview",
+        "final_interview",
+    ):
         return "interviewing"
     if status in ("applied", "submitted", "in_review"):
         return "applied"
@@ -114,11 +120,12 @@ def detect_stalled_applications(
 
         applied_dt = _parse_iso_date(job.get("applied_date") or job.get("date_applied"))
         updated_dt = _parse_iso_date(job.get("updated_at") or job.get("last_updated"))
-        shortlisted_dt = _parse_iso_date(job.get("date_shortlisted") or job.get("date_added"))
+        shortlisted_dt = _parse_iso_date(
+            job.get("date_shortlisted") or job.get("date_added")
+        )
 
         days_in_stage = 0
         threshold = 14
-        stage = status
 
         if status == "applied":
             threshold = 14
@@ -130,20 +137,24 @@ def detect_stalled_applications(
 
             if days_in_stage >= threshold:
                 severity = "critical" if days_in_stage >= 24 else "warning"
-                stalled_list.append({
-                    "id": job.get("id"),
-                    "title": job.get("title", "Unknown Role"),
-                    "company": job.get("company", "Unknown Employer"),
-                    "stage": "applied",
-                    "days_in_stage": days_in_stage,
-                    "threshold_days": threshold,
-                    "severity": severity,
-                    "action_recommendation": f"Application pending for {days_in_stage} days without response. Send a polite 14-day check-in email to the hiring manager or recruiter.",
-                })
+                stalled_list.append(
+                    {
+                        "id": job.get("id"),
+                        "title": job.get("title", "Unknown Role"),
+                        "company": job.get("company", "Unknown Employer"),
+                        "stage": "applied",
+                        "days_in_stage": days_in_stage,
+                        "threshold_days": threshold,
+                        "severity": severity,
+                        "action_recommendation": f"Application pending for {days_in_stage} days without response. Send a polite 14-day check-in email to the hiring manager or recruiter.",
+                    }
+                )
 
         elif status in ("interviewing", "interview"):
             threshold = 21
-            ref_dt = updated_dt or _parse_iso_date(job.get("interview_date")) or applied_dt
+            ref_dt = (
+                updated_dt or _parse_iso_date(job.get("interview_date")) or applied_dt
+            )
             if ref_dt:
                 days_in_stage = max(0, (current_time - ref_dt).days)
             else:
@@ -151,16 +162,18 @@ def detect_stalled_applications(
 
             if days_in_stage >= threshold:
                 severity = "critical" if days_in_stage >= 30 else "warning"
-                stalled_list.append({
-                    "id": job.get("id"),
-                    "title": job.get("title", "Unknown Role"),
-                    "company": job.get("company", "Unknown Employer"),
-                    "stage": "interviewing",
-                    "days_in_stage": days_in_stage,
-                    "threshold_days": threshold,
-                    "severity": severity,
-                    "action_recommendation": f"Interview stage has had no updates in {days_in_stage} days. Request feedback on interview panel deliberations or check next round timelines.",
-                })
+                stalled_list.append(
+                    {
+                        "id": job.get("id"),
+                        "title": job.get("title", "Unknown Role"),
+                        "company": job.get("company", "Unknown Employer"),
+                        "stage": "interviewing",
+                        "days_in_stage": days_in_stage,
+                        "threshold_days": threshold,
+                        "severity": severity,
+                        "action_recommendation": f"Interview stage has had no updates in {days_in_stage} days. Request feedback on interview panel deliberations or check next round timelines.",
+                    }
+                )
 
         elif status in ("shortlisted", "saved"):
             threshold = 30
@@ -168,18 +181,22 @@ def detect_stalled_applications(
             if ref_dt:
                 days_in_stage = max(0, (current_time - ref_dt).days)
                 if days_in_stage >= threshold:
-                    stalled_list.append({
-                        "id": job.get("id"),
-                        "title": job.get("title", "Unknown Role"),
-                        "company": job.get("company", "Unknown Employer"),
-                        "stage": "shortlisted",
-                        "days_in_stage": days_in_stage,
-                        "threshold_days": threshold,
-                        "severity": "warning",
-                        "action_recommendation": f"Job shortlisted {days_in_stage} days ago without applying. Check if listing is still active and submit application or archive.",
-                    })
+                    stalled_list.append(
+                        {
+                            "id": job.get("id"),
+                            "title": job.get("title", "Unknown Role"),
+                            "company": job.get("company", "Unknown Employer"),
+                            "stage": "shortlisted",
+                            "days_in_stage": days_in_stage,
+                            "threshold_days": threshold,
+                            "severity": "warning",
+                            "action_recommendation": f"Job shortlisted {days_in_stage} days ago without applying. Check if listing is still active and submit application or archive.",
+                        }
+                    )
 
-    stalled_list.sort(key=lambda x: (x["severity"] == "critical", x["days_in_stage"]), reverse=True)
+    stalled_list.sort(
+        key=lambda x: (x["severity"] == "critical", x["days_in_stage"]), reverse=True
+    )
     return stalled_list
 
 
@@ -188,8 +205,6 @@ def calculate_pipeline_velocity(
     now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """Computes average duration (in days) between stages."""
-    current_time = now or datetime.now(timezone.utc)
-
     days_to_interview_samples: List[float] = []
     days_interview_to_offer_samples: List[float] = []
     total_cycle_samples: List[float] = []
@@ -295,8 +310,19 @@ def compute_funnel_analytics(
 
         is_accepted = status in ("accepted", "hired")
         is_offer = is_accepted or status in ("offer", "offered")
-        is_interview = is_offer or status in ("interviewing", "interview", "screening", "technical_interview", "final_interview")
-        is_applied = is_interview or status in ("applied", "submitted", "in_review", "rejected")
+        is_interview = is_offer or status in (
+            "interviewing",
+            "interview",
+            "screening",
+            "technical_interview",
+            "final_interview",
+        )
+        is_applied = is_interview or status in (
+            "applied",
+            "submitted",
+            "in_review",
+            "rejected",
+        )
         is_shortlisted = is_applied or status in ("saved", "shortlist", "shortlisted")
 
         if status == "rejected":
@@ -331,11 +357,23 @@ def compute_funnel_analytics(
 
     # 30-Day Pipeline Forecast
     # Predicted interviews = active applied * benchmark or candidate apply_to_interview rate
-    active_applied_count = sum(1 for j in jobs if str(j.get("status", "")).lower() == "applied")
-    active_interview_count = sum(1 for j in jobs if str(j.get("status", "")).lower() in ("interviewing", "interview"))
+    active_applied_count = sum(
+        1 for j in jobs if str(j.get("status", "")).lower() == "applied"
+    )
+    active_interview_count = sum(
+        1
+        for j in jobs
+        if str(j.get("status", "")).lower() in ("interviewing", "interview")
+    )
 
-    est_apply_rate = (conversion_rates["apply_to_interview_pct"] or benchmark["apply_to_interview_pct"]) / 100.0
-    est_offer_rate = (conversion_rates["interview_to_offer_pct"] or benchmark["interview_to_offer_pct"]) / 100.0
+    est_apply_rate = (
+        conversion_rates["apply_to_interview_pct"]
+        or benchmark["apply_to_interview_pct"]
+    ) / 100.0
+    est_offer_rate = (
+        conversion_rates["interview_to_offer_pct"]
+        or benchmark["interview_to_offer_pct"]
+    ) / 100.0
 
     forecast_interviews = max(0, round(active_applied_count * est_apply_rate, 1))
     forecast_offers = max(0, round(active_interview_count * est_offer_rate, 1))
@@ -349,12 +387,14 @@ def compute_funnel_analytics(
     conv_ratio = (user_conv / mkt_conv) if mkt_conv > 0 else 1.0
     conv_score = min(35, max(5, conv_ratio * 25))
     # 3. Low Stall Ratio (0-25)
-    stall_ratio = (len(stalled) / max(1, active_pipeline_count))
+    stall_ratio = len(stalled) / max(1, active_pipeline_count)
     stall_score = max(0, 25 - (stall_ratio * 30))
     # 4. Activity Momentum (0-15)
     momentum_score = 15 if active_pipeline_count >= 3 else (active_pipeline_count * 5)
 
-    health_score = int(min(100, max(0, depth_score + conv_score + stall_score + momentum_score)))
+    health_score = int(
+        min(100, max(0, depth_score + conv_score + stall_score + momentum_score))
+    )
 
     if health_score >= 80:
         health_label = "Thriving"
@@ -372,26 +412,36 @@ def compute_funnel_analytics(
     # Actionable Recommendations
     recommendations = []
     if len(stalled) > 0:
-        recommendations.append({
-            "type": "stalled_alert",
-            "title": f"Unstick {len(stalled)} Stalled Applications",
-            "description": f"You have {len(stalled)} applications waiting beyond standard SLA response windows. Follow up with recruiters or hiring managers.",
-            "priority": "high",
-        })
-    if stage_counts["applied"] > 0 and conversion_rates["apply_to_interview_pct"] < benchmark["apply_to_interview_pct"] * 0.7:
-        recommendations.append({
-            "type": "resume_tailoring",
-            "title": "Optimize Resume Alignment",
-            "description": f"Your application-to-interview conversion ({conversion_rates['apply_to_interview_pct']}%) is below market average ({benchmark['apply_to_interview_pct']}%). Run the Semantic Gap Analyzer on upcoming applications.",
-            "priority": "medium",
-        })
+        recommendations.append(
+            {
+                "type": "stalled_alert",
+                "title": f"Unstick {len(stalled)} Stalled Applications",
+                "description": f"You have {len(stalled)} applications waiting beyond standard SLA response windows. Follow up with recruiters or hiring managers.",
+                "priority": "high",
+            }
+        )
+    if (
+        stage_counts["applied"] > 0
+        and conversion_rates["apply_to_interview_pct"]
+        < benchmark["apply_to_interview_pct"] * 0.7
+    ):
+        recommendations.append(
+            {
+                "type": "resume_tailoring",
+                "title": "Optimize Resume Alignment",
+                "description": f"Your application-to-interview conversion ({conversion_rates['apply_to_interview_pct']}%) is below market average ({benchmark['apply_to_interview_pct']}%). Run the Semantic Gap Analyzer on upcoming applications.",
+                "priority": "medium",
+            }
+        )
     if active_pipeline_count < 5:
-        recommendations.append({
-            "type": "pipeline_depth",
-            "title": "Build Pipeline Buffer",
-            "description": f"Active pipeline has only {active_pipeline_count} opportunities. Expand your search query to maintain interview momentum.",
-            "priority": "medium",
-        })
+        recommendations.append(
+            {
+                "type": "pipeline_depth",
+                "title": "Build Pipeline Buffer",
+                "description": f"Active pipeline has only {active_pipeline_count} opportunities. Expand your search query to maintain interview momentum.",
+                "priority": "medium",
+            }
+        )
 
     return {
         "total_jobs": total_jobs,
@@ -402,12 +452,24 @@ def compute_funnel_analytics(
         "health_label": health_label,
         "health_badge": health_badge,
         "stages": {
-            "sourced": {"count": stage_counts["sourced"], "label": "Sourced / Discovered"},
-            "shortlisted": {"count": stage_counts["shortlisted"], "label": "Shortlisted"},
+            "sourced": {
+                "count": stage_counts["sourced"],
+                "label": "Sourced / Discovered",
+            },
+            "shortlisted": {
+                "count": stage_counts["shortlisted"],
+                "label": "Shortlisted",
+            },
             "applied": {"count": stage_counts["applied"], "label": "Applied"},
-            "interviewing": {"count": stage_counts["interviewing"], "label": "Interviewing"},
+            "interviewing": {
+                "count": stage_counts["interviewing"],
+                "label": "Interviewing",
+            },
             "offer": {"count": stage_counts["offer"], "label": "Offer Received"},
-            "accepted": {"count": stage_counts["accepted"], "label": "Accepted / Hired"},
+            "accepted": {
+                "count": stage_counts["accepted"],
+                "label": "Accepted / Hired",
+            },
         },
         "conversion_rates": conversion_rates,
         "velocity": velocity,
@@ -426,9 +488,12 @@ def compute_funnel_analytics(
             "market_overall_yield_pct": benchmark["overall_yield_pct"],
             "market_avg_cycle_days": benchmark["avg_cycle_days"],
             "market_summary": benchmark["market_summary"],
-            "delta_apply_to_interview": round(conversion_rates["apply_to_interview_pct"] - benchmark["apply_to_interview_pct"], 1),
+            "delta_apply_to_interview": round(
+                conversion_rates["apply_to_interview_pct"]
+                - benchmark["apply_to_interview_pct"],
+                1,
+            ),
         },
         "recommendations": recommendations,
         "timestamp": now.isoformat(),
     }
-

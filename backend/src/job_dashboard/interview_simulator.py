@@ -5,7 +5,6 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from .cache import get_cache
 from .logging import get_logger
 from .sources.base import detect_query_stream
 

@@ -7,11 +7,10 @@ from typing import Any
 
 import httpx
 
-from ..models import JobRecord, SalaryBracket
+from ..models import JobRecord
 from .base import (
     SearchQuery,
     canonical_posted_date,
-    clean_description,
     estimate_salary_bracket,
     parse_salary_bracket,
     sanitize_html,
@@ -34,24 +33,32 @@ class RemoteOkApiSource:
         headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0"}
         try:
             if client:
-                response = await client.get(self.endpoint, headers=headers, timeout=self.timeout)
+                response = await client.get(
+                    self.endpoint, headers=headers, timeout=self.timeout
+                )
                 payload = response.json()
             else:
                 async with httpx.AsyncClient(timeout=self.timeout) as local_client:
                     response = await local_client.get(self.endpoint, headers=headers)
                     payload = response.json()
 
-            items = payload.get("jobs", []) or payload.get("results", []) if isinstance(payload, dict) else payload
+            items = (
+                payload.get("jobs", []) or payload.get("results", [])
+                if isinstance(payload, dict)
+                else payload
+            )
             results: list[JobRecord] = []
             for item in items:
                 if not isinstance(item, Mapping):
                     continue
-                haystack = " ".join([
-                    str(item.get("position") or item.get("title") or ""),
-                    str(item.get("company") or ""),
-                    str(item.get("description") or ""),
-                    str(item.get("location") or ""),
-                ]).lower()
+                haystack = " ".join(
+                    [
+                        str(item.get("position") or item.get("title") or ""),
+                        str(item.get("company") or ""),
+                        str(item.get("description") or ""),
+                        str(item.get("location") or ""),
+                    ]
+                ).lower()
                 if query.term.lower() not in haystack:
                     continue
                 results.append(_remoteok_record(item, query))
@@ -77,12 +84,14 @@ class RemoteOkApiSource:
             for item in items:
                 if not isinstance(item, Mapping):
                     continue
-                haystack = " ".join([
-                    str(item.get("position") or item.get("title") or ""),
-                    str(item.get("company") or ""),
-                    str(item.get("description") or ""),
-                    str(item.get("location") or ""),
-                ]).lower()
+                haystack = " ".join(
+                    [
+                        str(item.get("position") or item.get("title") or ""),
+                        str(item.get("company") or ""),
+                        str(item.get("description") or ""),
+                        str(item.get("location") or ""),
+                    ]
+                ).lower()
                 if query.term.lower() not in haystack.lower():
                     continue
                 yield _remoteok_record(item, query)
@@ -94,11 +103,13 @@ def _remoteok_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
     title = str(job.get("position") or job.get("title") or "").strip()
     company = str(job.get("company") or "").strip()
     location = str(job.get("location") or "Remote").strip() or "Remote"
-    url = str(job.get("url") or "").strip() or f"https://remoteok.com/remote-jobs/{job.get('slug', '')}"
+    url = (
+        str(job.get("url") or "").strip()
+        or f"https://remoteok.com/remote-jobs/{job.get('slug', '')}"
+    )
     raw_desc = str(job.get("description", ""))
     sanitized_desc = sanitize_html(raw_desc)
     posted = str(job.get("published_at") or "").strip()
-    remote_value = "remote" in location.lower() or "remote" in f"{title} {sanitized_desc}".lower()
 
     # Parse structured salary bracket
     salary_bracket = parse_salary_bracket(

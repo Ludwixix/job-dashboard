@@ -10,11 +10,10 @@ from typing import Any
 import httpx
 
 from ..logging import get_logger
-from ..models import JobRecord, SalaryBracket
+from ..models import JobRecord
 from .base import (
     SearchQuery,
     canonical_posted_date,
-    clean_description,
     estimate_salary_bracket,
     parse_salary_bracket,
     resolve_search_location,

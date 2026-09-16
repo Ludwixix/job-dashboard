@@ -9,13 +9,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from html import unescape
 from html.parser import HTMLParser
-from typing import Any, Protocol, Literal
+from typing import Any, Protocol
 
 import nh3
 
 from ..health import HealthCheck
 from ..logging import get_logger
-from ..models import SalaryBracket, JobRecord
+from ..models import SalaryBracket
 
 logger = get_logger("job_dashboard.sources.base")
 

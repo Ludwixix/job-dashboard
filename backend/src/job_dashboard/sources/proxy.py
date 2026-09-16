@@ -4,7 +4,6 @@ import os
 import threading
 import urllib.parse
 from dataclasses import dataclass
-from typing import Any
 
 from ..logging import get_logger
 

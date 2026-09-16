@@ -1,1 +1,0 @@
-import"./rolldown-runtime-hePW80VL.js";import{i as e,r as t}from"./vendor-framer-Bat9FBW0.js";import{t as n}from"./index-DQ4Y33mQ.js";e();var r=t(),i=e=>(0,r.jsx)(n,{initialTab:`sheet`,...e});export{i as GoogleIntegrationModal,i as default};

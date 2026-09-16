@@ -26,38 +26,154 @@ CAPABILITY_PILLARS = {
     "STRATEGIC_DIRECTION": {
         "name": "Shapes Strategic Thinking / Supports Strategic Direction",
         "description": "Inspires a sense of purpose and direction, focuses strategically, harnesses information, and shows sound judgement.",
-        "keywords": ["strategy", "strategic", "policy", "vision", "analytical", "research", "continuous improvement", "governance", "planning", "innovative"],
-        "action_verbs": ["Formulated", "Analyzed", "Pioneered", "Strategized", "Evaluated", "Conceptualized"],
+        "keywords": [
+            "strategy",
+            "strategic",
+            "policy",
+            "vision",
+            "analytical",
+            "research",
+            "continuous improvement",
+            "governance",
+            "planning",
+            "innovative",
+        ],
+        "action_verbs": [
+            "Formulated",
+            "Analyzed",
+            "Pioneered",
+            "Strategized",
+            "Evaluated",
+            "Conceptualized",
+        ],
     },
     "ACHIEVES_RESULTS": {
         "name": "Achieves Results / Delivers Measurable Outcomes",
         "description": "Identifies and uses resources wisely, applies and builds professional expertise, responds positively to change, and delivers on intended results.",
-        "keywords": ["delivery", "deliver", "results", "milestone", "kpi", "project management", "budget", "cost", "deadlines", "implement", "execute"],
-        "action_verbs": ["Delivered", "Executed", "Orchestrated", "Spearheaded", "Optimized", "Delivered"],
+        "keywords": [
+            "delivery",
+            "deliver",
+            "results",
+            "milestone",
+            "kpi",
+            "project management",
+            "budget",
+            "cost",
+            "deadlines",
+            "implement",
+            "execute",
+        ],
+        "action_verbs": [
+            "Delivered",
+            "Executed",
+            "Orchestrated",
+            "Spearheaded",
+            "Optimized",
+            "Delivered",
+        ],
     },
     "RELATIONSHIPS": {
         "name": "Cultivates Productive Working Relationships / Stakeholder Engagement",
         "description": "Nurtures internal and external relationships, listens to, understands and recognises the needs of others, values individual differences, and guides/mentors others.",
-        "keywords": ["stakeholder", "collaboration", "consultation", "co-design", "teamwork", "partner", "client", "negotiate", "mentor", "interpersonal", "relationship"],
-        "action_verbs": ["Collaborated", "Consulted", "Negotiated", "Partnered", "Mobilized", "Facilitated"],
+        "keywords": [
+            "stakeholder",
+            "collaboration",
+            "consultation",
+            "co-design",
+            "teamwork",
+            "partner",
+            "client",
+            "negotiate",
+            "mentor",
+            "interpersonal",
+            "relationship",
+        ],
+        "action_verbs": [
+            "Collaborated",
+            "Consulted",
+            "Negotiated",
+            "Partnered",
+            "Mobilized",
+            "Facilitated",
+        ],
     },
     "INTEGRITY_DRIVE": {
         "name": "Exemplifies Personal Drive, Integrity & Public Sector Values",
         "description": "Demonstrates public service professionalism and probity, engages with risk and shows personal courage, commits to action, and displays resilience.",
-        "keywords": ["integrity", "ethics", "probity", "values", "compliance", "resilience", "accountability", "governance", "impartial", "safety", "child safe"],
-        "action_verbs": ["Upheld", "Championed", "Safeguarded", "Demonstrated", "Modeled", "Secured"],
+        "keywords": [
+            "integrity",
+            "ethics",
+            "probity",
+            "values",
+            "compliance",
+            "resilience",
+            "accountability",
+            "governance",
+            "impartial",
+            "safety",
+            "child safe",
+        ],
+        "action_verbs": [
+            "Upheld",
+            "Championed",
+            "Safeguarded",
+            "Demonstrated",
+            "Modeled",
+            "Secured",
+        ],
     },
     "COMMUNICATION": {
         "name": "Communicates with Influence / High-Impact Stakeholder Messaging",
         "description": "Communicates clearly, listens, understands and adapts to audience, negotiates persuasively, and prepares clear, high-level briefings and submissions.",
-        "keywords": ["communication", "briefing", "written", "verbal", "presentation", "report", "influence", "submission", "cabinet", "ministerial", "correspondence"],
-        "action_verbs": ["Authored", "Articulated", "Presented", "Briefed", "Conveyed", "Persuaded"],
+        "keywords": [
+            "communication",
+            "briefing",
+            "written",
+            "verbal",
+            "presentation",
+            "report",
+            "influence",
+            "submission",
+            "cabinet",
+            "ministerial",
+            "correspondence",
+        ],
+        "action_verbs": [
+            "Authored",
+            "Articulated",
+            "Presented",
+            "Briefed",
+            "Conveyed",
+            "Persuaded",
+        ],
     },
     "TECHNICAL_EXPERTISE": {
         "name": "Technical & Specialized Domain Mastery",
         "description": "Applies depth of domain expertise, technical frameworks, specialized clinical/engineering/financial systems, and regulatory standards.",
-        "keywords": ["technical", "systems", "cloud", "aws", "azure", "sql", "data", "architecture", "software", "clinical", "nursing", "engineering", "legal", "financial"],
-        "action_verbs": ["Architected", "Engineered", "Implemented", "Deployed", "Configured", "Standardized"],
+        "keywords": [
+            "technical",
+            "systems",
+            "cloud",
+            "aws",
+            "azure",
+            "sql",
+            "data",
+            "architecture",
+            "software",
+            "clinical",
+            "nursing",
+            "engineering",
+            "legal",
+            "financial",
+        ],
+        "action_verbs": [
+            "Architected",
+            "Engineered",
+            "Implemented",
+            "Deployed",
+            "Configured",
+            "Standardized",
+        ],
     },
 }
 
@@ -107,7 +223,7 @@ def extract_ksc_from_jd(description: str, title: str = "") -> list[str]:
         return _fallback_criteria(title)
 
     clean_text = description.replace("\r\n", "\n")
-    
+
     # 1. Search for targeted KSC section headers
     section_match = re.search(
         r"(?:key\s+selection\s+criteria|ksc|selection\s+criteria|key\s+accountabilities|what\s+you(?:'ll|\s+will)\s+bring|about\s+you|skills\s+(?:and|&)\s+experience|capabilities|requirements)[:\s\n]+([\s\S]+?)(?=(?:\n\s*(?:how\s+to\s+apply|why\s+join|benefits|about\s+the\s+department|terms\s+of\s+appointment|pre-employment|applications\s+close)\b|$))",
@@ -117,7 +233,7 @@ def extract_ksc_from_jd(description: str, title: str = "") -> list[str]:
     search_scope = section_match.group(1) if section_match else clean_text
 
     extracted: list[str] = []
-    
+
     # 2. Check for numbered or KSC-labeled criteria (e.g. "KSC 1:", "1.", "Criterion 1:")
     numbered_matches = re.findall(
         r"^\s*(?:(?:ksc|criterion)?\s*\d+[.:]\s*)([^\n]+)",
@@ -126,7 +242,11 @@ def extract_ksc_from_jd(description: str, title: str = "") -> list[str]:
     )
     for m in numbered_matches:
         cleaned = " ".join(m.split()).strip()
-        if len(cleaned) >= 20 and not re.search(r"^(?:how to apply|salary|work type|location|reference|apply|close)\b", cleaned, re.IGNORECASE):
+        if len(cleaned) >= 20 and not re.search(
+            r"^(?:how to apply|salary|work type|location|reference|apply|close)\b",
+            cleaned,
+            re.IGNORECASE,
+        ):
             extracted.append(cleaned)
 
     # 3. If no numbered matches, search for bullet points under the criteria section
@@ -138,14 +258,18 @@ def extract_ksc_from_jd(description: str, title: str = "") -> list[str]:
         )
         for b in bullet_matches:
             cleaned = " ".join(b.split()).strip()
-            if len(cleaned) >= 25 and not re.search(r"^(?:how to apply|salary|work type|location|reference|apply|close)\b", cleaned, re.IGNORECASE):
+            if len(cleaned) >= 25 and not re.search(
+                r"^(?:how to apply|salary|work type|location|reference|apply|close)\b",
+                cleaned,
+                re.IGNORECASE,
+            ):
                 extracted.append(cleaned)
 
     # 4. Limit to top 6 most substantive criteria, or fill with fallback if sparse
     meaningful = [c for c in extracted if len(c) >= 20][:6]
     if len(meaningful) < 2:
         return _fallback_criteria(title)
-        
+
     return meaningful
 
 
@@ -164,10 +288,10 @@ def _fallback_criteria(title: str = "") -> list[str]:
 def map_ksc_to_capability_framework(criterion: str) -> dict[str, Any]:
     """Maps a criterion text to the APS Integrated Leadership System and VPSC Capability Framework."""
     crit_lower = criterion.lower()
-    
+
     best_pillar = "TECHNICAL_EXPERTISE"
     max_score = 0
-    
+
     for pillar_key, pillar_data in CAPABILITY_PILLARS.items():
         score = sum(1 for kw in pillar_data["keywords"] if kw in crit_lower)
         if score > max_score:
@@ -175,15 +299,43 @@ def map_ksc_to_capability_framework(criterion: str) -> dict[str, Any]:
             best_pillar = pillar_key
 
     # Specific heuristic overrides
-    if any(term in crit_lower for term in ["stakeholder", "collaborat", "relationship", "partner", "co-design"]):
+    if any(
+        term in crit_lower
+        for term in [
+            "stakeholder",
+            "collaborat",
+            "relationship",
+            "partner",
+            "co-design",
+        ]
+    ):
         best_pillar = "RELATIONSHIPS"
-    elif any(term in crit_lower for term in ["written", "verbal", "briefing", "report", "presentation", "communicat"]):
+    elif any(
+        term in crit_lower
+        for term in [
+            "written",
+            "verbal",
+            "briefing",
+            "report",
+            "presentation",
+            "communicat",
+        ]
+    ):
         best_pillar = "COMMUNICATION"
-    elif any(term in crit_lower for term in ["integrity", "probity", "values", "ethics", "child safe"]):
+    elif any(
+        term in crit_lower
+        for term in ["integrity", "probity", "values", "ethics", "child safe"]
+    ):
         best_pillar = "INTEGRITY_DRIVE"
-    elif any(term in crit_lower for term in ["deliver", "project", "milestone", "outcome", "budget", "kpi"]):
+    elif any(
+        term in crit_lower
+        for term in ["deliver", "project", "milestone", "outcome", "budget", "kpi"]
+    ):
         best_pillar = "ACHIEVES_RESULTS"
-    elif any(term in crit_lower for term in ["strategic", "policy", "strategy", "vision", "innovat"]):
+    elif any(
+        term in crit_lower
+        for term in ["strategic", "policy", "strategy", "vision", "innovat"]
+    ):
         best_pillar = "STRATEGIC_DIRECTION"
 
     return {
@@ -203,16 +355,19 @@ def generate_sao_statement(
 ) -> KscSolution:
     """Generates a structured Situation, Action, Outcome (SAO) statement resolving a Key Selection Criterion."""
     mapping = map_ksc_to_capability_framework(criterion)
-    candidate_name = str(profile.get("name") or "Candidate").strip()
     target_company = str(job.get("company") or "the Department").strip()
     job_title = str(job.get("title") or "the role").strip()
-    
+
     # Extract candidate background facts
     experience = profile.get("experience") or profile.get("history") or []
     recent_role = experience[0] if experience and isinstance(experience, list) else {}
-    past_company = recent_role.get("company") or "a multi-stakeholder enterprise organisation"
-    past_title = recent_role.get("title") or recent_role.get("role") or "Senior Specialist"
-    
+    past_company = (
+        recent_role.get("company") or "a multi-stakeholder enterprise organisation"
+    )
+    past_title = (
+        recent_role.get("title") or recent_role.get("role") or "Senior Specialist"
+    )
+
     skills = profile.get("skills") or profile.get("coreSkills") or []
     if isinstance(skills, dict):
         flat_skills = []
@@ -220,11 +375,15 @@ def generate_sao_statement(
             if isinstance(v, list):
                 flat_skills.extend(v)
         skills = flat_skills
-    skills_text = ", ".join(skills[:4]) if skills else "systems architecture, modern cloud workflows, and data-driven governance"
+    skills_text = (
+        ", ".join(skills[:4])
+        if skills
+        else "systems architecture, modern cloud workflows, and data-driven governance"
+    )
 
     # Dynamic SAO Synthesis based on capability pillar
     pillar = mapping["pillar"]
-    
+
     if pillar == "STRATEGIC_DIRECTION":
         situation = (
             f"While serving as {past_title} at {past_company}, our team was tasked with navigating a complex operational reform "
@@ -314,14 +473,12 @@ def generate_sao_statement(
 
     # Combine into standard APS / VPS SAO Statement
     full_text = (
-        f"**Situation:** {situation}\n\n"
-        f"**Action:** {action}\n\n"
-        f"**Outcome:** {outcome}"
+        f"**Situation:** {situation}\n\n**Action:** {action}\n\n**Outcome:** {outcome}"
     )
-    
+
     localized_full = localize_australian(full_text)
     word_count = len(localized_full.split())
-    
+
     return KscSolution(
         criterion_number=criterion_index,
         criterion_text=criterion,
@@ -353,13 +510,15 @@ def generate_ksc_report(
     criteria: list[str] = []
     if custom_criteria and isinstance(custom_criteria, list):
         criteria = [c.strip() for c in custom_criteria if c and c.strip()]
-    
+
     if not criteria:
         criteria = extract_ksc_from_jd(description, job_title)
 
     solutions: list[KscSolution] = []
     for idx, crit in enumerate(criteria, start=1):
-        sol = generate_sao_statement(crit, profile, job, criterion_index=idx, word_limit=word_limit)
+        sol = generate_sao_statement(
+            crit, profile, job, criterion_index=idx, word_limit=word_limit
+        )
         solutions.append(sol)
 
     # Build master single-column document formatted for Australian merit-based assessment
@@ -374,17 +533,19 @@ def generate_ksc_report(
     ]
 
     for sol in solutions:
-        doc_lines.extend([
-            f"## Criterion {sol.criterion_number}: {sol.criterion_text}",
-            f"*{sol.capability_name}*",
-            "",
-            sol.full_statement,
-            "",
-            f"*Word count: {sol.word_count} words (Target: {sol.target_word_limit} words)*",
-            "",
-            "---",
-            "",
-        ])
+        doc_lines.extend(
+            [
+                f"## Criterion {sol.criterion_number}: {sol.criterion_text}",
+                f"*{sol.capability_name}*",
+                "",
+                sol.full_statement,
+                "",
+                f"*Word count: {sol.word_count} words (Target: {sol.target_word_limit} words)*",
+                "",
+                "---",
+                "",
+            ]
+        )
 
     master_doc = "\n".join(doc_lines).strip()
 

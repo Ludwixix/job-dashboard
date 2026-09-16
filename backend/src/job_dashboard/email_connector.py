@@ -35,7 +35,14 @@ def clean_email_text(raw: str) -> str:
     if not raw:
         return ""
     text = re.sub(r"<[^>]+>", " ", str(raw))
-    text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"').replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
+    text = (
+        text.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+    )
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -104,7 +111,10 @@ class EmailClassifier:
                 if matches:
                     confidence = 0.7 if len(matches) == 1 else 0.9
                     # Favor higher category priority when confidence is comparable
-                    if (category_priority > best_priority and confidence >= 0.7) or (confidence > best_confidence and category_priority >= best_priority):
+                    if (category_priority > best_priority and confidence >= 0.7) or (
+                        confidence > best_confidence
+                        and category_priority >= best_priority
+                    ):
                         best_confidence = confidence
                         best_match = category
                         best_priority = category_priority
@@ -116,7 +126,9 @@ class EmailClassifier:
         for msg in messages:
             category, confidence = self.classify(msg)
             results["total"] += 1
-            results["classified"].setdefault(category, []).append({"subject": msg.subject, "confidence": round(confidence, 2)})
+            results["classified"].setdefault(category, []).append(
+                {"subject": msg.subject, "confidence": round(confidence, 2)}
+            )
             if confidence >= 0.8:
                 results["high_confidence"] += 1
         return results
@@ -133,14 +145,22 @@ class GmailScanner:
         "recruiter_reply",
     }
 
-    def __init__(self, username: str, app_password: str, days: int = 7, host: str = "imap.gmail.com"):
+    def __init__(
+        self,
+        username: str,
+        app_password: str,
+        days: int = 7,
+        host: str = "imap.gmail.com",
+    ):
         self.username = username
         self.app_password = app_password
         self.days = days
         self.host = host
 
     def fetch_messages(self) -> list[EmailMessage]:
-        since = (datetime.now(timezone.utc) - timedelta(days=self.days)).strftime("%d-%b-%Y")
+        since = (datetime.now(timezone.utc) - timedelta(days=self.days)).strftime(
+            "%d-%b-%Y"
+        )
         messages: list[EmailMessage] = []
         with imaplib.IMAP4_SSL(self.host) as mailbox:
             mailbox.login(self.username, self.app_password)
@@ -165,15 +185,29 @@ class GmailScanner:
                 results.append((message, category, confidence))
         return results
 
-    def scan_updates_for_application(self, app_dict: dict[str, Any], days: int = 14) -> dict[str, Any]:
+    def scan_updates_for_application(
+        self, app_dict: dict[str, Any], days: int = 14
+    ) -> dict[str, Any]:
         """Scan user inbox targeted specifically for updates regarding a single applied job."""
-        company = str(app_dict.get("company") or app_dict.get("job_data", {}).get("company") or "").strip().lower()
-        title = str(app_dict.get("title") or app_dict.get("job_data", {}).get("title") or "").strip().lower()
+        company = (
+            str(
+                app_dict.get("company")
+                or app_dict.get("job_data", {}).get("company")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
         current_status = str(app_dict.get("status") or "applied")
         job_id = app_dict.get("job_id") or app_dict.get("id")
 
         if not company or company in ("unknown", "gmail", "direct employer"):
-            return {"updated": False, "job_id": job_id, "status": current_status, "reason": "No valid company to search"}
+            return {
+                "updated": False,
+                "job_id": job_id,
+                "status": current_status,
+                "reason": "No valid company to search",
+            }
 
         classifier = EmailClassifier()
         status_map = {
@@ -194,13 +228,15 @@ class GmailScanner:
                 category, confidence = classifier.classify(msg)
                 if category in status_map and confidence >= 0.65:
                     new_status = status_map[category]
-                    matching_updates.append({
-                        "message": msg,
-                        "category": category,
-                        "new_status": new_status,
-                        "confidence": confidence,
-                        "date": msg.received_at
-                    })
+                    matching_updates.append(
+                        {
+                            "message": msg,
+                            "category": category,
+                            "new_status": new_status,
+                            "confidence": confidence,
+                            "date": msg.received_at,
+                        }
+                    )
 
         if not matching_updates:
             return {"updated": False, "job_id": job_id, "status": current_status}
@@ -218,10 +254,12 @@ class GmailScanner:
             "email_snippet": best["message"].snippet,
             "email_date": best["message"].received_at,
             "email_thread_id": best["message"].email_id,
-            "confidence": best["confidence"]
+            "confidence": best["confidence"],
         }
 
-    def scan_updates_for_all_applications(self, apps_list: list[dict[str, Any]], days: int = 14) -> list[dict[str, Any]]:
+    def scan_updates_for_all_applications(
+        self, apps_list: list[dict[str, Any]], days: int = 14
+    ) -> list[dict[str, Any]]:
         """Scan user inbox targeted across all tracked applications in a single IMAP connection."""
         classifier = EmailClassifier()
         status_map = {
@@ -236,7 +274,15 @@ class GmailScanner:
         results = []
 
         for app_dict in apps_list:
-            company = str(app_dict.get("company") or app_dict.get("job_data", {}).get("company") or "").strip().lower()
+            company = (
+                str(
+                    app_dict.get("company")
+                    or app_dict.get("job_data", {}).get("company")
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
             current_status = str(app_dict.get("status") or "applied")
             job_id = app_dict.get("job_id") or app_dict.get("id")
 
@@ -249,33 +295,35 @@ class GmailScanner:
                 if company in haystack:
                     category, confidence = classifier.classify(msg)
                     if category in status_map and confidence >= 0.65:
-                        app_updates.append({
-                            "message": msg,
-                            "new_status": status_map[category],
-                            "confidence": confidence,
-                            "date": msg.received_at
-                        })
+                        app_updates.append(
+                            {
+                                "message": msg,
+                                "new_status": status_map[category],
+                                "confidence": confidence,
+                                "date": msg.received_at,
+                            }
+                        )
 
             if app_updates:
                 app_updates.sort(key=lambda x: x["date"], reverse=True)
                 best = app_updates[0]
-                results.append({
-                    "updated": True,
-                    "job_id": job_id,
-                    "old_status": current_status,
-                    "new_status": best["new_status"],
-                    "email_subject": best["message"].subject,
-                    "email_snippet": best["message"].snippet,
-                    "email_date": best["message"].received_at,
-                    "email_thread_id": best["message"].email_id,
-                    "confidence": best["confidence"]
-                })
+                results.append(
+                    {
+                        "updated": True,
+                        "job_id": job_id,
+                        "old_status": current_status,
+                        "new_status": best["new_status"],
+                        "email_subject": best["message"].subject,
+                        "email_snippet": best["message"].snippet,
+                        "email_date": best["message"].received_at,
+                        "email_thread_id": best["message"].email_id,
+                        "confidence": best["confidence"],
+                    }
+                )
             else:
-                results.append({
-                    "updated": False,
-                    "job_id": job_id,
-                    "status": current_status
-                })
+                results.append(
+                    {"updated": False, "job_id": job_id, "status": current_status}
+                )
 
         return results
 
@@ -285,28 +333,52 @@ class GmailScanner:
         if not raw:
             return ""
         text = re.sub(r"<[^>]+>", " ", str(raw))
-        text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"').replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
+        text = (
+            text.replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&quot;", '"')
+            .replace("&#39;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+        )
         return re.sub(r"\s+", " ", text).strip()
 
     @staticmethod
     def _decode(value: str) -> str:
         parts = decode_header(value or "")
-        return "".join(part.decode(charset or "utf-8", errors="replace") if isinstance(part, bytes) else part for part, charset in parts)
+        return "".join(
+            part.decode(charset or "utf-8", errors="replace")
+            if isinstance(part, bytes)
+            else part
+            for part, charset in parts
+        )
 
     @classmethod
     def _to_email_message(cls, message: Message, message_id: str) -> EmailMessage:
         body = ""
         if message.is_multipart():
             for part in message.walk():
-                if part.get_content_type() == "text/plain" and not part.get("Content-Disposition"):
-                    body = part.get_payload(decode=True).decode(part.get_content_charset() or "utf-8", errors="replace")
+                if part.get_content_type() == "text/plain" and not part.get(
+                    "Content-Disposition"
+                ):
+                    body = part.get_payload(decode=True).decode(
+                        part.get_content_charset() or "utf-8", errors="replace"
+                    )
                     break
         else:
             payload = message.get_payload(decode=True)
-            body = payload.decode(message.get_content_charset() or "utf-8", errors="replace") if isinstance(payload, bytes) else str(payload or "")
+            body = (
+                payload.decode(
+                    message.get_content_charset() or "utf-8", errors="replace"
+                )
+                if isinstance(payload, bytes)
+                else str(payload or "")
+            )
         received = message.get("Date", "")
         try:
-            received = datetime.fromtimestamp(email.utils.mktime_tz(email.utils.parsedate_tz(received)), timezone.utc).isoformat()
+            received = datetime.fromtimestamp(
+                email.utils.mktime_tz(email.utils.parsedate_tz(received)), timezone.utc
+            ).isoformat()
         except (TypeError, ValueError, OverflowError):
             received = datetime.now(timezone.utc).isoformat()
         cleaned_body = cls.clean_email_text(body)
@@ -334,13 +406,25 @@ class GmailApiScanner(GmailScanner):
         token = Path(self.token_path)
         config = json.loads(Path(self.credentials_path).read_text(encoding="utf-8"))
         client = config.get("installed") or config.get("web")
-        credentials = json.loads(token.read_text(encoding="utf-8")) if token.exists() else None
-        if credentials and credentials.get("refresh_token") and credentials.get("expires_at", 0) <= time.time() + 60:
-            body = urllib.parse.urlencode({
-                "client_id": client["client_id"], "client_secret": client["client_secret"],
-                "refresh_token": credentials["refresh_token"], "grant_type": "refresh_token",
-            }).encode()
-            request = urllib.request.Request(client["token_uri"], data=body, method="POST")
+        credentials = (
+            json.loads(token.read_text(encoding="utf-8")) if token.exists() else None
+        )
+        if (
+            credentials
+            and credentials.get("refresh_token")
+            and credentials.get("expires_at", 0) <= time.time() + 60
+        ):
+            body = urllib.parse.urlencode(
+                {
+                    "client_id": client["client_id"],
+                    "client_secret": client["client_secret"],
+                    "refresh_token": credentials["refresh_token"],
+                    "grant_type": "refresh_token",
+                }
+            ).encode()
+            request = urllib.request.Request(
+                client["token_uri"], data=body, method="POST"
+            )
             with urllib.request.urlopen(request, timeout=30) as response:
                 refreshed = json.loads(response.read())
             credentials.update(refreshed)
@@ -351,12 +435,18 @@ class GmailApiScanner(GmailScanner):
 
         state = secrets.token_urlsafe(24)
         redirect_uri = "http://localhost:8765/"
-        query = urllib.parse.urlencode({
-            "client_id": client["client_id"], "redirect_uri": redirect_uri,
-            "response_type": "code", "scope": " ".join(self.SCOPES),
-            "access_type": "offline", "prompt": "consent", "state": state,
-        })
-        authorization_url = f'{client["auth_uri"]}?{query}'
+        query = urllib.parse.urlencode(
+            {
+                "client_id": client["client_id"],
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": " ".join(self.SCOPES),
+                "access_type": "offline",
+                "prompt": "consent",
+                "state": state,
+            }
+        )
+        authorization_url = f"{client['auth_uri']}?{query}"
         print(f"Authorize Gmail in your browser: {authorization_url}", flush=True)
         callback = {}
 
@@ -365,7 +455,9 @@ class GmailApiScanner(GmailScanner):
                 callback.update(parse_qs(urlparse(self.path).query))
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(b"Gmail authorization received. You can close this tab.")
+                self.wfile.write(
+                    b"Gmail authorization received. You can close this tab."
+                )
 
             def log_message(self, *_args):
                 return
@@ -376,11 +468,15 @@ class GmailApiScanner(GmailScanner):
         server.server_close()
         if callback.get("state", [""])[0] != state or not callback.get("code"):
             raise RuntimeError("Gmail OAuth authorization was not completed")
-        body = urllib.parse.urlencode({
-            "code": callback["code"][0], "client_id": client["client_id"],
-            "client_secret": client["client_secret"], "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code",
-        }).encode()
+        body = urllib.parse.urlencode(
+            {
+                "code": callback["code"][0],
+                "client_id": client["client_id"],
+                "client_secret": client["client_secret"],
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            }
+        ).encode()
         request = urllib.request.Request(client["token_uri"], data=body, method="POST")
         with urllib.request.urlopen(request, timeout=30) as response:
             credentials = json.loads(response.read())
@@ -391,13 +487,24 @@ class GmailApiScanner(GmailScanner):
     def fetch_messages(self) -> list[EmailMessage]:
         client, access_token = self._service()
         headers = {"Authorization": f"Bearer {access_token}"}
-        query = urllib.parse.urlencode({"q": f'newer_than:{self.days}d {{application applied interview recruiter offer position candidate hiring "thank you for applying"}}', "maxResults": 100})
-        request = urllib.request.Request(f"https://gmail.googleapis.com/gmail/v1/users/me/messages?{query}", headers=headers)
+        query = urllib.parse.urlencode(
+            {
+                "q": f'newer_than:{self.days}d {{application applied interview recruiter offer position candidate hiring "thank you for applying"}}',
+                "maxResults": 100,
+            }
+        )
+        request = urllib.request.Request(
+            f"https://gmail.googleapis.com/gmail/v1/users/me/messages?{query}",
+            headers=headers,
+        )
         with urllib.request.urlopen(request, timeout=30) as response:
             response_data = json.loads(response.read())
         messages = []
         for item in response_data.get("messages", []):
-            request = urllib.request.Request(f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{item['id']}?format=full", headers=headers)
+            request = urllib.request.Request(
+                f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{item['id']}?format=full",
+                headers=headers,
+            )
             with urllib.request.urlopen(request, timeout=30) as response:
                 payload = json.loads(response.read())
             messages.append(self._from_api_payload(payload))
@@ -405,12 +512,21 @@ class GmailApiScanner(GmailScanner):
 
     @classmethod
     def _from_api_payload(cls, payload):
-        headers = {header["name"].lower(): header["value"] for header in payload.get("payload", {}).get("headers", [])}
+        headers = {
+            header["name"].lower(): header["value"]
+            for header in payload.get("payload", {}).get("headers", [])
+        }
         body_parts = []
 
         def collect(part):
-            if part.get("mimeType") == "text/plain" and part.get("body", {}).get("data"):
-                body_parts.append(base64.urlsafe_b64decode(part["body"]["data"] + "===").decode("utf-8", errors="replace"))
+            if part.get("mimeType") == "text/plain" and part.get("body", {}).get(
+                "data"
+            ):
+                body_parts.append(
+                    base64.urlsafe_b64decode(part["body"]["data"] + "===").decode(
+                        "utf-8", errors="replace"
+                    )
+                )
             for child in part.get("parts", []):
                 collect(child)
 
@@ -419,12 +535,15 @@ class GmailApiScanner(GmailScanner):
         cleaned_body = cls.clean_email_text(raw_body)
         raw_date = headers.get("date", "")
         try:
-            received = datetime.fromtimestamp(email.utils.mktime_tz(email.utils.parsedate_tz(raw_date)), timezone.utc).isoformat()
+            received = datetime.fromtimestamp(
+                email.utils.mktime_tz(email.utils.parsedate_tz(raw_date)), timezone.utc
+            ).isoformat()
         except (TypeError, ValueError, OverflowError):
             received = datetime.now(timezone.utc).isoformat()
         return EmailMessage(
             subject=cls.clean_email_text(cls._decode(headers.get("subject", ""))),
-            snippet=cls.clean_email_text(payload.get("snippet", ""))[:1000] or cleaned_body[:1000],
+            snippet=cls.clean_email_text(payload.get("snippet", ""))[:1000]
+            or cleaned_body[:1000],
             from_address=cls._decode(headers.get("from", "")).strip(),
             received_at=received,
             email_id=payload.get("id", ""),

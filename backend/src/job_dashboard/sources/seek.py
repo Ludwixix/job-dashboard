@@ -6,7 +6,6 @@ import time
 import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -18,14 +17,13 @@ from .base import (
     SeekUnavailableError,
     canonical_posted_date,
     clean_description,
-    estimate_salary_bracket,
     is_recent,
     parse_salary_bracket,
     resolve_search_location,
     sanitize_html,
 )
 from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
-from .proxy import ProxyRotator, parse_proxy, sanitize_proxy_url
+from .proxy import ProxyRotator
 
 logger = get_logger("job_dashboard.sources.seek")
 

@@ -8,6 +8,7 @@ import os
 import random
 
 import time
+
 login_attempts = {}
 
 
@@ -26,7 +27,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from xml.sax.saxutils import escape
 
-from .config import settings
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -50,20 +50,12 @@ from .cover_letter_polarizer import (
 )
 from .screening_solver import (
     generate_screening_report,
-    solve_screening_question,
-    extract_screening_questions_from_jd,
 )
 from .ksc_generator import (
     generate_ksc_report,
-    extract_ksc_from_jd,
-    generate_sao_statement,
 )
 from .seek_pass_auditor import (
     generate_seek_pass_report,
-    extract_seek_pass_requirements,
-    audit_candidate_credentials,
-    calculate_readiness_score,
-    generate_seek_pass_responses,
 )
 from .auto_apply import auto_apply_manager
 from .career_recommender import get_career_recommender
@@ -87,21 +79,26 @@ from .sources import (
     detect_query_stream,
     ScrapePipeline,
     clean_description,
-    deduplicate_jobs,
-    ensure_descriptions,
     is_recent,
     posted_age,
     extract_seek_job_id,
     fetch_seek_job_description,
     fetch_portal_description,
 )
-from .semantic_tailoring import analyze_semantic_gap, generate_tailored_cover_letter, generate_linkedin_optimization
-from .offer_analytics import calculate_compensation_benchmark, scan_employment_contract_risks
+from .semantic_tailoring import (
+    analyze_semantic_gap,
+    generate_tailored_cover_letter,
+    generate_linkedin_optimization,
+)
+from .offer_analytics import (
+    calculate_compensation_benchmark,
+    scan_employment_contract_risks,
+)
 from .executive_dossier import generate_executive_dossier, export_dossier_markdown
 from .smart_applications import get_smart_application_tracker
-from .network_crm import NetworkCRMManager, NetworkContact
-from .funnel_analytics import compute_funnel_analytics, AU_SECTOR_BENCHMARKS
-from .career_matrix import generate_career_roadmap, SECTOR_CAREER_TRACKS, AU_CERTIFICATION_REGISTRY
+from .network_crm import NetworkCRMManager
+from .funnel_analytics import compute_funnel_analytics
+from .career_matrix import generate_career_roadmap
 from .interview_influence import (
     InterviewDebrief,
     evaluate_influence_health,
@@ -109,17 +106,17 @@ from .interview_influence import (
     generate_referee_alignment_pack,
 )
 
-from datetime import timedelta
-from urllib.error import URLError
-
 
 logger = get_logger("job_dashboard.web")
 TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
 
 
-def _persist_profile_to_all_sinks(app: Any, user_id: str, profile_data: dict[str, Any]) -> dict[str, Any]:
+def _persist_profile_to_all_sinks(
+    app: Any, user_id: str, profile_data: dict[str, Any]
+) -> dict[str, Any]:
     """Persist candidate profile across SQLite, in-memory dashboard, local JSON files, WAL checkpoint, and GCS."""
     from datetime import datetime, timezone
+
     profile_data["id"] = user_id
     if "updatedAt" not in profile_data and "updated_at" not in profile_data:
         profile_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
@@ -133,7 +130,7 @@ def _persist_profile_to_all_sinks(app: Any, user_id: str, profile_data: dict[str
             pass
     for prefix in ("user_", "prof_"):
         if user_id.startswith(prefix):
-            clean_id = user_id[len(prefix):]
+            clean_id = user_id[len(prefix) :]
             try:
                 app.repository.upsert_user_profile(clean_id, profile_data)
             except Exception:
@@ -156,6 +153,7 @@ def _persist_profile_to_all_sinks(app: Any, user_id: str, profile_data: dict[str
     # 3. Checkpoint SQLite WAL so changes are fully committed to main database file
     try:
         from .db_pool import get_db_connection
+
         with get_db_connection(app.repository.path) as conn:
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     except Exception as cp_err:
@@ -163,25 +161,45 @@ def _persist_profile_to_all_sinks(app: Any, user_id: str, profile_data: dict[str
 
     # 4. Immediate backup of job_profile.json to GCS (guarantees completion before Cloud Run throttles CPU)
     from .config import settings
+
     if settings.gcs_data_bucket and hasattr(app, "data_dir") and app.data_dir:
         try:
-            backup_to_gcs(settings.gcs_data_bucket, Path(app.data_dir), filenames=("job_profile.json",))
+            backup_to_gcs(
+                settings.gcs_data_bucket,
+                Path(app.data_dir),
+                filenames=("job_profile.json",),
+            )
         except Exception as b_err:
             logger.warning(f"Immediate GCS profile backup warning: {b_err}")
 
         # Also trigger background backup for the larger sqlite database
         def _bg_backup():
             try:
-                backup_to_gcs(settings.gcs_data_bucket, Path(app.data_dir), filenames=("jobs.sqlite3", "jobs.sqlite3-wal"))
+                backup_to_gcs(
+                    settings.gcs_data_bucket,
+                    Path(app.data_dir),
+                    filenames=("jobs.sqlite3", "jobs.sqlite3-wal"),
+                )
             except Exception as b_err:
-                logger.warning(f"GCS database backup failed on profile persist: {b_err}")
+                logger.warning(
+                    f"GCS database backup failed on profile persist: {b_err}"
+                )
+
         threading.Thread(target=_bg_backup, daemon=True).start()
 
     return res
 
 
 class DashboardApp:
-    def __init__(self, profile=None, sources=None, data_dir: str | Path = "data", document_generator=None, search_queries=None, repository=None):
+    def __init__(
+        self,
+        profile=None,
+        sources=None,
+        data_dir: str | Path = "data",
+        document_generator=None,
+        search_queries=None,
+        repository=None,
+    ):
         if isinstance(profile, (str, Path)):
             p = Path(profile)
             if p.exists() and p.is_file():
@@ -201,7 +219,9 @@ class DashboardApp:
         self.profile_path = self.data_dir / "job_profile.json"
         if (not profile or not self.dashboard.profile) and self.profile_path.exists():
             try:
-                self.dashboard.profile = json.loads(self.profile_path.read_text(encoding="utf-8"))
+                self.dashboard.profile = json.loads(
+                    self.profile_path.read_text(encoding="utf-8")
+                )
             except Exception:
                 pass
         self.search_queries = self._load_search_queries(search_queries)
@@ -209,16 +229,33 @@ class DashboardApp:
         self.repository = repository or JobRepository(self.data_dir / "jobs.sqlite3")
         self.health_check = get_health_check(self.data_dir)
         self.db = self.repository
-        self.generated_documents: dict[str, dict[str, str]] = self._load_generated_documents()
+        self.generated_documents: dict[str, dict[str, str]] = (
+            self._load_generated_documents()
+        )
         self.generation_progress: dict[str, dict[str, object]] = {}
-        self.compare_results: dict[str, dict[str, object]] = self._load_compare_results()
+        self.compare_results: dict[str, dict[str, object]] = (
+            self._load_compare_results()
+        )
         self.compare_progress: dict[str, dict[str, object]] = {}
-        self.tracker_state: dict[str, object] = {"status": "idle", "last_sync": None, "rows": 0, "matched": 0, "error": None}
+        self.tracker_state: dict[str, object] = {
+            "status": "idle",
+            "last_sync": None,
+            "rows": 0,
+            "matched": 0,
+            "error": None,
+        }
         self.tracker_rows: list[dict[str, str]] = []
         generator_factory = None
         if document_generator is not None:
-            generator_factory = lambda model: type(document_generator)(document_generator.source_dir, document_generator.guidelines_dir, model=model, api_key=document_generator.api_key)
-        self.compare_runner = CompareRunner(self.data_dir, generator_factory=generator_factory)
+            generator_factory = lambda model: type(document_generator)(
+                document_generator.source_dir,
+                document_generator.guidelines_dir,
+                model=model,
+                api_key=document_generator.api_key,
+            )
+        self.compare_runner = CompareRunner(
+            self.data_dir, generator_factory=generator_factory
+        )
         # Phase 6: Smart Application Tracker
         self.application_tracker = get_smart_application_tracker(self.data_dir)
         # Phase 16: Recruiter & Talent Network CRM
@@ -232,16 +269,22 @@ class DashboardApp:
                     try:
                         self.repository.upsert_scraped_jobs(self.jobs)
                     except Exception as err:
-                        logger.warning(f"Initial database seeding exception (non-fatal): {err}")
+                        logger.warning(
+                            f"Initial database seeding exception (non-fatal): {err}"
+                        )
                     self.db_ready_event.set()
                 else:
+
                     def _seed():
                         try:
                             self.repository.upsert_scraped_jobs(self.jobs)
                         except Exception as err:
-                            logger.warning(f"Initial database seeding exception (non-fatal): {err}")
+                            logger.warning(
+                                f"Initial database seeding exception (non-fatal): {err}"
+                            )
                         finally:
                             self.db_ready_event.set()
+
                     threading.Thread(target=_seed, daemon=True).start()
             else:
                 self.db_ready_event.set()
@@ -249,7 +292,10 @@ class DashboardApp:
             self.db_ready_event.set()
 
     def save_search_queries(self):
-        payload = [{"term": query.term, "location": query.location, "stream": query.stream} for query in self.search_queries]
+        payload = [
+            {"term": query.term, "location": query.location, "stream": query.stream}
+            for query in self.search_queries
+        ]
         temporary = self.search_queries_path.with_suffix(".tmp")
         with temporary.open("w", encoding="utf-8") as file:
             json.dump(payload, file, indent=2)
@@ -276,18 +322,42 @@ class DashboardApp:
                 term = str(item.get("term", "")).strip()
                 if not term:
                     continue
-                is_remote = any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(item.get("remote"))
-                raw_loc = str(item.get("location") or ("Australia" if is_remote else "Melbourne, VIC")).strip()
-                loc = "Australia" if (is_remote and raw_loc.lower() in ("melbourne, vic", "melbourne", "")) else (raw_loc or "Australia")
-                loaded.append(SearchQuery(
-                    term,
-                    loc,
-                    str(item.get("stream", "core-it")).strip(),
-                    str(item.get("group", "")).strip(),
-                    float(item.get("weight", 1.0)),
-                    tuple(str(t).strip() for t in item.get("exclude_terms", []) if str(t).strip()),
-                    bool(item.get("enabled", True)),
-                ))
+                is_remote = any(
+                    k in term.lower()
+                    for k in (
+                        "remote",
+                        "wfh",
+                        "work from home",
+                        "anywhere in australia",
+                    )
+                ) or bool(item.get("remote"))
+                raw_loc = str(
+                    item.get("location")
+                    or ("Australia" if is_remote else "Melbourne, VIC")
+                ).strip()
+                loc = (
+                    "Australia"
+                    if (
+                        is_remote
+                        and raw_loc.lower() in ("melbourne, vic", "melbourne", "")
+                    )
+                    else (raw_loc or "Australia")
+                )
+                loaded.append(
+                    SearchQuery(
+                        term,
+                        loc,
+                        str(item.get("stream", "core-it")).strip(),
+                        str(item.get("group", "")).strip(),
+                        float(item.get("weight", 1.0)),
+                        tuple(
+                            str(t).strip()
+                            for t in item.get("exclude_terms", [])
+                            if str(t).strip()
+                        ),
+                        bool(item.get("enabled", True)),
+                    )
+                )
             return loaded or list(defaults or DEFAULT_QUERIES)
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return list(defaults or [])
@@ -298,25 +368,58 @@ class DashboardApp:
             term = str(item.get("term", "")).strip()
             if not term:
                 continue
-            is_remote = any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(item.get("remote"))
-            raw_loc = str(item.get("location") or ("Australia" if is_remote else "Melbourne, VIC")).strip()
-            loc = "Australia" if (is_remote and raw_loc.lower() in ("melbourne, vic", "melbourne", "")) else (raw_loc or "Australia")
-            updated.append(SearchQuery(
-                term,
-                loc,
-                str(item.get("stream", "core-it")).strip().lower() or "core-it",
-                str(item.get("group", "")).strip(),
-                float(item.get("weight", 1.0)),
-                tuple(str(t).strip() for t in item.get("exclude_terms", []) if str(t).strip()),
-                bool(item.get("enabled", True)),
-            ))
+            is_remote = any(
+                k in term.lower()
+                for k in ("remote", "wfh", "work from home", "anywhere in australia")
+            ) or bool(item.get("remote"))
+            raw_loc = str(
+                item.get("location") or ("Australia" if is_remote else "Melbourne, VIC")
+            ).strip()
+            loc = (
+                "Australia"
+                if (
+                    is_remote and raw_loc.lower() in ("melbourne, vic", "melbourne", "")
+                )
+                else (raw_loc or "Australia")
+            )
+            updated.append(
+                SearchQuery(
+                    term,
+                    loc,
+                    str(item.get("stream", "core-it")).strip().lower() or "core-it",
+                    str(item.get("group", "")).strip(),
+                    float(item.get("weight", 1.0)),
+                    tuple(
+                        str(t).strip()
+                        for t in item.get("exclude_terms", [])
+                        if str(t).strip()
+                    ),
+                    bool(item.get("enabled", True)),
+                )
+            )
         self.search_queries = updated
         self.save_search_queries()
         result = []
         for query in self.search_queries:
-            entry = {"term": query.term, "location": query.location, "stream": query.stream}
-            if query.group or query.weight != 1.0 or query.exclude_terms or not query.enabled:
-                entry.update({"group": query.group, "weight": query.weight, "exclude_terms": list(query.exclude_terms), "enabled": query.enabled})
+            entry = {
+                "term": query.term,
+                "location": query.location,
+                "stream": query.stream,
+            }
+            if (
+                query.group
+                or query.weight != 1.0
+                or query.exclude_terms
+                or not query.enabled
+            ):
+                entry.update(
+                    {
+                        "group": query.group,
+                        "weight": query.weight,
+                        "exclude_terms": list(query.exclude_terms),
+                        "enabled": query.enabled,
+                    }
+                )
             result.append(entry)
         return result
 
@@ -333,64 +436,144 @@ class DashboardApp:
     # GET /api/search-criteria/suggestions returns industry-relevant terms.
     _INDUSTRY_TITLES: dict[str, list[str]] = {
         "Technology & IT": [
-            "systems administrator", "support engineer", "helpdesk", "infrastructure engineer",
-            "cloud engineer", "devops engineer", "service desk analyst",
-            "Microsoft 365 Administrator", "Azure Administrator", "SharePoint Administrator",
-            "Intune Administrator", "Endpoint Engineer", "PowerShell Automation Engineer",
-            "ServiceNow Administrator", "Technical Support Engineer", "Infrastructure Consultant",
+            "systems administrator",
+            "support engineer",
+            "helpdesk",
+            "infrastructure engineer",
+            "cloud engineer",
+            "devops engineer",
+            "service desk analyst",
+            "Microsoft 365 Administrator",
+            "Azure Administrator",
+            "SharePoint Administrator",
+            "Intune Administrator",
+            "Endpoint Engineer",
+            "PowerShell Automation Engineer",
+            "ServiceNow Administrator",
+            "Technical Support Engineer",
+            "Infrastructure Consultant",
         ],
         "Healthcare & Medical": [
-            "registered nurse", "enrolled nurse", "clinical nurse consultant",
-            "nurse practitioner", "ward manager", "hospital administrator",
-            "allied health professional", "physiotherapist", "occupational therapist",
-            "medical receptionist", "healthcare coordinator", "clinical coordinator",
-            "aged care worker", "disability support worker", "patient services officer",
+            "registered nurse",
+            "enrolled nurse",
+            "clinical nurse consultant",
+            "nurse practitioner",
+            "ward manager",
+            "hospital administrator",
+            "allied health professional",
+            "physiotherapist",
+            "occupational therapist",
+            "medical receptionist",
+            "healthcare coordinator",
+            "clinical coordinator",
+            "aged care worker",
+            "disability support worker",
+            "patient services officer",
         ],
         "Finance & Accounting": [
-            "financial analyst", "accountant", "senior accountant", "management accountant",
-            "financial controller", "tax accountant", "payroll officer", "bookkeeper",
-            "finance manager", "business analyst", "investment analyst", "compliance officer",
+            "financial analyst",
+            "accountant",
+            "senior accountant",
+            "management accountant",
+            "financial controller",
+            "tax accountant",
+            "payroll officer",
+            "bookkeeper",
+            "finance manager",
+            "business analyst",
+            "investment analyst",
+            "compliance officer",
         ],
         "Marketing & Sales": [
-            "marketing manager", "digital marketing manager", "SEO specialist",
-            "content strategist", "brand manager", "account manager",
-            "business development manager", "sales manager", "CRM manager",
+            "marketing manager",
+            "digital marketing manager",
+            "SEO specialist",
+            "content strategist",
+            "brand manager",
+            "account manager",
+            "business development manager",
+            "sales manager",
+            "CRM manager",
         ],
         "Construction & Trades": [
-            "site manager", "project manager construction", "construction manager",
-            "estimator", "quantity surveyor", "building supervisor", "civil engineer",
-            "structural engineer", "contracts administrator",
+            "site manager",
+            "project manager construction",
+            "construction manager",
+            "estimator",
+            "quantity surveyor",
+            "building supervisor",
+            "civil engineer",
+            "structural engineer",
+            "contracts administrator",
         ],
         "Education": [
-            "teacher", "primary school teacher", "secondary school teacher",
-            "early childhood educator", "curriculum developer", "education consultant",
-            "instructional designer", "school administrator", "TAFE trainer",
+            "teacher",
+            "primary school teacher",
+            "secondary school teacher",
+            "early childhood educator",
+            "curriculum developer",
+            "education consultant",
+            "instructional designer",
+            "school administrator",
+            "TAFE trainer",
         ],
         "Legal": [
-            "solicitor", "lawyer", "legal counsel", "in-house counsel", "paralegal",
-            "legal secretary", "conveyancer", "litigation lawyer", "corporate lawyer",
+            "solicitor",
+            "lawyer",
+            "legal counsel",
+            "in-house counsel",
+            "paralegal",
+            "legal secretary",
+            "conveyancer",
+            "litigation lawyer",
+            "corporate lawyer",
         ],
         "HR & People": [
-            "HR business partner", "HR manager", "human resources officer",
-            "talent acquisition specialist", "recruiter", "learning and development manager",
-            "people and culture manager", "HRIS specialist",
+            "HR business partner",
+            "HR manager",
+            "human resources officer",
+            "talent acquisition specialist",
+            "recruiter",
+            "learning and development manager",
+            "people and culture manager",
+            "HRIS specialist",
         ],
         "Retail & Hospitality": [
-            "retail manager", "store manager", "hospitality manager",
-            "restaurant manager", "hotel manager", "customer experience manager",
+            "retail manager",
+            "store manager",
+            "hospitality manager",
+            "restaurant manager",
+            "hotel manager",
+            "customer experience manager",
         ],
         "Engineering": [
-            "mechanical engineer", "electrical engineer", "chemical engineer",
-            "process engineer", "project engineer", "design engineer",
-            "maintenance engineer", "systems engineer", "automation engineer",
+            "mechanical engineer",
+            "electrical engineer",
+            "chemical engineer",
+            "process engineer",
+            "project engineer",
+            "design engineer",
+            "maintenance engineer",
+            "systems engineer",
+            "automation engineer",
         ],
         "Logistics & Supply Chain": [
-            "supply chain manager", "logistics coordinator", "warehouse manager",
-            "operations manager logistics", "procurement manager", "inventory manager",
+            "supply chain manager",
+            "logistics coordinator",
+            "warehouse manager",
+            "operations manager logistics",
+            "procurement manager",
+            "inventory manager",
         ],
         "Creative & Design": [
-            "graphic designer", "UX designer", "UI designer", "product designer",
-            "creative director", "art director", "video editor", "web designer",
+            "graphic designer",
+            "UX designer",
+            "UI designer",
+            "product designer",
+            "creative director",
+            "art director",
+            "video editor",
+            "web designer",
         ],
     }
 
@@ -406,7 +589,10 @@ class DashboardApp:
         profile = self.dashboard.profile
         terms = []
         seen: set[str] = set()
-        location = str(profile.get("location") or "Melbourne, VIC").split("(")[0].strip() or "Melbourne, VIC"
+        location = (
+            str(profile.get("location") or "Melbourne, VIC").split("(")[0].strip()
+            or "Melbourne, VIC"
+        )
 
         def add(term: str, stream: str = "core") -> None:
             term = str(term).strip()
@@ -415,19 +601,24 @@ class DashboardApp:
                 terms.append(SearchQuery(term, location, stream))
 
         # 1. Explicit target titles — highest priority
-        for title in (profile.get("targetTitles") or []):
+        for title in profile.get("targetTitles") or []:
             add(title)
 
         # 2. Past experience titles
-        for experience in (profile.get("experience") or []):
+        for experience in profile.get("experience") or []:
             add(experience.get("title", ""))
 
         # 3. Industry-appropriate titles
         industry = str(profile.get("industry") or "Technology & IT")
-        for title in self._INDUSTRY_TITLES.get(industry, self._INDUSTRY_TITLES["Technology & IT"]):
+        for title in self._INDUSTRY_TITLES.get(
+            industry, self._INDUSTRY_TITLES["Technology & IT"]
+        ):
             add(title)
 
-        return [{"term": query.term, "location": query.location, "stream": query.stream} for query in terms]
+        return [
+            {"term": query.term, "location": query.location, "stream": query.stream}
+            for query in terms
+        ]
 
     def _load_generated_documents(self):
         path = self.data_dir / "generated_documents.json"
@@ -435,22 +626,35 @@ class DashboardApp:
             return {}
         try:
             records = json.loads(path.read_text(encoding="utf-8"))
-            return {job_id: metadata for job_id, metadata in records.items() if self._documents_exist(metadata)}
+            return {
+                job_id: metadata
+                for job_id, metadata in records.items()
+                if self._documents_exist(metadata)
+            }
         except json.JSONDecodeError:
             return {}
 
     @staticmethod
     def _documents_exist(metadata):
-        return all(Path(metadata.get(name, "")).is_file() for name in ("resume_pdf", "cover_letter_pdf"))
+        return all(
+            Path(metadata.get(name, "")).is_file()
+            for name in ("resume_pdf", "cover_letter_pdf")
+        )
 
     def _recover_generated_documents(self, job_id):
         """Recover a completed pair if the worker was interrupted after writing files."""
-        if job_id in self.generated_documents and self._documents_exist(self.generated_documents[job_id]):
+        if job_id in self.generated_documents and self._documents_exist(
+            self.generated_documents[job_id]
+        ):
             return self.generated_documents[job_id]
         raw = next((job for job in self.jobs if normalize_job(job).id == job_id), None)
         if raw is None:
             return None
-        application_id = re.sub(r"[^a-z0-9]+", "_", f"{raw.get('company', '')}_{raw.get('title', '')}".lower()).strip("_")[:160]
+        application_id = re.sub(
+            r"[^a-z0-9]+",
+            "_",
+            f"{raw.get('company', '')}_{raw.get('title', '')}".lower(),
+        ).strip("_")[:160]
         output_dir = self.data_dir / "applications"
         metadata = {
             "application_id": application_id,
@@ -464,13 +668,23 @@ class DashboardApp:
         if self._documents_exist(metadata):
             self.generated_documents[job_id] = metadata
             self.save_generated_documents()
-            self.generation_progress[job_id] = {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "done": True, **metadata}
+            self.generation_progress[job_id] = {
+                "phase": "Completed",
+                "estimate_seconds": 0,
+                "progress": 100,
+                "done": True,
+                **metadata,
+            }
             return metadata
         return None
 
     def save_generated_documents(self):
-        payload = {str(job_id): meta for job_id, meta in self.generated_documents.items()}
-        (self.data_dir / "generated_documents.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        payload = {
+            str(job_id): meta for job_id, meta in self.generated_documents.items()
+        }
+        (self.data_dir / "generated_documents.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
 
     def _load_compare_results(self):
         path = self.data_dir / "compare_results.json"
@@ -482,12 +696,30 @@ class DashboardApp:
             return {}
 
     def _save_compare_results(self):
-        (self.data_dir / "compare_results.json").write_text(json.dumps(self.compare_results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (self.data_dir / "compare_results.json").write_text(
+            json.dumps(self.compare_results, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
     def _compare_update(self, comparison_id, model_id, cache_key, result):
-        comparison = self.compare_results.setdefault(comparison_id, {"comparison_id": comparison_id, "job_id": comparison_id.removeprefix("cmp_").rsplit("_", 1)[0], "models": {}, "selected_model": None})
+        comparison = self.compare_results.setdefault(
+            comparison_id,
+            {
+                "comparison_id": comparison_id,
+                "job_id": comparison_id.removeprefix("cmp_").rsplit("_", 1)[0],
+                "models": {},
+                "selected_model": None,
+            },
+        )
         comparison["models"][model_id] = {**result, "cache_key": cache_key}
-        self.compare_progress[comparison_id] = {"done": all(item.get("status") in {"completed", "failed", "timeout"} for item in comparison["models"].values()) and len(comparison["models"]) == len(COMPARE_MODELS), "models": comparison["models"]}
+        self.compare_progress[comparison_id] = {
+            "done": all(
+                item.get("status") in {"completed", "failed", "timeout"}
+                for item in comparison["models"].values()
+            )
+            and len(comparison["models"]) == len(COMPARE_MODELS),
+            "models": comparison["models"],
+        }
         self._save_compare_results()
 
     def start_compare(self, job_id: str):
@@ -496,12 +728,45 @@ class DashboardApp:
             raise KeyError(job_id)
         analysis = self.dashboard.analyse(raw)
         comparison_id = f"cmp_{job_id}_{int(time.time())}"
-        comparison = {"comparison_id": comparison_id, "job_id": job_id, "started_at": time.time(), "models": {}, "selected_model": None, "warning": "Low match quality; review carefully before using generated documents." if analysis.score.score < 70 or not analysis.score.matched_skills else ""}
+        comparison = {
+            "comparison_id": comparison_id,
+            "job_id": job_id,
+            "started_at": time.time(),
+            "models": {},
+            "selected_model": None,
+            "warning": "Low match quality; review carefully before using generated documents."
+            if analysis.score.score < 70 or not analysis.score.matched_skills
+            else "",
+        }
         self.compare_results[comparison_id] = comparison
-        self.compare_progress[comparison_id] = {"done": False, "models": {model_id: {"model_id": model_id, "display_name": display_name, "status": "queued"} for model_id, display_name in COMPARE_MODELS}, "warning": comparison["warning"]}
+        self.compare_progress[comparison_id] = {
+            "done": False,
+            "models": {
+                model_id: {
+                    "model_id": model_id,
+                    "display_name": display_name,
+                    "status": "queued",
+                }
+                for model_id, display_name in COMPARE_MODELS
+            },
+            "warning": comparison["warning"],
+        }
         self._save_compare_results()
-        cached = {result.get("cache_key"): result for past in self.compare_results.values() for result in past.get("models", {}).values() if result.get("cache_key")}
-        self.compare_runner.submit(comparison_id, analysis.job, self.dashboard.profile, cached, lambda model, key, result: self._compare_update(comparison_id, model, key, result))
+        cached = {
+            result.get("cache_key"): result
+            for past in self.compare_results.values()
+            for result in past.get("models", {}).values()
+            if result.get("cache_key")
+        }
+        self.compare_runner.submit(
+            comparison_id,
+            analysis.job,
+            self.dashboard.profile,
+            cached,
+            lambda model, key, result: self._compare_update(
+                comparison_id, model, key, result
+            ),
+        )
         return {"comparison_id": comparison_id, **self.compare_progress[comparison_id]}
 
     def select_compare_output(self, comparison_id: str, model_id: str):
@@ -514,14 +779,32 @@ class DashboardApp:
         job_id = comparison["job_id"]
         output_dir = self.data_dir / "applications"
         output_dir.mkdir(parents=True, exist_ok=True)
-        application_id = re.sub(r"[^a-z0-9]+", "_", f"{job_id}_{model_id}".lower()).strip("_")[:160]
+        application_id = re.sub(
+            r"[^a-z0-9]+", "_", f"{job_id}_{model_id}".lower()
+        ).strip("_")[:160]
         resume_path = output_dir / f"{application_id}_resume.md"
         cover_path = output_dir / f"{application_id}_cover_letter.md"
         resume_path.write_text(selected["resume_text"], encoding="utf-8")
         cover_path.write_text(selected["cover_letter_text"], encoding="utf-8")
-        self._write_pdf(output_dir / f"{application_id}_resume.pdf", selected["resume_text"])
-        self._write_pdf(output_dir / f"{application_id}_cover_letter.pdf", selected["cover_letter_text"])
-        metadata = {"application_id": application_id, "model_id": model_id, "status": "needs_review" if not selected.get("audit", {}).get("verified", True) else "draft_ready", "audit": selected.get("audit", {}), "resume": str(resume_path), "cover_letter": str(cover_path), "resume_pdf": str(output_dir / f"{application_id}_resume.pdf"), "cover_letter_pdf": str(output_dir / f"{application_id}_cover_letter.pdf")}
+        self._write_pdf(
+            output_dir / f"{application_id}_resume.pdf", selected["resume_text"]
+        )
+        self._write_pdf(
+            output_dir / f"{application_id}_cover_letter.pdf",
+            selected["cover_letter_text"],
+        )
+        metadata = {
+            "application_id": application_id,
+            "model_id": model_id,
+            "status": "needs_review"
+            if not selected.get("audit", {}).get("verified", True)
+            else "draft_ready",
+            "audit": selected.get("audit", {}),
+            "resume": str(resume_path),
+            "cover_letter": str(cover_path),
+            "resume_pdf": str(output_dir / f"{application_id}_resume.pdf"),
+            "cover_letter_pdf": str(output_dir / f"{application_id}_cover_letter.pdf"),
+        }
         self.generated_documents[job_id] = metadata
         comparison["selected_model"] = model_id
         self.save_generated_documents()
@@ -532,23 +815,85 @@ class DashboardApp:
         comparison = self.compare_results.get(comparison_id)
         if not comparison:
             raise KeyError(comparison_id)
-        raw = next((job for job in self.jobs if normalize_job(job).id == comparison["job_id"]), None)
+        raw = next(
+            (job for job in self.jobs if normalize_job(job).id == comparison["job_id"]),
+            None,
+        )
         if raw is None:
             raise KeyError(comparison["job_id"])
-        self.compare_runner.submit(comparison_id, self.dashboard.analyse(raw).job, self.dashboard.profile, {}, lambda model, key, result: self._compare_update(comparison_id, model, key, result), model_ids=[model_id])
+        self.compare_runner.submit(
+            comparison_id,
+            self.dashboard.analyse(raw).job,
+            self.dashboard.profile,
+            {},
+            lambda model, key, result: self._compare_update(
+                comparison_id, model, key, result
+            ),
+            model_ids=[model_id],
+        )
         comparison["models"][model_id] = {"model_id": model_id, "status": "loading"}
         self._save_compare_results()
         return comparison["models"][model_id]
 
     def _write_pdf(self, output_path: Path, text: str):
         styles = getSampleStyleSheet()
-        body = ParagraphStyle("DocumentBody", parent=styles["BodyText"], fontName="Helvetica", fontSize=9.5, leading=13, textColor=colors.HexColor("#26383a"), spaceAfter=5)
-        name = ParagraphStyle("DocumentName", parent=body, fontName="Helvetica-Bold", fontSize=21, leading=24, textColor=colors.HexColor("#123c42"), spaceAfter=2)
-        subtitle = ParagraphStyle("DocumentSubtitle", parent=body, fontSize=10.5, leading=14, textColor=colors.HexColor("#397078"), spaceAfter=3)
-        heading = ParagraphStyle("DocumentHeading", parent=body, fontName="Helvetica-Bold", fontSize=10.5, leading=14, textColor=colors.HexColor("#123c42"), spaceBefore=10, spaceAfter=5, keepWithNext=True)
-        role = ParagraphStyle("DocumentRole", parent=body, fontName="Helvetica-Bold", fontSize=10, leading=13, textColor=colors.HexColor("#26383a"), spaceBefore=6, spaceAfter=1, keepWithNext=True)
-        date = ParagraphStyle("DocumentDate", parent=body, fontSize=8.5, leading=11, textColor=colors.HexColor("#607477"), spaceAfter=3, keepWithNext=True)
-        bullet = ParagraphStyle("DocumentBullet", parent=body, leftIndent=10, firstLineIndent=-7, bulletIndent=0, spaceAfter=3)
+        body = ParagraphStyle(
+            "DocumentBody",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=9.5,
+            leading=13,
+            textColor=colors.HexColor("#26383a"),
+            spaceAfter=5,
+        )
+        name = ParagraphStyle(
+            "DocumentName",
+            parent=body,
+            fontName="Helvetica-Bold",
+            fontSize=21,
+            leading=24,
+            textColor=colors.HexColor("#123c42"),
+            spaceAfter=2,
+        )
+        heading = ParagraphStyle(
+            "DocumentHeading",
+            parent=body,
+            fontName="Helvetica-Bold",
+            fontSize=10.5,
+            leading=14,
+            textColor=colors.HexColor("#123c42"),
+            spaceBefore=10,
+            spaceAfter=5,
+            keepWithNext=True,
+        )
+        role = ParagraphStyle(
+            "DocumentRole",
+            parent=body,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=13,
+            textColor=colors.HexColor("#26383a"),
+            spaceBefore=6,
+            spaceAfter=1,
+            keepWithNext=True,
+        )
+        date = ParagraphStyle(
+            "DocumentDate",
+            parent=body,
+            fontSize=8.5,
+            leading=11,
+            textColor=colors.HexColor("#607477"),
+            spaceAfter=3,
+            keepWithNext=True,
+        )
+        bullet = ParagraphStyle(
+            "DocumentBullet",
+            parent=body,
+            leftIndent=10,
+            firstLineIndent=-7,
+            bulletIndent=0,
+            spaceAfter=3,
+        )
 
         story = []
         lines = [line.strip() for line in text.replace("**", "").splitlines()]
@@ -564,7 +909,10 @@ class DashboardApp:
                 story.append(Paragraph(escape(line[4:].strip()), role))
             elif line.startswith("- ") or line.startswith("• "):
                 story.append(Paragraph(f"&bull; {escape(line[2:].strip())}", bullet))
-            elif re.fullmatch(r"(?:[A-Z][a-z]+ \d{4}|Present|\d{4})\s*[–-]\s*(?:[A-Z][a-z]+ \d{4}|Present|\d{4})", line):
+            elif re.fullmatch(
+                r"(?:[A-Z][a-z]+ \d{4}|Present|\d{4})\s*[–-]\s*(?:[A-Z][a-z]+ \d{4}|Present|\d{4})",
+                line,
+            ):
                 story.append(Paragraph(escape(line), date))
             else:
                 story.append(Paragraph(escape(line), body))
@@ -578,18 +926,33 @@ class DashboardApp:
             canvas.drawRightString(190 * mm, 9 * mm, f"{document.page}")
             canvas.restoreState()
 
-        document = SimpleDocTemplate(str(output_path), pagesize=letter, rightMargin=20 * mm, leftMargin=20 * mm, topMargin=16 * mm, bottomMargin=20 * mm, title=output_path.stem, author="Local Job Desk")
+        document = SimpleDocTemplate(
+            str(output_path),
+            pagesize=letter,
+            rightMargin=20 * mm,
+            leftMargin=20 * mm,
+            topMargin=16 * mm,
+            bottomMargin=20 * mm,
+            title=output_path.stem,
+            author="Local Job Desk",
+        )
         document.build(story, onFirstPage=footer, onLaterPages=footer)
 
     def _document_metadata(self, job_id, documents, output_dir):
         metadata = {
             "application_id": documents["application_id"],
             "status": documents.get("status", "draft_ready"),
-            "audit": documents.get("audit", {"verified": True, "issue_count": 0, "issues": []}),
+            "audit": documents.get(
+                "audit", {"verified": True, "issue_count": 0, "issues": []}
+            ),
             "resume": str(output_dir / f"{documents['application_id']}_resume.md"),
-            "cover_letter": str(output_dir / f"{documents['application_id']}_cover_letter.md"),
+            "cover_letter": str(
+                output_dir / f"{documents['application_id']}_cover_letter.md"
+            ),
             "resume_pdf": str(output_dir / f"{documents['application_id']}_resume.pdf"),
-            "cover_letter_pdf": str(output_dir / f"{documents['application_id']}_cover_letter.pdf"),
+            "cover_letter_pdf": str(
+                output_dir / f"{documents['application_id']}_cover_letter.pdf"
+            ),
         }
         self.generated_documents[job_id] = metadata
         return metadata
@@ -605,7 +968,12 @@ class DashboardApp:
             pct, phase = min(90, 25 + int((elapsed - 8) / 37 * 65)), "Now generating"
         else:
             pct, phase = 95, "Now generating"
-        return {"phase": phase, "estimate_seconds": round(estimate), "progress": pct, "started_at": started_at}
+        return {
+            "phase": phase,
+            "estimate_seconds": round(estimate),
+            "progress": pct,
+            "started_at": started_at,
+        }
 
     def _load_jobs(self):
         if "PYTEST_CURRENT_TEST" in os.environ:
@@ -622,14 +990,28 @@ class DashboardApp:
                 self.data_dir / "jobs_combined.json",
                 Path("/app/src/job_dashboard/static/jobs_combined.json"),
                 Path("/app/data/jobs.json"),
-                Path(__file__).resolve().parents[3] / "job-dashboard-react" / "public" / "jobs_combined.json",
-                Path(__file__).resolve().parents[3] / "job-dashboard-site" / "scrapers" / "jobs_combined.json",
+                Path(__file__).resolve().parents[3]
+                / "job-dashboard-react"
+                / "public"
+                / "jobs_combined.json",
+                Path(__file__).resolve().parents[3]
+                / "job-dashboard-site"
+                / "scrapers"
+                / "jobs_combined.json",
             ]
         for p in candidate_paths:
             if p and p.exists():
                 try:
                     raw_data = json.loads(p.read_text(encoding="utf-8"))
-                    jobs = raw_data if isinstance(raw_data, list) else (raw_data.get("jobs", []) if isinstance(raw_data, dict) else [])
+                    jobs = (
+                        raw_data
+                        if isinstance(raw_data, list)
+                        else (
+                            raw_data.get("jobs", [])
+                            if isinstance(raw_data, dict)
+                            else []
+                        )
+                    )
                     if jobs:
                         logger.info(f"Loaded {len(jobs)} jobs from {p}")
                         return jobs
@@ -638,7 +1020,11 @@ class DashboardApp:
         return []
 
     def save_jobs(self):
-        self.jobs_path.write_text(json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+        self.jobs_path.write_text(
+            json.dumps({"jobs": self.jobs}, indent=2, ensure_ascii=False, default=str)
+            + "\n",
+            encoding="utf-8",
+        )
         self.repository.replace_jobs(self.jobs)
 
     def materialize_jobs(self, jobs):
@@ -651,7 +1037,10 @@ class DashboardApp:
             candidate = raw.to_dict() if hasattr(raw, "to_dict") else dict(raw)
             if not str(candidate.get("company") or "").strip():
                 candidate["company"] = "Confidential"
-            if isinstance(candidate.get("salary"), dict) and "raw_text" in candidate["salary"]:
+            if (
+                isinstance(candidate.get("salary"), dict)
+                and "raw_text" in candidate["salary"]
+            ):
                 candidate["salary"] = candidate["salary"]["raw_text"]
             elif hasattr(candidate.get("salary"), "raw_text"):
                 candidate["salary"] = candidate["salary"].raw_text
@@ -659,11 +1048,24 @@ class DashboardApp:
                 job = normalize_job(candidate)
                 analysis = self.dashboard.analyse(candidate)
             except Exception as error:
-                logger.warning(f"Skipping unnormalizable job during materialization: {error}")
+                logger.warning(
+                    f"Skipping unnormalizable job during materialization: {error}"
+                )
                 skipped.append({"job": candidate, "error": str(error)})
                 continue
             item = dict(candidate)
-            item.update({"id": job.id, "score": analysis.score.score, "stream": analysis.stream, "fit_category": analysis.fit_category, "dimensions": analysis.score.dimensions, "matched_skills": analysis.score.matched_skills, "missing_skills": analysis.score.missing_skills, "description": clean_description(job.description)})
+            item.update(
+                {
+                    "id": job.id,
+                    "score": analysis.score.score,
+                    "stream": analysis.stream,
+                    "fit_category": analysis.fit_category,
+                    "dimensions": analysis.score.dimensions,
+                    "matched_skills": analysis.score.matched_skills,
+                    "missing_skills": analysis.score.missing_skills,
+                    "description": clean_description(job.description),
+                }
+            )
             materialized.append(item)
         self.last_skipped_jobs = skipped
         return materialized
@@ -675,7 +1077,11 @@ class DashboardApp:
         archived = []
         seen = set()
         for raw in self.jobs:
-            events = [event for event in raw.get("email_events", []) if event.get("category") == "rejected"]
+            events = [
+                event
+                for event in raw.get("email_events", [])
+                if event.get("category") == "rejected"
+            ]
             if not events:
                 continue
             job = normalize_job(raw)
@@ -684,24 +1090,48 @@ class DashboardApp:
             if email_id in seen:
                 continue
             seen.add(email_id)
-            archived.append({"id": job.id, "title": job.title, "company": job.company or "Company not identified", "received_at": latest.get("received_at", ""), "confidence": latest.get("confidence", 0), "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "", "description": job.description})
+            archived.append(
+                {
+                    "id": job.id,
+                    "title": job.title,
+                    "company": job.company or "Company not identified",
+                    "received_at": latest.get("received_at", ""),
+                    "confidence": latest.get("confidence", 0),
+                    "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}"
+                    if email_id
+                    else "",
+                    "description": job.description,
+                }
+            )
         return archived
-
 
     def application_archive(self):
         archive = []
         for raw in self.jobs:
             for event in raw.get("email_events", []):
-                archive.append({"title": raw.get("title", "Gmail application"), "company": raw.get("company", "Company not identified"), "category": event.get("category", "tracked"), "received_at": event.get("received_at", "")})
+                archive.append(
+                    {
+                        "title": raw.get("title", "Gmail application"),
+                        "company": raw.get("company", "Company not identified"),
+                        "category": event.get("category", "tracked"),
+                        "received_at": event.get("received_at", ""),
+                    }
+                )
         return archive
-    
+
     # Phase 6: Smart Application Methods
-    def add_smart_application(self, job_id: str, job_title: str, company: str, 
-                             application_type: str = "direct", match_score: float = 0.0,
-                             application_url: str = None) -> dict:
+    def add_smart_application(
+        self,
+        job_id: str,
+        job_title: str,
+        company: str,
+        application_type: str = "direct",
+        match_score: float = 0.0,
+        application_url: str = None,
+    ) -> dict:
         """Add a new smart application to track."""
         from .smart_applications import ApplicationType
-        
+
         app_type = ApplicationType(application_type.lower())
         application = self.application_tracker.add_application(
             job_id=job_id,
@@ -709,65 +1139,75 @@ class DashboardApp:
             company=company,
             application_type=app_type,
             match_score=match_score,
-            application_url=application_url
+            application_url=application_url,
         )
         return application.to_dict()
-    
-    def update_application_status(self, application_id: str, status: str, notes: str = None) -> dict:
+
+    def update_application_status(
+        self, application_id: str, status: str, notes: str = None
+    ) -> dict:
         """Update application status."""
         from .smart_applications import ApplicationStatus
-        
+
         app_status = ApplicationStatus(status.lower())
-        application = self.application_tracker.update_status(application_id, app_status, notes)
+        application = self.application_tracker.update_status(
+            application_id, app_status, notes
+        )
         if application:
             return application.to_dict()
         return {"error": "Application not found"}
-    
+
     def get_smart_applications(self, status: str = None) -> list:
         """Get smart applications filtered by status."""
         from .smart_applications import ApplicationStatus
-        
+
         if status:
             app_status = ApplicationStatus(status.lower())
-            applications = self.application_tracker.get_applications_by_status(app_status)
+            applications = self.application_tracker.get_applications_by_status(
+                app_status
+            )
         else:
             applications = self.application_tracker.get_applications_by_status()
-        
+
         return [app.to_dict() for app in applications]
-    
+
     def get_application_statistics(self) -> dict:
         """Get application statistics."""
         return self.application_tracker.get_statistics()
-    
+
     def get_upcoming_follow_ups(self, days: int = 7) -> list:
         """Get applications with upcoming follow-ups."""
         applications = self.application_tracker.get_upcoming_follow_ups(days)
         return [app.to_dict() for app in applications]
-    
+
     def get_overdue_follow_ups(self) -> list:
         """Get applications with overdue follow-ups."""
         applications = self.application_tracker.get_overdue_follow_ups()
         return [app.to_dict() for app in applications]
-    
-    def set_application_follow_up(self, application_id: str, days_from_now: int = 7) -> dict:
+
+    def set_application_follow_up(
+        self, application_id: str, days_from_now: int = 7
+    ) -> dict:
         """Schedule a follow-up for an application."""
-        application = self.application_tracker.set_follow_up(application_id, days_from_now)
+        application = self.application_tracker.set_follow_up(
+            application_id, days_from_now
+        )
         if application:
             return application.to_dict()
         return {"error": "Application not found"}
-    
+
     def add_application_note(self, application_id: str, note: str) -> dict:
         """Add a note to an application."""
         application = self.application_tracker.add_note(application_id, note)
         if application:
             return application.to_dict()
         return {"error": "Application not found"}
-    
+
     def search_smart_applications(self, query: str) -> list:
         """Search applications by company, job title, or notes."""
         applications = self.application_tracker.search_applications(query)
         return [app.to_dict() for app in applications]
-    
+
     def delete_smart_application(self, application_id: str) -> dict:
         """Delete an application."""
         success = self.application_tracker.delete_application(application_id)
@@ -781,16 +1221,33 @@ class DashboardApp:
         for stored_job in stored:
             if str(stored_job.get("source", "")).lower() == "gmail":
                 continue
-            if not filters.get("status") and stored_job.get("status", "sourced") != "sourced":
+            if (
+                not filters.get("status")
+                and stored_job.get("status", "sourced") != "sourced"
+            ):
                 continue
-            if not filters.get("status") and (stored_job.get("status") == "rejected" or not self._has_recent_activity(stored_job)):
+            if not filters.get("status") and (
+                stored_job.get("status") == "rejected"
+                or not self._has_recent_activity(stored_job)
+            ):
                 continue
 
             job_id = stored_job.get("id")
-            raw_memory = next((j for j in self.jobs if j.get("id") == job_id or j.get("url") == stored_job.get("url")), {})
+            raw_memory = next(
+                (
+                    j
+                    for j in self.jobs
+                    if j.get("id") == job_id or j.get("url") == stored_job.get("url")
+                ),
+                {},
+            )
             posted = stored_job.get("posted") or raw_memory.get("posted", "")
-            generated = raw_memory.get("generated") or self.generated_documents.get(job_id)
-            email_events = stored_job.get("email_events") or raw_memory.get("email_events", [])
+            generated = raw_memory.get("generated") or self.generated_documents.get(
+                job_id
+            )
+            email_events = stored_job.get("email_events") or raw_memory.get(
+                "email_events", []
+            )
             email_id = email_events[-1].get("email_id") if email_events else ""
 
             # Check precomputed fields from stored_job or raw_memory or data_json
@@ -805,12 +1262,36 @@ class DashboardApp:
                 extra = data_json
 
             fit_val = stored_job.get("fit") or extra.get("fit") or raw_memory.get("fit")
-            matched_skills = stored_job.get("matched_skills") or extra.get("matched_skills") or raw_memory.get("matched_skills")
-            missing_skills = stored_job.get("missing_skills") or extra.get("missing_skills") or raw_memory.get("missing_skills")
-            dimensions = stored_job.get("dimensions") or extra.get("dimensions") or raw_memory.get("dimensions")
-            score_val = stored_job.get("score") if stored_job.get("score") is not None else extra.get("score")
-            stream_val = stored_job.get("stream") or extra.get("stream") or raw_memory.get("stream")
-            fit_cat = stored_job.get("fit_category") or extra.get("fit_category") or raw_memory.get("fit_category")
+            matched_skills = (
+                stored_job.get("matched_skills")
+                or extra.get("matched_skills")
+                or raw_memory.get("matched_skills")
+            )
+            missing_skills = (
+                stored_job.get("missing_skills")
+                or extra.get("missing_skills")
+                or raw_memory.get("missing_skills")
+            )
+            dimensions = (
+                stored_job.get("dimensions")
+                or extra.get("dimensions")
+                or raw_memory.get("dimensions")
+            )
+            score_val = (
+                stored_job.get("score")
+                if stored_job.get("score") is not None
+                else extra.get("score")
+            )
+            stream_val = (
+                stored_job.get("stream")
+                or extra.get("stream")
+                or raw_memory.get("stream")
+            )
+            fit_cat = (
+                stored_job.get("fit_category")
+                or extra.get("fit_category")
+                or raw_memory.get("fit_category")
+            )
 
             # Fallback to dynamic analysis ONLY if score was never computed (avoids 40s CPU freeze)
             if score_val is None or not dimensions:
@@ -830,7 +1311,9 @@ class DashboardApp:
                     matched_skills = matched_skills or analysis.score.matched_skills
                     missing_skills = missing_skills or analysis.score.missing_skills
                     dimensions = dimensions or analysis.score.dimensions
-                    score_val = score_val if score_val is not None else analysis.score.score
+                    score_val = (
+                        score_val if score_val is not None else analysis.score.score
+                    )
                     stream_val = stream_val or analysis.stream
                     fit_cat = fit_cat or analysis.fit_category
 
@@ -842,44 +1325,53 @@ class DashboardApp:
             stream_val = stream_val or "core-it"
             fit_cat = fit_cat or "Core IT"
 
-            result.append({
-                "id": job_id,
-                "title": stored_job.get("title", ""),
-                "company": stored_job.get("company") or "Confidential",
-                "location": stored_job.get("location", ""),
-                "description": clean_description(stored_job.get("description", "")),
-                "source": stored_job.get("source", ""),
-                "url": stored_job.get("url", ""),
-                "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}" if email_id else "",
-                "salary": stored_job.get("salary") or raw_memory.get("salary", ""),
-                "posted": posted,
-                "posted_age": posted_age(posted),
-                "remote": bool(stored_job.get("remote", False)),
-                "stream": stream_val,
-                "fit_category": fit_cat,
-                "score": score_val,
-                "fit": fit_val,
-                "matched_skills": matched_skills,
-                "missing_skills": missing_skills,
-                "dimensions": dimensions,
-                "generated": generated,
-                "status": stored_job.get("status", "sourced"),
-            })
+            result.append(
+                {
+                    "id": job_id,
+                    "title": stored_job.get("title", ""),
+                    "company": stored_job.get("company") or "Confidential",
+                    "location": stored_job.get("location", ""),
+                    "description": clean_description(stored_job.get("description", "")),
+                    "source": stored_job.get("source", ""),
+                    "url": stored_job.get("url", ""),
+                    "email_url": f"https://mail.google.com/mail/u/0/#all/{email_id}"
+                    if email_id
+                    else "",
+                    "salary": stored_job.get("salary") or raw_memory.get("salary", ""),
+                    "posted": posted,
+                    "posted_age": posted_age(posted),
+                    "remote": bool(stored_job.get("remote", False)),
+                    "stream": stream_val,
+                    "fit_category": fit_cat,
+                    "score": score_val,
+                    "fit": fit_val,
+                    "matched_skills": matched_skills,
+                    "missing_skills": missing_skills,
+                    "dimensions": dimensions,
+                    "generated": generated,
+                    "status": stored_job.get("status", "sourced"),
+                }
+            )
         return result
 
     @staticmethod
     def _has_recent_activity(job, days: int = 30):
         dates = [job.get("posted", "")]
-        dates.extend(event.get("received_at", "") for event in job.get("email_events", []))
+        dates.extend(
+            event.get("received_at", "") for event in job.get("email_events", [])
+        )
         return any(value and is_recent({"posted": value}, days=days) for value in dates)
 
-    def refresh(self, queries, force: bool = False, ttl_hours: float = 12.0, on_progress=None):
+    def refresh(
+        self, queries, force: bool = False, ttl_hours: float = 12.0, on_progress=None
+    ):
         self.db_ready_event.wait(timeout=5.0)
         with self.lock:
             if not queries:
                 queries = list(self.search_queries or [])
             if not queries:
                 from .scrape import resolve_cli_queries
+
                 queries = resolve_cli_queries(None)
 
             normalized_queries: list[SearchQuery] = []
@@ -888,35 +1380,126 @@ class DashboardApp:
                     term = q.term
                     stream = q.stream
                     loc = q.location
-                    is_rem = stream.lower() == "remote" or any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
-                    if is_rem and (not loc or loc.lower() in ("melbourne, vic", "melbourne", "vic")):
+                    is_rem = stream.lower() == "remote" or any(
+                        k in term.lower()
+                        for k in (
+                            "remote",
+                            "wfh",
+                            "work from home",
+                            "anywhere in australia",
+                        )
+                    )
+                    if is_rem and (
+                        not loc or loc.lower() in ("melbourne, vic", "melbourne", "vic")
+                    ):
                         loc = "Australia"
-                    normalized_queries.append(SearchQuery(term=term, location=loc or "Australia", stream=stream, group=q.group, weight=q.weight, exclude_terms=q.exclude_terms, enabled=q.enabled))
+                    normalized_queries.append(
+                        SearchQuery(
+                            term=term,
+                            location=loc or "Australia",
+                            stream=stream,
+                            group=q.group,
+                            weight=q.weight,
+                            exclude_terms=q.exclude_terms,
+                            enabled=q.enabled,
+                        )
+                    )
                 elif isinstance(q, str):
                     if q.strip():
                         s_term = q.strip()
                         s_stream = detect_query_stream(s_term)
-                        is_rem = s_stream.lower() == "remote" or any(k in s_term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                        is_rem = s_stream.lower() == "remote" or any(
+                            k in s_term.lower()
+                            for k in (
+                                "remote",
+                                "wfh",
+                                "work from home",
+                                "anywhere in australia",
+                            )
+                        )
                         s_loc = "Australia" if is_rem else "Melbourne, VIC"
-                        normalized_queries.append(SearchQuery(term=s_term, location=s_loc, stream=s_stream))
+                        normalized_queries.append(
+                            SearchQuery(term=s_term, location=s_loc, stream=s_stream)
+                        )
                 elif isinstance(q, dict):
                     term = str(q.get("term") or "").strip()
                     if term:
-                        stream = str(q.get("stream") or detect_query_stream(term)).strip()
-                        is_rem = stream.lower() == "remote" or any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(q.get("remote"))
-                        raw_loc = str(q.get("location") or ("Australia" if is_rem else "Melbourne, VIC")).strip()
-                        loc = "Australia" if (is_rem and raw_loc.lower() in ("melbourne, vic", "melbourne", "vic", "")) else (raw_loc or "Australia")
+                        stream = str(
+                            q.get("stream") or detect_query_stream(term)
+                        ).strip()
+                        is_rem = (
+                            stream.lower() == "remote"
+                            or any(
+                                k in term.lower()
+                                for k in (
+                                    "remote",
+                                    "wfh",
+                                    "work from home",
+                                    "anywhere in australia",
+                                )
+                            )
+                            or bool(q.get("remote"))
+                        )
+                        raw_loc = str(
+                            q.get("location")
+                            or ("Australia" if is_rem else "Melbourne, VIC")
+                        ).strip()
+                        loc = (
+                            "Australia"
+                            if (
+                                is_rem
+                                and raw_loc.lower()
+                                in ("melbourne, vic", "melbourne", "vic", "")
+                            )
+                            else (raw_loc or "Australia")
+                        )
                         enabled = bool(q.get("enabled", True))
-                        normalized_queries.append(SearchQuery(term=term, location=loc, stream=stream, enabled=enabled))
+                        normalized_queries.append(
+                            SearchQuery(
+                                term=term, location=loc, stream=stream, enabled=enabled
+                            )
+                        )
                 elif hasattr(q, "term"):
                     term = str(getattr(q, "term", "")).strip()
                     if term:
-                        stream = str(getattr(q, "stream", detect_query_stream(term))).strip()
-                        is_rem = stream.lower() == "remote" or any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia")) or bool(getattr(q, "remote", False))
-                        raw_loc = str(getattr(q, "location", "Australia" if is_rem else "Melbourne, VIC")).strip()
-                        loc = "Australia" if (is_rem and raw_loc.lower() in ("melbourne, vic", "melbourne", "vic", "")) else (raw_loc or "Australia")
+                        stream = str(
+                            getattr(q, "stream", detect_query_stream(term))
+                        ).strip()
+                        is_rem = (
+                            stream.lower() == "remote"
+                            or any(
+                                k in term.lower()
+                                for k in (
+                                    "remote",
+                                    "wfh",
+                                    "work from home",
+                                    "anywhere in australia",
+                                )
+                            )
+                            or bool(getattr(q, "remote", False))
+                        )
+                        raw_loc = str(
+                            getattr(
+                                q,
+                                "location",
+                                "Australia" if is_rem else "Melbourne, VIC",
+                            )
+                        ).strip()
+                        loc = (
+                            "Australia"
+                            if (
+                                is_rem
+                                and raw_loc.lower()
+                                in ("melbourne, vic", "melbourne", "vic", "")
+                            )
+                            else (raw_loc or "Australia")
+                        )
                         enabled = bool(getattr(q, "enabled", True))
-                        normalized_queries.append(SearchQuery(term=term, location=loc, stream=stream, enabled=enabled))
+                        normalized_queries.append(
+                            SearchQuery(
+                                term=term, location=loc, stream=stream, enabled=enabled
+                            )
+                        )
 
             queries_to_scrape = []
             cached_query_terms = []
@@ -925,7 +1508,9 @@ class DashboardApp:
                 term = q.term
                 loc = q.location
 
-                if not force and self.repository.is_query_cached(term, loc, ttl_hours=ttl_hours):
+                if not force and self.repository.is_query_cached(
+                    term, loc, ttl_hours=ttl_hours
+                ):
                     cached_query_terms.append(term)
                 else:
                     queries_to_scrape.append(q)
@@ -933,8 +1518,13 @@ class DashboardApp:
             pipeline_errors = []
             if queries_to_scrape:
                 if on_progress:
-                    on_progress(f"Scanning {len(queries_to_scrape)} live employment gateway queries...", 10)
-                pipeline = ScrapePipeline(self.sources, days=14, health_check=self.health_check)
+                    on_progress(
+                        f"Scanning {len(queries_to_scrape)} live employment gateway queries...",
+                        10,
+                    )
+                pipeline = ScrapePipeline(
+                    self.sources, days=14, health_check=self.health_check
+                )
                 fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
                 pipeline_errors = pipeline.errors
 
@@ -960,26 +1550,39 @@ class DashboardApp:
                     try:
                         self.repository.replace_jobs(fresh_materialized)
                     except Exception as repo_err:
-                        logger.warning(f"Error persisting fresh jobs to repository: {repo_err}")
+                        logger.warning(
+                            f"Error persisting fresh jobs to repository: {repo_err}"
+                        )
 
                     # Update jobs_combined.json for static client compatibility
                     try:
                         combined_path = self.data_dir / "jobs_combined.json"
-                        combined_path.write_text(json.dumps(self.jobs, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                        combined_path.write_text(
+                            json.dumps(self.jobs, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
                     except Exception as comb_err:
                         logger.warning(f"Error updating jobs_combined.json: {comb_err}")
 
                     from .config import settings
+
                     if settings.gcs_data_bucket:
                         backup_to_gcs(settings.gcs_data_bucket, self.data_dir)
 
                 # Record cache hit timestamps for freshly scraped queries
                 for q in queries_to_scrape:
                     term = q.term if hasattr(q, "term") else str(q.get("term", ""))
-                    loc = q.location if hasattr(q, "location") else str(q.get("location", ""))
+                    loc = (
+                        q.location
+                        if hasattr(q, "location")
+                        else str(q.get("location", ""))
+                    )
                     self.repository.record_query_scrape(term, loc, len(fresh or []))
             elif on_progress:
-                on_progress(f"All {len(cached_query_terms)} queries already fresh (cached), skipping re-scan...", 60)
+                on_progress(
+                    f"All {len(cached_query_terms)} queries already fresh (cached), skipping re-scan...",
+                    60,
+                )
 
             # Recalibrate/score all database jobs against current profile when updated
             if queries_to_scrape or force:
@@ -996,10 +1599,11 @@ class DashboardApp:
             }
             return self.public_jobs(), pipeline_errors, stats
 
-
     @staticmethod
     def _gmail_job_details(message):
-        subject = re.sub(r"^\s*(re|fw|fwd)\s*:\s*", "", message.subject, flags=re.IGNORECASE).strip()
+        subject = re.sub(
+            r"^\s*(re|fw|fwd)\s*:\s*", "", message.subject, flags=re.IGNORECASE
+        ).strip()
         from_lower = (message.from_address or "").lower()
         sub_lower = subject.lower()
 
@@ -1013,7 +1617,11 @@ class DashboardApp:
             company = "Schoolbox"
         elif "nexon" in from_lower or "nexon" in sub_lower:
             company = "Nexon"
-        elif "health.vic" in from_lower or "victorian department of health" in sub_lower or "department of health" in sub_lower:
+        elif (
+            "health.vic" in from_lower
+            or "victorian department of health" in sub_lower
+            or "department of health" in sub_lower
+        ):
             company = "Victorian Department of Health"
         elif "racv" in from_lower or "racv" in sub_lower:
             company = "RACV"
@@ -1023,14 +1631,22 @@ class DashboardApp:
             company = "NEXTDC"
 
         # Regex pattern matching for Title and Company
-        match = re.search(r"(?:application|applying|applied|interest|submission|interview).*?(?:for|to|:)[\s\-]*(.+?)\s+(?:at|with)\s+(.+)$", subject, re.IGNORECASE)
+        match = re.search(
+            r"(?:application|applying|applied|interest|submission|interview).*?(?:for|to|:)[\s\-]*(.+?)\s+(?:at|with)\s+(.+)$",
+            subject,
+            re.IGNORECASE,
+        )
         if match:
             t, c = match.groups()
             title = title or t
             company = company or c
         else:
             # Check for "Company - Title" or "Company: Title" pattern
-            comp_dash = re.search(r"^([A-Za-z0-9\s&.,'-]+?)\s*[:|–\-]\s*(?:Interview Invitation|Application Acknowledgment|Application Receipt|Application Received|Update on your application|Update|Status)?\s*[:|–\-]?\s*([A-Za-z0-9\s/()\-]+)$", subject, re.IGNORECASE)
+            comp_dash = re.search(
+                r"^([A-Za-z0-9\s&.,'-]+?)\s*[:|–\-]\s*(?:Interview Invitation|Application Acknowledgment|Application Receipt|Application Received|Update on your application|Update|Status)?\s*[:|–\-]?\s*([A-Za-z0-9\s/()\-]+)$",
+                subject,
+                re.IGNORECASE,
+            )
             if comp_dash:
                 c, t = comp_dash.groups()
                 company = company or c.strip()
@@ -1051,9 +1667,17 @@ class DashboardApp:
                 company = domain.group(1).split(".")[0].replace("-", " ").title()
 
         # Clean noise from title and company
-        title = re.sub(r"(?i)\b(interview\s*invitation|application\s*(?:received|confirmation|confirmed|acknowledgment|status|receipt)|update\s*on\s*your\s*application)\b", "", title).strip(" .:-")
-        company = re.sub(r"(?i)\b(careers|talent|recruitment|jobs)\b", "", company).strip(" .:-")
-        return (title[:160].strip() or "Gmail application"), (company[:120].strip() or "Direct Employer")
+        title = re.sub(
+            r"(?i)\b(interview\s*invitation|application\s*(?:received|confirmation|confirmed|acknowledgment|status|receipt)|update\s*on\s*your\s*application)\b",
+            "",
+            title,
+        ).strip(" .:-")
+        company = re.sub(
+            r"(?i)\b(careers|talent|recruitment|jobs)\b", "", company
+        ).strip(" .:-")
+        return (title[:160].strip() or "Gmail application"), (
+            company[:120].strip() or "Direct Employer"
+        )
 
     @staticmethod
     def _gmail_status(category):
@@ -1068,14 +1692,23 @@ class DashboardApp:
     @staticmethod
     def _same_job(left, title, company):
         def tokens(value):
-            return {token for token in re.findall(r"[a-z0-9]+", (value or "").lower()) if len(token) > 2}
+            return {
+                token
+                for token in re.findall(r"[a-z0-9]+", (value or "").lower())
+                if len(token) > 2
+            }
+
         left_title = tokens(left.get("title", ""))
         target_title = tokens(title)
         left_company = tokens(left.get("company", ""))
         target_company = tokens(company)
 
         norm = lambda s: re.sub(r"[^a-z0-9]", "", (s or "").lower())
-        if norm(left.get("company")) and norm(company) and norm(left.get("company")) == norm(company):
+        if (
+            norm(left.get("company"))
+            and norm(company)
+            and norm(left.get("company")) == norm(company)
+        ):
             if left_title & target_title:
                 return True
 
@@ -1083,13 +1716,22 @@ class DashboardApp:
         company_overlap = left_company & target_company
         if company_overlap and len(title_overlap) >= 1:
             return True
-        return len(title_overlap) >= 2 and (not company or not left.get("company") or company_overlap)
+        return len(title_overlap) >= 2 and (
+            not company or not left.get("company") or company_overlap
+        )
 
-    def scan_gmail(self, username: str | None = None, app_password: str | None = None, days: int = 7):
+    def scan_gmail(
+        self,
+        username: str | None = None,
+        app_password: str | None = None,
+        days: int = 7,
+    ):
         with self.lock:
             days = max(1, min(7, int(days)))
             credential_candidates = []
-            for candidate in Path(__file__).resolve().parents[2].glob("client_secret_*.json"):
+            for candidate in (
+                Path(__file__).resolve().parents[2].glob("client_secret_*.json")
+            ):
                 try:
                     config = json.loads(candidate.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
@@ -1101,28 +1743,51 @@ class DashboardApp:
             if username and app_password:
                 scanner = GmailScanner(username, app_password, days=days)
             elif credential_candidates:
-                scanner = GmailApiScanner(str(credential_candidates[0]), str(self.data_dir / "gmail_token.json"), days=days)
+                scanner = GmailApiScanner(
+                    str(credential_candidates[0]),
+                    str(self.data_dir / "gmail_token.json"),
+                    days=days,
+                )
             else:
-                raise RuntimeError("Gmail OAuth client file or IMAP credentials are required")
+                raise RuntimeError(
+                    "Gmail OAuth client file or IMAP credentials are required"
+                )
             matched = created = updated = 0
             messages = scanner.application_messages()
             for message, category, confidence in messages:
                 title, company = self._gmail_job_details(message)
-                existing = next((job for job in self.jobs if self._same_job(job, title, company)), None)
+                existing = next(
+                    (job for job in self.jobs if self._same_job(job, title, company)),
+                    None,
+                )
                 status = self._gmail_status(category)
                 if existing:
                     job_id = normalize_job(existing).id
                     events = existing.setdefault("email_events", [])
                     # Deduplicate event records by email_id
                     if not any(e.get("email_id") == message.email_id for e in events):
-                        events.append({"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence})
+                        events.append(
+                            {
+                                "email_id": message.email_id,
+                                "category": category,
+                                "received_at": message.received_at,
+                                "confidence": confidence,
+                            }
+                        )
                     self.repository.update_status(job_id, status)
                     updated += 1
                     matched += 1
                     continue
 
                 # Ensure we do not duplicate-create by email_id
-                existing_gmail_job = next((job for job in self.jobs if job.get("id") == f"gmail-{message.email_id}"), None)
+                existing_gmail_job = next(
+                    (
+                        job
+                        for job in self.jobs
+                        if job.get("id") == f"gmail-{message.email_id}"
+                    ),
+                    None,
+                )
                 if existing_gmail_job:
                     self.repository.update_status(existing_gmail_job["id"], status)
                     updated += 1
@@ -1130,9 +1795,13 @@ class DashboardApp:
 
                 posted_date = (message.received_at or "")[:10]
                 if not re.match(r"^\d{4}-\d{2}-\d{2}$", posted_date):
-                    posted_date = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+                    posted_date = (
+                        datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+                    )
 
-                clean_desc = EmailClassifier.clean_email_text(message.body_preview or message.snippet)
+                clean_desc = EmailClassifier.clean_email_text(
+                    message.body_preview or message.snippet
+                )
                 new_job = {
                     "id": f"gmail-{message.email_id}",
                     "title": title,
@@ -1144,7 +1813,14 @@ class DashboardApp:
                     "posted": posted_date,
                     "remote": False,
                     "tags": ["gmail", "application", category],
-                    "email_events": [{"email_id": message.email_id, "category": category, "received_at": message.received_at, "confidence": confidence}],
+                    "email_events": [
+                        {
+                            "email_id": message.email_id,
+                            "category": category,
+                            "received_at": message.received_at,
+                            "confidence": confidence,
+                        }
+                    ],
                 }
                 self.jobs.extend(self.materialize_jobs([new_job]))
                 self.save_jobs()
@@ -1152,36 +1828,67 @@ class DashboardApp:
                 created += 1
             if updated:
                 self.save_jobs()
-            return {"scanned": len(messages), "matched": matched, "updated": updated, "created": created, "jobs": self.public_jobs()}
+            return {
+                "scanned": len(messages),
+                "matched": matched,
+                "updated": updated,
+                "created": created,
+                "jobs": self.public_jobs(),
+            }
 
     def start_gmail_scan(self):
-        thread = threading.Thread(target=self.scan_gmail, kwargs={"days": 7}, daemon=True)
+        thread = threading.Thread(
+            target=self.scan_gmail, kwargs={"days": 7}, daemon=True
+        )
         thread.start()
         return thread
 
     def sync_tracker(self):
         """Pull the shared application tracker sheet and reconcile it against current jobs."""
         if not TRACKER_CSV_URL:
-            self.tracker_state = {**self.tracker_state, "status": "idle", "rows": 0, "matched": 0}
+            self.tracker_state = {
+                **self.tracker_state,
+                "status": "idle",
+                "rows": 0,
+                "matched": 0,
+            }
             return self.tracker_state
         self.tracker_state = {**self.tracker_state, "status": "syncing"}
         try:
-            request = urllib.request.Request(TRACKER_CSV_URL, headers={"User-Agent": "job-dashboard/1.0"})
+            request = urllib.request.Request(
+                TRACKER_CSV_URL, headers={"User-Agent": "job-dashboard/1.0"}
+            )
             with urllib.request.urlopen(request, timeout=20) as response:
                 text = response.read().decode("utf-8", errors="replace")
         except (urllib.error.URLError, TimeoutError) as error:
-            self.tracker_state = {**self.tracker_state, "status": "failed", "error": str(error)}
+            self.tracker_state = {
+                **self.tracker_state,
+                "status": "failed",
+                "error": str(error),
+            }
             return self.tracker_state
-        rows = [row for row in csv.DictReader(io.StringIO(text)) if any(value.strip() for value in row.values())]
+        rows = [
+            row
+            for row in csv.DictReader(io.StringIO(text))
+            if any(value.strip() for value in row.values())
+        ]
         self.tracker_rows = rows
         matched = 0
         for row in rows:
-            title = str(row.get("Job Title") or row.get("Title") or row.get("Role") or row.get("Position") or "").strip()
+            title = str(
+                row.get("Job Title")
+                or row.get("Title")
+                or row.get("Role")
+                or row.get("Position")
+                or ""
+            ).strip()
             company = str(row.get("Company") or row.get("Employer") or "").strip()
             status = str(row.get("Status") or row.get("Stage") or "").strip().lower()
             if not title:
                 continue
-            existing = next((job for job in self.jobs if self._same_job(job, title, company)), None)
+            existing = next(
+                (job for job in self.jobs if self._same_job(job, title, company)), None
+            )
             if not existing:
                 continue
             matched += 1
@@ -1191,7 +1898,13 @@ class DashboardApp:
                     self.update_status(normalize_job(existing).id, mapped_status)
                 except (KeyError, ValueError):
                     pass
-        self.tracker_state = {"status": "completed", "last_sync": time.time(), "rows": len(rows), "matched": matched, "error": None}
+        self.tracker_state = {
+            "status": "completed",
+            "last_sync": time.time(),
+            "rows": len(rows),
+            "matched": matched,
+            "error": None,
+        }
         return self.tracker_state
 
     def start_tracker_sync(self):
@@ -1203,7 +1916,10 @@ class DashboardApp:
     def _map_tracker_status(status_text: str) -> str | None:
         """Classify a free-text tracker status cell into a dashboard stage."""
         text = status_text.lower()
-        if any(term in text for term in ("unsuccessful", "reject", "declined", "closed", "expired")):
+        if any(
+            term in text
+            for term in ("unsuccessful", "reject", "declined", "closed", "expired")
+        ):
             return "rejected"
         if "offer" in text:
             return "offer"
@@ -1211,7 +1927,19 @@ class DashboardApp:
             return "interviewing"
         if any(term in text for term in ("shortlist",)):
             return "shortlisted"
-        if any(term in text for term in ("applied", "submitted", "confirmation", "confirmed", "under review", "action required", "viewed", "response received")):
+        if any(
+            term in text
+            for term in (
+                "applied",
+                "submitted",
+                "confirmation",
+                "confirmed",
+                "under review",
+                "action required",
+                "viewed",
+                "response received",
+            )
+        ):
             return "applied"
         return None
 
@@ -1219,76 +1947,95 @@ class DashboardApp:
         """Tracker rows not yet represented among the dashboard's jobs."""
         suggestions = []
         for row in self.tracker_rows:
-            title = str(row.get("Job Title") or row.get("Title") or row.get("Role") or row.get("Position") or "").strip()
+            title = str(
+                row.get("Job Title")
+                or row.get("Title")
+                or row.get("Role")
+                or row.get("Position")
+                or ""
+            ).strip()
             company = str(row.get("Company") or row.get("Employer") or "").strip()
-            if not title or any(self._same_job(job, title, company) for job in self.jobs):
+            if not title or any(
+                self._same_job(job, title, company) for job in self.jobs
+            ):
                 continue
-            suggestions.append({
-                "title": title,
-                "company": company or "Company not listed",
-                "status": str(row.get("Status") or row.get("Stage") or "").strip(),
-                "date": str(row.get("Date") or row.get("Applied") or "").strip(),
-                "notes": str(row.get("Notes") or "").strip(),
-                "email_link": str(row.get("Email Link") or row.get("Email link") or row.get("Email") or "").strip(),
-            })
+            suggestions.append(
+                {
+                    "title": title,
+                    "company": company or "Company not listed",
+                    "status": str(row.get("Status") or row.get("Stage") or "").strip(),
+                    "date": str(row.get("Date") or row.get("Applied") or "").strip(),
+                    "notes": str(row.get("Notes") or "").strip(),
+                    "email_link": str(
+                        row.get("Email Link")
+                        or row.get("Email link")
+                        or row.get("Email")
+                        or ""
+                    ).strip(),
+                }
+            )
         return suggestions
 
-# Phase 4B: Advanced AI Features
+    # Phase 4B: Advanced AI Features
     def analyze_resume_ai(self, resume_text: str) -> dict:
         """AI-powered resume analysis."""
         analyzer = get_resume_analyzer()
         return analyzer.analyze(resume_text)
-    
-    def simulate_interview(self, job_description: str, role: str, question_count: int = 5) -> dict:
+
+    def simulate_interview(
+        self, job_description: str, role: str, question_count: int = 5
+    ) -> dict:
         """Simulate an interview for a job."""
         simulator = get_interview_simulator()
         return simulator.create_session(job_description, role, question_count)
-    
-    def submit_interview_answer(self, session_id: str, question_id: str, answer: str) -> dict:
+
+    def submit_interview_answer(
+        self, session_id: str, question_id: str, answer: str
+    ) -> dict:
         """Submit answer to interview question."""
         simulator = get_interview_simulator()
         return simulator.submit_answer(session_id, question_id, answer)
-    
+
     def get_interview_feedback(self, session_id: str) -> dict:
         """Get feedback for completed interview session."""
         simulator = get_interview_simulator()
         return simulator.get_feedback(session_id)
-    
+
     def analyze_interview_performance(self, session_id: str) -> dict:
         """Analyze overall interview performance."""
         simulator = get_interview_simulator()
         return simulator.analyze_performance(session_id)
-    
+
     def get_predictive_analytics(self, forecast_days: int = 30) -> dict:
         """Get predictive analytics for current job market."""
         analyzer = get_predictive_analytics()
         return analyzer.predict_market_trends(self.jobs, forecast_days)
-    
+
     def get_application_timing_recommendations(self) -> dict:
         """Get recommendations for optimal application timing."""
         analyzer = get_predictive_analytics()
         return analyzer.recommend_timing(self.jobs)
-    
+
     def analyze_skill_gap(self, user_skills: list, target_role: str) -> dict:
         """Analyze skill gap for a target role."""
         recommender = get_career_recommender()
         return recommender.analyze_skill_gap(user_skills, target_role, self.jobs)
-    
+
     def recommend_career_paths(self, user_skills: list, user_interests: list) -> list:
         """Recommend career paths based on skills and interests."""
         recommender = get_career_recommender()
         return recommender.recommend_paths(user_skills, user_interests, self.jobs)
-    
+
     def get_interview_statistics(self) -> dict:
         """Get interview simulation statistics."""
         simulator = get_interview_simulator()
         return simulator.get_statistics()
-    
+
     def reset_interview_simulator(self) -> dict:
         """Reset interview simulator data."""
         simulator = get_interview_simulator()
         return simulator.reset_data()
-    
+
     # End Phase 4B Features
     def generate(self, job_id):
         raw = next((job for job in self.jobs if normalize_job(job).id == job_id), None)
@@ -1301,7 +2048,9 @@ class DashboardApp:
         self.generation_progress[job_id] = self._generation_status(job_id, started_at)
         if self.document_generator:
             if hasattr(generator, "generate"):
-                documents = generator.generate(normalize_job(raw), self.dashboard.profile)
+                documents = generator.generate(
+                    normalize_job(raw), self.dashboard.profile
+                )
             else:
                 documents = generator(normalize_job(raw), self.dashboard.profile)
         else:
@@ -1318,13 +2067,26 @@ class DashboardApp:
                 job["generated"] = self.generated_documents[job_id]
                 break
         self.save_jobs()
-        self.generation_progress[job_id] = {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "started_at": started_at, "done": True, **self.generated_documents[job_id]}
+        self.generation_progress[job_id] = {
+            "phase": "Completed",
+            "estimate_seconds": 0,
+            "progress": 100,
+            "started_at": started_at,
+            "done": True,
+            **self.generated_documents[job_id],
+        }
         return {**documents, **self.generated_documents[job_id]}
 
     def start_generation(self, job_id):
         existing = self._recover_generated_documents(job_id)
         if existing and self._documents_exist(existing):
-            return {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "done": True, **existing}
+            return {
+                "phase": "Completed",
+                "estimate_seconds": 0,
+                "progress": 100,
+                "done": True,
+                **existing,
+            }
         if self.generation_progress.get(job_id, {}).get("done"):
             return self.generation_progress[job_id]
         started_at = time.time()
@@ -1333,9 +2095,24 @@ class DashboardApp:
         def runner():
             try:
                 generated = self.generate(job_id)
-                status = {"phase": "Completed", "estimate_seconds": 0, "progress": 100, "started_at": started_at, "done": True, **generated}
+                status = {
+                    "phase": "Completed",
+                    "estimate_seconds": 0,
+                    "progress": 100,
+                    "started_at": started_at,
+                    "done": True,
+                    **generated,
+                }
             except Exception as error:
-                status = {"phase": "Failed", "error": str(error), "estimate_seconds": 0, "progress": 100, "started_at": started_at, "done": True, "failed": True}
+                status = {
+                    "phase": "Failed",
+                    "error": str(error),
+                    "estimate_seconds": 0,
+                    "progress": 100,
+                    "started_at": started_at,
+                    "done": True,
+                    "failed": True,
+                }
             self.generation_progress[job_id] = status
 
         thread = threading.Thread(target=runner, daemon=True)
@@ -1410,7 +2187,10 @@ def validate_password_complexity(password: str) -> tuple[bool, str]:
         return False, "Password must include at least one number (0-9)."
     special_chars = set("!@#$%^&*()_+-=[]{};':\"|,.<>/?~`")
     if not any(c in special_chars for c in password):
-        return False, "Password must include at least one special character (!@#$%^&* etc.)."
+        return (
+            False,
+            "Password must include at least one special character (!@#$%^&* etc.).",
+        )
     return True, ""
 
 
@@ -1424,6 +2204,7 @@ _ALLOWED_ORIGINS = {
     "http://localhost:8080",
 }
 
+
 def make_handler(app: DashboardApp):
     class Handler(BaseHTTPRequestHandler):
         def _cors_origin(self):
@@ -1436,8 +2217,13 @@ def make_handler(app: DashboardApp):
             origin = self._cors_origin()
             if origin:
                 self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id")
+            self.send_header(
+                "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
+            )
+            self.send_header(
+                "Access-Control-Allow-Headers",
+                "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id",
+            )
             self.send_header("Access-Control-Max-Age", "86400")
 
         def do_OPTIONS(self):
@@ -1463,14 +2249,29 @@ def make_handler(app: DashboardApp):
             path = parsed.path
             if path in ("/health", "/", "/index.html"):
                 self.send_response(200)
-                self.send_header("Content-Type", "application/json" if path == "/health" else "text/html; charset=utf-8")
+                self.send_header(
+                    "Content-Type",
+                    "application/json"
+                    if path == "/health"
+                    else "text/html; charset=utf-8",
+                )
                 self._send_cors_headers()
             else:
                 self.do_GET()
 
-        def _get_job_seek_pass_report(self, job_id: str, query_params: dict[str, list[str]] | None = None) -> dict[str, Any] | None:
+        def _get_job_seek_pass_report(
+            self, job_id: str, query_params: dict[str, list[str]] | None = None
+        ) -> dict[str, Any] | None:
             job = None
-            repo = getattr(app, "repository", None) or (app if (hasattr(app, "get_job") or hasattr(app, "get_job_by_id")) else None) or getattr(self, "repository", None)
+            repo = (
+                getattr(app, "repository", None)
+                or (
+                    app
+                    if (hasattr(app, "get_job") or hasattr(app, "get_job_by_id"))
+                    else None
+                )
+                or getattr(self, "repository", None)
+            )
             if repo:
                 if hasattr(repo, "get_job"):
                     job = repo.get_job(job_id)
@@ -1484,17 +2285,29 @@ def make_handler(app: DashboardApp):
             if not job:
                 return None
 
-            user_id = resolve_user_id(self, query_params or {}) if hasattr(self, "headers") else None
+            user_id = (
+                resolve_user_id(self, query_params or {})
+                if hasattr(self, "headers")
+                else None
+            )
             profile = None
             if repo and user_id and hasattr(repo, "get_user_profile"):
                 profile = repo.get_user_profile(user_id)
-            if not profile and hasattr(app, "dashboard") and hasattr(app.dashboard, "profile"):
+            if (
+                not profile
+                and hasattr(app, "dashboard")
+                and hasattr(app.dashboard, "profile")
+            ):
                 profile = app.dashboard.profile
             if not profile and repo and hasattr(repo, "get_profile"):
                 profile = repo.get_profile()
             profile = profile or {}
 
-            job_dict = dict(job) if isinstance(job, dict) else (dict(job.__dict__) if hasattr(job, "__dict__") else {})
+            job_dict = (
+                dict(job)
+                if isinstance(job, dict)
+                else (dict(job.__dict__) if hasattr(job, "__dict__") else {})
+            )
             job_dict.setdefault("id", job_id)
             return generate_seek_pass_report(job_dict, profile)
 
@@ -1508,13 +2321,15 @@ def make_handler(app: DashboardApp):
                 if not auth_header or not auth_header.startswith("Bearer "):
                     self.send_json(401, {"error": "Missing or invalid token"})
                     return
-                
+
                 token = auth_header.split(" ")[1]
                 try:
                     payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
                     user_id = payload.get("sub")
                     user_email = payload.get("email")
-                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
+                    user_profile = (
+                        app.repository.get_user_profile(user_id) if user_id else {}
+                    )
                     if not user_profile and user_email:
                         user_profile = app.repository.get_user_profile(user_email) or {}
                     has_profile = _is_valid_profile(user_profile)
@@ -1523,24 +2338,30 @@ def make_handler(app: DashboardApp):
                         try:
                             with app.db.get_connection() as conn:
                                 cur = conn.cursor()
-                                cur.execute("SELECT email_verified FROM users WHERE id = ?", (user_id,))
+                                cur.execute(
+                                    "SELECT email_verified FROM users WHERE id = ?",
+                                    (user_id,),
+                                )
                                 urow = cur.fetchone()
                                 if urow and urow[0]:
                                     email_verified = True
                         except Exception:
                             pass
 
-                    self.send_json(200, {
-                        "success": True,
-                        "user": {
-                            "id": user_id,
-                            "email": user_email,
-                            "name": payload.get("name"),
-                            "email_verified": email_verified
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "user": {
+                                "id": user_id,
+                                "email": user_email,
+                                "name": payload.get("name"),
+                                "email_verified": email_verified,
+                            },
+                            "profile": user_profile if has_profile else None,
+                            "has_profile": has_profile,
                         },
-                        "profile": user_profile if has_profile else None,
-                        "has_profile": has_profile
-                    })
+                    )
                 except Exception as e:
                     self.send_json(401, {"error": str(e)})
                 return
@@ -1552,14 +2373,20 @@ def make_handler(app: DashboardApp):
                 search = query_params.get("search", [""])[0]
                 industry = query_params.get("industry", [""])[0]
                 remote_param = query_params.get("remote", [None])[0]
-                remote = None if remote_param is None else (remote_param.lower() in ("true", "1"))
+                remote = (
+                    None
+                    if remote_param is None
+                    else (remote_param.lower() in ("true", "1"))
+                )
                 sort_by = query_params.get("sortBy", ["newest"])[0]
-                
+
                 if app.repository.count_jobs() == 0:
                     if not app.jobs:
                         app.jobs = app._load_jobs()
                     if app.jobs:
-                        logger.info(f"Seeding database with {len(app.jobs)} jobs on demand...")
+                        logger.info(
+                            f"Seeding database with {len(app.jobs)} jobs on demand..."
+                        )
                         app.repository.upsert_scraped_jobs(app.jobs)
 
                 result = app.repository.query_jobs_paginated(
@@ -1568,7 +2395,7 @@ def make_handler(app: DashboardApp):
                     search=search,
                     industry=industry,
                     remote=remote,
-                    sort_by=sort_by
+                    sort_by=sort_by,
                 )
                 self.send_json(200, result)
                 return
@@ -1576,7 +2403,13 @@ def make_handler(app: DashboardApp):
             if path == "/api/profile":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 prof = app.repository.get_user_profile(user_id)
                 if not prof and query_params and "email" in query_params:
@@ -1586,7 +2419,9 @@ def make_handler(app: DashboardApp):
                 try:
                     with app.db.get_connection() as conn:
                         cur = conn.cursor()
-                        cur.execute("SELECT email, name FROM users WHERE id = ?", (user_id,))
+                        cur.execute(
+                            "SELECT email, name FROM users WHERE id = ?", (user_id,)
+                        )
                         urow = cur.fetchone()
                         if urow:
                             is_registered_user = True
@@ -1603,7 +2438,7 @@ def make_handler(app: DashboardApp):
                                     "location": "Melbourne, VIC",
                                     "targetTitles": [],
                                     "coreSkills": [],
-                                    "keyStrengths": []
+                                    "keyStrengths": [],
                                 }
                 except Exception:
                     pass
@@ -1612,19 +2447,30 @@ def make_handler(app: DashboardApp):
                 if not prof and not is_registered_user:
                     try:
                         from .db_pool import get_db_connection
+
                         with get_db_connection(app.repository.path) as conn:
-                            row = conn.execute("SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1").fetchone()
+                            row = conn.execute(
+                                "SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1"
+                            ).fetchone()
                             if row and row[0]:
                                 prof = json.loads(row[0])
                     except Exception:
                         pass
-                if not prof and (user_id in ("default_user", "sam_ludwig") or not is_registered_user):
+                if not prof and (
+                    user_id in ("default_user", "sam_ludwig") or not is_registered_user
+                ):
                     # Check in-memory dashboard profile for default or guest user
-                    if hasattr(app, "dashboard") and getattr(app.dashboard, "profile", None):
+                    if hasattr(app, "dashboard") and getattr(
+                        app.dashboard, "profile", None
+                    ):
                         prof = app.dashboard.profile
                     if not prof:
                         # Check data_dir / job_profile.json
-                        data_file = Path(app.data_dir) / "job_profile.json" if hasattr(app, "data_dir") and app.data_dir else None
+                        data_file = (
+                            Path(app.data_dir) / "job_profile.json"
+                            if hasattr(app, "data_dir") and app.data_dir
+                            else None
+                        )
                         if data_file and data_file.exists():
                             try:
                                 with open(data_file, "r", encoding="utf-8") as f:
@@ -1637,7 +2483,13 @@ def make_handler(app: DashboardApp):
             if path == "/api/preferences":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 prefs = app.repository.get_user_preferences(user_id)
                 self.send_json(200, {"success": True, "preferences": prefs})
@@ -1646,39 +2498,82 @@ def make_handler(app: DashboardApp):
             if path == "/api/saved-searches":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
-                self.send_json(200, {"success": True, "saved_searches": app.repository.list_saved_searches(user_id)})
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "saved_searches": app.repository.list_saved_searches(user_id),
+                    },
+                )
                 return
 
             if path == "/api/reminders":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
-                include_future = query_params.get("include_future", ["false"])[0].lower() in ("1", "true")
-                self.send_json(200, {"success": True, "reminders": app.repository.list_due_reminders(user_id, include_future)})
+                include_future = query_params.get("include_future", ["false"])[
+                    0
+                ].lower() in ("1", "true")
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "reminders": app.repository.list_due_reminders(
+                            user_id, include_future
+                        ),
+                    },
+                )
                 return
 
             if path == "/api/source-health":
                 hours = max(1, min(168, int(query_params.get("hours", ["24"])[0])))
                 workers_info = {
                     "generation_tasks": len(getattr(app, "generation_progress", {})),
-                    "active_generation_tasks": len([p for p in getattr(app, "generation_progress", {}).values() if not p.get("done", False)]),
+                    "active_generation_tasks": len(
+                        [
+                            p
+                            for p in getattr(app, "generation_progress", {}).values()
+                            if not p.get("done", False)
+                        ]
+                    ),
                     "scrape_in_progress": getattr(app, "scrape_in_progress", False),
                     "scheduler_active": getattr(app, "scheduler_active", True),
                 }
-                self.send_json(200, {
-                    "success": True,
-                    "checks": app.health_check.get_recent_checks(hours=hours),
-                    "workers": workers_info,
-                })
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "checks": app.health_check.get_recent_checks(hours=hours),
+                        "workers": workers_info,
+                    },
+                )
                 return
 
             if path == "/api/feature-flags":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 flags = app.repository.get_feature_flags()
                 self.send_json(200, {"success": True, "flags": flags})
@@ -1687,20 +2582,38 @@ def make_handler(app: DashboardApp):
             if path == "/api/job-explanation":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 job_id = query_params.get("job_id", [""])[0]
                 job_data = app.repository.get_job(job_id)
                 if not job_data:
                     self.send_json(404, {"error": "Job not found"})
                     return
-                profile = app.repository.get_user_profile(user_id) or app.dashboard.profile
-                fields = {key: job_data.get(key, "") for key in Job.__dataclass_fields__}
+                profile = (
+                    app.repository.get_user_profile(user_id) or app.dashboard.profile
+                )
+                fields = {
+                    key: job_data.get(key, "") for key in Job.__dataclass_fields__
+                }
                 fields["tags"] = tuple(job_data.get("tags") or ())
-                self.send_json(200, {"success": True, "explanation": explain_score(score_job(Job(**fields), profile))})
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "explanation": explain_score(score_job(Job(**fields), profile)),
+                    },
+                )
                 return
 
-            if path in ("/api/dossier", "/api/executive-dossier") or (path.startswith("/api/jobs/") and path.endswith("/dossier")):
+            if path in ("/api/dossier", "/api/executive-dossier") or (
+                path.startswith("/api/jobs/") and path.endswith("/dossier")
+            ):
                 job_id = ""
                 if path.startswith("/api/jobs/") and path.endswith("/dossier"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/dossier")
@@ -1722,7 +2635,9 @@ def make_handler(app: DashboardApp):
                         "location": query_params.get("location", ["Australia"])[0],
                     }
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
                 dossier = generate_executive_dossier(job_data, profile)
                 self.send_json(200, {"success": True, "dossier": dossier})
                 return
@@ -1732,7 +2647,9 @@ def make_handler(app: DashboardApp):
                 user_id = resolve_user_id(self, query_params)
                 # Gather available jobs from dashboard / repository
                 raw_jobs = getattr(app.dashboard, "jobs", []) or []
-                jobs_list = [j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs]
+                jobs_list = [
+                    j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs
+                ]
                 analytics = compute_funnel_analytics(jobs_list, sector=sector)
                 self.send_json(200, {"success": True, "analytics": analytics})
                 return
@@ -1741,14 +2658,20 @@ def make_handler(app: DashboardApp):
                 sector = query_params.get("sector", [None])[0]
                 target_level = query_params.get("target_level", [None])[0]
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
-                roadmap = generate_career_roadmap(profile, target_level=target_level, sector=sector)
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
+                roadmap = generate_career_roadmap(
+                    profile, target_level=target_level, sector=sector
+                )
                 self.send_json(200, {"success": True, "roadmap": roadmap})
             # Phase 19: Post-Interview Influence & Debrief GET Endpoint
             if path == "/api/interview-debrief":
                 job_id = query_params.get("job_id", [""])[0]
                 if not job_id:
-                    self.send_json(400, {"success": False, "error": "job_id is required"})
+                    self.send_json(
+                        400, {"success": False, "error": "job_id is required"}
+                    )
                     return
                 user_id = resolve_user_id(self, query_params) or "default_user"
                 # Check stored debrief in memory or persistence
@@ -1758,9 +2681,13 @@ def make_handler(app: DashboardApp):
                 if raw_debrief:
                     debrief_obj = InterviewDebrief.from_dict(raw_debrief)
                     health = evaluate_influence_health(debrief_obj)
-                    self.send_json(200, {"success": True, "debrief": raw_debrief, "health": health})
+                    self.send_json(
+                        200, {"success": True, "debrief": raw_debrief, "health": health}
+                    )
                 else:
-                    self.send_json(200, {"success": True, "debrief": None, "health": None})
+                    self.send_json(
+                        200, {"success": True, "debrief": None, "health": None}
+                    )
                 return
 
                 return
@@ -1788,7 +2715,9 @@ def make_handler(app: DashboardApp):
                     health=health,
                     search=search,
                 )
-                self.send_json(200, {"success": True, "contacts": [c.to_dict() for c in contacts]})
+                self.send_json(
+                    200, {"success": True, "contacts": [c.to_dict() for c in contacts]}
+                )
                 return
 
             if path.startswith("/api/network/contacts/"):
@@ -1797,15 +2726,21 @@ def make_handler(app: DashboardApp):
                     user_id = resolve_user_id(self, query_params) or "default_user"
                     contact = app.network_crm.get_contact(contact_id, user_id=user_id)
                     if contact:
-                        self.send_json(200, {"success": True, "contact": contact.to_dict()})
+                        self.send_json(
+                            200, {"success": True, "contact": contact.to_dict()}
+                        )
                     else:
                         self.send_json(404, {"error": "Contact not found"})
                     return
 
-            if path == "/api/semantic-gap" or (path.startswith("/api/jobs/") and path.endswith("/semantic-gap")):
+            if path == "/api/semantic-gap" or (
+                path.startswith("/api/jobs/") and path.endswith("/semantic-gap")
+            ):
                 job_id = ""
                 if path.startswith("/api/jobs/") and path.endswith("/semantic-gap"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/semantic-gap")
+                    job_id = path.removeprefix("/api/jobs/").removesuffix(
+                        "/semantic-gap"
+                    )
                 else:
                     job_id = query_params.get("job_id", [""])[0]
 
@@ -1820,19 +2755,27 @@ def make_handler(app: DashboardApp):
                         "id": job_id,
                         "title": query_params.get("title", ["Role"])[0],
                         "company": query_params.get("company", ["Company"])[0],
-                        "description": query_params.get("description", [""])[0]
+                        "description": query_params.get("description", [""])[0],
                     }
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
                 diagnostic = analyze_semantic_gap(job_data, profile)
-                self.send_json(200, {"success": True, "diagnostic": diagnostic.to_dict()})
+                self.send_json(
+                    200, {"success": True, "diagnostic": diagnostic.to_dict()}
+                )
                 return
 
-            if path == "/api/cover-letter" or (path.startswith("/api/jobs/") and path.endswith("/cover-letter")):
+            if path == "/api/cover-letter" or (
+                path.startswith("/api/jobs/") and path.endswith("/cover-letter")
+            ):
                 job_id = ""
                 if path.startswith("/api/jobs/") and path.endswith("/cover-letter"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/cover-letter")
+                    job_id = path.removeprefix("/api/jobs/").removesuffix(
+                        "/cover-letter"
+                    )
                 else:
                     job_id = query_params.get("job_id", [""])[0]
 
@@ -1846,20 +2789,31 @@ def make_handler(app: DashboardApp):
                     job_data = {
                         "id": job_id,
                         "title": query_params.get("title", ["Systems Engineer"])[0],
-                        "company": query_params.get("company", ["Target Organisation"])[0],
-                        "description": query_params.get("description", [""])[0]
+                        "company": query_params.get("company", ["Target Organisation"])[
+                            0
+                        ],
+                        "description": query_params.get("description", [""])[0],
                     }
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
                 cover = generate_tailored_cover_letter(job_data, profile)
                 self.send_json(200, {"success": True, "cover_letter": cover.to_dict()})
                 return
 
-            if path == "/api/linkedin-optimization" or (path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization")):
+            if path == "/api/linkedin-optimization" or (
+                path.startswith("/api/jobs/")
+                and path.endswith("/linkedin-optimization")
+            ):
                 job_id = ""
-                if path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/linkedin-optimization")
+                if path.startswith("/api/jobs/") and path.endswith(
+                    "/linkedin-optimization"
+                ):
+                    job_id = path.removeprefix("/api/jobs/").removesuffix(
+                        "/linkedin-optimization"
+                    )
                 else:
                     job_id = query_params.get("job_id", [""])[0]
 
@@ -1873,21 +2827,31 @@ def make_handler(app: DashboardApp):
                     job_data = {
                         "id": job_id,
                         "title": query_params.get("title", ["Systems Engineer"])[0],
-                        "company": query_params.get("company", ["Target Organisation"])[0],
-                        "description": query_params.get("description", [""])[0]
+                        "company": query_params.get("company", ["Target Organisation"])[
+                            0
+                        ],
+                        "description": query_params.get("description", [""])[0],
                     }
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
                 opt = generate_linkedin_optimization(job_data, profile)
-                self.send_json(200, {"success": True, "linkedin_optimization": opt.to_dict()})
+                self.send_json(
+                    200, {"success": True, "linkedin_optimization": opt.to_dict()}
+                )
                 return
 
             # Phase 20: ATS Sentinel & Parser Diagnostic GET Endpoint
-            if path == "/api/ats-diagnostic" or (path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic")):
+            if path == "/api/ats-diagnostic" or (
+                path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic")
+            ):
                 job_id = ""
                 if path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/ats-diagnostic")
+                    job_id = path.removeprefix("/api/jobs/").removesuffix(
+                        "/ats-diagnostic"
+                    )
                 else:
                     job_id = query_params.get("job_id", [""])[0]
 
@@ -1901,11 +2865,18 @@ def make_handler(app: DashboardApp):
                                 break
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
 
                 resume_text = query_params.get("resume_text", [None])[0]
                 if not resume_text and profile:
-                    resume_text = profile.get("resume_text") or profile.get("rawResumeText") or profile.get("summary") or ""
+                    resume_text = (
+                        profile.get("resume_text")
+                        or profile.get("rawResumeText")
+                        or profile.get("summary")
+                        or ""
+                    )
 
                 report = generate_ats_diagnostic_report(resume_text or "", job_data)
                 self.send_json(200, {"success": True, "diagnostic": report})
@@ -1916,13 +2887,21 @@ def make_handler(app: DashboardApp):
                 title = query_params.get("title", ["Systems Engineer"])[0]
                 industry = query_params.get("industry", ["Technology"])[0]
                 skills_param = query_params.get("skills", [""])[0]
-                skills = [s.strip() for s in skills_param.split(",") if s.strip()] if skills_param else None
-                queries = generate_recruiter_boolean_queries(title=title, skills=skills, industry=industry)
+                skills = (
+                    [s.strip() for s in skills_param.split(",") if s.strip()]
+                    if skills_param
+                    else None
+                )
+                queries = generate_recruiter_boolean_queries(
+                    title=title, skills=skills, industry=industry
+                )
                 self.send_json(200, {"success": True, "queries": queries})
                 return
 
             if path.startswith("/api/jobs/") and path.endswith("/inbound-optimization"):
-                job_id = path.removeprefix("/api/jobs/").removesuffix("/inbound-optimization")
+                job_id = path.removeprefix("/api/jobs/").removesuffix(
+                    "/inbound-optimization"
+                )
                 job = app.repository.get_job(job_id)
                 if not job:
                     for j in app.dashboard.jobs:
@@ -1932,25 +2911,40 @@ def make_handler(app: DashboardApp):
 
                 title = getattr(job, "title", "") or "Senior Systems Engineer"
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
-                skills = profile.get("coreSkills", []) if profile else ["Cloud", "Infrastructure", "Automation", "Security"]
-                
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
+                skills = (
+                    profile.get("coreSkills", [])
+                    if profile
+                    else ["Cloud", "Infrastructure", "Automation", "Security"]
+                )
+
                 queries = generate_recruiter_boolean_queries(title=title, skills=skills)
-                headlines = generate_boolean_optimized_headlines(target_title=title, core_skills=skills)
-                about_index = generate_keyword_about_index(target_title=title, core_skills=skills)
-                
-                self.send_json(200, {
-                    "success": True,
-                    "target_title": title,
-                    "queries": queries,
-                    "headlines": headlines,
-                    "about_index": about_index
-                })
+                headlines = generate_boolean_optimized_headlines(
+                    target_title=title, core_skills=skills
+                )
+                about_index = generate_keyword_about_index(
+                    target_title=title, core_skills=skills
+                )
+
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "target_title": title,
+                        "queries": queries,
+                        "headlines": headlines,
+                        "about_index": about_index,
+                    },
+                )
                 return
 
             # Phase 22: Cover Letter Polarizer & Swappability GET Endpoints
             if path.startswith("/api/jobs/") and path.endswith("/cover-letter-audit"):
-                job_id = path.removeprefix("/api/jobs/").removesuffix("/cover-letter-audit")
+                job_id = path.removeprefix("/api/jobs/").removesuffix(
+                    "/cover-letter-audit"
+                )
                 job = app.repository.get_job(job_id)
                 if not job:
                     for j in app.dashboard.jobs:
@@ -1959,18 +2953,42 @@ def make_handler(app: DashboardApp):
                             break
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
-                
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
+
                 # Check for existing custom cover letter doc
                 cover_letter_text = ""
                 if user_id and job_id:
-                    existing_doc = app.repository.get_generated_document(user_id, job_id, "cover_letter")
+                    existing_doc = app.repository.get_generated_document(
+                        user_id, job_id, "cover_letter"
+                    )
                     if existing_doc and isinstance(existing_doc, dict):
                         cover_letter_text = existing_doc.get("content", "")
 
-                company = (job.get("company") if isinstance(job, dict) else getattr(job, "company", "")) or "Target Employer"
-                title = (job.get("title") if isinstance(job, dict) else getattr(job, "title", "")) or "Engineering Role"
-                desc = (job.get("description") if isinstance(job, dict) else getattr(job, "description", "")) or (job.get("notes") if isinstance(job, dict) else getattr(job, "notes", "")) or ""
+                company = (
+                    job.get("company")
+                    if isinstance(job, dict)
+                    else getattr(job, "company", "")
+                ) or "Target Employer"
+                title = (
+                    job.get("title")
+                    if isinstance(job, dict)
+                    else getattr(job, "title", "")
+                ) or "Engineering Role"
+                desc = (
+                    (
+                        job.get("description")
+                        if isinstance(job, dict)
+                        else getattr(job, "description", "")
+                    )
+                    or (
+                        job.get("notes")
+                        if isinstance(job, dict)
+                        else getattr(job, "notes", "")
+                    )
+                    or ""
+                )
 
                 audit = audit_cover_letter(
                     cover_letter_text=cover_letter_text,
@@ -1983,18 +3001,23 @@ def make_handler(app: DashboardApp):
                     profile,
                 )
 
-                self.send_json(200, {
-                    "success": True,
-                    "audit": audit.to_dict(),
-                    "variants": variants,
-                    "company": company,
-                    "title": title,
-                })
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "audit": audit.to_dict(),
+                        "variants": variants,
+                        "company": company,
+                        "title": title,
+                    },
+                )
                 return
 
             # Phase 23: Screening Questionnaire Solver GET Endpoints
             if path.startswith("/api/jobs/") and path.endswith("/screening-solutions"):
-                job_id = path.removeprefix("/api/jobs/").removesuffix("/screening-solutions")
+                job_id = path.removeprefix("/api/jobs/").removesuffix(
+                    "/screening-solutions"
+                )
                 job = app.repository.get_job(job_id)
                 if not job:
                     for j in app.dashboard.jobs:
@@ -2003,9 +3026,15 @@ def make_handler(app: DashboardApp):
                             break
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
 
-                job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
+                job_dict = (
+                    job
+                    if isinstance(job, dict)
+                    else (job.__dict__ if hasattr(job, "__dict__") else {})
+                )
                 report = generate_screening_report(job_dict, profile)
                 self.send_json(200, {"success": True, "report": report.to_dict()})
                 return
@@ -2021,9 +3050,15 @@ def make_handler(app: DashboardApp):
                             break
 
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
 
-                job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
+                job_dict = (
+                    job
+                    if isinstance(job, dict)
+                    else (job.__dict__ if hasattr(job, "__dict__") else {})
+                )
                 report = generate_ksc_report(job_dict, profile)
                 self.send_json(200, {"success": True, "report": report.to_dict()})
                 return
@@ -2033,7 +3068,9 @@ def make_handler(app: DashboardApp):
                 job_id = path.removeprefix("/api/jobs/").removesuffix("/seek-pass")
                 report = self._get_job_seek_pass_report(job_id, query_params)
                 if not report:
-                    self.send_json(404, {"success": False, "error": f"Job {job_id} not found"})
+                    self.send_json(
+                        404, {"success": False, "error": f"Job {job_id} not found"}
+                    )
                     return
                 self.send_json(200, {"success": True, "report": report})
                 return
@@ -2041,7 +3078,13 @@ def make_handler(app: DashboardApp):
             if path == "/api/documents":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 job_id = query_params.get("job_id", [""])[0]
                 doc_type = query_params.get("doc_type", ["resume"])[0]
@@ -2053,13 +3096,18 @@ def make_handler(app: DashboardApp):
                 job_id = query_params.get("job_id", [""])[0].strip()
                 format_type = query_params.get("format", ["docx"])[0].lower()
                 user_id = resolve_user_id(self, query_params)
-                profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                profile = (
+                    app.repository.get_user_profile(user_id) if user_id else None
+                ) or app.dashboard.profile
 
                 job = None
                 if job_id:
                     job = app.repository.get_job(job_id)
                     if not job and app.jobs:
-                        job = next((j for j in app.jobs if str(j.get("id")) == str(job_id)), None)
+                        job = next(
+                            (j for j in app.jobs if str(j.get("id")) == str(job_id)),
+                            None,
+                        )
 
                 resume_data = generate_ats_optimized_resume(profile, job)
 
@@ -2071,7 +3119,10 @@ def make_handler(app: DashboardApp):
                     text_bytes = resume_data["markdown_text"].encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "text/plain; charset=utf-8")
-                    self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.txt"')
+                    self.send_header(
+                        "Content-Disposition",
+                        f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.txt"',
+                    )
                     self.send_header("Content-Length", str(len(text_bytes)))
                     self.end_headers()
                     self.wfile.write(text_bytes)
@@ -2080,8 +3131,14 @@ def make_handler(app: DashboardApp):
                 # Default to native OpenXML .docx
                 docx_bytes = generate_ats_docx_bytes(resume_data)
                 self.send_response(200)
-                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.docx"')
+                self.send_header(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+                self.send_header(
+                    "Content-Disposition",
+                    f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.docx"',
+                )
                 self.send_header("Content-Length", str(len(docx_bytes)))
                 self.end_headers()
                 self.wfile.write(docx_bytes)
@@ -2096,7 +3153,13 @@ def make_handler(app: DashboardApp):
             if path == "/api/interview-sessions":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 job_id = query_params.get("job_id", [""])[0] or None
                 sessions = app.repository.get_interview_sessions(user_id, job_id)
@@ -2106,7 +3169,13 @@ def make_handler(app: DashboardApp):
             if path == "/api/applications":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                    self.send_json(
+                        401,
+                        {
+                            "success": False,
+                            "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                        },
+                    )
                     return
                 apps = app.repository.get_user_applications(user_id)
                 self.send_json(200, {"success": True, "applications": apps})
@@ -2115,56 +3184,90 @@ def make_handler(app: DashboardApp):
             if path == "/api/matches":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
-                    self.send_json(401, {"success": False, "error": "Authentication required."})
+                    self.send_json(
+                        401, {"success": False, "error": "Authentication required."}
+                    )
                     return
                 min_score = int(query_params.get("min_score", [0])[0] or 0)
                 limit = int(query_params.get("limit", [100])[0] or 100)
-                matches = app.repository.get_candidate_matches(user_id, min_score=min_score, limit=limit)
+                matches = app.repository.get_candidate_matches(
+                    user_id, min_score=min_score, limit=limit
+                )
                 self.send_json(200, {"success": True, "matches": matches})
                 return
-
 
             if path == "/api/job-description":
                 job_id = query_params.get("job_id", [""])[0].strip()
                 url = query_params.get("url", [""])[0].strip()
                 force = query_params.get("force", ["false"])[0].lower() in ("true", "1")
                 if not job_id and not url:
-                    self.send_json(400, {"success": False, "error": "job_id or url parameter is required"})
+                    self.send_json(
+                        400,
+                        {
+                            "success": False,
+                            "error": "job_id or url parameter is required",
+                        },
+                    )
                     return
 
                 existing_job = None
                 if job_id:
                     existing_job = app.repository.get_job(job_id)
                 if not existing_job and app.jobs:
-                    existing_job = next((j for j in app.jobs if job_id and str(j.get("id")) == str(job_id)), None)
+                    existing_job = next(
+                        (
+                            j
+                            for j in app.jobs
+                            if job_id and str(j.get("id")) == str(job_id)
+                        ),
+                        None,
+                    )
                     if not existing_job and url:
-                        existing_job = next((j for j in app.jobs if (j.get("url") == url or j.get("portalLink") == url)), None)
+                        existing_job = next(
+                            (
+                                j
+                                for j in app.jobs
+                                if (j.get("url") == url or j.get("portalLink") == url)
+                            ),
+                            None,
+                        )
 
                 curr_desc = ""
                 if existing_job:
                     if not url:
-                        url = existing_job.get("url") or existing_job.get("portalLink") or ""
+                        url = (
+                            existing_job.get("url")
+                            or existing_job.get("portalLink")
+                            or ""
+                        )
                     curr_desc = (existing_job.get("description") or "").strip()
 
                 if not force and len(curr_desc) >= 350:
-                    self.send_json(200, {
-                        "success": True,
-                        "job_id": job_id,
-                        "description": curr_desc,
-                        "cached": True,
-                        "length": len(curr_desc),
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "job_id": job_id,
+                            "description": curr_desc,
+                            "cached": True,
+                            "length": len(curr_desc),
+                        },
+                    )
                     return
 
                 detailed_desc = ""
                 try:
-                    seek_id = extract_seek_job_id(url) or (job_id if str(job_id).isdigit() else "")
+                    seek_id = extract_seek_job_id(url) or (
+                        job_id if str(job_id).isdigit() else ""
+                    )
                     if seek_id or ("seek.com.au" in url.lower()):
                         detailed_desc = fetch_seek_job_description(url or seek_id)
                     elif url:
                         detailed_desc = fetch_portal_description(url)
                 except Exception as e:
-                    logger.warning(f"Failed to fetch job description for job_id={job_id}, url={url}: {e}")
+                    logger.warning(
+                        f"Failed to fetch job description for job_id={job_id}, url={url}: {e}"
+                    )
 
                 if detailed_desc and len(detailed_desc) > len(curr_desc):
                     if job_id:
@@ -2173,26 +3276,34 @@ def make_handler(app: DashboardApp):
                         for j in app.jobs:
                             if job_id and str(j.get("id")) == str(job_id):
                                 j["description"] = detailed_desc
-                            elif url and (j.get("url") == url or j.get("portalLink") == url):
+                            elif url and (
+                                j.get("url") == url or j.get("portalLink") == url
+                            ):
                                 j["description"] = detailed_desc
 
-                    self.send_json(200, {
-                        "success": True,
-                        "job_id": job_id,
-                        "description": detailed_desc,
-                        "enriched": True,
-                        "length": len(detailed_desc),
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "job_id": job_id,
+                            "description": detailed_desc,
+                            "enriched": True,
+                            "length": len(detailed_desc),
+                        },
+                    )
                     return
 
-                self.send_json(200, {
-                    "success": True,
-                    "job_id": job_id,
-                    "description": curr_desc,
-                    "enriched": False,
-                    "message": "Detailed description could not be fetched or original description is already sufficient",
-                    "length": len(curr_desc),
-                })
+                self.send_json(
+                    200,
+                    {
+                        "success": True,
+                        "job_id": job_id,
+                        "description": curr_desc,
+                        "enriched": False,
+                        "message": "Detailed description could not be fetched or original description is already sufficient",
+                        "length": len(curr_desc),
+                    },
+                )
                 return
 
             if path == "/api/verify-job-url":
@@ -2203,6 +3314,7 @@ def make_handler(app: DashboardApp):
                     self.send_json(400, {"error": "Missing url parameter"})
                     return
                 from .verifier import verify_job_url
+
                 res = verify_job_url(target_url, force=force)
                 self.send_json(200, res)
                 return
@@ -2210,41 +3322,58 @@ def make_handler(app: DashboardApp):
             if path == "/health":
                 import time
 
-                self.send_json(200, {
-                    "status": "healthy",
-                    "timestamp": time.time(),
-                    "version": "1.0.0",
-                    "services": {
-                        "database": True,
-                        "cache": True,
-                        "jobs_count": len(app.jobs)
-                    }
-                })
+                self.send_json(
+                    200,
+                    {
+                        "status": "healthy",
+                        "timestamp": time.time(),
+                        "version": "1.0.0",
+                        "services": {
+                            "database": True,
+                            "cache": True,
+                            "jobs_count": len(app.jobs),
+                        },
+                    },
+                )
                 return
 
             if path == "/api/telemetry/status":
                 from datetime import datetime, timezone
                 from .config import settings
+
                 seek_cookies = app.repository.get_provider_cookies("seek")
                 indeed_cookies = app.repository.get_provider_cookies("indeed")
                 providers = {
                     "seek": {
                         "name": "SEEK",
-                        "status": "active" if seek_cookies.get("updated_at") or settings.seek_enabled else "active",
+                        "status": "active"
+                        if seek_cookies.get("updated_at") or settings.seek_enabled
+                        else "active",
                         "badge": "🟢 Active",
-                        "has_custom_session": bool(seek_cookies.get("headers") or seek_cookies.get("cookies")),
+                        "has_custom_session": bool(
+                            seek_cookies.get("headers") or seek_cookies.get("cookies")
+                        ),
                     },
                     "indeed": {
                         "name": "Indeed",
                         "status": "active",
                         "badge": "🟢 Active",
-                        "has_custom_session": bool(indeed_cookies.get("headers") or indeed_cookies.get("cookies")),
+                        "has_custom_session": bool(
+                            indeed_cookies.get("headers")
+                            or indeed_cookies.get("cookies")
+                        ),
                     },
                     "adzuna": {
                         "name": "Adzuna",
-                        "status": "active" if bool(settings.adzuna_app_id and settings.adzuna_api_key) else "configured",
-                        "badge": "🟢 Active" if bool(settings.adzuna_app_id) else "🟡 Standby",
-                        "has_credentials": bool(settings.adzuna_app_id and settings.adzuna_api_key),
+                        "status": "active"
+                        if bool(settings.adzuna_app_id and settings.adzuna_api_key)
+                        else "configured",
+                        "badge": "🟢 Active"
+                        if bool(settings.adzuna_app_id)
+                        else "🟡 Standby",
+                        "has_credentials": bool(
+                            settings.adzuna_app_id and settings.adzuna_api_key
+                        ),
                     },
                     "remoteok": {
                         "name": "RemoteOK",
@@ -2253,16 +3382,19 @@ def make_handler(app: DashboardApp):
                         "has_credentials": True,
                     },
                 }
-                self.send_json(200, {
-                    "status": "ok",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "providers": providers,
-                    "workers": {
-                        "active_scrapes": 0,
-                        "generation_queue_length": 0,
-                        "scheduler_active": True,
+                self.send_json(
+                    200,
+                    {
+                        "status": "ok",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "providers": providers,
+                        "workers": {
+                            "active_scrapes": 0,
+                            "generation_queue_length": 0,
+                            "scheduler_active": True,
+                        },
                     },
-                })
+                )
                 return
 
             if path == "/api/settings/cookies":
@@ -2274,11 +3406,11 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, **data})
                 return
 
-            
             # Prometheus metrics endpoint
             if path == "/metrics":
                 try:
                     from .metrics import get_metrics
+
                     metrics = get_metrics()
                     self.send_response(200)
                     self.send_header("Content-Type", "text/plain; version=0.0.4")
@@ -2290,7 +3422,11 @@ def make_handler(app: DashboardApp):
                     return
             if path in ("/api/jobs", "/api/scraped-jobs"):
                 query = parse_qs(parsed.query)
-                filters = {key: query[key][0] for key in ("location", "role", "source", "stream", "status") if key in query}
+                filters = {
+                    key: query[key][0]
+                    for key in ("location", "role", "source", "stream", "status")
+                    if key in query
+                }
                 filters["match_score_min"] = int(query.get("match_score_min", [0])[0])
                 jobs = app.public_jobs(filters)
                 self.send_json(200, {"success": True, "jobs": jobs})
@@ -2310,6 +3446,7 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/openapi.json":
                 from job_dashboard.openapi import generate_openapi_spec
+
                 self.send_json(200, generate_openapi_spec())
                 return
 
@@ -2317,7 +3454,13 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"rejections": app.rejected_applications()})
                 return
             if path == "/api/tracker/suggestions":
-                self.send_json(200, {"suggestions": app.tracker_suggestions(), "tracker_state": app.tracker_state})
+                self.send_json(
+                    200,
+                    {
+                        "suggestions": app.tracker_suggestions(),
+                        "tracker_state": app.tracker_state,
+                    },
+                )
                 return
             if path.startswith("/api/compare/"):
                 comparison_id = path.removeprefix("/api/compare/")
@@ -2331,25 +3474,60 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"applications": app.application_archive()})
                 return
             if path == "/api/search-criteria":
-                self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream, "group": query.group, "weight": query.weight, "exclude_terms": list(query.exclude_terms), "enabled": query.enabled} for query in app.search_queries]})
+                self.send_json(
+                    200,
+                    {
+                        "queries": [
+                            {
+                                "term": query.term,
+                                "location": query.location,
+                                "stream": query.stream,
+                                "group": query.group,
+                                "weight": query.weight,
+                                "exclude_terms": list(query.exclude_terms),
+                                "enabled": query.enabled,
+                            }
+                            for query in app.search_queries
+                        ]
+                    },
+                )
                 return
             if path == "/api/search-criteria/defaults":
-                self.send_json(200, {"queries": [{"term": query.term, "location": query.location, "stream": query.stream} for query in DEFAULT_QUERIES]})
+                self.send_json(
+                    200,
+                    {
+                        "queries": [
+                            {
+                                "term": query.term,
+                                "location": query.location,
+                                "stream": query.stream,
+                            }
+                            for query in DEFAULT_QUERIES
+                        ]
+                    },
+                )
                 return
             if path == "/api/search-criteria/suggestions":
                 self.send_json(200, {"queries": app.suggested_search_queries()})
                 return
             if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
-                job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")
+                job_id = path.removeprefix("/api/jobs/").removesuffix(
+                    "/generate-status"
+                )
                 app._recover_generated_documents(job_id)
-                status = app.generation_progress.get(job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0})
+                status = app.generation_progress.get(
+                    job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0}
+                )
                 if not status.get("done") and status.get("started_at"):
-                    status = {**status, **app._generation_status(job_id, status["started_at"])}
+                    status = {
+                        **status,
+                        **app._generation_status(job_id, status["started_at"]),
+                    }
                 if status.get("done"):
                     status = {**status, "status": "done"}
                 self.send_json(200, status)
                 return
-            
+
             # Phase 4B: Advanced AI Features endpoints
             if path == "/api/ai/resume-analyze":
                 # Parse query parameters for resume text
@@ -2361,49 +3539,53 @@ def make_handler(app: DashboardApp):
                 result = app.analyze_resume_ai(resume_text)
                 self.send_json(200, result)
                 return
-            
+
             if path == "/api/ai/interview-statistics":
                 result = app.get_interview_statistics()
                 self.send_json(200, result)
                 return
-            
+
             if path == "/api/ai/predictive-analytics":
                 query = parse_qs(parsed.query)
                 days = int(query.get("days", [30])[0])
                 result = app.get_predictive_analytics(days)
                 self.send_json(200, result)
                 return
-            
+
             if path == "/api/ai/timing-recommendations":
                 result = app.get_application_timing_recommendations()
                 self.send_json(200, result)
                 return
-            
+
             # Interview session endpoints
             if path.startswith("/api/ai/interview/") and path.endswith("/feedback"):
-                session_id = path.removeprefix("/api/ai/interview/").removesuffix("/feedback")
+                session_id = path.removeprefix("/api/ai/interview/").removesuffix(
+                    "/feedback"
+                )
                 result = app.get_interview_feedback(session_id)
                 self.send_json(200, result)
                 return
-            
+
             if path.startswith("/api/ai/interview/") and path.endswith("/performance"):
-                session_id = path.removeprefix("/api/ai/interview/").removesuffix("/performance")
+                session_id = path.removeprefix("/api/ai/interview/").removesuffix(
+                    "/performance"
+                )
                 result = app.analyze_interview_performance(session_id)
                 self.send_json(200, result)
                 return
-            
+
             if path == "/api/scrape/stream":
                 self.send_response(200)
-                self.send_header('Content-Type', 'text/event-stream')
-                self.send_header('Cache-Control', 'no-cache')
-                self.send_header('Connection', 'keep-alive')
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
                 self._send_cors_headers()
                 self.end_headers()
-                
+
                 def on_progress(stage, pct):
                     try:
                         msg = json.dumps({"stage": stage, "percent": pct})
-                        self.wfile.write(f"data: {msg}\n\n".encode('utf-8'))
+                        self.wfile.write(f"data: {msg}\n\n".encode("utf-8"))
                         self.wfile.flush()
                     except Exception:
                         pass
@@ -2411,12 +3593,14 @@ def make_handler(app: DashboardApp):
                 queries = app.search_queries
                 on_progress("Connecting to job gateways...", 5)
                 try:
-                    app.refresh(queries, force=False, ttl_hours=12.0, on_progress=on_progress)
+                    app.refresh(
+                        queries, force=False, ttl_hours=12.0, on_progress=on_progress
+                    )
                     on_progress("Discovery Complete", 100)
                 except Exception as scrape_err:
                     logger.warning(f"Live scrape stream warning: {scrape_err}")
                     on_progress("Discovery complete (cached fallback)", 100)
-                
+
                 try:
                     self.wfile.write(b"data: [DONE]\n\n")
                     self.wfile.flush()
@@ -2433,13 +3617,19 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, task.to_dict())
                 return
 
-            
             if path.startswith("/applications/"):
                 target = (app.data_dir / path.removeprefix("/applications/")).resolve()
-                if target.parent == (app.data_dir / "applications").resolve() and target.is_file():
+                if (
+                    target.parent == (app.data_dir / "applications").resolve()
+                    and target.is_file()
+                ):
                     data = target.read_bytes()
                     self.send_response(200)
-                    content_type = "application/pdf" if target.suffix.lower() == ".pdf" else "text/markdown; charset=utf-8"
+                    content_type = (
+                        "application/pdf"
+                        if target.suffix.lower() == ".pdf"
+                        else "text/markdown; charset=utf-8"
+                    )
                     self.send_header("Content-Type", content_type)
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
@@ -2447,17 +3637,26 @@ def make_handler(app: DashboardApp):
                     return
             static_dir = Path(__file__).parent / "static"
             target_asset = (static_dir / path.removeprefix("/")).resolve()
-            if target_asset.is_file() and str(target_asset).startswith(str(static_dir.resolve())):
+            if target_asset.is_file() and str(target_asset).startswith(
+                str(static_dir.resolve())
+            ):
                 data = target_asset.read_bytes()
                 self.send_response(200)
-                self.send_header("Content-Type", mimetypes.guess_type(target_asset.name)[0] or "text/plain")
+                self.send_header(
+                    "Content-Type",
+                    mimetypes.guess_type(target_asset.name)[0] or "text/plain",
+                )
                 self.send_header("Content-Length", str(len(data)))
                 self._send_cors_headers()
                 self.end_headers()
                 self.wfile.write(data)
                 return
 
-            if path == "/" or (not path.startswith("/api/") and not path.startswith("/health") and not path.startswith("/metrics")):
+            if path == "/" or (
+                not path.startswith("/api/")
+                and not path.startswith("/health")
+                and not path.startswith("/metrics")
+            ):
                 index_html = static_dir / "index.html"
                 if index_html.is_file():
                     data = index_html.read_bytes()
@@ -2478,7 +3677,11 @@ def make_handler(app: DashboardApp):
             try:
                 if path == "/api/settings/cookies":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     provider = body.get("provider", "").lower()
                     if not provider:
                         self.send_json(400, {"error": "Missing provider"})
@@ -2488,33 +3691,69 @@ def make_handler(app: DashboardApp):
                         headers=body.get("headers"),
                         cookies=body.get("cookies"),
                     )
-                    self.send_json(200, {
-                        "success": True,
-                        "provider": provider,
-                        "message": f"Successfully stored session cookies for {provider}",
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "provider": provider,
+                            "message": f"Successfully stored session cookies for {provider}",
+                        },
+                    )
                     return
 
                 if path.startswith("/api/jobs/") and path.endswith("/compare"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/compare")
-                    self.send_json(202, {"status": "queued", **app.start_compare(job_id)})
+                    self.send_json(
+                        202, {"status": "queued", **app.start_compare(job_id)}
+                    )
                     return
                 if path.startswith("/api/compare/") and path.endswith("/retry"):
-                    comparison_id = path.removeprefix("/api/compare/").removesuffix("/retry")
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    self.send_json(202, {"status": "queued", **app.retry_compare_model(comparison_id, payload["model_id"])})
+                    comparison_id = path.removeprefix("/api/compare/").removesuffix(
+                        "/retry"
+                    )
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
+                    self.send_json(
+                        202,
+                        {
+                            "status": "queued",
+                            **app.retry_compare_model(
+                                comparison_id, payload["model_id"]
+                            ),
+                        },
+                    )
                     return
                 if path.startswith("/api/compare/") and path.endswith("/select"):
-                    comparison_id = path.removeprefix("/api/compare/").removesuffix("/select")
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    self.send_json(200, app.select_compare_output(comparison_id, payload["model_id"]))
+                    comparison_id = path.removeprefix("/api/compare/").removesuffix(
+                        "/select"
+                    )
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
+                    self.send_json(
+                        200,
+                        app.select_compare_output(comparison_id, payload["model_id"]),
+                    )
                     return
-                
+
                 if path == "/api/export-ats-resume":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     user_id = resolve_user_id(self)
-                    profile = body.get("profile") or (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    profile = (
+                        body.get("profile")
+                        or (
+                            app.repository.get_user_profile(user_id)
+                            if user_id
+                            else None
+                        )
+                        or app.dashboard.profile
+                    )
                     job = body.get("job") or {}
                     custom_text = body.get("resume_text")
                     format_type = str(body.get("format") or "docx").lower()
@@ -2532,7 +3771,10 @@ def make_handler(app: DashboardApp):
                         text_bytes = resume_data["markdown_text"].encode("utf-8")
                         self.send_response(200)
                         self.send_header("Content-Type", "text/plain; charset=utf-8")
-                        self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.txt"')
+                        self.send_header(
+                            "Content-Disposition",
+                            f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.txt"',
+                        )
                         self.send_header("Content-Length", str(len(text_bytes)))
                         self.end_headers()
                         self.wfile.write(text_bytes)
@@ -2540,8 +3782,14 @@ def make_handler(app: DashboardApp):
 
                     docx_bytes = generate_ats_docx_bytes(resume_data)
                     self.send_response(200)
-                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                    self.send_header("Content-Disposition", f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.docx"')
+                    self.send_header(
+                        "Content-Type",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    )
+                    self.send_header(
+                        "Content-Disposition",
+                        f'attachment; filename="ATS_Resume_{resume_data["name"].replace(" ", "_")}.docx"',
+                    )
                     self.send_header("Content-Length", str(len(docx_bytes)))
                     self.end_headers()
                     self.wfile.write(docx_bytes)
@@ -2550,10 +3798,20 @@ def make_handler(app: DashboardApp):
                 if path == "/api/profile":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     res = _persist_profile_to_all_sinks(app, user_id, body)
                     self.send_json(200, {"success": True, "profile": res})
                     return
@@ -2561,17 +3819,27 @@ def make_handler(app: DashboardApp):
                 if path == "/api/profile/auto-generate":
                     user_id = resolve_user_id(self)
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    raw_text = body.get("raw_text") or body.get("resume_text") or body.get("text") or ""
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    raw_text = (
+                        body.get("raw_text")
+                        or body.get("resume_text")
+                        or body.get("text")
+                        or ""
+                    )
                     pdf_b64 = body.get("pdf_base64") or body.get("resume_base64")
                     raw_input = raw_text
                     if pdf_b64:
                         import base64
+
                         try:
                             raw_input = base64.b64decode(pdf_b64)
                         except Exception as b64_err:
                             logger.warning(f"Failed to decode base64 PDF: {b64_err}")
-                    
+
                     profile = build_candidate_profile(raw_input)
                     if user_id and body.get("save", True):
                         profile = _persist_profile_to_all_sinks(app, user_id, profile)
@@ -2581,43 +3849,95 @@ def make_handler(app: DashboardApp):
                 if path == "/api/preferences":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     res = app.repository.upsert_user_preferences(user_id, body)
                     from .config import settings
+
                     if settings.gcs_data_bucket:
-                        threading.Thread(target=backup_to_gcs, args=(settings.gcs_data_bucket, app.data_dir), daemon=True).start()
+                        threading.Thread(
+                            target=backup_to_gcs,
+                            args=(settings.gcs_data_bucket, app.data_dir),
+                            daemon=True,
+                        ).start()
                     self.send_json(200, {"success": True, "preferences": res})
                     return
 
                 if path == "/api/saved-searches":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    saved = app.repository.upsert_saved_search(user_id, str(body.get("name") or ""), body.get("query") or {}, str(body.get("id") or ""))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    saved = app.repository.upsert_saved_search(
+                        user_id,
+                        str(body.get("name") or ""),
+                        body.get("query") or {},
+                        str(body.get("id") or ""),
+                    )
                     self.send_json(200, {"success": True, "saved_search": saved})
                     return
 
                 if path == "/api/reminders":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    reminder = app.repository.create_reminder(user_id, str(body.get("job_id") or ""), str(body.get("reminder_type") or ""), str(body.get("remind_at") or ""), body.get("details"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    reminder = app.repository.create_reminder(
+                        user_id,
+                        str(body.get("job_id") or ""),
+                        str(body.get("reminder_type") or ""),
+                        str(body.get("remind_at") or ""),
+                        body.get("details"),
+                    )
                     self.send_json(201, {"success": True, "reminder": reminder})
                     return
 
                 if path == "/api/reminders/dismiss":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     self.send_json(200, {"success": dismissed})
                     return
@@ -2625,134 +3945,261 @@ def make_handler(app: DashboardApp):
                 if path == "/api/documents":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_id = str(body.get("job_id") or "")
                     doc_type = str(body.get("doc_type") or "resume")
-                    content_text = str(body.get("content_text") or body.get("text") or "")
+                    content_text = str(
+                        body.get("content_text") or body.get("text") or ""
+                    )
                     model_name = str(body.get("model_name") or "")
                     metadata = body.get("metadata") or {}
-                    doc = app.repository.upsert_generated_document(user_id, job_id, doc_type, content_text, model_name, metadata)
+                    doc = app.repository.upsert_generated_document(
+                        user_id, job_id, doc_type, content_text, model_name, metadata
+                    )
                     self.send_json(200, {"success": True, "document": doc})
                     return
 
                 if path == "/api/psychology":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_id = str(body.get("job_id") or "")
                     company = str(body.get("company") or "")
                     title = str(body.get("title") or "")
                     insights = body.get("insights") or {}
                     model_name = str(body.get("model_name") or "")
-                    psy = app.repository.upsert_job_psychology(job_id, company, title, insights, model_name)
+                    psy = app.repository.upsert_job_psychology(
+                        job_id, company, title, insights, model_name
+                    )
                     self.send_json(200, {"success": True, "psychology": psy})
                     return
 
                 if path == "/api/interview-sessions":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_id = str(body.get("job_id") or "")
                     company = str(body.get("company") or "")
                     title = str(body.get("title") or "")
                     session_data = body.get("session_data") or body
                     score = float(body.get("score") or 0.0)
-                    sess = app.repository.save_interview_session(user_id, job_id, company, title, session_data, score)
+                    sess = app.repository.save_interview_session(
+                        user_id, job_id, company, title, session_data, score
+                    )
                     self.send_json(200, {"success": True, "session": sess})
                     return
 
                 if path == "/api/feature-flags":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     key = body.get("key")
                     enabled = body.get("enabled")
                     desc = body.get("description", "")
                     if not key or enabled is None:
-                        self.send_json(400, {"success": False, "error": "Missing key or enabled state"})
+                        self.send_json(
+                            400,
+                            {"success": False, "error": "Missing key or enabled state"},
+                        )
                         return
-                    app.repository.set_feature_flag(key, bool(enabled), description=desc)
-                    self.send_json(200, {"success": True, "key": key, "enabled": bool(enabled)})
+                    app.repository.set_feature_flag(
+                        key, bool(enabled), description=desc
+                    )
+                    self.send_json(
+                        200, {"success": True, "key": key, "enabled": bool(enabled)}
+                    )
                     return
 
                 if path == "/api/matches/evaluate":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required."})
+                        self.send_json(
+                            401, {"success": False, "error": "Authentication required."}
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    profile = body.get("profile") or app.repository.get_user_profile(user_id) or getattr(app.dashboard, "profile", {})
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    profile = (
+                        body.get("profile")
+                        or app.repository.get_user_profile(user_id)
+                        or getattr(app.dashboard, "profile", {})
+                    )
                     min_score = int(body.get("min_score") or 50)
-                    staged_count = app.repository.evaluate_and_stage_matches(user_id, profile, min_score=min_score)
-                    matches = app.repository.get_candidate_matches(user_id, min_score=min_score)
-                    self.send_json(200, {"success": True, "staged_count": staged_count, "matches": matches})
+                    staged_count = app.repository.evaluate_and_stage_matches(
+                        user_id, profile, min_score=min_score
+                    )
+                    matches = app.repository.get_candidate_matches(
+                        user_id, min_score=min_score
+                    )
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "staged_count": staged_count,
+                            "matches": matches,
+                        },
+                    )
                     return
 
                 if path == "/api/applications":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_id = str(body.get("job_id") or body.get("id") or "").strip()
                     if not job_id:
                         self.send_json(400, {"error": "Missing job_id"})
                         return
-                        
-                    app_rec = app.repository.upsert_user_application(user_id, job_id, body)
+
+                    app_rec = app.repository.upsert_user_application(
+                        user_id, job_id, body
+                    )
                     self.send_json(200, {"success": True, "application": app_rec})
                     return
 
                 if path == "/api/applications/sync":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     apps_list = body.get("applications") or []
                     synced = []
                     for item in apps_list:
                         jid = str(item.get("job_id") or item.get("id") or "").strip()
                         if jid:
-                            synced.append(app.repository.upsert_user_application(user_id, jid, item))
-                    self.send_json(200, {"success": True, "synced_count": len(synced), "applications": app.repository.get_user_applications(user_id)})
+                            synced.append(
+                                app.repository.upsert_user_application(
+                                    user_id, jid, item
+                                )
+                            )
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "synced_count": len(synced),
+                            "applications": app.repository.get_user_applications(
+                                user_id
+                            ),
+                        },
+                    )
                     return
 
                 if path == "/api/applications/scan-updates":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     username = body.get("username")
                     app_password = body.get("app_password")
                     target_job_id = body.get("job_id")
                     days = int(body.get("days") or 14)
 
                     if not username or not app_password:
-                        self.send_json(400, {"error": "Missing Gmail username or app_password"})
+                        self.send_json(
+                            400, {"error": "Missing Gmail username or app_password"}
+                        )
                         return
 
                     from .email_connector import GmailScanner
-                    scanner = GmailScanner(username=username, app_password=app_password, days=days)
+
+                    scanner = GmailScanner(
+                        username=username, app_password=app_password, days=days
+                    )
 
                     apps = app.repository.get_user_applications(user_id)
                     if target_job_id:
-                        apps = [a for a in apps if a.get("job_id") == target_job_id or a.get("id") == target_job_id]
+                        apps = [
+                            a
+                            for a in apps
+                            if a.get("job_id") == target_job_id
+                            or a.get("id") == target_job_id
+                        ]
 
-                    scan_results = scanner.scan_updates_for_all_applications(apps, days=days)
+                    scan_results = scanner.scan_updates_for_all_applications(
+                        apps, days=days
+                    )
                     updates_applied = []
 
                     for res in scan_results:
@@ -2770,57 +4217,90 @@ def make_handler(app: DashboardApp):
                                 email_subject=subj,
                                 email_snippet=snip,
                                 email_date=edate,
-                                email_thread_id=th_id
+                                email_thread_id=th_id,
                             )
                             updates_applied.append(res)
 
-                    self.send_json(200, {
-                        "success": True,
-                        "scanned_count": len(apps),
-                        "updates_count": len(updates_applied),
-                        "updates": updates_applied,
-                        "applications": app.repository.get_user_applications(user_id)
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "scanned_count": len(apps),
+                            "updates_count": len(updates_applied),
+                            "updates": updates_applied,
+                            "applications": app.repository.get_user_applications(
+                                user_id
+                            ),
+                        },
+                    )
                     return
 
                 if path == "/api/passkey-setup":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     credential_id = payload.get("credential_id") or payload.get("id")
                     if not credential_id:
-                        self.send_json(400, {"success": False, "error": "Missing credential_id"})
+                        self.send_json(
+                            400, {"success": False, "error": "Missing credential_id"}
+                        )
                         return
 
                     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     try:
                         with app.db.get_connection() as conn:
                             cur = conn.cursor()
-                            cur.execute("UPDATE users SET passkey_id = ? WHERE id = ?", (credential_id, user_id))
+                            cur.execute(
+                                "UPDATE users SET passkey_id = ? WHERE id = ?",
+                                (credential_id, user_id),
+                            )
                             conn.commit()
                     except Exception as e:
-                        logger.error(f"Error associating passkey for user {user_id}: {e}")
+                        logger.error(
+                            f"Error associating passkey for user {user_id}: {e}"
+                        )
 
-                    current_prof = app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+                    current_prof = (
+                        app.repository.get_user_profile(user_id)
+                        if hasattr(app, "repository")
+                        else {}
+                    )
                     if current_prof:
                         current_prof["hasPasskey"] = True
                         current_prof["passkeyUpdatedAt"] = now
                         _persist_profile_to_all_sinks(app, user_id, current_prof)
 
-                    self.send_json(200, {
-                        "success": True,
-                        "credential_id": credential_id,
-                        "user_id": user_id,
-                        "message": "Passkey successfully registered and bound to user account."
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "credential_id": credential_id,
+                            "user_id": user_id,
+                            "message": "Passkey successfully registered and bound to user account.",
+                        },
+                    )
                     return
 
                 if path == "/api/passkey-login":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
 
                     credential_id = payload.get("credential_id") or payload.get("id")
                     email = payload.get("email")
@@ -2831,7 +4311,10 @@ def make_handler(app: DashboardApp):
                         try:
                             with app.db.get_connection() as conn:
                                 cur = conn.cursor()
-                                cur.execute("SELECT id, email, name FROM users WHERE passkey_id = ?", (credential_id,))
+                                cur.execute(
+                                    "SELECT id, email, name FROM users WHERE passkey_id = ?",
+                                    (credential_id,),
+                                )
                                 row = cur.fetchone()
                                 if row:
                                     user_id, email, name = row[0], row[1], row[2]
@@ -2842,7 +4325,10 @@ def make_handler(app: DashboardApp):
                         try:
                             with app.db.get_connection() as conn:
                                 cur = conn.cursor()
-                                cur.execute("SELECT id, email, name FROM users WHERE email = ?", (email,))
+                                cur.execute(
+                                    "SELECT id, email, name FROM users WHERE email = ?",
+                                    (email,),
+                                )
                                 row = cur.fetchone()
                                 if row:
                                     user_id, email, name = row[0], row[1], row[2]
@@ -2856,104 +4342,159 @@ def make_handler(app: DashboardApp):
 
                     # Generate authentic JWT token
                     now = datetime.datetime.now(datetime.timezone.utc)
-                    token = jwt.encode({
-                        "sub": user_id,
-                        "email": email,
-                        "name": name,
-                        "exp": now + datetime.timedelta(days=7)
-                    }, JWT_SECRET, algorithm="HS256")
-
-                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    if (not user_profile or not _is_valid_profile(user_profile)) and email:
-                        user_profile = app.repository.get_user_profile(email) or user_profile
-                    has_profile = _is_valid_profile(user_profile)
-                    self.send_json(200, {
-                        "success": True,
-                        "token": token,
-                        "user": {
-                            "id": user_id,
+                    token = jwt.encode(
+                        {
+                            "sub": user_id,
                             "email": email,
-                            "name": name
+                            "name": name,
+                            "exp": now + datetime.timedelta(days=7),
                         },
-                        "profile": user_profile if has_profile else None,
-                        "has_profile": has_profile
-                    })
+                        JWT_SECRET,
+                        algorithm="HS256",
+                    )
+
+                    user_profile = (
+                        app.repository.get_user_profile(user_id) if user_id else {}
+                    )
+                    if (
+                        not user_profile or not _is_valid_profile(user_profile)
+                    ) and email:
+                        user_profile = (
+                            app.repository.get_user_profile(email) or user_profile
+                        )
+                    has_profile = _is_valid_profile(user_profile)
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "token": token,
+                            "user": {"id": user_id, "email": email, "name": name},
+                            "profile": user_profile if has_profile else None,
+                            "has_profile": has_profile,
+                        },
+                    )
                     return
 
                 if path == "/api/google-login":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     email = (payload.get("email") or "").strip().lower()
-                    name = (payload.get("name") or "").strip() or (email.split("@")[0] if email else "Google User")
-                    google_id = payload.get("google_id") or payload.get("id") or str(uuid.uuid4())
+                    name = (payload.get("name") or "").strip() or (
+                        email.split("@")[0] if email else "Google User"
+                    )
+                    google_id = (
+                        payload.get("google_id")
+                        or payload.get("id")
+                        or str(uuid.uuid4())
+                    )
                     user_id = f"google_{google_id}"
-                    
+
                     if not email:
                         self.send_json(400, {"error": "Missing Google email address"})
                         return
-                        
+
                     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     try:
                         with app.db.get_connection() as conn:
                             cur = conn.cursor()
-                            cur.execute("SELECT id, name FROM users WHERE email = ?", (email,))
+                            cur.execute(
+                                "SELECT id, name FROM users WHERE email = ?", (email,)
+                            )
                             existing = cur.fetchone()
                             if existing:
                                 user_id = existing[0]
-                                cur.execute("UPDATE users SET name = ?, email_verified = 1 WHERE id = ?", (name, user_id))
+                                cur.execute(
+                                    "UPDATE users SET name = ?, email_verified = 1 WHERE id = ?",
+                                    (name, user_id),
+                                )
                             else:
-                                dummy_hash = bcrypt.hashpw(str(uuid.uuid4()).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                                dummy_hash = bcrypt.hashpw(
+                                    str(uuid.uuid4()).encode("utf-8"), bcrypt.gensalt()
+                                ).decode("utf-8")
                                 cur.execute(
                                     "INSERT INTO users (id, email, name, password_hash, created_at, email_verified) VALUES (?, ?, ?, ?, ?, 1)",
-                                    (user_id, email, name, dummy_hash, now)
+                                    (user_id, email, name, dummy_hash, now),
                                 )
                                 if hasattr(app, "repository") and app.repository:
                                     try:
                                         app.repository.migrate_default_user(user_id)
                                     except Exception as mig_err:
-                                        logger.warning(f"Could not migrate default_user data for {user_id}: {mig_err}")
+                                        logger.warning(
+                                            f"Could not migrate default_user data for {user_id}: {mig_err}"
+                                        )
                             conn.commit()
                     except Exception as e:
                         logger.error(f"Error persisting Google user: {e}")
-                        
-                    token = jwt.encode({
-                        "sub": user_id,
-                        "email": email,
-                        "name": name,
-                        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
-                    }, JWT_SECRET, algorithm="HS256")
-                    
-                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    if (not user_profile or not _is_valid_profile(user_profile)) and email:
-                        user_profile = app.repository.get_user_profile(email) or user_profile
-                    has_profile = _is_valid_profile(user_profile)
-                    self.send_json(200, {
-                        "success": True,
-                        "token": token,
-                        "user": {
-                            "id": user_id,
+
+                    token = jwt.encode(
+                        {
+                            "sub": user_id,
                             "email": email,
                             "name": name,
-                            "email_verified": True
+                            "exp": datetime.datetime.now(datetime.timezone.utc)
+                            + datetime.timedelta(days=7),
                         },
-                        "profile": user_profile if has_profile else None,
-                        "has_profile": has_profile
-                    })
+                        JWT_SECRET,
+                        algorithm="HS256",
+                    )
+
+                    user_profile = (
+                        app.repository.get_user_profile(user_id) if user_id else {}
+                    )
+                    if (
+                        not user_profile or not _is_valid_profile(user_profile)
+                    ) and email:
+                        user_profile = (
+                            app.repository.get_user_profile(email) or user_profile
+                        )
+                    has_profile = _is_valid_profile(user_profile)
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "token": token,
+                            "user": {
+                                "id": user_id,
+                                "email": email,
+                                "name": name,
+                                "email_verified": True,
+                            },
+                            "profile": user_profile if has_profile else None,
+                            "has_profile": has_profile,
+                        },
+                    )
                     return
 
                 if path == "/api/link-google":
                     user_id = resolve_user_id(self)
                     if not user_id:
-                        self.send_json(401, {"success": False, "error": "Authentication required. Provide Authorization token or X-User-Id header."})
+                        self.send_json(
+                            401,
+                            {
+                                "success": False,
+                                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
+                            },
+                        )
                         return
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     google_id = payload.get("google_id") or payload.get("id") or ""
                     google_email = (payload.get("email") or "").strip().lower()
                     picture = payload.get("picture") or ""
 
                     if not google_id and not google_email:
-                        self.send_json(400, {"success": False, "error": "Missing Google ID or email"})
+                        self.send_json(
+                            400,
+                            {"success": False, "error": "Missing Google ID or email"},
+                        )
                         return
 
                     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -2962,14 +4503,20 @@ def make_handler(app: DashboardApp):
                             cur = conn.cursor()
                             cur.execute(
                                 "UPDATE users SET google_id = ?, picture = ? WHERE id = ?",
-                                (google_id, picture, user_id)
+                                (google_id, picture, user_id),
                             )
                             conn.commit()
                     except Exception as e:
-                        logger.error(f"Error linking Google account to user {user_id}: {e}")
+                        logger.error(
+                            f"Error linking Google account to user {user_id}: {e}"
+                        )
 
                     # Update profile with picture / avatarUrl and googleEmail
-                    current_prof = app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+                    current_prof = (
+                        app.repository.get_user_profile(user_id)
+                        if hasattr(app, "repository")
+                        else {}
+                    )
                     if current_prof:
                         if picture and not current_prof.get("avatarUrl"):
                             current_prof["avatarUrl"] = picture
@@ -2978,17 +4525,24 @@ def make_handler(app: DashboardApp):
                         current_prof["updatedAt"] = now
                         _persist_profile_to_all_sinks(app, user_id, current_prof)
 
-                    self.send_json(200, {
-                        "success": True,
-                        "linked_email": google_email,
-                        "google_id": google_id,
-                        "user_id": user_id
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "linked_email": google_email,
+                            "google_id": google_id,
+                            "user_id": user_id,
+                        },
+                    )
                     return
 
                 if path == "/api/register":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     email = (payload.get("email") or "").strip().lower()
                     password = payload.get("password")
                     name = (payload.get("name") or "").strip()
@@ -2998,21 +4552,35 @@ def make_handler(app: DashboardApp):
 
                     # Clean up old attempts
                     for ip in list(login_attempts.keys()):
-                        if current_time - login_attempts[ip]['time'] > 60:
+                        if current_time - login_attempts[ip]["time"] > 60:
                             del login_attempts[ip]
 
                     if client_ip not in ("127.0.0.1", "localhost", "testclient"):
                         if client_ip in login_attempts:
-                            if login_attempts[client_ip]['count'] >= 60:
-                                if current_time - login_attempts[client_ip]['time'] < 60:
-                                    self.send_json(429, {"error": "Too many login attempts. Please try again later."})
+                            if login_attempts[client_ip]["count"] >= 60:
+                                if (
+                                    current_time - login_attempts[client_ip]["time"]
+                                    < 60
+                                ):
+                                    self.send_json(
+                                        429,
+                                        {
+                                            "error": "Too many login attempts. Please try again later."
+                                        },
+                                    )
                                     return
                                 else:
-                                    login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                                    login_attempts[client_ip] = {
+                                        "count": 1,
+                                        "time": current_time,
+                                    }
                             else:
-                                login_attempts[client_ip]['count'] += 1
+                                login_attempts[client_ip]["count"] += 1
                         else:
-                            login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                            login_attempts[client_ip] = {
+                                "count": 1,
+                                "time": current_time,
+                            }
 
                     if not email or not password:
                         self.send_json(400, {"error": "Missing email or password"})
@@ -3023,18 +4591,31 @@ def make_handler(app: DashboardApp):
                         self.send_json(400, {"error": complexity_err})
                         return
 
-                    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                    password_hash = bcrypt.hashpw(
+                        password.encode("utf-8"), bcrypt.gensalt()
+                    ).decode("utf-8")
                     user_id = str(uuid.uuid4())
                     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     verification_code = f"{random.randint(100000, 999999)}"
-                    verification_exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
+                    verification_exp = (
+                        datetime.datetime.now(datetime.timezone.utc)
+                        + datetime.timedelta(minutes=30)
+                    ).isoformat()
 
                     try:
                         with app.db.get_connection() as conn:
                             cur = conn.cursor()
                             cur.execute(
                                 "INSERT INTO users (id, email, name, password_hash, created_at, email_verified, email_verification_code, email_verification_expires_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
-                                (user_id, email, name, password_hash, now, verification_code, verification_exp)
+                                (
+                                    user_id,
+                                    email,
+                                    name,
+                                    password_hash,
+                                    now,
+                                    verification_code,
+                                    verification_exp,
+                                ),
                             )
                             conn.commit()
                     except sqlite3.IntegrityError:
@@ -3045,36 +4626,48 @@ def make_handler(app: DashboardApp):
                         try:
                             app.repository.migrate_default_user(user_id)
                         except Exception as mig_err:
-                            logger.warning(f"Could not migrate default_user data for {user_id}: {mig_err}")
+                            logger.warning(
+                                f"Could not migrate default_user data for {user_id}: {mig_err}"
+                            )
 
                     # Create token
                     payload_data = {
                         "sub": user_id,
                         "email": email,
                         "name": name,
-                        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                        "exp": datetime.datetime.now(datetime.timezone.utc)
+                        + datetime.timedelta(hours=JWT_EXPIRY_HOURS),
                     }
                     token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
 
-                    self.send_json(200, {
-                        "success": True,
-                        "token": token,
-                        "user": {
-                            "id": user_id,
-                            "email": email,
-                            "name": name,
-                            "email_verified": False,
-                            "email_verification_sent": True
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "token": token,
+                            "user": {
+                                "id": user_id,
+                                "email": email,
+                                "name": name,
+                                "email_verified": False,
+                                "email_verification_sent": True,
+                            },
+                            "verification_code_preview": verification_code
+                            if os.environ.get("ENV") != "production"
+                            else None,
+                            "profile": None,
+                            "has_profile": False,
                         },
-                        "verification_code_preview": verification_code if os.environ.get("ENV") != "production" else None,
-                        "profile": None,
-                        "has_profile": False
-                    })
+                    )
                     return
 
                 if path == "/api/verify-email":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     code = str(payload.get("code") or "").strip()
                     email = (payload.get("email") or "").strip().lower()
 
@@ -3086,11 +4679,22 @@ def make_handler(app: DashboardApp):
                     with app.db.get_connection() as conn:
                         cur = conn.cursor()
                         if user_id:
-                            cur.execute("SELECT id, email, email_verified, email_verification_code, email_verification_expires_at FROM users WHERE id = ?", (user_id,))
+                            cur.execute(
+                                "SELECT id, email, email_verified, email_verification_code, email_verification_expires_at FROM users WHERE id = ?",
+                                (user_id,),
+                            )
                         elif email:
-                            cur.execute("SELECT id, email, email_verified, email_verification_code, email_verification_expires_at FROM users WHERE email = ?", (email,))
+                            cur.execute(
+                                "SELECT id, email, email_verified, email_verification_code, email_verification_expires_at FROM users WHERE email = ?",
+                                (email,),
+                            )
                         else:
-                            self.send_json(400, {"error": "Authentication or email required to verify."})
+                            self.send_json(
+                                400,
+                                {
+                                    "error": "Authentication or email required to verify."
+                                },
+                            )
                             return
                         row = cur.fetchone()
 
@@ -3098,22 +4702,34 @@ def make_handler(app: DashboardApp):
                         self.send_json(404, {"error": "User account not found."})
                         return
 
-                    uid, uemail, is_verified, stored_code, stored_exp = row[0], row[1], bool(row[2]), str(row[3] or ""), str(row[4] or "")
+                    uid, uemail, is_verified, stored_code, stored_exp = (
+                        row[0],
+                        row[1],
+                        bool(row[2]),
+                        str(row[3] or ""),
+                        str(row[4] or ""),
+                    )
 
                     if is_verified:
-                        self.send_json(200, {
-                            "success": True,
-                            "message": "Email is already verified.",
-                            "email_verified": True
-                        })
+                        self.send_json(
+                            200,
+                            {
+                                "success": True,
+                                "message": "Email is already verified.",
+                                "email_verified": True,
+                            },
+                        )
                         return
 
                     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     if stored_exp and now_iso > stored_exp:
-                        self.send_json(400, {
-                            "error": "Verification code has expired. Please request a new code.",
-                            "expired": True
-                        })
+                        self.send_json(
+                            400,
+                            {
+                                "error": "Verification code has expired. Please request a new code.",
+                                "expired": True,
+                            },
+                        )
                         return
 
                     if stored_code and code == stored_code:
@@ -3121,33 +4737,53 @@ def make_handler(app: DashboardApp):
                             cur = conn.cursor()
                             cur.execute(
                                 "UPDATE users SET email_verified = 1, email_verification_code = '', email_verification_expires_at = '' WHERE id = ?",
-                                (uid,)
+                                (uid,),
                             )
                             conn.commit()
-                        self.send_json(200, {
-                            "success": True,
-                            "message": "Email verified successfully.",
-                            "email_verified": True
-                        })
+                        self.send_json(
+                            200,
+                            {
+                                "success": True,
+                                "message": "Email verified successfully.",
+                                "email_verified": True,
+                            },
+                        )
                         return
                     else:
-                        self.send_json(400, {"error": "Invalid verification code. Please check and try again."})
+                        self.send_json(
+                            400,
+                            {
+                                "error": "Invalid verification code. Please check and try again."
+                            },
+                        )
                         return
 
                 if path == "/api/resend-verification":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     email = (payload.get("email") or "").strip().lower()
                     user_id = resolve_user_id(self)
 
                     with app.db.get_connection() as conn:
                         cur = conn.cursor()
                         if user_id:
-                            cur.execute("SELECT id, email, email_verified FROM users WHERE id = ?", (user_id,))
+                            cur.execute(
+                                "SELECT id, email, email_verified FROM users WHERE id = ?",
+                                (user_id,),
+                            )
                         elif email:
-                            cur.execute("SELECT id, email, email_verified FROM users WHERE email = ?", (email,))
+                            cur.execute(
+                                "SELECT id, email, email_verified FROM users WHERE email = ?",
+                                (email,),
+                            )
                         else:
-                            self.send_json(400, {"error": "Authentication or email required."})
+                            self.send_json(
+                                400, {"error": "Authentication or email required."}
+                            )
                             return
                         row = cur.fetchone()
 
@@ -3157,34 +4793,49 @@ def make_handler(app: DashboardApp):
 
                     uid, uemail, is_verified = row[0], row[1], bool(row[2])
                     if is_verified:
-                        self.send_json(200, {
-                            "success": True,
-                            "message": "Email is already verified.",
-                            "email_verified": True
-                        })
+                        self.send_json(
+                            200,
+                            {
+                                "success": True,
+                                "message": "Email is already verified.",
+                                "email_verified": True,
+                            },
+                        )
                         return
 
                     new_code = f"{random.randint(100000, 999999)}"
-                    new_exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
+                    new_exp = (
+                        datetime.datetime.now(datetime.timezone.utc)
+                        + datetime.timedelta(minutes=30)
+                    ).isoformat()
 
                     with app.db.get_connection() as conn:
                         cur = conn.cursor()
                         cur.execute(
                             "UPDATE users SET email_verification_code = ?, email_verification_expires_at = ? WHERE id = ?",
-                            (new_code, new_exp, uid)
+                            (new_code, new_exp, uid),
                         )
                         conn.commit()
 
-                    self.send_json(200, {
-                        "success": True,
-                        "message": f"A new verification code has been dispatched to {uemail}.",
-                        "verification_code_preview": new_code if os.environ.get("ENV") != "production" else None
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "message": f"A new verification code has been dispatched to {uemail}.",
+                            "verification_code_preview": new_code
+                            if os.environ.get("ENV") != "production"
+                            else None,
+                        },
+                    )
                     return
 
                 elif path == "/api/login":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     email = (payload.get("email") or "").strip().lower()
                     password = payload.get("password")
 
@@ -3193,21 +4844,35 @@ def make_handler(app: DashboardApp):
 
                     # Clean up old attempts
                     for ip in list(login_attempts.keys()):
-                        if current_time - login_attempts[ip]['time'] > 60:
+                        if current_time - login_attempts[ip]["time"] > 60:
                             del login_attempts[ip]
 
                     if client_ip not in ("127.0.0.1", "localhost", "testclient"):
                         if client_ip in login_attempts:
-                            if login_attempts[client_ip]['count'] >= 60:
-                                if current_time - login_attempts[client_ip]['time'] < 60:
-                                    self.send_json(429, {"error": "Too many login attempts. Please try again later."})
+                            if login_attempts[client_ip]["count"] >= 60:
+                                if (
+                                    current_time - login_attempts[client_ip]["time"]
+                                    < 60
+                                ):
+                                    self.send_json(
+                                        429,
+                                        {
+                                            "error": "Too many login attempts. Please try again later."
+                                        },
+                                    )
                                     return
                                 else:
-                                    login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                                    login_attempts[client_ip] = {
+                                        "count": 1,
+                                        "time": current_time,
+                                    }
                             else:
-                                login_attempts[client_ip]['count'] += 1
+                                login_attempts[client_ip]["count"] += 1
                         else:
-                            login_attempts[client_ip] = {'count': 1, 'time': current_time}
+                            login_attempts[client_ip] = {
+                                "count": 1,
+                                "time": current_time,
+                            }
 
                     if not email or not password:
                         self.send_json(400, {"error": "Missing email or password"})
@@ -3215,7 +4880,10 @@ def make_handler(app: DashboardApp):
 
                     with app.db.get_connection() as conn:
                         cur = conn.cursor()
-                        cur.execute("SELECT id, name, password_hash, email_verified FROM users WHERE email = ?", (email,))
+                        cur.execute(
+                            "SELECT id, name, password_hash, email_verified FROM users WHERE email = ?",
+                            (email,),
+                        )
                         row = cur.fetchone()
 
                     if not row:
@@ -3225,7 +4893,9 @@ def make_handler(app: DashboardApp):
                     user_id, name, password_hash = row[0], row[1], row[2]
                     email_verified = bool(row[3]) if len(row) > 3 and row[3] else False
 
-                    if not bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
+                    if not bcrypt.checkpw(
+                        password.encode("utf-8"), password_hash.encode("utf-8")
+                    ):
                         self.send_json(401, {"error": "Invalid credentials"})
                         return
 
@@ -3233,21 +4903,36 @@ def make_handler(app: DashboardApp):
                         "sub": user_id,
                         "email": email,
                         "name": name,
-                        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRY_HOURS)
+                        "exp": datetime.datetime.now(datetime.timezone.utc)
+                        + datetime.timedelta(hours=JWT_EXPIRY_HOURS),
                     }
                     token = jwt.encode(payload_data, JWT_SECRET, algorithm="HS256")
 
-                    user_profile = app.repository.get_user_profile(user_id) if user_id else {}
-                    if (not user_profile or not _is_valid_profile(user_profile)) and email:
-                        user_profile = app.repository.get_user_profile(email) or user_profile
+                    user_profile = (
+                        app.repository.get_user_profile(user_id) if user_id else {}
+                    )
+                    if (
+                        not user_profile or not _is_valid_profile(user_profile)
+                    ) and email:
+                        user_profile = (
+                            app.repository.get_user_profile(email) or user_profile
+                        )
                     has_profile = _is_valid_profile(user_profile)
-                    self.send_json(200, {
-                        "success": True,
-                        "token": token,
-                        "user": {"id": user_id, "email": email, "name": name, "email_verified": email_verified},
-                        "profile": user_profile if has_profile else None,
-                        "has_profile": has_profile
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "token": token,
+                            "user": {
+                                "id": user_id,
+                                "email": email,
+                                "name": name,
+                                "email_verified": email_verified,
+                            },
+                            "profile": user_profile if has_profile else None,
+                            "has_profile": has_profile,
+                        },
+                    )
                     return
 
                 elif path == "/api/refresh":
@@ -3267,69 +4952,135 @@ def make_handler(app: DashboardApp):
                     for item in raw_queries:
                         if isinstance(item, str):
                             term = item.strip()
-                            location, stream, group, weight, exclude_terms, enabled = "Melbourne, VIC", detect_query_stream(term), "", 1.0, (), True
+                            location, stream, group, weight, exclude_terms, enabled = (
+                                "Melbourne, VIC",
+                                detect_query_stream(term),
+                                "",
+                                1.0,
+                                (),
+                                True,
+                            )
                         elif isinstance(item, dict):
                             term = str(item.get("term") or "").strip()
                             location = str(item.get("location") or "Melbourne, VIC")
-                            stream = str(item.get("stream") or detect_query_stream(term))
+                            stream = str(
+                                item.get("stream") or detect_query_stream(term)
+                            )
                             group = str(item.get("group") or "")
                             weight = float(item.get("weight", 1.0))
-                            exclude_terms = tuple(str(value) for value in (item.get("exclude_terms") or ()))
+                            exclude_terms = tuple(
+                                str(value)
+                                for value in (item.get("exclude_terms") or ())
+                            )
                             enabled = bool(item.get("enabled", True))
                         else:
                             continue
                         if term:
-                            queries.append(SearchQuery(term, location, stream, group, weight, exclude_terms, enabled))
+                            queries.append(
+                                SearchQuery(
+                                    term,
+                                    location,
+                                    stream,
+                                    group,
+                                    weight,
+                                    exclude_terms,
+                                    enabled,
+                                )
+                            )
                     if not queries:
                         user_id = resolve_user_id(self)
-                        user_profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
-                        if user_profile and (user_profile.get("targetTitles") or user_profile.get("target_titles")):
-                            titles = user_profile.get("targetTitles") or user_profile.get("target_titles") or []
-                            loc = str(user_profile.get("location") or "Melbourne, VIC").strip() or "Melbourne, VIC"
+                        user_profile = (
+                            app.repository.get_user_profile(user_id)
+                            if user_id
+                            else None
+                        ) or app.dashboard.profile
+                        if user_profile and (
+                            user_profile.get("targetTitles")
+                            or user_profile.get("target_titles")
+                        ):
+                            titles = (
+                                user_profile.get("targetTitles")
+                                or user_profile.get("target_titles")
+                                or []
+                            )
+                            loc = (
+                                str(
+                                    user_profile.get("location") or "Melbourne, VIC"
+                                ).strip()
+                                or "Melbourne, VIC"
+                            )
                             for t in titles:
                                 if str(t).strip():
-                                    queries.append(SearchQuery(term=str(t).strip(), location=loc, stream=detect_query_stream(str(t))))
+                                    queries.append(
+                                        SearchQuery(
+                                            term=str(t).strip(),
+                                            location=loc,
+                                            stream=detect_query_stream(str(t)),
+                                        )
+                                    )
                         if not queries:
                             queries = list(app.search_queries)
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:
-                        jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                        jobs, errors, cache_stats = app.refresh(
+                            queries, force=force, ttl_hours=ttl_hours
+                        )
                     except Exception as refresh_err:
-                        logger.warning(f"/api/refresh scrape failed, returning cached DB jobs: {refresh_err}")
+                        logger.warning(
+                            f"/api/refresh scrape failed, returning cached DB jobs: {refresh_err}"
+                        )
                         # Fall back to returning cached jobs from the SQLite database
                         try:
-                            cached_result = app.repository.query_jobs_paginated(page=1, page_size=5000)
+                            cached_result = app.repository.query_jobs_paginated(
+                                page=1, page_size=5000
+                            )
                             jobs = cached_result.get("jobs", [])
                         except Exception:
                             jobs = []
                         errors = [str(refresh_err)]
                         cache_stats = {"fallback": True, "total": len(jobs)}
-                    self.send_json(200, {
-                        "jobs": jobs,
-                        "errors": errors,
-                        "cache_stats": cache_stats,
-                        "success": True
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "jobs": jobs,
+                            "errors": errors,
+                            "cache_stats": cache_stats,
+                            "success": True,
+                        },
+                    )
                     return
-
 
                 if path == "/api/search-criteria":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                    self.send_json(200, {"queries": app.update_search_queries(payload.get("queries", []))})
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
+                    self.send_json(
+                        200,
+                        {
+                            "queries": app.update_search_queries(
+                                payload.get("queries", [])
+                            )
+                        },
+                    )
                     return
                 if path == "/api/gmail/scan":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     username = payload.get("username") or os.getenv("GMAIL_USERNAME")
                     app_password = os.getenv("GMAIL_APP_PASSWORD")
                     days = max(1, min(7, int(payload.get("days", 7))))
                     self.send_json(200, app.scan_gmail(username, app_password, days))
                     return
                 if path == "/api/verify-jobs":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     urls = payload.get("urls", [])
                     force = bool(payload.get("force", False))
                     from .verifier import verify_job_urls
+
                     results = verify_job_urls(urls, force=force)
                     self.send_json(200, {"success": True, "results": results})
                     return
@@ -3338,55 +5089,75 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, app.sync_tracker())
                     return
                 if path.startswith("/api/jobs/") and path.endswith("/generate-status"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-status")
-                    status = app.generation_progress.get(job_id, {"phase": "Queued", "estimate_seconds": 15, "progress": 0})
+                    job_id = path.removeprefix("/api/jobs/").removesuffix(
+                        "/generate-status"
+                    )
+                    status = app.generation_progress.get(
+                        job_id,
+                        {"phase": "Queued", "estimate_seconds": 15, "progress": 0},
+                    )
                     if status.get("done"):
                         status = {**status, "status": "done"}
                     self.send_json(200, status)
                     return
                 if path.startswith("/api/jobs/") and path.endswith("/status"):
                     job_id = path.removeprefix("/api/jobs/").removesuffix("/status")
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     self.send_json(200, app.update_status(job_id, payload["status"]))
                     return
-# Phase 4B: POST endpoints for AI features
+                # Phase 4B: POST endpoints for AI features
                 if path == "/api/ai/interview/simulate":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     job_desc = payload.get("job_description", "")
                     role = payload.get("role", "")
                     count = int(payload.get("question_count", 5))
                     result = app.simulate_interview(job_desc, role, count)
                     self.send_json(200, result)
                     return
-                
+
                 if path.startswith("/api/ai/interview/") and path.endswith("/answer"):
-                    session_id = path.removeprefix("/api/ai/interview/").removesuffix("/answer")
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    session_id = path.removeprefix("/api/ai/interview/").removesuffix(
+                        "/answer"
+                    )
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     question_id = payload.get("question_id", "")
                     answer = payload.get("answer", "")
-                    result = app.submit_interview_answer(session_id, question_id, answer)
+                    result = app.submit_interview_answer(
+                        session_id, question_id, answer
+                    )
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/ai/skill-gap":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     skills = payload.get("skills", [])
                     target_role = payload.get("target_role", "")
                     result = app.analyze_skill_gap(skills, target_role)
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/ai/career-paths":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     skills = payload.get("skills", [])
                     interests = payload.get("interests", [])
                     result = app.recommend_career_paths(skills, interests)
                     self.send_json(200, result)
                     return
-                
-                
+
                 if path.startswith("/api/ai/interview/") and path.endswith("/feedback"):
-                    session_id = path.removeprefix("/api/ai/interview/").removesuffix("/feedback")
+                    session_id = path.removeprefix("/api/ai/interview/").removesuffix(
+                        "/feedback"
+                    )
                     result = get_interview_simulator().get_feedback(session_id)
                     self.send_json(200, result)
                     return
@@ -3395,91 +5166,105 @@ def make_handler(app: DashboardApp):
                     result = app.reset_interview_simulator()
                     self.send_json(200, result)
                     return
-                
+
                 # Phase 6: Smart Application Endpoints
                 if path == "/api/smart-applications/add":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     result = app.add_smart_application(
                         job_id=payload.get("job_id"),
                         job_title=payload.get("job_title"),
                         company=payload.get("company"),
                         application_type=payload.get("application_type", "direct"),
                         match_score=payload.get("match_score", 0.0),
-                        application_url=payload.get("application_url")
+                        application_url=payload.get("application_url"),
                     )
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/smart-applications/update-status":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     result = app.update_application_status(
                         application_id=payload.get("application_id"),
                         status=payload.get("status"),
-                        notes=payload.get("notes")
+                        notes=payload.get("notes"),
                     )
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/smart-applications":
                     query = parse_qs(parsed.query)
                     status = query.get("status", [None])[0]
                     result = app.get_smart_applications(status)
                     self.send_json(200, {"applications": result})
                     return
-                
+
                 if path == "/api/smart-applications/statistics":
                     result = app.get_application_statistics()
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/smart-applications/follow-ups/upcoming":
                     query = parse_qs(parsed.query)
                     days = int(query.get("days", [7])[0])
                     result = app.get_upcoming_follow_ups(days)
                     self.send_json(200, {"applications": result})
                     return
-                
+
                 if path == "/api/smart-applications/follow-ups/overdue":
                     result = app.get_overdue_follow_ups()
                     self.send_json(200, {"applications": result})
                     return
-                
+
                 if path == "/api/smart-applications/set-follow-up":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     result = app.set_application_follow_up(
                         application_id=payload.get("application_id"),
-                        days_from_now=payload.get("days_from_now", 7)
+                        days_from_now=payload.get("days_from_now", 7),
                     )
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/smart-applications/add-note":
-                    payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                    payload = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    )
                     result = app.add_application_note(
                         application_id=payload.get("application_id"),
-                        note=payload.get("note")
+                        note=payload.get("note"),
                     )
                     self.send_json(200, result)
                     return
-                
+
                 if path == "/api/smart-applications/search":
                     query = parse_qs(parsed.query)
                     search_query = query.get("q", [""])[0]
                     result = app.search_smart_applications(search_query)
                     self.send_json(200, {"applications": result})
                     return
-                
+
                 if path == "/api/scrape/stream":
                     self.send_response(200)
-                    self.send_header('Content-Type', 'text/event-stream')
-                    self.send_header('Cache-Control', 'no-cache')
-                    self.send_header('Connection', 'keep-alive')
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Connection", "keep-alive")
                     self.end_headers()
-                    
+
                     def on_progress(stage, pct):
                         try:
-                            msg = '{"stage": "' + stage + '", "percent": ' + str(pct) + '}'
-                            self.wfile.write(f"data: {msg}\n\n".encode('utf-8'))
+                            msg = (
+                                '{"stage": "'
+                                + stage
+                                + '", "percent": '
+                                + str(pct)
+                                + "}"
+                            )
+                            self.wfile.write(f"data: {msg}\n\n".encode("utf-8"))
                             self.wfile.flush()
                         except:
                             pass
@@ -3487,7 +5272,12 @@ def make_handler(app: DashboardApp):
                     queries = app.search_queries
                     on_progress("Starting pipeline...", 0)
                     try:
-                        app.refresh(queries, force=False, ttl_hours=12.0, on_progress=on_progress)
+                        app.refresh(
+                            queries,
+                            force=False,
+                            ttl_hours=12.0,
+                            on_progress=on_progress,
+                        )
                         on_progress("Done", 100)
                     except Exception as scrape_err:
                         logger.warning(f"Live scrape stream warning: {scrape_err}")
@@ -3501,60 +5291,109 @@ def make_handler(app: DashboardApp):
 
                 if path in ("/api/refresh", "/api/scrape"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     raw_queries = payload.get("queries", [])
                     queries = []
                     for item in raw_queries:
                         if isinstance(item, str):
-                            queries.append(SearchQuery(term=item, location="Melbourne, VIC", stream=detect_query_stream(item)))
+                            queries.append(
+                                SearchQuery(
+                                    term=item,
+                                    location="Melbourne, VIC",
+                                    stream=detect_query_stream(item),
+                                )
+                            )
                         elif isinstance(item, dict):
                             term = str(item.get("term") or "").strip()
-                            queries.append(SearchQuery(
-                                term,
-                                item.get("location", "Melbourne, VIC"),
-                                item.get("stream") or detect_query_stream(term),
-                                item.get("group", ""),
-                                float(item.get("weight", 1.0)),
-                                tuple(item.get("exclude_terms", [])),
-                                bool(item.get("enabled", True))
-                            ))
+                            queries.append(
+                                SearchQuery(
+                                    term,
+                                    item.get("location", "Melbourne, VIC"),
+                                    item.get("stream") or detect_query_stream(term),
+                                    item.get("group", ""),
+                                    float(item.get("weight", 1.0)),
+                                    tuple(item.get("exclude_terms", [])),
+                                    bool(item.get("enabled", True)),
+                                )
+                            )
                     if not queries:
                         user_id = resolve_user_id(self)
-                        user_profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
-                        if user_profile and (user_profile.get("targetTitles") or user_profile.get("target_titles")):
-                            titles = user_profile.get("targetTitles") or user_profile.get("target_titles") or []
-                            loc = str(user_profile.get("location") or "Melbourne, VIC").strip() or "Melbourne, VIC"
+                        user_profile = (
+                            app.repository.get_user_profile(user_id)
+                            if user_id
+                            else None
+                        ) or app.dashboard.profile
+                        if user_profile and (
+                            user_profile.get("targetTitles")
+                            or user_profile.get("target_titles")
+                        ):
+                            titles = (
+                                user_profile.get("targetTitles")
+                                or user_profile.get("target_titles")
+                                or []
+                            )
+                            loc = (
+                                str(
+                                    user_profile.get("location") or "Melbourne, VIC"
+                                ).strip()
+                                or "Melbourne, VIC"
+                            )
                             for t in titles:
                                 if str(t).strip():
-                                    queries.append(SearchQuery(term=str(t).strip(), location=loc, stream=detect_query_stream(str(t))))
+                                    queries.append(
+                                        SearchQuery(
+                                            term=str(t).strip(),
+                                            location=loc,
+                                            stream=detect_query_stream(str(t)),
+                                        )
+                                    )
                         if not queries:
                             queries = list(app.search_queries)
                     force = bool(payload.get("force", False))
                     ttl_hours = float(payload.get("ttl_hours", 12.0))
                     try:
-                        jobs, errors, cache_stats = app.refresh(queries, force=force, ttl_hours=ttl_hours)
+                        jobs, errors, cache_stats = app.refresh(
+                            queries, force=force, ttl_hours=ttl_hours
+                        )
                     except Exception as refresh_err:
-                        logger.warning(f"{path} scrape failed, returning cached DB jobs: {refresh_err}")
+                        logger.warning(
+                            f"{path} scrape failed, returning cached DB jobs: {refresh_err}"
+                        )
                         try:
-                            cached_result = app.repository.query_jobs_paginated(page=1, page_size=5000)
+                            cached_result = app.repository.query_jobs_paginated(
+                                page=1, page_size=5000
+                            )
                             jobs = cached_result.get("jobs", [])
                         except Exception:
                             jobs = []
                         errors = [str(refresh_err)]
                         cache_stats = {"fallback": True, "total": len(jobs)}
-                    self.send_json(200, {
-                        "jobs": jobs,
-                        "errors": errors,
-                        "cache_stats": cache_stats,
-                        "success": True
-                    })
+                    self.send_json(
+                        200,
+                        {
+                            "jobs": jobs,
+                            "errors": errors,
+                            "cache_stats": cache_stats,
+                            "success": True,
+                        },
+                    )
                     return
 
                 if path in ("/api/auto-apply", "/api/auto-apply/start"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job = payload.get("job") or payload
-                    profile = payload.get("profile") or payload.get("candidateProfile") or {}
+                    profile = (
+                        payload.get("profile") or payload.get("candidateProfile") or {}
+                    )
 
                     if path == "/api/auto-apply/start":
                         task = auto_apply_manager.create_task(job, profile)
@@ -3562,15 +5401,33 @@ def make_handler(app: DashboardApp):
                         return
 
                     # Synchronous auto-apply resolution & dispatch receipt
-                    candidate_name = (profile.get("name") or "Verified Candidate").strip()
-                    candidate_email = profile.get("email") or "applicant@career-agent.internal"
+                    candidate_name = (
+                        profile.get("name") or "Verified Candidate"
+                    ).strip()
+                    candidate_email = (
+                        profile.get("email") or "applicant@career-agent.internal"
+                    )
                     candidate_phone = profile.get("phone") or "0400 000 000"
-                    candidate_location = profile.get("location") or job.get("location") or "Melbourne, VIC"
-                    work_rights = profile.get("workRights") or "Australian Citizen (Unrestricted)"
-                    clearance = profile.get("clearance") or "Standard Australian Vetting Ready"
-                    salary = job.get("salary") or profile.get("targetSalary") or "Market Competitive Remuneration"
+                    candidate_location = (
+                        profile.get("location")
+                        or job.get("location")
+                        or "Melbourne, VIC"
+                    )
+                    work_rights = (
+                        profile.get("workRights") or "Australian Citizen (Unrestricted)"
+                    )
+                    clearance = (
+                        profile.get("clearance") or "Standard Australian Vetting Ready"
+                    )
+                    salary = (
+                        job.get("salary")
+                        or profile.get("targetSalary")
+                        or "Market Competitive Remuneration"
+                    )
 
-                    sample_questions = auto_apply_manager._generate_sector_questions(job, profile)
+                    sample_questions = auto_apply_manager._generate_sector_questions(
+                        job, profile
+                    )
                     screening_answers = {
                         q: auto_apply_manager.resolve_screening_answer(q, profile, job)
                         for q in sample_questions
@@ -3583,7 +5440,9 @@ def make_handler(app: DashboardApp):
                         "company": job.get("company") or "Target Employer",
                         "applied_date": time.strftime("%Y-%m-%d"),
                         "source": job.get("source") or "Direct Aggregator",
-                        "direct_ad_link": job.get("portalLink") or job.get("link") or "",
+                        "direct_ad_link": job.get("portalLink")
+                        or job.get("link")
+                        or "",
                         "quality_score": 96,
                         "submitted_fields": {
                             "Full Name": candidate_name,
@@ -3593,62 +5452,113 @@ def make_handler(app: DashboardApp):
                             "Work Rights": work_rights,
                             "Security Clearance": clearance,
                             "Notice Period": "Immediate / <2 Weeks",
-                            "Target Salary": salary
+                            "Target Salary": salary,
                         },
                         "screening_answers": screening_answers,
                         "resume_text": f"# {candidate_name.upper()}\n**{job.get('title', 'Engineer')}**\n{candidate_location} | {candidate_email}\n\n## PROFESSIONAL SUMMARY\nProven authority tailored to {job.get('company', 'Target Employer')}.",
                         "cover_text": f"Dear Hiring Team at {job.get('company', 'Target Employer')},\n\nI am writing to express my strong interest in the {job.get('title', 'Position')} role.",
-                        "google_drive_status": "Saved to Google Drive / Applications Folder (PDF)"
+                        "google_drive_status": "Saved to Google Drive / Applications Folder (PDF)",
                     }
                     self.send_json(200, {"success": True, "pipeline_result": receipt})
                     return
 
-                if path == "/api/semantic-gap" or (path.startswith("/api/jobs/") and path.endswith("/semantic-gap")):
+                if path == "/api/semantic-gap" or (
+                    path.startswith("/api/jobs/") and path.endswith("/semantic-gap")
+                ):
                     payload = self.read_json_body() or {}
                     job_id = ""
                     if path.startswith("/api/jobs/") and path.endswith("/semantic-gap"):
-                        job_id = path.removeprefix("/api/jobs/").removesuffix("/semantic-gap")
+                        job_id = path.removeprefix("/api/jobs/").removesuffix(
+                            "/semantic-gap"
+                        )
                     else:
                         job_id = payload.get("job_id") or ""
 
-                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
-                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    job = (
+                        payload.get("job")
+                        or (app.repository.get_job(job_id) if job_id else None)
+                        or payload
+                    )
+                    profile = (
+                        payload.get("profile")
+                        or payload.get("candidateProfile")
+                        or app.dashboard.profile
+                    )
                     diagnostic = analyze_semantic_gap(job, profile)
-                    self.send_json(200, {"success": True, "diagnostic": diagnostic.to_dict()})
+                    self.send_json(
+                        200, {"success": True, "diagnostic": diagnostic.to_dict()}
+                    )
                     return
 
-                if path == "/api/cover-letter" or (path.startswith("/api/jobs/") and path.endswith("/cover-letter")):
+                if path == "/api/cover-letter" or (
+                    path.startswith("/api/jobs/") and path.endswith("/cover-letter")
+                ):
                     payload = self.read_json_body() or {}
                     job_id = ""
                     if path.startswith("/api/jobs/") and path.endswith("/cover-letter"):
-                        job_id = path.removeprefix("/api/jobs/").removesuffix("/cover-letter")
+                        job_id = path.removeprefix("/api/jobs/").removesuffix(
+                            "/cover-letter"
+                        )
                     else:
                         job_id = payload.get("job_id") or ""
 
-                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
-                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    job = (
+                        payload.get("job")
+                        or (app.repository.get_job(job_id) if job_id else None)
+                        or payload
+                    )
+                    profile = (
+                        payload.get("profile")
+                        or payload.get("candidateProfile")
+                        or app.dashboard.profile
+                    )
                     cover = generate_tailored_cover_letter(job, profile)
-                    self.send_json(200, {"success": True, "cover_letter": cover.to_dict()})
+                    self.send_json(
+                        200, {"success": True, "cover_letter": cover.to_dict()}
+                    )
                     return
 
-                if path == "/api/linkedin-optimization" or (path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization")):
+                if path == "/api/linkedin-optimization" or (
+                    path.startswith("/api/jobs/")
+                    and path.endswith("/linkedin-optimization")
+                ):
                     payload = self.read_json_body() or {}
                     job_id = ""
-                    if path.startswith("/api/jobs/") and path.endswith("/linkedin-optimization"):
-                        job_id = path.removeprefix("/api/jobs/").removesuffix("/linkedin-optimization")
+                    if path.startswith("/api/jobs/") and path.endswith(
+                        "/linkedin-optimization"
+                    ):
+                        job_id = path.removeprefix("/api/jobs/").removesuffix(
+                            "/linkedin-optimization"
+                        )
                     else:
                         job_id = payload.get("job_id") or ""
 
-                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
-                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    job = (
+                        payload.get("job")
+                        or (app.repository.get_job(job_id) if job_id else None)
+                        or payload
+                    )
+                    profile = (
+                        payload.get("profile")
+                        or payload.get("candidateProfile")
+                        or app.dashboard.profile
+                    )
                     opt = generate_linkedin_optimization(job, profile)
-                    self.send_json(200, {"success": True, "linkedin_optimization": opt.to_dict()})
+                    self.send_json(
+                        200, {"success": True, "linkedin_optimization": opt.to_dict()}
+                    )
                     return
 
                 if path in ("/api/compensation/benchmark", "/api/compensation/analyze"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    salary = float(payload.get("base_salary") or payload.get("salary") or 0.0)
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    salary = float(
+                        payload.get("base_salary") or payload.get("salary") or 0.0
+                    )
                     role = payload.get("title") or payload.get("role") or ""
                     sector = payload.get("sector")
                     super_inc = bool(payload.get("super_included", False))
@@ -3658,32 +5568,60 @@ def make_handler(app: DashboardApp):
                         role_title=role,
                         sector=sector,
                         super_included=super_inc,
-                        location=location
+                        location=location,
                     )
                     self.send_json(200, {"success": True, "benchmark": benchmark})
                     return
 
                 if path in ("/api/contracts/scan-risks", "/api/contracts/audit"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    contract_text = payload.get("contract_text") or payload.get("text") or payload.get("content") or ""
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    contract_text = (
+                        payload.get("contract_text")
+                        or payload.get("text")
+                        or payload.get("content")
+                        or ""
+                    )
                     risks = scan_employment_contract_risks(contract_text)
                     self.send_json(200, {"success": True, "analysis": risks})
                     return
 
                 if path in ("/api/dossier/generate", "/api/executive-dossier/generate"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_id = payload.get("job_id") or payload.get("id") or ""
-                    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
-                    profile = payload.get("profile") or payload.get("candidateProfile") or app.dashboard.profile
+                    job = (
+                        payload.get("job")
+                        or (app.repository.get_job(job_id) if job_id else None)
+                        or payload
+                    )
+                    profile = (
+                        payload.get("profile")
+                        or payload.get("candidateProfile")
+                        or app.dashboard.profile
+                    )
                     dossier = generate_executive_dossier(job, profile)
                     self.send_json(200, {"success": True, "dossier": dossier})
                     return
 
-                if path in ("/api/dossier/export-markdown", "/api/executive-dossier/export-markdown"):
+                if path in (
+                    "/api/dossier/export-markdown",
+                    "/api/executive-dossier/export-markdown",
+                ):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     dossier = payload.get("dossier")
                     if not dossier:
                         job = payload.get("job") or payload
@@ -3696,14 +5634,24 @@ def make_handler(app: DashboardApp):
                 # Phase 17: Funnel Analytics POST Endpoint
                 if path == "/api/analytics/funnel":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    sector = payload.get("sector") or query_params.get("sector", ["technology"])[0]
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    sector = (
+                        payload.get("sector")
+                        or query_params.get("sector", ["technology"])[0]
+                    )
                     client_jobs = payload.get("jobs")
                     if client_jobs is not None and isinstance(client_jobs, list):
                         jobs_list = client_jobs
                     else:
                         raw_jobs = getattr(app.dashboard, "jobs", []) or []
-                        jobs_list = [j.to_dict() if hasattr(j, "to_dict") else j for j in raw_jobs]
+                        jobs_list = [
+                            j.to_dict() if hasattr(j, "to_dict") else j
+                            for j in raw_jobs
+                        ]
                     analytics = compute_funnel_analytics(jobs_list, sector=sector)
                     self.send_json(200, {"success": True, "analytics": analytics})
                     return
@@ -3711,70 +5659,151 @@ def make_handler(app: DashboardApp):
                 # Phase 18: Career Matrix POST Endpoint
                 if path == "/api/career/roadmap":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    sector = payload.get("sector") or query_params.get("sector", [None])[0]
-                    target_level = payload.get("target_level") or query_params.get("target_level", [None])[0]
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    sector = (
+                        payload.get("sector") or query_params.get("sector", [None])[0]
+                    )
+                    target_level = (
+                        payload.get("target_level")
+                        or query_params.get("target_level", [None])[0]
+                    )
                     profile = payload.get("profile")
                     if not profile:
                         user_id = resolve_user_id(self, query_params)
-                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
-                    roadmap = generate_career_roadmap(profile, target_level=target_level, sector=sector)
+                        profile = (
+                            app.repository.get_user_profile(user_id)
+                            if user_id
+                            else None
+                        ) or app.dashboard.profile
+                    roadmap = generate_career_roadmap(
+                        profile, target_level=target_level, sector=sector
+                    )
                     self.send_json(200, {"success": True, "roadmap": roadmap})
                     return
                 # Phase 19: Post-Interview Influence & Debrief POST Endpoints
                 if path == "/api/interview-debrief":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_id = payload.get("job_id")
                     if not job_id:
-                        self.send_json(400, {"success": False, "error": "job_id is required"})
+                        self.send_json(
+                            400, {"success": False, "error": "job_id is required"}
+                        )
                         return
-                    user_id = resolve_user_id(self, query_params) or payload.get("user_id") or "default_user"
+                    user_id = (
+                        resolve_user_id(self, query_params)
+                        or payload.get("user_id")
+                        or "default_user"
+                    )
                     debrief = InterviewDebrief.from_dict(payload)
                     if not hasattr(app, "_interview_debriefs"):
                         app._interview_debriefs = {}
                     store_key = f"{user_id}::{job_id}"
                     app._interview_debriefs[store_key] = debrief.to_dict()
                     health = evaluate_influence_health(debrief)
-                    self.send_json(200, {"success": True, "debrief": debrief.to_dict(), "health": health})
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "debrief": debrief.to_dict(),
+                            "health": health,
+                        },
+                    )
                     return
 
                 if path == "/api/interview-debrief/follow-up":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_data = payload.get("job", {})
                     debrief_data = payload.get("debrief", {})
                     user_id = resolve_user_id(self, query_params)
-                    profile = payload.get("profile") or (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    profile = (
+                        payload.get("profile")
+                        or (
+                            app.repository.get_user_profile(user_id)
+                            if user_id
+                            else None
+                        )
+                        or app.dashboard.profile
+                    )
                     debrief = InterviewDebrief.from_dict(debrief_data)
-                    memo = generate_objection_resolution_memo(job_data, debrief, profile)
+                    memo = generate_objection_resolution_memo(
+                        job_data, debrief, profile
+                    )
                     self.send_json(200, {"success": True, "memo": memo})
                     return
 
                 if path == "/api/interview-debrief/referee-pack":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_data = payload.get("job", {})
                     debrief_data = payload.get("debrief", {})
                     referee_name = payload.get("referee_name", "Referee")
-                    referee_title = payload.get("referee_title", "Professional Reference")
-                    referee_relationship = payload.get("referee_relationship", "Former Supervisor")
+                    referee_title = payload.get(
+                        "referee_title", "Professional Reference"
+                    )
+                    referee_relationship = payload.get(
+                        "referee_relationship", "Former Supervisor"
+                    )
                     user_id = resolve_user_id(self, query_params)
-                    profile = payload.get("profile") or (app.repository.get_user_profile(user_id) if user_id else None) or app.dashboard.profile
+                    profile = (
+                        payload.get("profile")
+                        or (
+                            app.repository.get_user_profile(user_id)
+                            if user_id
+                            else None
+                        )
+                        or app.dashboard.profile
+                    )
                     debrief = InterviewDebrief.from_dict(debrief_data)
-                    pack = generate_referee_alignment_pack(job_data, debrief, referee_name, referee_title, referee_relationship, profile)
+                    pack = generate_referee_alignment_pack(
+                        job_data,
+                        debrief,
+                        referee_name,
+                        referee_title,
+                        referee_relationship,
+                        profile,
+                    )
                     self.send_json(200, {"success": True, "pack": pack})
                     return
 
                 # Phase 20: ATS Sentinel & Parser Diagnostic POST Endpoint
-                if path == "/api/ats-diagnostic" or (path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic")):
+                if path == "/api/ats-diagnostic" or (
+                    path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic")
+                ):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
-                    resume_text = payload.get("resume_text") or payload.get("resumeText") or ""
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    resume_text = (
+                        payload.get("resume_text") or payload.get("resumeText") or ""
+                    )
                     job = payload.get("job")
                     job_id = None
-                    if path.startswith("/api/jobs/") and path.endswith("/ats-diagnostic"):
-                        job_id = path.removeprefix("/api/jobs/").removesuffix("/ats-diagnostic")
+                    if path.startswith("/api/jobs/") and path.endswith(
+                        "/ats-diagnostic"
+                    ):
+                        job_id = path.removeprefix("/api/jobs/").removesuffix(
+                            "/ats-diagnostic"
+                        )
                     elif payload.get("job_id"):
                         job_id = payload["job_id"]
 
@@ -3787,10 +5816,25 @@ def make_handler(app: DashboardApp):
                                     break
 
                     if not resume_text:
-                        user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                        user_id = resolve_user_id(self, query_params) or payload.get(
+                            "user_id"
+                        )
+                        profile = (
+                            (
+                                app.repository.get_user_profile(user_id)
+                                if user_id
+                                else None
+                            )
+                            or payload.get("profile")
+                            or app.dashboard.profile
+                        )
                         if profile:
-                            resume_text = profile.get("resume_text") or profile.get("rawResumeText") or profile.get("summary") or ""
+                            resume_text = (
+                                profile.get("resume_text")
+                                or profile.get("rawResumeText")
+                                or profile.get("summary")
+                                or ""
+                            )
 
                     report = generate_ats_diagnostic_report(resume_text or "", job)
                     self.send_json(200, {"success": True, "diagnostic": report})
@@ -3799,60 +5843,119 @@ def make_handler(app: DashboardApp):
                 # Phase 21: Inbound Sourcing & LinkedIn Boolean Indexing POST Endpoints
                 if path == "/api/inbound-sourcing/test-query":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     query = payload.get("query") or ""
                     text = payload.get("text") or ""
                     if not text:
-                        user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                        user_id = resolve_user_id(self, query_params) or payload.get(
+                            "user_id"
+                        )
+                        profile = (
+                            (
+                                app.repository.get_user_profile(user_id)
+                                if user_id
+                                else None
+                            )
+                            or payload.get("profile")
+                            or app.dashboard.profile
+                        )
                         if profile:
                             text = f"{profile.get('headline', '')} {profile.get('about', '')} {profile.get('summary', '')} {' '.join(profile.get('coreSkills', []))}"
-                    
+
                     eval_result = evaluate_boolean_query(query, text)
                     self.send_json(200, {"success": True, "result": eval_result})
                     return
 
                 if path == "/api/inbound-sourcing/audit":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     headline = payload.get("headline") or ""
                     about = payload.get("about") or ""
-                    target_role = payload.get("target_role") or payload.get("targetRole") or "Systems Engineer"
-                    core_skills = payload.get("core_skills") or payload.get("coreSkills") or []
+                    target_role = (
+                        payload.get("target_role")
+                        or payload.get("targetRole")
+                        or "Systems Engineer"
+                    )
+                    core_skills = (
+                        payload.get("core_skills") or payload.get("coreSkills") or []
+                    )
 
                     if not headline or not about:
-                        user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                        profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                        user_id = resolve_user_id(self, query_params) or payload.get(
+                            "user_id"
+                        )
+                        profile = (
+                            (
+                                app.repository.get_user_profile(user_id)
+                                if user_id
+                                else None
+                            )
+                            or payload.get("profile")
+                            or app.dashboard.profile
+                        )
                         if profile:
-                            headline = headline or profile.get("headline") or profile.get("title") or ""
-                            about = about or profile.get("about") or profile.get("summary") or ""
+                            headline = (
+                                headline
+                                or profile.get("headline")
+                                or profile.get("title")
+                                or ""
+                            )
+                            about = (
+                                about
+                                or profile.get("about")
+                                or profile.get("summary")
+                                or ""
+                            )
                             core_skills = core_skills or profile.get("coreSkills") or []
 
                     audit = audit_linkedin_indexability(
                         headline=headline,
                         about=about,
                         target_role=target_role,
-                        core_skills=core_skills
+                        core_skills=core_skills,
                     )
-                    headlines = generate_boolean_optimized_headlines(target_title=target_role, core_skills=core_skills)
-                    about_index = generate_keyword_about_index(target_title=target_role, core_skills=core_skills)
-                    
-                    self.send_json(200, {
-                        "success": True,
-                        "audit": audit,
-                        "headlines": headlines,
-                        "about_index": about_index
-                    })
+                    headlines = generate_boolean_optimized_headlines(
+                        target_title=target_role, core_skills=core_skills
+                    )
+                    about_index = generate_keyword_about_index(
+                        target_title=target_role, core_skills=core_skills
+                    )
+
+                    self.send_json(
+                        200,
+                        {
+                            "success": True,
+                            "audit": audit,
+                            "headlines": headlines,
+                            "about_index": about_index,
+                        },
+                    )
                     return
 
                 # Phase 22: Cover Letter Polarizer & Swappability POST Endpoints
                 if path == "/api/cover-letter/audit":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     text = payload.get("cover_letter") or payload.get("text") or ""
                     company = payload.get("company") or ""
                     job_title = payload.get("job_title") or payload.get("title") or ""
-                    job_description = payload.get("job_description") or payload.get("description") or ""
+                    job_description = (
+                        payload.get("job_description")
+                        or payload.get("description")
+                        or ""
+                    )
 
                     audit = audit_cover_letter(
                         cover_letter_text=text,
@@ -3865,10 +5968,20 @@ def make_handler(app: DashboardApp):
 
                 if path == "/api/cover-letter/polarize":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_data = payload.get("job") or {}
-                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                    profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
+                    user_id = resolve_user_id(self, query_params) or payload.get(
+                        "user_id"
+                    )
+                    profile = (
+                        (app.repository.get_user_profile(user_id) if user_id else None)
+                        or payload.get("profile")
+                        or app.dashboard.profile
+                    )
                     variants = generate_polarized_variants(job_data, profile)
                     self.send_json(200, {"success": True, "variants": variants})
                     return
@@ -3876,41 +5989,86 @@ def make_handler(app: DashboardApp):
                 # Phase 23: Screening Questionnaire Solver POST Endpoints
                 if path == "/api/screening/solve":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_data = payload.get("job") or {}
-                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                    profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
-                    custom_questions = payload.get("questions") or payload.get("custom_questions")
+                    user_id = resolve_user_id(self, query_params) or payload.get(
+                        "user_id"
+                    )
+                    profile = (
+                        (app.repository.get_user_profile(user_id) if user_id else None)
+                        or payload.get("profile")
+                        or app.dashboard.profile
+                    )
+                    custom_questions = payload.get("questions") or payload.get(
+                        "custom_questions"
+                    )
                     if isinstance(custom_questions, str):
                         custom_questions = [custom_questions]
 
-                    report = generate_screening_report(job_data, profile, custom_questions=custom_questions)
+                    report = generate_screening_report(
+                        job_data, profile, custom_questions=custom_questions
+                    )
                     self.send_json(200, {"success": True, "report": report.to_dict()})
                     return
 
                 # Phase 24: Australian Key Selection Criteria (KSC) POST Endpoints
                 if path == "/api/ksc/generate":
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_data = payload.get("job") or {}
-                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                    profile = (app.repository.get_user_profile(user_id) if user_id else None) or payload.get("profile") or app.dashboard.profile
-                    custom_criteria = payload.get("criteria") or payload.get("custom_criteria")
+                    user_id = resolve_user_id(self, query_params) or payload.get(
+                        "user_id"
+                    )
+                    profile = (
+                        (app.repository.get_user_profile(user_id) if user_id else None)
+                        or payload.get("profile")
+                        or app.dashboard.profile
+                    )
+                    custom_criteria = payload.get("criteria") or payload.get(
+                        "custom_criteria"
+                    )
                     word_limit = int(payload.get("word_limit") or 300)
                     if isinstance(custom_criteria, str):
                         custom_criteria = [custom_criteria]
 
-                    report = generate_ksc_report(job_data, profile, custom_criteria=custom_criteria, word_limit=word_limit)
+                    report = generate_ksc_report(
+                        job_data,
+                        profile,
+                        custom_criteria=custom_criteria,
+                        word_limit=word_limit,
+                    )
                     self.send_json(200, {"success": True, "report": report.to_dict()})
                     return
 
                 # Phase 25: SEEK Pass & Verified Credentials Pre-Qualification POST Endpoints
                 if path in ("/api/seek-pass/audit", "/api/seek-pass/audit/"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     job_data = payload.get("job") or {}
-                    user_id = resolve_user_id(self, query_params) or payload.get("user_id")
-                    profile = (app.repository.get_user_profile(user_id) if (user_id and hasattr(app, "repository")) else None) or payload.get("profile") or getattr(app.dashboard, "profile", {})
+                    user_id = resolve_user_id(self, query_params) or payload.get(
+                        "user_id"
+                    )
+                    profile = (
+                        (
+                            app.repository.get_user_profile(user_id)
+                            if (user_id and hasattr(app, "repository"))
+                            else None
+                        )
+                        or payload.get("profile")
+                        or getattr(app.dashboard, "profile", {})
+                    )
                     report = generate_seek_pass_report(job_data, profile or {})
                     self.send_json(200, {"success": True, "report": report})
                     return
@@ -3918,39 +6076,85 @@ def make_handler(app: DashboardApp):
                 # Phase 16: Network CRM POST Endpoints
                 if path in ("/api/network/contacts", "/api/network/contacts/"):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     user_id = resolve_user_id(self, query_params) or "default_user"
                     saved = app.network_crm.upsert_contact(payload, user_id=user_id)
                     self.send_json(200, {"success": True, "contact": saved.to_dict()})
                     return
 
-                if path in ("/api/network/contacts/delete", "/api/network/delete") or (path.startswith("/api/network/contacts/") and path.endswith("/delete")):
+                if path in ("/api/network/contacts/delete", "/api/network/delete") or (
+                    path.startswith("/api/network/contacts/")
+                    and path.endswith("/delete")
+                ):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     contact_id = payload.get("id") or payload.get("contact_id") or ""
-                    if not contact_id and path.startswith("/api/network/contacts/") and path.endswith("/delete"):
-                        contact_id = path.removeprefix("/api/network/contacts/").removesuffix("/delete").strip("/")
+                    if (
+                        not contact_id
+                        and path.startswith("/api/network/contacts/")
+                        and path.endswith("/delete")
+                    ):
+                        contact_id = (
+                            path.removeprefix("/api/network/contacts/")
+                            .removesuffix("/delete")
+                            .strip("/")
+                        )
                     user_id = resolve_user_id(self, query_params) or "default_user"
-                    deleted = app.network_crm.delete_contact(contact_id, user_id=user_id)
+                    deleted = app.network_crm.delete_contact(
+                        contact_id, user_id=user_id
+                    )
                     self.send_json(200, {"success": True, "deleted": deleted})
                     return
 
-                if path in ("/api/network/interactions", "/api/network/contacts/interaction") or (path.startswith("/api/network/contacts/") and path.endswith("/interactions")):
+                if path in (
+                    "/api/network/interactions",
+                    "/api/network/contacts/interaction",
+                ) or (
+                    path.startswith("/api/network/contacts/")
+                    and path.endswith("/interactions")
+                ):
                     content_len = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
                     contact_id = payload.get("contact_id") or payload.get("id") or ""
-                    if not contact_id and path.startswith("/api/network/contacts/") and path.endswith("/interactions"):
-                        contact_id = path.removeprefix("/api/network/contacts/").removesuffix("/interactions").strip("/")
+                    if (
+                        not contact_id
+                        and path.startswith("/api/network/contacts/")
+                        and path.endswith("/interactions")
+                    ):
+                        contact_id = (
+                            path.removeprefix("/api/network/contacts/")
+                            .removesuffix("/interactions")
+                            .strip("/")
+                        )
                     interaction = payload.get("interaction") or payload
                     user_id = resolve_user_id(self, query_params) or "default_user"
-                    updated = app.network_crm.add_interaction(contact_id, interaction, user_id=user_id)
+                    updated = app.network_crm.add_interaction(
+                        contact_id, interaction, user_id=user_id
+                    )
                     self.send_json(200, {"success": True, "contact": updated.to_dict()})
                     return
 
                 if path == "/api/network/seed":
                     user_id = resolve_user_id(self, query_params) or "default_user"
-                    seeded = app.network_crm.seed_default_contacts(user_id=user_id, force=True)
-                    self.send_json(200, {"success": True, "contacts": [c.to_dict() for c in seeded]})
+                    seeded = app.network_crm.seed_default_contacts(
+                        user_id=user_id, force=True
+                    )
+                    self.send_json(
+                        200,
+                        {"success": True, "contacts": [c.to_dict() for c in seeded]},
+                    )
                     return
 
                 # Handle POST generation endpoints
@@ -3959,13 +6163,17 @@ def make_handler(app: DashboardApp):
                     status = app.start_generation(job_id)
                     self.send_json(200, {"status": "queued", **status})
                     return
-                
+
                 if path.startswith("/api/jobs/") and path.endswith("/generate-final"):
-                    job_id = path.removeprefix("/api/jobs/").removesuffix("/generate-final")
+                    job_id = path.removeprefix("/api/jobs/").removesuffix(
+                        "/generate-final"
+                    )
                     app._recover_generated_documents(job_id)
                     status = app.generation_progress.get(job_id, {})
                     if not status.get("done"):
-                        self.send_json(409, {"error": "Documents are still being generated"})
+                        self.send_json(
+                            409, {"error": "Documents are still being generated"}
+                        )
                         return
                     self.send_json(200, app.generated_documents[job_id])
                     return
@@ -3983,7 +6191,9 @@ def make_handler(app: DashboardApp):
                 if path.startswith("/api/network/contacts/"):
                     contact_id = path.removeprefix("/api/network/contacts/").strip("/")
                     user_id = resolve_user_id(self, query_params) or "default_user"
-                    deleted = app.network_crm.delete_contact(contact_id, user_id=user_id)
+                    deleted = app.network_crm.delete_contact(
+                        contact_id, user_id=user_id
+                    )
                     self.send_json(200, {"success": True, "deleted": deleted})
                     return
                 self.send_json(404, {"error": f"Endpoint not found: {path}"})
@@ -3991,14 +6201,15 @@ def make_handler(app: DashboardApp):
                 logger.error(f"DELETE {path} failed: {error}", exc_info=True)
                 self.send_json(500, {"error": str(error)})
 
-        
         def log_message(self, *_args):
             return
 
     return Handler
 
+
 JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-key-fallback")
 JWT_EXPIRY_HOURS = 24
+
 
 def serve(app: DashboardApp, host: str = "127.0.0.1", port: int = 8787):
     server = ThreadingHTTPServer((host, port), make_handler(app))

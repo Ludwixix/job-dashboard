@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, List, Literal
 from datetime import datetime, timezone
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, Field
 
 
 class SalaryBracket(BaseModel):

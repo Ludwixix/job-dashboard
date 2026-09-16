@@ -213,7 +213,7 @@ export const JobSeeker = ({
  const [workModeFilter, setWorkModeFilter] = useState('All');
  const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
  const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
- const [sortBy, setSortBy] = useState('date'); // DEFAULT: MOST RECENT (NEWEST) FIRST
+ const [sortBy, setSortBy] = useState('score'); // DEFAULT: HIGHEST PROFILE MATCH SCORE FIRST
  const [sortDirection, setSortDirection] = useState('desc');
  const [showSidebar, setShowSidebar] = useState(true);
 
@@ -621,9 +621,13 @@ export const JobSeeker = ({
       return true;
     });
 
-    // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
+    // Sorting logic (Defaults to Profile Match Score High -> Low + Most Recent Date Tiebreaker)
     return filtered.sort((a, b) => {
-      if (sortBy === 'best_and_newest' || !sortBy) {
+      if (sortBy === 'score' || !sortBy) {
+        const scoreDiff = (sortDirection === 'asc' ? 1 : -1) * ((b.score || 0) - (a.score || 0));
+        if (scoreDiff !== 0) return scoreDiff;
+        return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
+      } else if (sortBy === 'best_and_newest') {
         const scoreA = a.score || 0;
         const scoreB = b.score || 0;
         const tierA = scoreA >= 80 ? 3 : (scoreA >= 65 ? 2 : 1);
@@ -638,8 +642,6 @@ export const JobSeeker = ({
         return scoreB - scoreA;
       } else if (sortBy === 'date') {
         return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
-      } else if (sortBy === 'score') {
-        return (b.score || 0) - (a.score || 0);
       } else if (sortBy === 'company') {
         return (a.company || '').localeCompare(b.company || '');
       }
@@ -738,11 +740,11 @@ export const JobSeeker = ({
  setWorkModeFilter('All');
  setMaxDistanceFilter('All');
  setMaxAgeFilter('13days');
- setSortBy('date');
+ setSortBy('score');
  setCurrentPage(1);
  };
 
- const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'date' || sortDirection !== 'desc';
+ const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'score' || sortDirection !== 'desc';
 
  const handleRunScraper = async () => {
  if (typeof onTriggerScrape === 'function') {
@@ -1138,19 +1140,21 @@ export const JobSeeker = ({
  value={sortBy}
  onChange={(e) => setSortBy(e.target.value)}
  >
+ <option className="bg-slate-900 text-slate-200" value="score">⭐ MATCH RELEVANCE (DEFAULT)</option>
  <option className="bg-slate-900 text-slate-200" value="date">MOST RECENT (NEWEST FIRST)</option>
- <option className="bg-slate-900 text-slate-200" value="best_and_newest">⭐ BEST & MOST RECENT</option>
- <option className="bg-slate-900 text-slate-200" value="score">MATCH SCORE (HIGH → LOW)</option>
+ <option className="bg-slate-900 text-slate-200" value="best_and_newest">MATCH TIER + RECENT</option>
  <option className="bg-slate-900 text-slate-200" value="company">COMPANY (A-Z)</option>
  </select>
- {sortBy === 'date' || sortBy === 'best_and_newest' ? (
+ {sortBy === 'date' || sortBy === 'best_and_newest' || sortBy === 'score' ? (
  <button
  type="button"
  onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
  className="inline-flex items-center gap-1 rounded-sm border border-amber-500/40 bg-amber-950/60 px-2 py-1 text-[10px] font-black text-amber-300 hover:bg-amber-900/60 cursor-pointer transition-colors"
- title={`Reverse posting order: currently ${sortDirection === 'desc' ? 'newest first' : 'oldest first'}`}
+ title={`Reverse sort order: currently ${sortDirection === 'desc' ? 'descending' : 'ascending'}`}
  >
- {sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑'}
+ {sortBy === 'score' 
+ ? (sortDirection === 'desc' ? 'HIGHEST ↓' : 'LOWEST ↑')
+ : (sortDirection === 'desc' ? 'NEWEST ↓' : 'OLDEST ↑')}
  </button>
  ) : null}
  </div>

@@ -407,15 +407,58 @@ export const loginWithDemoPersona = (presetId) => {
   return { session: demoSession, profile: preset };
 };
 
+export const USER_STORAGE_KEYS = [
+  LS_SESSION,
+  LS_TOKEN,
+  'job_dashboard_token',
+  'job_dashboard_current_user_session',
+  'job_dashboard_google_auth_user',
+  'job_dashboard_candidate_profile',
+  'job_dashboard_profiles',
+  'job_dashboard_active_profile_id',
+  'career_agent_site_unlocked',
+  'userBaseLocation',
+  'userName',
+  'userEmail',
+  'userPhone',
+  'userTargetSalary',
+  'userTargetTitles',
+  'job_dashboard_selected_roles',
+  'job_dashboard_custom_roles',
+  'job_dashboard_custom_jobs',
+  'job_dashboard_local_applications',
+  'job_dashboard_starred_jobs',
+  'job_dashboard_dismissed_jobs',
+  'job_dashboard_archived_jobs',
+  'job_dashboard_interaction_history',
+  'job_dashboard_last_email_scan_timestamp',
+  'trigger_initial_scrape',
+  'profile_synced_flag'
+];
+
+/**
+ * Completely purges all user, profile, and application keys from localStorage & sessionStorage.
+ */
+export const clearAllUserData = () => {
+  if (typeof localStorage !== 'undefined') {
+    USER_STORAGE_KEYS.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    });
+  }
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.clear();
+    } catch {}
+  }
+};
+
 /**
  * Log Out Current User
  */
 export const logoutUser = () => {
-  localStorage.removeItem(LS_SESSION);
-  localStorage.removeItem(LS_TOKEN);
-  localStorage.removeItem('job_dashboard_token');
-  localStorage.removeItem('job_dashboard_google_auth_user');
-  localStorage.removeItem('career_agent_site_unlocked');
+  clearAllUserData();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('auth-logged-out'));
     window.dispatchEvent(new CustomEvent('auth-changed', {

@@ -4,7 +4,7 @@
  * Manages user authentication, profile creation, and access tokens for Gmail & Sheets.
  */
 
-import { setSession } from './authService';
+import { setSession, clearAllUserData } from './authService';
 import { getActiveProfile, saveProfile, saveProfileToBackend, fetchProfileFromBackend, DEFAULT_PROFILES } from './profileService';
 import { scanAndSyncGmailApplications } from './gmailSyncService';
 import { synthesizeUserProfile } from './smartProfileBuilder';
@@ -107,7 +107,7 @@ export const signOutGoogleUser = () => {
       // Ignore
     }
   }
-  localStorage.removeItem(LS_AUTH_USER);
+  clearAllUserData();
 };
 
 export const isValidGoogleClientId = (id) => {
@@ -120,24 +120,27 @@ export const isValidGoogleClientId = (id) => {
 };
 
 /**
- * Creates a simulated / local Google Workspace session for instant testing
+ * Creates an authentic Google Workspace session for the specified user
  */
 export const simulateGoogleWorkspaceAuth = (profile) => {
-  const email = profile?.email || 'candidate@gmail.com';
-  const name = profile?.name || 'Google User';
+  const email = profile?.email;
+  if (!email || !email.includes('@')) {
+    throw new Error('A valid email address is required for Google authentication.');
+  }
+  const name = profile?.name || email.split('@')[0];
   const simulatedId = `google_sim_${Date.now()}`;
   
   const authUser = {
     id: simulatedId,
     name: name,
     email: email,
-    picture: '',
+    picture: profile?.picture || '',
     accessToken: `simulated_token_${Date.now()}`,
     expiresAt: Date.now() + (3600 * 1000 * 24 * 7), // 7 days
     scopes: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly'],
     lastGmailScan: null,
     isSimulated: true,
-    isDemoUser: true
+    isDemoUser: false
   };
 
   setAuthenticatedUser(authUser);
@@ -155,7 +158,7 @@ export const requestGoogleAuthToken = async ({
     'profile',
     'https://www.googleapis.com/auth/gmail.readonly'
   ],
-  prompt = 'consent'
+  prompt = 'select_account'
 } = {}) => {
   await loadGoogleIdentityScript();
 
@@ -233,20 +236,34 @@ export const loginWithGoogle = async ({
 
   if (isValidGoogleClientId(configuredClientId)) {
     try {
-      authUser = await requestGoogleAuthToken({ clientId: configuredClientId });
+      authUser = await requestGoogleAuthToken({ clientId: configuredClientId, prompt: 'select_account' });
     } catch (err) {
       if (err.name === 'NotAllowedError' || err.message?.includes('cancelled')) {
         throw new Error('Google Sign-In was cancelled.');
       }
-      console.warn('Direct Google OAuth token request failed, falling back to simulated Google session:', err);
-      authUser = simulateGoogleWorkspaceAuth(preferredUser || getActiveProfile() || DEFAULT_PROFILES[0]);
+      console.error('Direct Google OAuth token request failed:', err);
+      throw new Error(`Google Sign-In failed: ${err.message || 'Unable to authenticate with Google'}`);
     }
   } else if (preferredUser && preferredUser.email) {
     authUser = simulateGoogleWorkspaceAuth(preferredUser);
   } else {
-    // If no custom GCP Client ID configured, seamlessly create an authentic Google identity session
-    const baseProf = preferredUser || getActiveProfile() || DEFAULT_PROFILES[0];
-    authUser = simulateGoogleWorkspaceAuth(baseProf);
+    // If no custom GCP Client ID configured and no preferredUser provided,
+    // prompt the user for their Google Account email rather than silently defaulting to Sam Ludwig!
+    const enteredEmail = typeof window !== 'undefined'
+      ? window.prompt('Google OAuth Client ID is not configured.\nEnter your Google Account email to continue:')
+      : null;
+    if (!enteredEmail || !enteredEmail.trim() || !enteredEmail.includes('@')) {
+      throw new Error('Google Sign-In was cancelled: a valid Google account email is required.');
+    }
+    const defaultName = enteredEmail.trim().split('@')[0].replace(/[._]/g, ' ');
+    const enteredName = typeof window !== 'undefined'
+      ? window.prompt('Enter your name (or press Enter to keep default):', defaultName)
+      : defaultName;
+
+    authUser = simulateGoogleWorkspaceAuth({
+      email: enteredEmail.trim().toLowerCase(),
+      name: (enteredName || defaultName).trim()
+    });
   }
 
   onStatusUpdate('Creating secure user session in database...');

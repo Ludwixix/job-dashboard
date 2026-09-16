@@ -117,8 +117,14 @@ export default function SiteGate({ onUnlock = () => {} }) {
     setStatusMsg('Connecting with Google Identity Services...');
 
     try {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const preferredUser = cleanEmail && cleanEmail.includes('@')
+        ? { email: cleanEmail, name: (name || '').trim() || cleanEmail.split('@')[0] }
+        : null;
+
       const result = await loginWithGoogle({
         autoScanGmail: false,
+        preferredUser,
         onStatusUpdate: (msg) => setStatusMsg(msg)
       });
       setSiteUnlocked(true);

@@ -699,17 +699,23 @@ export const parseResumeTextClientSide = (text = '') => {
 
   // Name extraction
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  let name = lines[0] || 'Sam Ludwig';
-  if (name.length > 35 || /resume|curriculum|cv|summary|experience/i.test(name)) {
-    name = lines[1] && lines[1].length <= 35 ? lines[1] : 'Sam Ludwig';
+  let name = '';
+  if (lines.length > 0 && lines[0].length <= 40 && !/resume|curriculum|cv|summary|experience|%pdf/i.test(lines[0])) {
+    name = lines[0];
+  } else if (lines.length > 1 && lines[1].length <= 40 && !/resume|curriculum|cv|summary|experience|%pdf/i.test(lines[1])) {
+    name = lines[1];
   }
 
   // Email & Phone
   const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
-  const email = emailMatch ? emailMatch[1] : 'sam.ludwig@gmail.com';
+  const email = emailMatch ? emailMatch[1] : '';
+  if (!name && email) {
+    name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  }
+  if (!name) name = 'Candidate';
 
   const phoneMatch = text.match(/(?:\+?61|0)[2-478](?:[ -]?[0-9]){8}/);
-  const phone = phoneMatch ? phoneMatch[0] : '0405 993 245';
+  const phone = phoneMatch ? phoneMatch[0] : '';
 
   // Suburb & Location
   let suburb = 'Balaclava';
@@ -764,7 +770,7 @@ export const parseResumeTextClientSide = (text = '') => {
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   return {
-    id: 'sam_ludwig',
+    id: `profile_${Date.now()}`,
     name: name,
     title: title,
     industry: industry,

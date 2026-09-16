@@ -87,9 +87,9 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
       expect(screen.getByText(/Email verified!/i)).toBeInTheDocument();
     });
 
-    // Advances to Step 2 (Industry)
+    // Advances to Step 2 (AI Intelligence Engine)
     await waitFor(() => {
-      expect(screen.getByText(/STEP 2 OF 5 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
+      expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
     }, { timeout: 2000 });
   });
 
@@ -103,6 +103,6 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
 
-    expect(screen.getByText(/STEP 2 OF 5 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
+    expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
   });
 });

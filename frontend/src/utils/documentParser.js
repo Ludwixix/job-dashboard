@@ -63,17 +63,40 @@ export const extractTextFromPastedPdfString = async (rawString) => {
     return rawString;
   }
 
+  // 1. Attempt binary buffer extraction with PDF.js
   try {
     const len = rawString.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
       bytes[i] = rawString.charCodeAt(i) & 0xff;
     }
-    return await extractTextFromPdfBuffer(bytes.buffer);
+    const extracted = await extractTextFromPdfBuffer(bytes.buffer);
+    if (extracted && extracted.trim().length > 20) {
+      return extracted;
+    }
   } catch (e) {
-    console.warn('Could not recover pasted PDF binary string:', e);
-    return rawString;
+    console.warn('Binary buffer extraction from pasted PDF string failed, trying stream heuristic:', e);
   }
+
+  // 2. Heuristic fallback for PDF strings converted via UTF-8 FileReader
+  try {
+    const textMatches = [];
+    const textRegex = /\(([^\r\n()]{2,})\)/g;
+    let match;
+    while ((match = textRegex.exec(rawString)) !== null) {
+      const val = match[1].trim();
+      if (val && !val.startsWith('/') && !val.includes('Identity-H') && !val.includes('WinAnsiEncoding') && val.length > 1) {
+        textMatches.push(val);
+      }
+    }
+    if (textMatches.length > 5) {
+      return textMatches.join(' ');
+    }
+  } catch (err) {
+    console.warn('PDF stream heuristic fallback error:', err);
+  }
+
+  return rawString;
 };
 
 /**

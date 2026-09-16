@@ -4,7 +4,8 @@ import {
  DollarSign, Upload, FileText, CheckCircle2, ArrowRight, ArrowLeft, 
  Zap, Building2, Tag, RefreshCw, AlertCircle, Plus, X, HeartPulse, 
  TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Check,
- ShoppingBag, Truck, Palette, Compass, Key, Sliders, Award, Target, HelpCircle, Info, ChevronRight
+  ShoppingBag, Truck, Palette, Compass, Key, Sliders, Award, Target, HelpCircle, Info, ChevronRight,
+  Cpu, ExternalLink, Eye, EyeOff, Loader2
 } from 'lucide-react';
 import { 
   loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPersona,
@@ -17,6 +18,8 @@ import { GooglePromptModal } from './GooglePromptModal';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
+import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
+import { PROVIDERS, getLlmConfig, saveLlmConfig, testLlmConnection } from '../services/llmConfig';
 
 export const SENIORITY_OPTIONS = [
  { id: 'Junior', label: 'Junior / Entry', exp: '0–2 Yrs', desc: 'Focus on growth, mentorship & core fundamentals' },
@@ -186,7 +189,18 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   const [resendCountdown, setResendCountdown] = useState(0);
   const [resendStatus, setResendStatus] = useState('');
 
-  // Step 2-4 Profile Builder state
+  // Step 2 AI Intelligence Engine state
+  const initialLlmConfig = useMemo(() => getLlmConfig(), []);
+  const [llmProvider, setLlmProvider] = useState(() => initialLlmConfig.provider || 'openrouter');
+  const [llmModel, setLlmModel] = useState(() => initialLlmConfig.model || 'anthropic/claude-3.7-sonnet');
+  const [llmApiKey, setLlmApiKey] = useState(() => initialLlmConfig.apiKey || '');
+  const [llmEndpoint, setLlmEndpoint] = useState(() => initialLlmConfig.endpoint || '');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [llmTesting, setLlmTesting] = useState(false);
+  const [llmTestResult, setLlmTestResult] = useState(null);
+  const [llmError, setLlmError] = useState('');
+
+  // Step 3-5 Profile Builder state
   const [profileData, setProfileData] = useState(() => ({
     id: initialUser?.id || initialUser?.profileId || `profile_${Date.now()}`,
     name: initialUser?.name || '',
@@ -400,70 +414,148 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  if (onComplete) onComplete(session, profile);
  };
 
- // STEP 2: INDUSTRY SELECTION
- const handleSelectIndustry = (ind) => {
- setProfileData(prev => ({
- ...prev,
- industry: ind.id,
- targetTitles: [...ind.defaultTitles.slice(0, 3)],
- coreSkills: [...new Set([...prev.coreSkills, ...ind.defaultSkills.slice(0, 5)])],
- title: ind.defaultTitles[0] || prev.title
- }));
- setStep(3);
- };
+  // STEP 2: AI ENGINE CONFIGURATION HANDLERS
+  const handleSelectProvider = (provId) => {
+    setLlmProvider(provId);
+    const meta = PROVIDERS[provId] || PROVIDERS.openrouter;
+    setLlmModel(meta.defaultModel || (meta.models?.[0]?.id) || '');
+    setLlmEndpoint(meta.defaultEndpoint || '');
+    setLlmTestResult(null);
+    setLlmError('');
+  };
 
- // STEP 3: RESUME UPLOAD & PARSING
- const handleFileUpload = (e) => {
- const file = e.target.files?.[0];
- if (!file) return;
+  const handleTestLlm = async () => {
+    if (!llmApiKey.trim()) {
+      setLlmError('Please enter your API key before testing the connection.');
+      return;
+    }
+    setLlmTesting(true);
+    setLlmError('');
+    setLlmTestResult(null);
+    try {
+      const res = await testLlmConnection({
+        provider: llmProvider,
+        model: llmModel,
+        apiKey: llmApiKey.trim(),
+        endpoint: llmEndpoint
+      });
+      setLlmTestResult(res);
+    } catch (err) {
+      setLlmError(err.message || 'Connection test failed.');
+    } finally {
+      setLlmTesting(false);
+    }
+  };
 
- const reader = new FileReader();
- reader.onload = (event) => {
- const text = event.target?.result || '';
- setResumeText(text);
- handleParseResumeText(text);
- };
- reader.readAsText(file);
- };
+  const handleSaveLlmAndContinue = () => {
+    const cleanKey = llmApiKey.trim();
+    const meta = PROVIDERS[llmProvider] || PROVIDERS.openrouter;
+    if (meta.requiresKey && !cleanKey) {
+      setLlmError(`An API key is required for ${meta.name} to generate tailored applications and unlock the site.`);
+      return;
+    }
+    saveLlmConfig({
+      provider: llmProvider,
+      model: llmModel,
+      apiKey: cleanKey,
+      endpoint: llmEndpoint
+    });
+    setLlmError('');
+    setStep(3); // Advance to Step 3: Industry
+  };
 
- const handleParseResumeText = async (textToParse = resumeText) => {
- if (!textToParse.trim()) return;
+  // STEP 3: INDUSTRY SELECTION
+  const handleSelectIndustry = (ind) => {
+    setProfileData(prev => ({
+      ...prev,
+      industry: ind.id,
+      targetTitles: [...ind.defaultTitles.slice(0, 3)],
+      coreSkills: [...new Set([...prev.coreSkills, ...ind.defaultSkills.slice(0, 5)])],
+      title: ind.defaultTitles[0] || prev.title
+    }));
+    setStep(4);
+  };
 
- setIsParsing(true);
- setParseSuccessMsg('');
- try {
- const apiKey = getActiveApiKey();
- const model = getActiveModel();
- const parsed = await parseResumeWithAI(textToParse, apiKey, model);
+  // STEP 4: RESUME UPLOAD & PARSING
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
- if (parsed) {
- setProfileData(prev => ({
- ...prev,
- name: parsed.name || prev.name,
- title: parsed.title || prev.title,
- email: parsed.email || prev.email,
- phone: parsed.phone || prev.phone,
- location: parsed.location || prev.location,
- suburb: parsed.suburb || prev.suburb,
- workRights: parsed.workRights || prev.workRights,
- clearance: parsed.clearance || prev.clearance,
- targetSalary: parsed.targetSalary || prev.targetSalary,
- targetTitles: parsed.targetTitles?.length ? parsed.targetTitles : prev.targetTitles,
- coreSkills: parsed.coreSkills?.length ? parsed.coreSkills : prev.coreSkills,
- certifications: parsed.certifications || prev.certifications,
- workHistorySummary: parsed.workHistorySummary || prev.workHistorySummary,
- fullWorkExperienceText: parsed.fullWorkExperienceText || textToParse
- }));
- setParseSuccessMsg('✨ AI Resume Successfully Extracted! Your titles, skills and metrics are loaded.');
- }
- } catch {
- const clientParsed = parseResumeTextClientSide(textToParse);
- setProfileData(prev => ({ ...prev, ...clientParsed, fullWorkExperienceText: textToParse }));
- setParseSuccessMsg('✅ Resume text analyzed & skills extracted.');
- } finally {
- setIsParsing(false);
- }
- };
+    setIsParsing(true);
+    setParseSuccessMsg('');
+    try {
+      const text = await extractTextFromFile(file);
+      setResumeText(text);
+      await handleParseResumeText(text);
+    } catch (err) {
+      console.warn('PDF.js extractTextFromFile error, attempting fallback reader:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fallbackText = event.target?.result || '';
+        setResumeText(fallbackText);
+        handleParseResumeText(fallbackText);
+      };
+      reader.readAsText(file);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleParseResumeText = async (textToParse = resumeText) => {
+    if (!textToParse.trim()) return;
+
+    let cleanText = textToParse;
+    if (cleanText.trim().startsWith('%PDF')) {
+      try {
+        cleanText = await extractTextFromPastedPdfString(cleanText);
+        setResumeText(cleanText);
+      } catch (err) {
+        console.warn('Pasted PDF extraction error:', err);
+      }
+    }
+
+    setIsParsing(true);
+    setParseSuccessMsg('');
+    try {
+      const apiKey = getActiveApiKey();
+      const model = getActiveModel();
+      const parsed = await parseResumeWithAI(cleanText, apiKey, model);
+
+      if (parsed) {
+        setProfileData(prev => ({
+          ...prev,
+          name: parsed.name || prev.name,
+          title: parsed.title || prev.title,
+          email: parsed.email || prev.email,
+          phone: parsed.phone || prev.phone,
+          location: parsed.location || prev.location,
+          suburb: parsed.suburb || prev.suburb,
+          workRights: parsed.workRights || prev.workRights,
+          clearance: parsed.clearance || prev.clearance,
+          targetSalary: parsed.targetSalary || prev.targetSalary,
+          targetTitles: parsed.targetTitles?.length ? parsed.targetTitles : prev.targetTitles,
+          coreSkills: parsed.coreSkills?.length ? parsed.coreSkills : prev.coreSkills,
+          certifications: parsed.certifications || prev.certifications,
+          workHistorySummary: parsed.workHistorySummary || prev.workHistorySummary,
+          fullWorkExperienceText: parsed.fullWorkExperienceText || cleanText
+        }));
+        setParseSuccessMsg('✨ AI Resume Successfully Extracted! Your titles, skills and metrics are loaded.');
+      }
+    } catch {
+      const clientParsed = parseResumeTextClientSide(cleanText);
+      setProfileData(prev => ({ 
+        ...prev, 
+        ...clientParsed, 
+        id: prev.id,
+        name: clientParsed.name && clientParsed.name !== 'Candidate' ? clientParsed.name : prev.name,
+        email: clientParsed.email || prev.email,
+        fullWorkExperienceText: cleanText 
+      }));
+      setParseSuccessMsg('✅ Resume text analyzed & skills extracted.');
+    } finally {
+      setIsParsing(false);
+    }
+  };
 
  const handleAddSkill = (skillToAdd = newSkillInput) => {
  const trimmed = (skillToAdd || '').trim();
@@ -541,15 +633,22 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   <div className="flex items-center gap-1.5 text-xs font-bold w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
   {[
     { num: 1, label: isVerifyingEmail ? 'Verify Email' : 'Identity' },
-    { num: 2, label: 'Industry' },
-    { num: 3, label: 'Skills & Experience' },
-    { num: 4, label: 'Location & Work' },
-    { num: 5, label: 'Launch' }
+    { num: 2, label: 'AI Engine' },
+    { num: 3, label: 'Industry' },
+    { num: 4, label: 'Skills & Experience' },
+    { num: 5, label: 'Location & Work' },
+    { num: 6, label: 'Launch' }
   ].map((s) => (
     <div
       key={s.num}
       onClick={() => {
-        if (step > s.num && !(s.num === 1 && isVerifyingEmail)) {
+        if (s.num === 1 && isVerifyingEmail) return;
+        if (s.num > 2 && !llmApiKey.trim()) {
+          setLlmError('Please configure your AI API key first.');
+          setStep(2);
+          return;
+        }
+        if (step > s.num) {
           setStep(s.num);
         }
       }}
@@ -907,12 +1006,175 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  )}
 
- {/* STEP 2: CHOOSE INDUSTRY */}
- {step === 2 && (
- <div className="space-y-6">
+  {/* STEP 2: AI INTELLIGENCE ENGINE & CREDENTIALS */}
+  {step === 2 && (
+    <div className="space-y-6 animate-in fade-in duration-200 font-mono text-xs">
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
+          <Cpu size={14} /> STEP 2 OF 6 // AI INTELLIGENCE ENGINE & CREDENTIALS
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-white font-sans">
+          Configure Your Career AI Engine
+        </h1>
+        <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto font-sans">
+          An API key is required to power ATS match scoring, custom executive cover letters, and live interview simulation.
+        </p>
+      </div>
+
+      {/* Provider Selection Grid */}
+      <div className="space-y-3">
+        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+          1. Select AI Provider
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {['openrouter', 'openai', 'gemini', 'anthropic', 'deepseek', 'groq'].map((pKey) => {
+            const meta = PROVIDERS[pKey];
+            if (!meta) return null;
+            const isSelected = llmProvider === pKey;
+            return (
+              <button
+                key={pKey}
+                type="button"
+                onClick={() => handleSelectProvider(pKey)}
+                className={`p-3.5 rounded-sm border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                  isSelected
+                    ? 'bg-amber-500/10 border-amber-500 text-white shadow-lg shadow-amber-500/10'
+                    : 'bg-slate-950/80 hover:bg-slate-800/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-bold text-sm text-white font-sans">{meta.name}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-slate-800 text-amber-400 border border-slate-700">
+                    {meta.badge}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 line-clamp-2 font-sans">
+                  {meta.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Model Selection & API Key Inputs */}
+      <div className="bg-slate-950/90 border border-slate-800 rounded-sm p-5 space-y-4">
+        {/* Model Dropdown */}
+        <div>
+          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+            2. Primary Reasoning Model
+          </label>
+          <select
+            value={llmModel}
+            onChange={(e) => setLlmModel(e.target.value)}
+            className="w-full p-2.5 rounded-sm bg-slate-900 border border-slate-700 text-slate-100 font-sans text-xs focus:border-amber-500 focus:outline-none cursor-pointer"
+          >
+            {(PROVIDERS[llmProvider]?.models || []).map((m) => (
+              <option key={m.id} value={m.id} className="bg-slate-900 text-slate-100">
+                {m.name} {m.description ? `— ${m.description}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* API Key Input */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+              3. {PROVIDERS[llmProvider]?.name || 'Provider'} API Key <span className="text-rose-400">*</span>
+            </label>
+            {PROVIDERS[llmProvider]?.keyUrl && (
+              <a
+                href={PROVIDERS[llmProvider].keyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-amber-400 hover:text-amber-300 inline-flex items-center gap-1 underline font-sans"
+              >
+                Get {PROVIDERS[llmProvider].name} Key <ExternalLink size={11} />
+              </a>
+            )}
+          </div>
+          <div className="relative">
+            <input
+              type={showApiKey ? 'text' : 'password'}
+              value={llmApiKey}
+              onChange={(e) => {
+                setLlmApiKey(e.target.value);
+                setLlmError('');
+                setLlmTestResult(null);
+              }}
+              placeholder={PROVIDERS[llmProvider]?.keyPlaceholder || 'Paste your API key here...'}
+              className="w-full p-2.5 pr-20 rounded-sm bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs focus:border-amber-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey(!showApiKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-slate-400 hover:text-slate-200 text-[11px] flex items-center gap-1 font-sans cursor-pointer"
+            >
+              {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+              <span>{showApiKey ? 'Hide' : 'Show'}</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-500 mt-1 font-sans">
+            🔒 Stored securely in your browser session. Required for ATS scoring and application generation.
+          </p>
+        </div>
+
+        {/* Test Connection Button & Status */}
+        <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handleTestLlm}
+            disabled={llmTesting || !llmApiKey.trim()}
+            className="px-3.5 py-2 rounded-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50 text-xs"
+          >
+            {llmTesting ? <Loader2 size={13} className="animate-spin text-amber-400" /> : <Zap size={13} className="text-amber-400" />}
+            <span>{llmTesting ? 'Testing Model Handshake...' : 'Test Connection'}</span>
+          </button>
+
+          {llmTestResult && (
+            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-sans">
+              <CheckCircle2 size={14} />
+              <span>{llmTestResult.message || `Connected in ${llmTestResult.latencyMs}ms!`}</span>
+            </div>
+          )}
+
+          {llmError && (
+            <div className="flex items-center gap-1.5 text-rose-400 text-xs font-sans">
+              <AlertCircle size={14} />
+              <span>{llmError}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Navigation Footer */}
+      <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
+        <button
+          type="button"
+          onClick={() => setStep(1)}
+          className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveLlmAndContinue}
+          disabled={!llmApiKey.trim()}
+          className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shadow-lg shadow-amber-600/20"
+        >
+          Save & Continue to Industry <ArrowRight size={14} />
+        </button>
+      </div>
+    </div>
+  )}
+
+  {/* STEP 3: CHOOSE INDUSTRY */}
+  {step === 6 && (
+<div className="space-y-6">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
- <Building2 size={14} /> STEP 2 OF 5 // TARGET SECTOR & INDUSTRY
+ <Building2 size={14} /> STEP 3 OF 6 // TARGET SECTOR & INDUSTRY
  </div>
  <h1 className="text-2xl sm:text-3xl font-black text-white">
  What Industry Do You Specialize In?
@@ -1015,13 +1277,13 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
  <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
  <button
- onClick={() => setStep(1)}
+ onClick={() => setStep(2)}
  className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back
  </button>
  <button
- onClick={() => setStep(3)}
+ onClick={() => setStep(4)}
  className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5"
  >
  Continue to Roles & Skills <ArrowRight size={14} />
@@ -1030,12 +1292,12 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  )}
 
- {/* STEP 3: ROLES, SKILLS & RESUME */}
+ {/* STEP 4: ROLES, SKILLS & RESUME */}
  {step === 3 && (
  <div className="space-y-6">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black industry-accent-badge">
- <Target size={14} /> STEP 3 OF 5 // TARGET ROLES & CORE SKILLS
+ <Target size={14} /> STEP 4 OF 6 // TARGET ROLES & CORE SKILLS
  </div>
  <h1 className="text-2xl sm:text-3xl font-black text-white">
  Target Roles & Technical Skills
@@ -1248,13 +1510,13 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
  <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
  <button
- onClick={() => setStep(2)}
+ onClick={() => setStep(3)}
  className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back
  </button>
  <button
- onClick={() => setStep(4)}
+ onClick={() => setStep(5)}
  className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5"
  >
  Continue to Location & Preferences <ArrowRight size={14} />
@@ -1263,12 +1525,12 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  )}
 
- {/* STEP 4: LOCATION, WORK STYLE & COMPENSATION */}
+ {/* STEP 5: LOCATION, WORK STYLE & COMPENSATION */}
  {step === 4 && (
  <div className="space-y-6 font-mono text-xs">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black industry-accent-badge">
- <MapPin size={14} /> STEP 4 OF 5 // LOCATION, WORK STYLE & COMPENSATION
+ <MapPin size={14} /> STEP 5 OF 6 // LOCATION, WORK STYLE & COMPENSATION
  </div>
  <h1 className="text-2xl sm:text-3xl font-black text-white">
  Location & Work Style Preferences
@@ -1410,13 +1672,13 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
  <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
  <button
- onClick={() => setStep(3)}
+ onClick={() => setStep(4)}
  className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back
  </button>
  <button
- onClick={() => setStep(5)}
+ onClick={() => setStep(6)}
  className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5"
  >
  Review Bespoke Blueprint <ArrowRight size={14} />
@@ -1425,12 +1687,12 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  )}
 
- {/* STEP 5: REVIEW & LAUNCH */}
+ {/* STEP 6: REVIEW & LAUNCH */}
  {step === 5 && (
  <div className="space-y-6">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
- <CheckCircle2 size={14} /> STEP 5 OF 5 // BESPOKE BLUEPRINT READY
+ <CheckCircle2 size={14} /> STEP 6 OF 6 // BESPOKE BLUEPRINT READY
  </div>
  <h1 className="text-2xl sm:text-3xl font-black text-white">
  Your Bespoke Candidate Matrix is Configured!
@@ -1461,7 +1723,11 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  </div>
 
- <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-slate-800 text-[11px] text-slate-300">
+ <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-[11px] text-slate-300">
+ <div className="p-2.5 rounded-sm bg-slate-900/80 border border-slate-800">
+ <div className="text-[9px] text-slate-500 uppercase font-bold">AI ENGINE</div>
+ <div className="font-bold text-amber-400 truncate mt-0.5">{PROVIDERS[llmProvider]?.name || 'Configured'} ({llmModel.split('/').pop()})</div>
+ </div>
  <div className="p-2.5 rounded-sm bg-slate-900/80 border border-slate-800">
  <div className="text-[9px] text-slate-500 uppercase font-bold">INDUSTRY</div>
  <div className="font-bold text-white truncate mt-0.5">{profileData.industry}</div>
@@ -1538,7 +1804,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  <div className="text-center">
  <button
  type="button"
- onClick={() => setStep(4)}
+ onClick={() => setStep(5)}
  disabled={isLaunching}
  className="text-slate-400 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
  >

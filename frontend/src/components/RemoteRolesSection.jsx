@@ -260,8 +260,8 @@ export const RemoteRolesSection = ({
 
  {/* Salary & Location Info */}
  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/60 text-xs font-mono">
- <div className="flex items-center gap-1 text-slate-400">
- <MapPin size={12} className="text-slate-500" />
+ <div className="flex items-center gap-1 text-slate-300">
+ <MapPin size={12} className="text-slate-400" />
  <span className="truncate max-w-[140px]">{job.location || 'Remote'}</span>
  </div>
  <div className="flex items-center gap-1 text-amber-300/90 font-bold ml-auto">
@@ -271,14 +271,14 @@ export const RemoteRolesSection = ({
  </div>
 
  {/* Description preview */}
- <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+ <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed font-normal">
  {job.description || job.notes || 'Full remote job description available via card inspection.'}
  </p>
  </div>
 
  {/* Card Actions */}
  <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between gap-2 font-mono text-xs">
- <span className="text-[10px] text-slate-500 flex items-center gap-1">
+ <span className="text-[10px] text-slate-400 flex items-center gap-1">
  <Clock size={11} />
  {job.date || 'Recent'}
  </span>

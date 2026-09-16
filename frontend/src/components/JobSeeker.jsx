@@ -50,6 +50,7 @@ import { getCommuteDetails } from '../services/commuteService';
 import { recordJobInteraction, generateSmartJobSuggestions } from '../services/profileLearningEngine';
 
 import { EmptyState } from './ui/EmptyState';
+import { cleanDescriptionText } from '../services/dataService';
 
 import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 import { matchesSalaryThreshold } from '../utils/salaryUtils';
@@ -1641,13 +1642,13 @@ export const JobSeeker = ({
  {job.score || 85}% match
  </span>
 
- <div className="flex items-center gap-2 text-stone-400">
+ <div className="flex items-center gap-2 text-stone-300">
  {job.source && (
  <span className="type-meta px-2 py-0.5 rounded-sm bg-stone-900/80 text-stone-300 border border-stone-800">
  {job.source}
  </span>
  )}
- <span className="type-meta text-stone-400 flex items-center gap-1">
+ <span className="type-meta text-stone-300 flex items-center gap-1">
  <Clock size={11} aria-hidden="true" /> {formatJobPostedAge(job.date)}
  </span>
  </div>
@@ -1677,13 +1678,20 @@ export const JobSeeker = ({
  </h3>
  )}
 
- <p className="type-meta text-stone-400 flex items-center gap-1.5 flex-wrap">
+ <p className="type-meta text-stone-300 flex items-center gap-1.5 flex-wrap">
  <Building2 size={12} className="text-amber-400/80 shrink-0" aria-hidden="true" />
- <span className="font-semibold text-stone-200">{job.company}</span>
- <span className="text-stone-600" aria-hidden="true">•</span>
- <MapPin size={11} className="text-stone-400 shrink-0" aria-hidden="true" />
+ <span className="font-semibold text-stone-100">{job.company}</span>
+ <span className="text-stone-500" aria-hidden="true">•</span>
+ <MapPin size={11} className="text-stone-300 shrink-0" aria-hidden="true" />
  <span className="truncate">{job.location || 'Australia'}</span>
  </p>
+
+ {/* Job Description Brief / Snippet */}
+ {Boolean(job.description || job.notes || job.snippet) && (
+ <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed font-sans font-normal selection:bg-amber-500/30 pt-0.5">
+ {cleanDescriptionText(job.description || job.notes || job.snippet)}
+ </p>
+ )}
  </>
  );
  })()}

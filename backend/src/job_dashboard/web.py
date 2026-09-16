@@ -3150,6 +3150,18 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "psychology": psy})
                 return
 
+            if path == "/api/job-intelligence":
+                job_id = query_params.get("job_id", [""])[0]
+                tool_key = query_params.get("tool_key", [None])[0]
+                if not job_id:
+                    self.send_json(
+                        400, {"success": False, "error": "job_id is required"}
+                    )
+                    return
+                intel = app.repository.get_job_intelligence(job_id, tool_key)
+                self.send_json(200, {"success": True, "intelligence": intel})
+                return
+
             if path == "/api/interview-sessions":
                 user_id = resolve_user_id(self, query_params)
                 if not user_id:
@@ -3988,6 +4000,32 @@ def make_handler(app: DashboardApp):
                         job_id, company, title, insights, model_name
                     )
                     self.send_json(200, {"success": True, "psychology": psy})
+                    return
+
+                if path == "/api/job-intelligence":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    job_id = str(body.get("job_id") or "")
+                    tool_key = str(body.get("tool_key") or "")
+                    data = body.get("data") or {}
+                    model_name = str(body.get("model_name") or "")
+                    if not job_id or not tool_key:
+                        self.send_json(
+                            400,
+                            {
+                                "success": False,
+                                "error": "job_id and tool_key are required",
+                            },
+                        )
+                        return
+                    res = app.repository.upsert_job_intelligence(
+                        job_id, tool_key, data, model_name
+                    )
+                    self.send_json(200, {"success": True, **res})
                     return
 
                 if path == "/api/interview-sessions":

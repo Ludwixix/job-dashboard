@@ -580,16 +580,16 @@ export default function MonolithMode({
  <h3 className="text-base font-black tracking-wide text-[#ede6dc] group-hover:text-white uppercase mt-1 line-clamp-1">
  {job.title}
  </h3>
- <p className="text-xs text-[#a89d8e] font-bold uppercase tracking-wider">
+ <p className="text-xs text-[#ded6cb] font-bold uppercase tracking-wider">
  {job.company}
  </p>
  </div>
- <span className="text-[9px] font-mono text-[#706659] border border-[#262019] px-2 py-0.5">
+ <span className="text-[9px] font-mono text-[#a89d8e] border border-[#262019] px-2 py-0.5">
  {formatJobPostedAge(job.date)}
  </span>
  </div>
 
- <p className="text-xs text-[#8c8275] font-sans line-clamp-2">
+ <p className="text-xs text-[#ded6cb] font-sans line-clamp-2 leading-relaxed font-normal">
  {job.description || 'Target opportunity verified by background autonomous engine. Custom resume and cover letter synthesized.'}
  </p>
 
@@ -606,7 +606,7 @@ export default function MonolithMode({
  <button
  type="button"
  onClick={() => handleQuickPreviewPsych(job)}
- className="text-[10px] tracking-wider font-bold text-[#8c8275] hover:text-[#ede6dc] flex items-center gap-1 border border-[#2e271f] bg-[#16130f] px-2.5 py-1 transition-colors cursor-pointer"
+ className="text-[10px] tracking-wider font-bold text-[#ded6cb] hover:text-white flex items-center gap-1 border border-[#2e271f] bg-[#16130f] px-2.5 py-1 transition-colors cursor-pointer"
  >
  <BrainCircuit size={11} />
  <span>AUDIT</span>

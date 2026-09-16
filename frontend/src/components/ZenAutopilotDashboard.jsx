@@ -337,7 +337,7 @@ export default function ZenAutopilotDashboard({
  <span>{job.company}</span>
  )}
  {' • '}
- <span className="text-slate-500">{job.location || 'Melbourne, VIC'}</span>
+ <span className="text-slate-300 font-normal">{job.location || 'Melbourne, VIC'}</span>
  </p>
  </div>
  <div className="px-2.5 py-1 rounded-sm bg-teal-950/80 text-teal-400 border border-teal-800/80 text-xs font-bold shrink-0">
@@ -354,7 +354,7 @@ export default function ZenAutopilotDashboard({
  </span>
  </div>
 
- <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+ <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed font-normal">
  {job.description ? job.description.replace(/<[^>]*>/g, '').slice(0, 140) + '...' : 'Tailored application synthesized for this position based on master engineering profile.'}
  </p>
  </div>

@@ -1,0 +1,1 @@
+import"./rolldown-runtime-hePW80VL.js";import{i as e,r as t}from"./vendor-framer-Bat9FBW0.js";import{t as n}from"./InterviewSuiteModal-Cs5-Z_yZ.js";e();var r=t(),i=e=>(0,r.jsx)(n,{...e,initialTab:`psychology`});export{i as PsychologyDecoderModal};

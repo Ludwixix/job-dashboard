@@ -22,6 +22,7 @@ import { cleanDescriptionText, fetchDetailedJobDescription, downloadAtsDocxResum
 import { saveUserApplicationToBackend } from '../services/trackerService';
 import { formatJobPostedAge } from '../utils/dateUtils';
 import { getActiveProfile } from '../services/profileService';
+import { hasJobIntelligence } from '../services/jobIntelligenceService';
 
 export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onRejectJob, onUnrejectJob, onOpenAutoApply, onOpenMockInterview, onOpenInterviewPrep, onOpenOutreach, onOpenOfferHub, onOpenExecutiveDossier, onOpenRecruiterCrm, onOpenFunnelIntel, onOpenCareerCompass, onOpenInfluenceHub, onOpenAtsDiagnostic, onOpenLinkedInInbound, onOpenCoverLetterPolarizer, onOpenScreeningSolver, onOpenKscGenerator, onOpenSeekPass, onOpenCheatSheet, userProfile }) => {
  const activeProfile = useMemo(() => userProfile || getActiveProfile(), [userProfile]);
@@ -316,8 +317,8 @@ ${candidatePhone}`;
  return (
  <ul key={pIdx} className="space-y-1.5 pl-1">
  {lines.map((line, lIdx) => (
- <li key={lIdx} className="flex items-start gap-2 text-xs text-slate-800 leading-relaxed font-sans font-medium">
- <span className="w-1.5 h-1.5 rounded-sm bg-amber-600 mt-1.5 shrink-0" />
+ <li key={lIdx} className="flex items-start gap-2 text-xs text-slate-200 leading-relaxed font-sans font-normal">
+ <span className="w-1.5 h-1.5 rounded-sm bg-amber-500 mt-1.5 shrink-0" />
  <span>{line.replace(/^[•*\-|]\s*/, '')}</span>
  </li>
  ))}
@@ -326,19 +327,19 @@ ${candidatePhone}`;
  }
 
  return (
- <div key={pIdx} className="space-y-1">
+ <div key={pIdx} className="space-y-1.5">
  {lines.map((line, lIdx) => {
  const isHeader = line.endsWith(':') && line.length < 50;
  if (isHeader) {
  return (
- <h5 key={lIdx} className="font-mono font-extrabold text-xs text-slate-900 uppercase tracking-wider mt-2 mb-1">
+ <h5 key={lIdx} className="font-mono font-extrabold text-xs text-amber-300 uppercase tracking-wider mt-3 mb-1.5">
  {line}
  </h5>
  );
  }
 
  return (
- <p key={lIdx} className="text-xs text-slate-800 leading-relaxed font-sans font-medium">
+ <p key={lIdx} className="text-xs text-slate-200 leading-relaxed font-sans font-normal">
  {line}
  </p>
  );
@@ -975,7 +976,7 @@ ${candidatePhone}`;
  />
  <div>
  <div className="font-bold text-slate-200">Base Salary & Super in Writing</div>
- <div className="text-[10px] text-slate-500">Ensure superannuation (11.5%) is explicitly stated as inclusive or exclusive.</div>
+ <div className="text-[10px] text-slate-400 font-medium">Ensure superannuation (11.5%) is explicitly stated as inclusive or exclusive.</div>
  </div>
  </label>
 
@@ -988,7 +989,7 @@ ${candidatePhone}`;
  />
  <div>
  <div className="font-bold text-slate-200">Probation Terms Defined</div>
- <div className="text-[10px] text-slate-500">Standard 3-month or 6-month review criteria with mutual notice terms.</div>
+ <div className="text-[10px] text-slate-400 font-medium">Standard 3-month or 6-month review criteria with mutual notice terms.</div>
  </div>
  </label>
 
@@ -1001,7 +1002,7 @@ ${candidatePhone}`;
  />
  <div>
  <div className="font-bold text-slate-200">Notice Period & Termination</div>
- <div className="text-[10px] text-slate-500">Standard 4-week notice period following probation.</div>
+ <div className="text-[10px] text-slate-400 font-medium">Standard 4-week notice period following probation.</div>
  </div>
  </label>
 
@@ -1014,7 +1015,7 @@ ${candidatePhone}`;
  />
  <div>
  <div className="font-bold text-slate-200">Work Location & Hybrid Policy</div>
- <div className="text-[10px] text-slate-500">Fixed WFH / office days documented to avoid arbitrary mandate changes.</div>
+ <div className="text-[10px] text-slate-400 font-medium">Fixed WFH / office days documented to avoid arbitrary mandate changes.</div>
  </div>
  </label>
 
@@ -1027,7 +1028,7 @@ ${candidatePhone}`;
  />
  <div>
  <div className="font-bold text-slate-200">Field Travel, Vehicle & Tool Allowances</div>
- <div className="text-[10px] text-slate-500">Cents-per-km ATO rate, company vehicle, or phone/laptop provisioning confirmed for field duties.</div>
+ <div className="text-[10px] text-slate-400 font-medium">Cents-per-km ATO rate, company vehicle, or phone/laptop provisioning confirmed for field duties.</div>
  </div>
  </label>
  </div>
@@ -1471,7 +1472,7 @@ ${candidatePhone}`;
  <div className="flex items-center gap-2 p-3 rounded-sm bg-slate-900/80 border border-slate-800 text-slate-200">
  <Clock size={15} className="text-amber-400 shrink-0" />
  <div>
- <div className="text-[9px] text-slate-500 font-bold uppercase">POSTED</div>
+ <div className="text-[9px] text-slate-400 font-bold uppercase">POSTED</div>
  <div className="font-extrabold text-slate-100">{formatJobPostedAge(job.date)}</div>
  </div>
  </div>
@@ -1479,7 +1480,7 @@ ${candidatePhone}`;
  <div className="flex items-center gap-2 p-3 rounded-sm bg-slate-900/80 border border-slate-800 text-slate-200">
  <MapPin size={15} className="text-amber-400 shrink-0" />
  <div>
- <div className="text-[9px] text-slate-500 font-bold uppercase">LOCATION</div>
+ <div className="text-[9px] text-slate-400 font-bold uppercase">LOCATION</div>
  <div className="font-extrabold text-slate-100 truncate">{job.location || 'Melbourne, VIC'}</div>
  </div>
  </div>
@@ -1495,7 +1496,7 @@ ${candidatePhone}`;
  <div className="flex items-center gap-2 p-3 rounded-sm bg-slate-900/80 border border-slate-800 text-slate-200">
  <Briefcase size={15} className="text-amber-400 shrink-0" />
  <div>
- <div className="text-[9px] text-slate-500 font-bold uppercase">WORK MODE</div>
+ <div className="text-[9px] text-slate-400 font-bold uppercase">WORK MODE</div>
  <div className="font-extrabold text-slate-100">{job.workArrangement || (job.remote ? 'Remote' : 'Hybrid')} • {job.employmentType || 'Full-time'}</div>
  </div>
  </div>
@@ -2056,221 +2057,333 @@ ${data.pipeline_result?.cover_text || ''}`;
  <Sparkles size={14} className="text-amber-400 animate-spin-slow" /> TAILORED ASSET GENERATION SUITE
  </div>
 
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
- {/* Resume Generation Option */}
- <button
- onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
- className="p-4 rounded-sm bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-slate-900/80 border border-emerald-500/40 hover:border-emerald-400 text-left transition-all cursor-pointer group "
- >
- <div className="flex items-center gap-2 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
- <FileUser size={16} className="text-emerald-400" /> GENERATE TAILORED RESUME
- </div>
- <p className="text-[11px] font-medium text-slate-400 mt-1 leading-relaxed">
- Explicitly customizes {activeProfile?.name ? `${activeProfile.name}'s` : 'candidate'}{' '}
- {activeProfile?.industry || 'professional'} credentials for {job.company}.
- </p>
- </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
+                {/* Resume Generation Option */}
+                <button
+                  onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
+                  className="p-4 rounded-sm bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-slate-900/80 border border-emerald-500/40 hover:border-emerald-400 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
+                      <FileUser size={16} className="text-emerald-400" /> GENERATE TAILORED RESUME
+                    </div>
+                    {hasGeneratedApplicationDocs(job) ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-400 mt-1 leading-relaxed">
+                    Explicitly customizes {activeProfile?.name ? `${activeProfile.name}'s` : 'candidate'}{' '}
+                    {activeProfile?.industry || 'professional'} credentials for {job.company}.
+                  </p>
+                </button>
 
- {/* Cover Letter Generation Option */}
- <button
- onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
- className="p-4 rounded-sm bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-slate-900/80 border border-amber-500/40 hover:border-amber-400 text-left transition-all cursor-pointer group "
- >
- <div className="flex items-center gap-2 text-xs font-black text-amber-300 group-hover:text-amber-200">
- <FileText size={16} className="text-amber-400" /> GENERATE IMPACT COVER LETTER
- </div>
- <p className="text-[11px] font-medium text-slate-400 mt-1 leading-relaxed">
- Drafts a high-impact executive cover letter targeting selection criteria for {job.title}.
- </p>
- </button>
- </div>
+                {/* Cover Letter Generation Option */}
+                <button
+                  onClick={() => { onClose(); if (onOpenGenerator) onOpenGenerator(job); }}
+                  className="p-4 rounded-sm bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-slate-900/80 border border-amber-500/40 hover:border-amber-400 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-amber-300 group-hover:text-amber-200">
+                      <FileText size={16} className="text-amber-400" /> GENERATE IMPACT COVER LETTER
+                    </div>
+                    {hasGeneratedApplicationDocs(job) ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-400 mt-1 leading-relaxed">
+                    Drafts a high-impact executive cover letter targeting selection criteria for {job.title}.
+                  </p>
+                </button>
+              </div>
 
- {/* Interview & Outreach Quick Actions */}
- <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 font-mono pt-1">
- <button
- onClick={() => { onClose(); if (onOpenRecruiterCrm) onOpenRecruiterCrm(job); }}
- className="p-3 rounded-sm bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-purple-300 group-hover:text-purple-200">
- <Users size={14} className="text-purple-400" /> RECRUITER CRM
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Link talent partners &amp; manage cadence.
- </p>
- </button>
+              {/* Interview & Outreach Quick Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 font-mono pt-1">
+                <button
+                  onClick={() => { onClose(); if (onOpenRecruiterCrm) onOpenRecruiterCrm(job); }}
+                  className="p-3 rounded-sm bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-purple-300 group-hover:text-purple-200 truncate">
+                      <Users size={14} className="text-purple-400 shrink-0" /> RECRUITER CRM
+                    </div>
+                    {hasJobIntelligence(job, 'recruiter_crm') ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    Link talent partners &amp; manage cadence.
+                  </p>
+                </button>
 
- <button
- onClick={() => { onClose(); if (onOpenExecutiveDossier) onOpenExecutiveDossier(job); }}
- className="p-3 rounded-sm bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300 group-hover:text-cyan-200">
- <Building2 size={14} className="text-cyan-400" /> EXECUTIVE DOSSIER
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- 90-day plan, leadership alignment &amp; pain points.
- </p>
- </button>
+                <button
+                  onClick={() => { onClose(); if (onOpenExecutiveDossier) onOpenExecutiveDossier(job); }}
+                  className="p-3 rounded-sm bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300 group-hover:text-cyan-200 truncate">
+                      <Building2 size={14} className="text-cyan-400 shrink-0" /> EXECUTIVE DOSSIER
+                    </div>
+                    {hasJobIntelligence(job, 'executive_dossier') ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    90-day plan, leadership alignment &amp; pain points.
+                  </p>
+                </button>
 
- {onOpenInfluenceHub && (
- <button
- onClick={() => { onClose(); onOpenInfluenceHub(job); }}
- className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
- <ShieldCheck size={14} className="text-amber-400" /> INFLUENCE &amp; DEBRIEF
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Objection overcoming &amp; referee briefing.
- </p>
- </button>
- )}
+                {onOpenInfluenceHub && (
+                  <button
+                    onClick={() => { onClose(); onOpenInfluenceHub(job); }}
+                    className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200 truncate">
+                        <ShieldCheck size={14} className="text-amber-400 shrink-0" /> INFLUENCE &amp; DEBRIEF
+                      </div>
+                      {hasJobIntelligence(job, 'influence_debrief') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Objection overcoming &amp; referee briefing.
+                    </p>
+                  </button>
+                )}
 
- {onOpenAtsDiagnostic && (
- <button
- onClick={() => { onClose(); onOpenAtsDiagnostic(job); }}
- className="p-3 rounded-sm bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
- <ShieldCheck size={14} className="text-emerald-400" /> ATS SENTINEL
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Workday &amp; STAR parser simulation.
- </p>
- </button>
- )}
+                {onOpenAtsDiagnostic && (
+                  <button
+                    onClick={() => { onClose(); onOpenAtsDiagnostic(job); }}
+                    className="p-3 rounded-sm bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200 truncate">
+                        <ShieldCheck size={14} className="text-emerald-400 shrink-0" /> ATS SENTINEL
+                      </div>
+                      {hasJobIntelligence(job, 'ats_sentinel') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Workday &amp; STAR parser simulation.
+                    </p>
+                  </button>
+                )}
 
- {onOpenLinkedInInbound && (
- <button
- onClick={() => { onClose(); onOpenLinkedInInbound(job); }}
- className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
- <Search size={14} className="text-amber-400" /> LINKEDIN INBOUND
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Recruiter Boolean indexing &amp; headlines.
- </p>
- </button>
- )}
+                {onOpenLinkedInInbound && (
+                  <button
+                    onClick={() => { onClose(); onOpenLinkedInInbound(job); }}
+                    className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200 truncate">
+                        <Search size={14} className="text-amber-400 shrink-0" /> LINKEDIN INBOUND
+                      </div>
+                      {hasJobIntelligence(job, 'linkedin_inbound') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Recruiter Boolean indexing &amp; headlines.
+                    </p>
+                  </button>
+                )}
 
- {onOpenCoverLetterPolarizer && (
- <button
- onClick={() => { onClose(); onOpenCoverLetterPolarizer(job); }}
- className="p-3 rounded-sm bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-rose-300 group-hover:text-rose-200">
- <Flame size={14} className="text-rose-400" /> CL POLARIZER
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Swappability audit &amp; anti-template rewrites.
- </p>
- </button>
- )}
+                {onOpenCoverLetterPolarizer && (
+                  <button
+                    onClick={() => { onClose(); onOpenCoverLetterPolarizer(job); }}
+                    className="p-3 rounded-sm bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-rose-300 group-hover:text-rose-200 truncate">
+                        <Flame size={14} className="text-rose-400 shrink-0" /> CL POLARIZER
+                      </div>
+                      {hasJobIntelligence(job, 'cl_polarizer') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Swappability audit &amp; anti-template rewrites.
+                    </p>
+                  </button>
+                )}
 
- {onOpenScreeningSolver && (
- <button
- onClick={() => { onClose(); onOpenScreeningSolver(job); }}
- className="p-3 rounded-sm bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
- <ClipboardCheck size={14} className="text-emerald-400" /> SCREENING SOLVER
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Auto-solve portal questionnaires &amp; compliance.
- </p>
- </button>
- )}
+                {onOpenScreeningSolver && (
+                  <button
+                    onClick={() => { onClose(); onOpenScreeningSolver(job); }}
+                    className="p-3 rounded-sm bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200 truncate">
+                        <ClipboardCheck size={14} className="text-emerald-400 shrink-0" /> SCREENING SOLVER
+                      </div>
+                      {hasJobIntelligence(job, 'screening_solver') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Auto-solve portal questionnaires &amp; compliance.
+                    </p>
+                  </button>
+                )}
 
- {onOpenCareerCompass && (
- <button
- onClick={() => { onClose(); onOpenCareerCompass(); }}
- className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
- <Compass size={14} className="text-amber-400" /> CAREER COMPASS
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Strategic matrix &amp; progression roadmap.
- </p>
- </button>
- )}
+                {onOpenCareerCompass && (
+                  <button
+                    onClick={() => { onClose(); onOpenCareerCompass(); }}
+                    className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200 truncate">
+                        <Compass size={14} className="text-amber-400 shrink-0" /> CAREER COMPASS
+                      </div>
+                      {hasJobIntelligence(job, 'career_compass') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Strategic matrix &amp; progression roadmap.
+                    </p>
+                  </button>
+                )}
 
- {onOpenKscGenerator && (
- <button
- onClick={() => { onClose(); onOpenKscGenerator(job); }}
- className="p-3 rounded-sm bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-teal-300 group-hover:text-teal-200">
- <BookOpen size={14} className="text-teal-400" /> KSC GENERATOR
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- APS &amp; VPS capability criteria responses.
- </p>
- </button>
- )}
+                {onOpenKscGenerator && (
+                  <button
+                    onClick={() => { onClose(); onOpenKscGenerator(job); }}
+                    className="p-3 rounded-sm bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-teal-300 group-hover:text-teal-200 truncate">
+                        <BookOpen size={14} className="text-teal-400 shrink-0" /> KSC GENERATOR
+                      </div>
+                      {hasJobIntelligence(job, 'ksc_generator') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      APS &amp; VPS capability criteria responses.
+                    </p>
+                  </button>
+                )}
 
- {onOpenSeekPass && (
- <button
- onClick={() => { onClose(); onOpenSeekPass(job); }}
- className="p-3 rounded-sm bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200">
- <ShieldCheck size={14} className="text-emerald-400" /> SEEK PASS AUDIT
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Pre-qualification knockout radar.
- </p>
- </button>
- )}
+                {onOpenSeekPass && (
+                  <button
+                    onClick={() => { onClose(); onOpenSeekPass(job); }}
+                    className="p-3 rounded-sm bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-300 group-hover:text-emerald-200 truncate">
+                        <ShieldCheck size={14} className="text-emerald-400 shrink-0" /> SEEK PASS AUDIT
+                      </div>
+                      {hasJobIntelligence(job, 'seek_pass_audit') ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      Pre-qualification knockout radar.
+                    </p>
+                  </button>
+                )}
 
- <button
- onClick={() => { setIsCheatSheetOpen(true); if (onOpenCheatSheet) onOpenCheatSheet(job); }}
- className="p-3 rounded-sm bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300 group-hover:text-cyan-200">
- <Sparkles size={14} className="text-cyan-400" /> MASTER CHEAT SHEET
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- 3-column cockpit with 90s pacing timer.
- </p>
- </button>
+                <button
+                  onClick={() => { setIsCheatSheetOpen(true); if (onOpenCheatSheet) onOpenCheatSheet(job); }}
+                  className="p-3 rounded-sm bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300 group-hover:text-cyan-200 truncate">
+                      <Sparkles size={14} className="text-cyan-400 shrink-0" /> MASTER CHEAT SHEET
+                    </div>
+                    {hasJobIntelligence(job, 'master_cheat_sheet') ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    3-column cockpit with 90s pacing timer.
+                  </p>
+                </button>
 
- <button
- onClick={() => { onClose(); if (onOpenInterviewPrep) onOpenInterviewPrep(job); }}
- className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
- <Target size={14} className="text-amber-400" /> STAR PREP GUIDE
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Sector-grounded question strategy &amp; talking points.
- </p>
- </button>
+                <button
+                  onClick={() => { onClose(); if (onOpenInterviewPrep) onOpenInterviewPrep(job); }}
+                  className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200 truncate">
+                      <Target size={14} className="text-amber-400 shrink-0" /> STAR PREP GUIDE
+                    </div>
+                    {hasJobIntelligence(job, 'star_prep_guide') ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    Sector-grounded question strategy &amp; talking points.
+                  </p>
+                </button>
 
- <button
- onClick={() => { onClose(); if (onOpenMockInterview) onOpenMockInterview(job); }}
- className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200">
- <Zap size={14} className="text-amber-400" /> AI MOCK INTERVIEW
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Live simulated interview with rubric scoring.
- </p>
- </button>
+                <button
+                  onClick={() => { onClose(); if (onOpenMockInterview) onOpenMockInterview(job); }}
+                  className="p-3 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-300 group-hover:text-amber-200 truncate">
+                      <Zap size={14} className="text-amber-400 shrink-0" /> AI MOCK INTERVIEW
+                    </div>
+                    {hasJobIntelligence(job, 'ai_mock_interview') ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    Live simulated interview with rubric scoring.
+                  </p>
+                </button>
 
- <button
- onClick={() => { onClose(); if (onOpenOutreach) onOpenOutreach(job); }}
- className="p-3 rounded-sm bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-left transition-all cursor-pointer group -xs"
- >
- <div className="flex items-center gap-1.5 text-xs font-black text-teal-300 group-hover:text-teal-200">
- <Mail size={14} className="text-teal-400" /> RECRUITER OUTREACH
- </div>
- <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
- Follow-up, cold pitch, or post-interview notes.
- </p>
- </button>
- </div>
+                <button
+                  onClick={() => { onClose(); if (onOpenOutreach) onOpenOutreach(job); }}
+                  className="p-3 rounded-sm bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-teal-300 group-hover:text-teal-200 truncate">
+                      <Mail size={14} className="text-teal-400 shrink-0" /> RECRUITER OUTREACH
+                    </div>
+                    {hasJobIntelligence(job, 'recruiter_outreach') ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 shrink-0">✓ READY</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-300 border border-slate-700 shrink-0">⚡ ON DEMAND</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    Follow-up, cold pitch, or post-interview notes.
+                  </p>
+                </button>
+              </div>
  </div>
 
  {/* 1-Click Copy Reference Subject */}

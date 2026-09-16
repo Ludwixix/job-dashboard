@@ -437,7 +437,7 @@ export const JobDrawer = ({ job, isOpen, onClose, onUpdateStatus, onSaveNotes, o
  <Sparkles size={14} className="text-amber-400" />
  Job Summary
  </div>
- <div className="p-4 rounded-sm bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed max-h-40 overflow-y-auto custom-scrollbar font-sans">
+ <div className="p-4 rounded-sm bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed font-normal max-h-40 overflow-y-auto custom-scrollbar font-sans">
  {job.description}
  </div>
  </section>

@@ -63,6 +63,7 @@ import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../servic
 import { suggestRelatedTitles, buildQueriesFromProfile, triggerProfileScrape } from '../services/jobQueryService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../services/profileOnboardingPipeline';
+import { getSpendSummary, subscribeToSpendUpdates } from '../services/llmCostService';
 import { 
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
@@ -92,6 +93,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [selectedForKscGenerator, setSelectedForKscGenerator] = useState(null);
  const [selectedForSeekPass, setSelectedForSeekPass] = useState(null);
  const [selectedForCheatSheet, setSelectedForCheatSheet] = useState(null);
+ const [spendSummary, setSpendSummary] = useState(() => getSpendSummary());
+
+ useEffect(() => {
+ const unsubscribe = subscribeToSpendUpdates((summary) => {
+ setSpendSummary(summary);
+ });
+ return () => unsubscribe();
+ }, []);
 
  const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
  const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
@@ -959,6 +968,19 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  title="Open Command Palette (Ctrl+K)"
  >
  <Command size={11} /> ⌘K
+ </button>
+
+ {/* LLM Spend HUD */}
+ <button
+ type="button"
+ onClick={() => setIsSettingsOpen(true)}
+ className="flex items-center gap-1.5 text-amber-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-mono font-bold bg-amber-950/70 hover:bg-amber-900/80 border border-amber-500/40 px-2.5 py-1 rounded-sm shadow-xs"
+ title={`Total LLM Spend: $${(spendSummary.totalSpendUsd || 0).toFixed(4)} USD (${(spendSummary.totalTokens || 0).toLocaleString()} tokens across ${spendSummary.callCount || 0} calls). Click to open Settings & Model selection.`}
+ >
+ <Zap size={11} className="text-amber-400 animate-pulse" />
+ <span>
+ SPEND: <strong className="text-emerald-400 font-black">${(spendSummary.totalSpendUsd || 0) > 0 ? (spendSummary.totalSpendUsd).toFixed(4) : '0.00'}</strong>
+ </span>
  </button>
 
  {/* Provider Mesh Telemetry Desk */}

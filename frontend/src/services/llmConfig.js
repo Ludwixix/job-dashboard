@@ -17,6 +17,10 @@ export const PROVIDERS = {
     requiresKey: true,
     isOpenAiCompatible: true,
     models: [
+      { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta Llama 3.3 70B (✨ Free / Zero Cost)', description: 'Elite 70B open-weights model completely free of charge on OpenRouter' },
+      { id: 'google/gemini-2.0-flash-exp:free', name: 'Google Gemini 2.0 Flash (✨ Free / High Speed)', description: 'Ultra-fast multimodal flash model free tier' },
+      { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1 (✨ Free / Reasoning)', description: 'Rigorous chain-of-thought reasoning model free tier' },
+      { id: 'qwen/qwen-2.5-coder-32b-instruct:free', name: 'Qwen 2.5 Coder 32B (✨ Free / Technical)', description: 'Top open coding and technical instruction model free tier' },
       { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet (⭐ Elite Executive Writer)', description: 'Nuanced ATS keyword tailoring and high-impact accomplishment bullets' },
       { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o (High-Precision ATS)', description: 'Top-tier structural precision, metric extraction, and formatting' },
       { id: 'google/gemini-2.5-pro', name: 'Google Gemini 2.5 Pro (Deep Technical)', description: 'Deep technical reasoning and thorough skill alignment' },
@@ -145,6 +149,24 @@ export const PROVIDERS = {
     models: [
       { id: 'custom-model', name: 'Custom Specified Model', description: 'Configured by model ID input' }
     ]
+  },
+  free: {
+    id: 'free',
+    name: 'Free AI Tier (Zero Cost)',
+    badge: '100% Free / No Key Required',
+    description: 'Community-sponsored open-weights LLMs (Llama 3.3 70B, Gemini 2.0 Flash, DeepSeek R1) with zero cost and no API key required.',
+    defaultEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    keyPlaceholder: 'No API key needed (Free Tier)',
+    keyUrl: '',
+    defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
+    requiresKey: false,
+    isOpenAiCompatible: true,
+    models: [
+      { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta Llama 3.3 70B (Free Tier Flagship)', description: 'Full 70B model with exceptional reasoning, cover letter writing, and criteria generation' },
+      { id: 'google/gemini-2.0-flash-exp:free', name: 'Google Gemini 2.0 Flash (Free Ultra-Speed)', description: 'Lightning-fast sub-second document and interview prep generation' },
+      { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1 (Free Reasoning Engine)', description: 'Deep chain-of-thought analysis for complex job specs' },
+      { id: 'qwen/qwen-2.5-coder-32b-instruct:free', name: 'Qwen 2.5 Coder 32B (Free Technical)', description: 'Specialized for IT, architecture, and systems engineering criteria' }
+    ]
   }
 };
 
@@ -200,13 +222,20 @@ export const getLlmConfig = () => {
 
   const customModel = localStorage.getItem(`${STORAGE_KEYS.CUSTOM_MODEL}_${provider}`) || '';
 
+  const isFree = Boolean(
+    provider === 'free' || 
+    (model && model.includes(':free')) || 
+    !providerMeta.requiresKey
+  );
+
   return {
     provider,
     model,
     apiKey,
     endpoint,
     customModel,
-    providerMeta
+    providerMeta,
+    isFree
   };
 };
 

@@ -177,6 +177,16 @@ class JobRepository:
                     model_name TEXT DEFAULT '',
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS job_intelligence (
+                    job_id TEXT NOT NULL,
+                    tool_key TEXT NOT NULL,
+                    intelligence_json TEXT NOT NULL DEFAULT '{}',
+                    model_name TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(job_id, tool_key)
+                );
+                CREATE INDEX IF NOT EXISTS idx_job_intel_job ON job_intelligence(job_id);
                 CREATE TABLE IF NOT EXISTS interview_sessions (
                     id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
@@ -1418,6 +1428,82 @@ class JobRepository:
             "company": company,
             "title": title,
             "insights": insights,
+            "model_name": model_name,
+            "updated_at": now,
+        }
+
+    # ==========================================
+    # ON-DEMAND JOB INTELLIGENCE ARTIFACTS
+    # ==========================================
+    def get_job_intelligence(
+        self, job_id: str, tool_key: str | None = None
+    ) -> dict[str, Any]:
+        """Retrieve persisted on-demand intelligence artifacts for a job card."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            if tool_key:
+                row = conn.execute(
+                    """
+                    SELECT job_id, tool_key, intelligence_json, model_name, created_at, updated_at
+                    FROM job_intelligence
+                    WHERE job_id = ? AND tool_key = ?
+                """,
+                    (job_id, tool_key),
+                ).fetchone()
+                if row:
+                    d = dict(row)
+                    try:
+                        d["data"] = json.loads(d.get("intelligence_json") or "{}")
+                    except Exception:
+                        d["data"] = {}
+                    return d
+                return {}
+
+            rows = conn.execute(
+                """
+                SELECT job_id, tool_key, intelligence_json, model_name, created_at, updated_at
+                FROM job_intelligence
+                WHERE job_id = ?
+            """,
+                (job_id,),
+            ).fetchall()
+            result = {}
+            for r in rows:
+                d = dict(r)
+                try:
+                    d["data"] = json.loads(d.get("intelligence_json") or "{}")
+                except Exception:
+                    d["data"] = {}
+                result[d["tool_key"]] = d
+            return result
+
+    def upsert_job_intelligence(
+        self,
+        job_id: str,
+        tool_key: str,
+        data: dict[str, Any],
+        model_name: str = "",
+    ) -> dict[str, Any]:
+        """Persist on-demand intelligence artifact in SQLite WAL database."""
+        now = datetime.now(timezone.utc).isoformat()
+        intel_json = json.dumps(data, ensure_ascii=False)
+        with get_db_connection(self.path) as conn:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO job_intelligence (job_id, tool_key, intelligence_json, model_name, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(job_id, tool_key) DO UPDATE SET
+                        intelligence_json = excluded.intelligence_json,
+                        model_name = excluded.model_name,
+                        updated_at = excluded.updated_at
+                """,
+                    (job_id, tool_key, intel_json, model_name, now, now),
+                )
+        return {
+            "job_id": job_id,
+            "tool_key": tool_key,
+            "data": data,
             "model_name": model_name,
             "updated_at": now,
         }

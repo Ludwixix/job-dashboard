@@ -25,6 +25,7 @@ venv/
 *.db-journal
 *.db-wal
 *.db-shm
+*_combined.json
 
 # Node / Web
 node_modules/

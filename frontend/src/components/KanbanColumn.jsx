@@ -60,29 +60,29 @@ const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet, onMoveStage }) 
  {job.title}
  </h4>
 
- {/* Company — secondary hierarchy */}
- <div className="flex items-center gap-1.5 mb-2">
- <Building2 size={12} className="text-amber-400 shrink-0" aria-hidden="true" />
- <span className="text-xs text-slate-400 truncate font-medium">{job.company}</span>
- </div>
- 
- {needsFollowUp && (
- <div className="mb-2">
- <Badge variant="amber" size="xs">Follow-Up Due ({daysAgo}d)</Badge>
- </div>
- )}
+      {/* Company — secondary hierarchy */}
+      <div className="flex items-center gap-1.5 mb-2">
+        <Building2 size={12} className="text-amber-400 shrink-0" aria-hidden="true" />
+        <span className="text-xs text-slate-200 truncate font-semibold">{job.company}</span>
+      </div>
+      
+      {needsFollowUp && (
+        <div className="mb-2">
+          <Badge variant="amber" size="xs">Follow-Up Due ({daysAgo}d)</Badge>
+        </div>
+      )}
 
- {/* Meta row — tertiary */}
- <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
- <div className="flex items-center gap-1 truncate max-w-[60%]">
- <MapPin size={10} aria-hidden="true" />
- <span className="truncate">{job.location || 'Melbourne, VIC'}</span>
- </div>
- <div className="flex items-center gap-1 whitespace-nowrap">
- <Clock size={10} aria-hidden="true" />
- <span>{daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}</span>
- </div>
- </div>
+      {/* Meta row — tertiary */}
+      <div className="flex items-center justify-between text-[10px] font-mono text-slate-300">
+        <div className="flex items-center gap-1 truncate max-w-[60%]">
+          <MapPin size={10} aria-hidden="true" />
+          <span className="truncate text-slate-300">{job.location || 'Melbourne, VIC'}</span>
+        </div>
+        <div className="flex items-center gap-1 whitespace-nowrap">
+          <Clock size={10} aria-hidden="true" />
+          <span>{daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}</span>
+        </div>
+      </div>
 
  {/* 1-Click Master Interview Cheat Sheet Cockpit */}
  {(stage?.id === 'Interviewing' || s.includes('interview')) && onOpenCheatSheet && (

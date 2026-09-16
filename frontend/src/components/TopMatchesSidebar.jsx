@@ -585,7 +585,7 @@ export const TopMatchesSidebar = ({
  </span>
  </div>
 
- <p className="text-[10px] text-cyan-200/90 font-medium italic line-clamp-2 bg-slate-950/70 p-2 rounded border border-cyan-500/20">
+ <p className="text-[10px] text-cyan-100 font-normal italic line-clamp-2 bg-slate-950/70 p-2 rounded border border-cyan-500/20">
  "{activeWildCardJob.highlightSnippet || `${activeWildCardJob.stream || activeWildCardJob.coolArchetype?.category || 'Frontier Tech'} — Cutting-edge or unusual opportunity!`}"
  </p>
 
@@ -667,8 +667,8 @@ export const TopMatchesSidebar = ({
  <p className="text-[11px] font-semibold text-slate-300 truncate mb-2">{job.title}</p>
  
  <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-800">
- <span className="text-slate-400 truncate max-w-[140px]">
- <MapPin size={10} className="inline mr-1 text-slate-500" />
+ <span className="text-slate-300 truncate max-w-[140px]">
+ <MapPin size={10} className="inline mr-1 text-slate-400" />
  {job.location}
  </span>
  <button
@@ -740,9 +740,9 @@ export const TopMatchesSidebar = ({
 
  <p className="text-[11px] font-bold text-slate-300 truncate mb-1.5">{job.title}</p>
  
- <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-800 text-slate-400">
+ <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-800 text-slate-300">
  <span className="truncate max-w-[150px]">
- <MapPin size={10} className="inline mr-1 text-slate-500" />
+ <MapPin size={10} className="inline mr-1 text-slate-400" />
  {job.location}
  </span>
  <button

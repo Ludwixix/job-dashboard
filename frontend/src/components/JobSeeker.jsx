@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense, useDeferredValue } from 'react';
 import { TopMatchesSidebar } from './TopMatchesSidebar';
 import { 
  Sparkles, Search, Filter, 
@@ -7,7 +7,7 @@ import {
  ChevronLeft, ChevronRight, Navigation, Clock, AlertCircle, Eye,
  ChevronFirst, ChevronLast, ArrowDown, Wrench, Briefcase,
  ThumbsUp, ThumbsDown, FileText, Zap, Bot, Flame, Star, Building2, Download,
- Target,
+ Target, Loader2, X,
 
  HeartPulse, TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Trash2,
  Train, Car, Bike, MoreVertical, Compass
@@ -181,6 +181,8 @@ export const JobSeeker = ({
 
  const currentProfile = activeProfile || getActiveProfile();
  const [search, setSearch] = useState('');
+ const deferredSearch = useDeferredValue(search);
+ const isSearchPending = search !== deferredSearch;
  const [sourceFilter, setSourceFilter] = useState('All');
  const [activeStreamTab, setActiveStreamTab] = useState('All');
  const [starredJobIds, setStarredJobIds] = useState(() => {
@@ -503,161 +505,156 @@ export const JobSeeker = ({
  }, [completeJobs, missingDataJobs, starredJobIds, readyToSubmitCount, rejectedJobs, currentProfile, userPrefs]);
 
 
- const seekerJobs = useMemo(() => {
- const sourcePool = sourceFilter !== 'All' && activeStreamTab === 'All'
- ? unsubmittedJobs
- : activeStreamTab === 'Rejected Jobs' 
- ? rejectedJobs 
- : activeStreamTab === 'MissingData' 
- ? missingDataJobs 
- : completeJobs;
+  // Decoupled candidate ATS scoring & commute enrichment memo
+  // Only recalculates when the source pool, user preferences, or active candidate profile changes (NEVER on search keystrokes!)
+  const enrichedPool = useMemo(() => {
+    const sourcePool = sourceFilter !== 'All' && activeStreamTab === 'All'
+      ? unsubmittedJobs
+      : activeStreamTab === 'Rejected Jobs' 
+      ? rejectedJobs 
+      : activeStreamTab === 'MissingData' 
+      ? missingDataJobs 
+      : completeJobs;
 
- // Enriched with active candidate dynamic ATS match & commute distance & preference weights
- const enrichedPool = sourcePool.map(job => {
- const match = calculateCandidateJobMatch(job, currentProfile, userPrefs);
- return {
- ...job,
- score: match.score,
- matchedSkills: match.matchedSkills,
- distanceKm: match.distanceKm,
- matchTier: match.matchTier,
- feedbackBonus: match.feedbackBonus
- };
- });
+    return sourcePool.map(job => {
+      const match = calculateCandidateJobMatch(job, currentProfile, userPrefs);
+      return {
+        ...job,
+        score: match.score,
+        matchedSkills: match.matchedSkills,
+        distanceKm: match.distanceKm,
+        matchTier: match.matchTier,
+        feedbackBonus: match.feedbackBonus
+      };
+    });
+  }, [sourceFilter, activeStreamTab, unsubmittedJobs, rejectedJobs, missingDataJobs, completeJobs, currentProfile, userPrefs]);
 
- const filtered = enrichedPool.filter(job => {
- const q = (search || '').toLowerCase().trim();
- const comp = (job.company || '').toLowerCase();
- const tit = (job.title || '').toLowerCase();
- const nts = (job.notes || '').toLowerCase();
- const loc = (job.location || '').toLowerCase();
- const tags = Array.isArray(job.tags) ? job.tags.join(' ').toLowerCase() : '';
- const matchesSearch = !q || comp.includes(q) || tit.includes(q) || nts.includes(q) || loc.includes(q) || tags.includes(q);
- 
- const matchesSource = sourceFilter === 'All' || (job.source || '').toLowerCase() === sourceFilter.toLowerCase();
- // Stream Tab filter
- let matchesStream = true;
- if (activeStreamTab === 'Custom') {
- matchesStream = Boolean(job.isCustom || String(job.id || '').startsWith('custom_'));
- } else if (activeStreamTab === 'TopFit') {
- matchesStream = (job.score || 0) >= 85;
- } else if (activeStreamTab === 'SmartSuggestions') {
- matchesStream = (job.score || 0) >= 70 || Boolean(job.learnedMatch);
- } else if (activeStreamTab === 'Starred') {
- matchesStream = starredJobIds.some(id => String(id) === String(job.id) || String(id) === `${job.company}_${job.title}`);
- } else if (activeStreamTab === 'QuickApply') {
- matchesStream = isQuickApplyEligible(job);
- } else if (activeStreamTab === 'ReadyForSubmission') {
- matchesStream = hasGeneratedApplicationDocs(job);
- } else if (activeStreamTab === 'MissingData' || activeStreamTab === 'Rejected Jobs' || activeStreamTab === 'All') {
- matchesStream = true;
- } else {
- const subStream = getJobSubStream(job);
- matchesStream = subStream === activeStreamTab || 
- (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
- (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
- }
+  // High-speed, short-circuiting filtering & sorting using deferredSearch (Non-blocking search)
+  const seekerJobs = useMemo(() => {
+    const q = (deferredSearch || '').toLowerCase().trim();
+    const candLoc = currentProfile?.location || baseLocation;
+    const isFilteredRoles = roleArchetypeCounts.length > 0 && selectedRoleIds.length < roleArchetypeCounts.length;
 
- let matchesDocsReady = true;
- if (docsReadyFilter) {
- matchesDocsReady = hasGeneratedApplicationDocs(job);
- }
+    const filtered = enrichedPool.filter(job => {
+      // 1. Text Search Filter (Fast exit if search term present and not matched)
+      if (q) {
+        const comp = (job.company || '').toLowerCase();
+        const tit = (job.title || '').toLowerCase();
+        const nts = (job.notes || '').toLowerCase();
+        const loc = (job.location || '').toLowerCase();
+        const tags = Array.isArray(job.tags) ? job.tags.join(' ').toLowerCase() : '';
+        if (!comp.includes(q) && !tit.includes(q) && !nts.includes(q) && !loc.includes(q) && !tags.includes(q)) {
+          return false;
+        }
+      }
 
- // Salary filter
- let matchesSalary = matchesSalaryThreshold(job, minSalaryFilter);
+      // 2. Stream Tab filter
+      if (activeStreamTab === 'Custom') {
+        if (!job.isCustom && !String(job.id || '').startsWith('custom_')) return false;
+      } else if (activeStreamTab === 'TopFit') {
+        if ((job.score || 0) < 85) return false;
+      } else if (activeStreamTab === 'SmartSuggestions') {
+        if ((job.score || 0) < 70 && !job.learnedMatch) return false;
+      } else if (activeStreamTab === 'Starred') {
+        if (!starredJobIds.some(id => String(id) === String(job.id) || String(id) === `${job.company}_${job.title}`)) return false;
+      } else if (activeStreamTab === 'QuickApply') {
+        if (!isQuickApplyEligible(job)) return false;
+      } else if (activeStreamTab === 'ReadyForSubmission') {
+        if (!hasGeneratedApplicationDocs(job)) return false;
+      } else if (activeStreamTab !== 'MissingData' && activeStreamTab !== 'Rejected Jobs' && activeStreamTab !== 'All') {
+        const subStream = getJobSubStream(job);
+        const matchesStream = subStream === activeStreamTab || 
+          (job.stream || '').toLowerCase().includes(activeStreamTab.toLowerCase()) ||
+          (job.industry || '').toLowerCase().includes(activeStreamTab.toLowerCase());
+        if (!matchesStream) return false;
+      }
 
- // Score filter
- let matchesScore = true;
- if (minScoreFilter === '80+') {
- matchesScore = (job.score || 0) >= 80;
- } else if (minScoreFilter === '70+') {
- matchesScore = (job.score || 0) >= 70;
- }
+      // 3. Source Filter
+      if (sourceFilter !== 'All' && (job.source || '').toLowerCase() !== sourceFilter.toLowerCase()) {
+        return false;
+      }
 
- // Work Mode filter
- let matchesWorkMode = true;
- if (workModeFilter === 'remote') {
- matchesWorkMode = job.remote || (job.location || '').toLowerCase().includes('remote') || (job.location || '').toLowerCase().includes('hybrid');
- } else if (workModeFilter === 'onsite') {
- matchesWorkMode = !job.remote && !(job.location || '').toLowerCase().includes('remote');
- }
+      // 4. Docs Ready Filter
+      if (docsReadyFilter && !hasGeneratedApplicationDocs(job)) {
+        return false;
+      }
 
- // Distance Filter (Relative to Candidate Profile Location)
- let matchesDistance = true;
- const candLoc = currentProfile?.location || baseLocation;
- const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, candLoc);
- if (maxDistanceFilter === '5km') {
- matchesDistance = distKm <= 5;
- } else if (maxDistanceFilter === '10km') {
- matchesDistance = distKm <= 10;
- } else if (maxDistanceFilter === '25km') {
- matchesDistance = distKm <= 25;
- }
+      // 5. Salary Filter
+      if (!matchesSalaryThreshold(job, minSalaryFilter)) {
+        return false;
+      }
 
- // Strict 13-Day Expiry Filter
- // A null age means the posted date is missing/unparseable — such jobs
- // cannot be verified as recent, so they must not silently pass an
- // age-window filter (this previously defaulted to age=0, making
- // stale/garbage-dated listings appear freshly posted).
- let matchesAge = true;
- const ageDays = getJobAgeInDays(job.date);
- if (maxAgeFilter === '13days') {
- matchesAge = ageDays !== null && ageDays <= 13;
- } else if (maxAgeFilter === '7days') {
- matchesAge = ageDays !== null && ageDays <= 7;
- } else if (maxAgeFilter === '3days') {
- matchesAge = ageDays !== null && ageDays <= 3;
- }
+      // 6. Score Filter
+      if (minScoreFilter === '80+' && (job.score || 0) < 80) return false;
+      if (minScoreFilter === '70+' && (job.score || 0) < 70) return false;
 
- // Multi-Role Archetype Filter
- let matchesRole = true;
- if (roleArchetypeCounts.length > 0) {
- if (selectedRoleIds.length === 0) {
- matchesRole = false;
- } else if (selectedRoleIds.length < roleArchetypeCounts.length) {
- const jobRole = classifyJobRole(job, customRoles);
- matchesRole = selectedRoleIds.includes(jobRole.id);
- }
- }
+      // 7. Work Mode Filter
+      if (workModeFilter === 'remote') {
+        if (!job.remote && !(job.location || '').toLowerCase().includes('remote') && !(job.location || '').toLowerCase().includes('hybrid')) return false;
+      } else if (workModeFilter === 'onsite') {
+        if (job.remote || (job.location || '').toLowerCase().includes('remote')) return false;
+      }
 
- return matchesSearch && matchesSource && matchesStream && matchesRole && matchesDocsReady && matchesSalary && matchesScore && matchesWorkMode && matchesDistance && matchesAge;
- });
+      // 8. Distance Filter (Relative to Candidate Profile Location)
+      if (maxDistanceFilter !== 'All') {
+        const distKm = job.distanceKm || calculateCandidateDistanceKm(job.location, candLoc);
+        if (maxDistanceFilter === '5km' && distKm > 5) return false;
+        if (maxDistanceFilter === '10km' && distKm > 10) return false;
+        if (maxDistanceFilter === '25km' && distKm > 25) return false;
+      }
 
- // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
- return filtered.sort((a, b) => {
- if (sortBy === 'best_and_newest' || !sortBy) {
- const scoreA = a.score || 0;
- const scoreB = b.score || 0;
- const tierA = scoreA >= 80 ? 3 : (scoreA >= 65 ? 2 : 1);
- const tierB = scoreB >= 80 ? 3 : (scoreB >= 65 ? 2 : 1);
- 
- if (tierA !== tierB) {
- return tierB - tierA; // Higher match tier first
- }
- const dateComp = compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
- if (dateComp !== 0) return dateComp;
- 
- return scoreB - scoreA;
- } else if (sortBy === 'date') {
- return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
- } else if (sortBy === 'score') {
- return (b.score || 0) - (a.score || 0);
- } else if (sortBy === 'company') {
- return (a.company || '').localeCompare(b.company || '');
- }
- return 0;
- });
- }, [completeJobs, missingDataJobs, unsubmittedJobs, search, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, customRoles, starredJobIds, docsReadyFilter, rejectedJobs, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, userPrefs]);
+      // 9. Age Filter
+      if (maxAgeFilter !== 'All') {
+        const ageDays = getJobAgeInDays(job.date);
+        if (maxAgeFilter === '13days' && (ageDays === null || ageDays > 13)) return false;
+        if (maxAgeFilter === '7days' && (ageDays === null || ageDays > 7)) return false;
+        if (maxAgeFilter === '3days' && (ageDays === null || ageDays > 3)) return false;
+      }
 
+      // 10. Multi-Role Archetype Filter
+      if (isFilteredRoles) {
+        if (selectedRoleIds.length === 0) return false;
+        const jobRole = classifyJobRole(job, customRoles);
+        if (!selectedRoleIds.includes(jobRole.id)) return false;
+      }
 
- // Paginated Sliced Jobs
- const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
- const totalPages = Math.max(1, Math.ceil(seekerJobs.length / (effectivePageSize || 1)));
+      return true;
+    });
 
- // Reset pagination to page 1 whenever filters or search criteria change
- useEffect(() => {
- setCurrentPage(1);
- }, [search, sourceFilter, activeStreamTab, docsReadyFilter, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, selectedRoleIds]);
+    // Sorting logic (Defaults to Best Matching Tier + Most Recent Date First)
+    return filtered.sort((a, b) => {
+      if (sortBy === 'best_and_newest' || !sortBy) {
+        const scoreA = a.score || 0;
+        const scoreB = b.score || 0;
+        const tierA = scoreA >= 80 ? 3 : (scoreA >= 65 ? 2 : 1);
+        const tierB = scoreB >= 80 ? 3 : (scoreB >= 65 ? 2 : 1);
+        
+        if (tierA !== tierB) {
+          return tierB - tierA; // Higher match tier first
+        }
+        const dateComp = compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
+        if (dateComp !== 0) return dateComp;
+        
+        return scoreB - scoreA;
+      } else if (sortBy === 'date') {
+        return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
+      } else if (sortBy === 'score') {
+        return (b.score || 0) - (a.score || 0);
+      } else if (sortBy === 'company') {
+        return (a.company || '').localeCompare(b.company || '');
+      }
+      return 0;
+    });
+  }, [enrichedPool, deferredSearch, sourceFilter, activeStreamTab, selectedRoleIds, roleArchetypeCounts, customRoles, starredJobIds, docsReadyFilter, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, sortBy, sortDirection, currentProfile, baseLocation]);
+
+  // Paginated Sliced Jobs
+  const effectivePageSize = pageSize === 'All' ? seekerJobs.length : Number(pageSize);
+  const totalPages = Math.max(1, Math.ceil(seekerJobs.length / (effectivePageSize || 1)));
+
+  // Reset pagination to page 1 whenever filters or search criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deferredSearch, sourceFilter, activeStreamTab, docsReadyFilter, minSalaryFilter, minScoreFilter, workModeFilter, maxDistanceFilter, maxAgeFilter, selectedRoleIds]);
 
  // Ensure currentPage does not exceed totalPages when result count drops
  useEffect(() => {
@@ -702,29 +699,29 @@ export const JobSeeker = ({
  const ageLabel = maxAgeFilter === '13days' ? '13 days' : maxAgeFilter === '7days' ? '7 days' : '3 days';
  reasons.push(`posted in the last ${ageLabel}`);
  }
- if (search.trim()) {
- reasons.push(`matching keyword "${search}"`);
- }
- if (minSalaryFilter !== 'All') {
- reasons.push(`matching ${minSalaryFilter} salary`);
- }
- if (minScoreFilter !== 'All') {
- reasons.push(`with ${minScoreFilter} match score`);
- }
+    if (deferredSearch.trim()) {
+      reasons.push(`matching keyword "${deferredSearch}"`);
+    }
+    if (minSalaryFilter !== 'All') {
+      reasons.push(`matching ${minSalaryFilter} salary`);
+    }
+    if (minScoreFilter !== 'All') {
+      reasons.push(`with ${minScoreFilter} match score`);
+    }
 
- let summaryText = 'No opportunities found';
- if (reasons.length > 0) {
- summaryText += ' ' + reasons.join(' ');
- }
+    let summaryText = 'No opportunities found';
+    if (reasons.length > 0) {
+      summaryText += ' ' + reasons.join(' ');
+    }
 
- return {
- summaryText,
- hasStreamFilter: activeStreamTab !== 'All',
- hasDistanceFilter: maxDistanceFilter !== 'All',
- hasAgeFilter: maxAgeFilter !== 'All',
- hasSearchFilter: search.trim() !== ''
- };
- }, [seekerJobs, activeStreamTab, maxDistanceFilter, maxAgeFilter, search, minSalaryFilter, minScoreFilter]);
+    return {
+      summaryText,
+      hasStreamFilter: activeStreamTab !== 'All',
+      hasDistanceFilter: maxDistanceFilter !== 'All',
+      hasAgeFilter: maxAgeFilter !== 'All',
+      hasSearchFilter: deferredSearch.trim() !== ''
+    };
+  }, [seekerJobs, activeStreamTab, maxDistanceFilter, maxAgeFilter, deferredSearch, minSalaryFilter, minScoreFilter]);
 
  const sources = useMemo(() => {
  const s = new Set(jobs.map(j => j.source).filter(Boolean));
@@ -956,7 +953,7 @@ export const JobSeeker = ({
             onOpenGenerator={(job) => setSelectedForGenerator(job)} 
             baseLocation={currentProfile?.location || baseLocation}
             activeStreamTab={activeStreamTab}
-            searchQuery={search}
+            searchQuery={deferredSearch}
           />
         )}
 
@@ -1062,17 +1059,31 @@ export const JobSeeker = ({
  <div className="obsidian-card p-3.5 sm:p-4 rounded-sm border border-slate-800/80 space-y-3 font-mono">
 
  <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
- {/* Main Keyword Search */}
- <div className="relative flex-1 w-full">
- <Search size={16} className="absolute left-3.5 top-3 text-amber-400" />
- <input
- type="text"
- placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
- className="w-full pl-10 pr-3 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all"
- value={search}
- onChange={(e) => setSearch(e.target.value)}
- />
- </div>
+              {/* Main Keyword Search */}
+              <div className="relative flex-1 w-full">
+                {isSearchPending ? (
+                  <Loader2 size={16} className="absolute left-3.5 top-3 text-amber-400 animate-spin" />
+                ) : (
+                  <Search size={16} className="absolute left-3.5 top-3 text-amber-400" />
+                )}
+                <input
+                  type="text"
+                  placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
+                  className="w-full pl-10 pr-9 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-3 top-2.5 p-0.5 text-slate-400 hover:text-amber-400 rounded transition-colors"
+                    title="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
 
  {/* Ready for Submission Filter Toggle */}
  <button

@@ -155,6 +155,65 @@ const detectCoolCategory = (job) => {
   };
 };
 
+// Global WeakMap cache to prevent re-evaluating regexes across unchanged job instances
+const coolnessCache = new WeakMap();
+
+const evaluateJobCoolness = (job) => {
+  if (!job) return null;
+  if (coolnessCache.has(job)) {
+    return coolnessCache.get(job);
+  }
+
+  const title = job.title || '';
+  const desc = job.description || job.snippet || '';
+  const stream = job.stream || '';
+  const tags = Array.isArray(job.tags) ? job.tags.join(' ') : '';
+
+  let matchScore = 0;
+  let matchedArchetype = null;
+  const matchedKwList = [];
+
+  for (const archetype of COOL_TECH_ARCHETYPES) {
+    let archetypeMatches = 0;
+    for (const kw of archetype.keywords) {
+      if (matchesKeyword(title, kw)) {
+        archetypeMatches += 6;
+        matchedKwList.push(kw);
+      } else if (matchesKeyword(stream, kw) || matchesKeyword(tags, kw)) {
+        archetypeMatches += 4;
+        matchedKwList.push(kw);
+      } else if (matchesKeyword(desc, kw)) {
+        archetypeMatches += 2;
+        matchedKwList.push(kw);
+      }
+    }
+    if (archetypeMatches > 0) {
+      matchScore += archetypeMatches;
+      if (!matchedArchetype) matchedArchetype = archetype;
+    }
+  }
+
+  // Outlier salary bonus
+  const parsedSal = parseSalaryNumeric(job);
+  if (matchScore > 0 && parsedSal.max && parsedSal.max >= 150000) {
+    matchScore += 4;
+  }
+
+  // Freshness bonus for verified recent listings that matched an archetype
+  const age = getJobAgeInDays(job.date || job.posted);
+  if (matchScore > 0 && age !== null && age <= 7) matchScore += 2;
+
+  const result = {
+    job,
+    coolnessScore: matchScore,
+    archetype: matchedArchetype || detectCoolCategory(job),
+    matchedKeywords: Array.from(new Set(matchedKwList))
+  };
+
+  coolnessCache.set(job, result);
+  return result;
+};
+
 export const TopMatchesSidebar = ({ 
   jobs = [], 
   onSelectJob, 
@@ -207,28 +266,35 @@ export const TopMatchesSidebar = ({
   // Live Analytics & Points of Interest Computation (Dynamic to candidate's base location)
   const liveInsights = useMemo(() => {
     const totalCount = unsubmittedJobs.length || 1;
-    
-    // Proximity < 10km (or remote) relative to active baseLocation
-    const nearLocation = unsubmittedJobs.filter(j => getDistanceToOrigin(j, baseLocation) <= 10).length;
-    const proximityPct = Math.round((nearLocation / totalCount) * 100);
+    let nearLocation = 0;
+    let topEmployer = null;
+    let topScore = -Infinity;
+    let fresh7Days = 0;
+    let highSalaryCount = 0;
 
-    // Top employer & match score
-    const sortedByScore = [...unsubmittedJobs].sort((a, b) => (b.score || 0) - (a.score || 0));
-    const topEmployer = sortedByScore[0] || null;
-
-    // Fresh < 7 days; an unknown date is not a verified fresh listing.
-    const fresh7Days = unsubmittedJobs.filter((job) => {
-      const age = getJobAgeInDays(job.date || job.posted);
-      return age !== null && age <= 7;
-    }).length;
-
-    // High compensation roles ($100k+) using numerical salary parser
-    const highSalaryCount = unsubmittedJobs.filter(j => matchesSalaryThreshold(j, '100k+')).length;
+    for (let i = 0; i < unsubmittedJobs.length; i++) {
+      const j = unsubmittedJobs[i];
+      if (getDistanceToOrigin(j, baseLocation) <= 10) {
+        nearLocation++;
+      }
+      const score = j.score || 0;
+      if (score > topScore) {
+        topScore = score;
+        topEmployer = j;
+      }
+      const age = getJobAgeInDays(j.date || j.posted);
+      if (age !== null && age <= 7) {
+        fresh7Days++;
+      }
+      if (matchesSalaryThreshold(j, '100k+')) {
+        highSalaryCount++;
+      }
+    }
 
     return {
       nearLocation,
       nearBalaclava: nearLocation,
-      proximityPct,
+      proximityPct: Math.round((nearLocation / totalCount) * 100),
       topEmployer,
       fresh7Days,
       freshPct: Math.round((fresh7Days / totalCount) * 100),
@@ -243,73 +309,35 @@ export const TopMatchesSidebar = ({
       .slice(0, 3);
   }, [unsubmittedJobs]);
 
-  // Highlighted Local Job (Sorted by Proximity to candidate's baseLocation)
+  // Highlighted Local Job (Single-pass O(n) proximity search to candidate's baseLocation)
   const baseSuburb = useMemo(() => extractSuburb(baseLocation), [baseLocation]);
 
   const highlightedLocalJob = useMemo(() => {
     if (!unsubmittedJobs.length) return null;
-    const sortedByProximity = [...unsubmittedJobs].sort((a, b) => {
-      const distA = getDistanceToOrigin(a, baseLocation);
-      const distB = getDistanceToOrigin(b, baseLocation);
-      if (distA !== distB) return distA - distB;
-      return (b.score || 0) - (a.score || 0);
-    });
-    return sortedByProximity[0] || unsubmittedJobs[0];
+    let closest = unsubmittedJobs[0];
+    let minDist = getDistanceToOrigin(closest, baseLocation);
+
+    for (let i = 1; i < unsubmittedJobs.length; i++) {
+      const j = unsubmittedJobs[i];
+      const dist = getDistanceToOrigin(j, baseLocation);
+      if (dist < minDist) {
+        closest = j;
+        minDist = dist;
+      } else if (dist === minDist && (j.score || 0) > (closest.score || 0)) {
+        closest = j;
+        minDist = dist;
+      }
+    }
+    return closest;
   }, [unsubmittedJobs, baseLocation]);
 
   const localJobDist = highlightedLocalJob ? getDistanceToOrigin(highlightedLocalJob, baseLocation) : 0;
 
-  // Wild Card Jobs: Curated pool of cool, unusual, cutting-edge, or novelty tech opportunities
+  // Wild Card Jobs: Curated pool of cool, unusual, cutting-edge, or novelty tech opportunities (Cached via WeakMap)
   const coolWildCardJobs = useMemo(() => {
     if (!unsubmittedJobs.length) return [];
 
-    const scored = unsubmittedJobs.map(job => {
-      const title = job.title || '';
-      const desc = job.description || job.snippet || '';
-      const stream = job.stream || '';
-      const tags = Array.isArray(job.tags) ? job.tags.join(' ') : '';
-
-      let matchScore = 0;
-      let matchedArchetype = null;
-      let matchedKwList = [];
-
-      for (const archetype of COOL_TECH_ARCHETYPES) {
-        let archetypeMatches = 0;
-        for (const kw of archetype.keywords) {
-          if (matchesKeyword(title, kw)) {
-            archetypeMatches += 6;
-            matchedKwList.push(kw);
-          } else if (matchesKeyword(stream, kw) || matchesKeyword(tags, kw)) {
-            archetypeMatches += 4;
-            matchedKwList.push(kw);
-          } else if (matchesKeyword(desc, kw)) {
-            archetypeMatches += 2;
-            matchedKwList.push(kw);
-          }
-        }
-        if (archetypeMatches > 0) {
-          matchScore += archetypeMatches;
-          if (!matchedArchetype) matchedArchetype = archetype;
-        }
-      }
-
-      // Outlier salary bonus
-      const parsedSal = parseSalaryNumeric(job);
-      if (matchScore > 0 && parsedSal.max && parsedSal.max >= 150000) {
-        matchScore += 4;
-      }
-
-      // Freshness bonus for verified recent listings that matched an archetype
-      const age = getJobAgeInDays(job.date || job.posted);
-      if (matchScore > 0 && age !== null && age <= 7) matchScore += 2;
-
-      return {
-        job,
-        coolnessScore: matchScore,
-        archetype: matchedArchetype || detectCoolCategory(job),
-        matchedKeywords: Array.from(new Set(matchedKwList))
-      };
-    });
+    const scored = unsubmittedJobs.map(evaluateJobCoolness).filter(Boolean);
 
     const coolMatches = scored
       .filter(entry => entry.coolnessScore > 0)

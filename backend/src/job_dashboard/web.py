@@ -292,17 +292,23 @@ class DashboardApp:
             self.db_ready_event.set()
 
     def save_search_queries(self):
-        payload = [
-            {"term": query.term, "location": query.location, "stream": query.stream}
-            for query in self.search_queries
-        ]
-        temporary = self.search_queries_path.with_suffix(".tmp")
-        with temporary.open("w", encoding="utf-8") as file:
-            json.dump(payload, file, indent=2)
-            file.write("\n")
-            file.flush()
-            os.fsync(file.fileno())
-        temporary.replace(self.search_queries_path)
+        try:
+            payload = [
+                {"term": query.term, "location": query.location, "stream": query.stream}
+                for query in self.search_queries
+            ]
+            self.search_queries_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self.search_queries_path.with_suffix(".tmp")
+            with temporary.open("w", encoding="utf-8") as file:
+                json.dump(payload, file, indent=2)
+                file.write("\n")
+                file.flush()
+                os.fsync(file.fileno())
+            temporary.replace(self.search_queries_path)
+        except Exception as err:
+            logger.warning(
+                f"Failed to persist search queries to {self.search_queries_path}: {err}"
+            )
 
     def _load_search_queries(self, defaults=None):
 
@@ -363,17 +369,36 @@ class DashboardApp:
             return list(defaults or [])
 
     def update_search_queries(self, items):
+        if isinstance(items, dict):
+            items = items.get("queries") or items.get("items") or []
+        if not isinstance(items, list):
+            items = []
         updated = []
         for item in items:
-            term = str(item.get("term", "")).strip()
-            if not term:
+            if isinstance(item, str):
+                term = item.strip()
+                if not term:
+                    continue
+                item_dict = {"term": term}
+            elif isinstance(item, dict):
+                item_dict = item
+                term = str(
+                    item.get("term", "")
+                    or item.get("query", "")
+                    or item.get("title", "")
+                ).strip()
+                if not term:
+                    continue
+            else:
                 continue
+
             is_remote = any(
                 k in term.lower()
                 for k in ("remote", "wfh", "work from home", "anywhere in australia")
-            ) or bool(item.get("remote"))
+            ) or bool(item_dict.get("remote"))
             raw_loc = str(
-                item.get("location") or ("Australia" if is_remote else "Melbourne, VIC")
+                item_dict.get("location")
+                or ("Australia" if is_remote else "Melbourne, VIC")
             ).strip()
             loc = (
                 "Australia"
@@ -382,19 +407,30 @@ class DashboardApp:
                 )
                 else (raw_loc or "Australia")
             )
+            raw_exclude = item_dict.get("exclude_terms", [])
+            if not isinstance(raw_exclude, (list, tuple)):
+                raw_exclude = []
+            exclude_terms = tuple(str(t).strip() for t in raw_exclude if str(t).strip())
+            try:
+                weight = float(item_dict.get("weight", 1.0))
+            except (ValueError, TypeError):
+                weight = 1.0
+
+            stream = (
+                str(item_dict.get("stream", "core-it")).strip().lower() or "core-it"
+            )
+            group = str(item_dict.get("group", "")).strip()
+            enabled = bool(item_dict.get("enabled", True))
+
             updated.append(
                 SearchQuery(
                     term,
                     loc,
-                    str(item.get("stream", "core-it")).strip().lower() or "core-it",
-                    str(item.get("group", "")).strip(),
-                    float(item.get("weight", 1.0)),
-                    tuple(
-                        str(t).strip()
-                        for t in item.get("exclude_terms", [])
-                        if str(t).strip()
-                    ),
-                    bool(item.get("enabled", True)),
+                    stream,
+                    group,
+                    weight,
+                    exclude_terms,
+                    enabled,
                 )
             )
         self.search_queries = updated
@@ -2368,8 +2404,16 @@ def make_handler(app: DashboardApp):
 
             if path == "/api/jobs":
                 app.db_ready_event.wait(timeout=10.0)
-                page = int(query_params.get("page", ["1"])[0])
-                page_size = int(query_params.get("pageSize", ["50"])[0])
+                try:
+                    page = max(1, int(query_params.get("page", ["1"])[0]))
+                except (ValueError, TypeError):
+                    page = 1
+                try:
+                    page_size = max(
+                        1, min(500, int(query_params.get("pageSize", ["50"])[0]))
+                    )
+                except (ValueError, TypeError):
+                    page_size = 50
                 search = query_params.get("search", [""])[0]
                 industry = query_params.get("industry", [""])[0]
                 remote_param = query_params.get("remote", [None])[0]
@@ -5090,15 +5134,33 @@ def make_handler(app: DashboardApp):
                     return
 
                 if path == "/api/search-criteria":
-                    payload = json.loads(
-                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
-                    )
+                    try:
+                        content_length = int(self.headers.get("Content-Length", "0"))
+                        raw_data = (
+                            self.rfile.read(content_length).decode("utf-8")
+                            if content_length > 0
+                            else "{}"
+                        )
+                        payload = json.loads(raw_data) if raw_data.strip() else {}
+                    except Exception as err:
+                        logger.warning(
+                            f"Error parsing POST /api/search-criteria body: {err}"
+                        )
+                        payload = {}
+
+                    if isinstance(payload, dict):
+                        raw_queries = payload.get("queries", payload.get("items", []))
+                    elif isinstance(payload, list):
+                        raw_queries = payload
+                    else:
+                        raw_queries = []
+
+                    res_queries = app.update_search_queries(raw_queries)
                     self.send_json(
                         200,
                         {
-                            "queries": app.update_search_queries(
-                                payload.get("queries", [])
-                            )
+                            "success": True,
+                            "queries": res_queries,
                         },
                     )
                     return

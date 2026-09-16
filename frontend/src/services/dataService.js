@@ -443,8 +443,8 @@ export const fetchJobsFromApi = async ({
 
   try {
     const res = await fetch(`${apiBase}/api/jobs?${params.toString()}`, {
-      // Large indexed responses need time to serialize on Cloud Run.
-      signal: AbortSignal.timeout(30000)
+      // Allow sufficient time for indexed job queries
+      signal: AbortSignal.timeout(45000)
     });
     if (res.ok) {
       const data = await res.json();
@@ -641,15 +641,23 @@ const fetchDemoFallbackJobs = async () => {
   };
 };
 
+let inFlightFetchJobsPromise = null;
+
 /**
  * Main fetch function for populating the active dashboard state.
  * Queries /api/jobs (or cached jobs), deduplicates them cleanly, and merges user-scoped applications.
  */
 export const fetchJobsData = async () => {
-  const [apiJobsResult, userApps] = await Promise.all([
-    fetchJobsFromApi({ page: 1, pageSize: 5000 }),
-    fetchUserApplications()
-  ]);
+  if (inFlightFetchJobsPromise) {
+    return inFlightFetchJobsPromise;
+  }
+
+  inFlightFetchJobsPromise = (async () => {
+    try {
+      const [apiJobsResult, userApps] = await Promise.all([
+        fetchJobsFromApi({ page: 1, pageSize: 300 }),
+        fetchUserApplications()
+      ]);
 
   const jobs = apiJobsResult?.jobs || [];
   if (apiJobsResult?.isFallback && typeof window !== 'undefined') {
@@ -737,7 +745,13 @@ export const fetchJobsData = async () => {
   }
 
   // Return strictly genuine scraped & custom job ads
-  return deduplicatedJobs;
+      return deduplicatedJobs;
+    } finally {
+      inFlightFetchJobsPromise = null;
+    }
+  })();
+
+  return inFlightFetchJobsPromise;
 };
 
 

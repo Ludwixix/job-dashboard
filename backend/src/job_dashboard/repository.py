@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,8 @@ class JobRepository:
     def __init__(self, path: str | Path):
         self.path = str(path)
         self.pool = get_connection_pool(self.path)
+        self._public_jobs_cache = None
+        self._public_jobs_cache_time = 0.0
 
         # Initialize database schema
         self._init_schema()
@@ -546,6 +549,8 @@ class JobRepository:
 
         duration = (datetime.now() - start_time).total_seconds()
         logger.info(f"Updated job {job_id} status to {status} in {duration:.3f}s")
+        self._public_jobs_cache = None
+        self._public_jobs_cache_time = 0.0
 
         return {"job_id": job_id, "status": status}
 
@@ -722,6 +727,8 @@ class JobRepository:
         logger.info(
             f"Batch upserted {len(batch_params)} scraped jobs in {duration:.3f}s"
         )
+        self._public_jobs_cache = None
+        self._public_jobs_cache_time = 0.0
         return len(batch_params)
 
     def query_jobs_paginated(
@@ -735,101 +742,123 @@ class JobRepository:
     ) -> dict[str, Any]:
         """Query jobs with database-level pagination, search filtering, and sorting."""
         page = max(1, int(page))
-        page_size = max(1, min(10000, int(page_size)))
+        page_size = max(1, min(500, int(page_size)))
         offset = (page - 1) * page_size
 
-        # Gmail messages are workflow records, not public job listings.
-        clauses = ["lower(source) != 'gmail'"]
-        params: list[Any] = []
+        is_default_query = (
+            not search
+            and (not industry or industry.lower() == "all")
+            and remote is None
+        )
+        if (
+            is_default_query
+            and self._public_jobs_cache is not None
+            and (time.time() - self._public_jobs_cache_time < 300)
+        ):
+            jobs = [dict(j) for j in self._public_jobs_cache]
+        else:
+            # Gmail messages are workflow records, not public job listings.
+            clauses = ["lower(source) != 'gmail'"]
+            params: list[Any] = []
 
-        if search:
-            search_pattern = f"%{search.strip().lower()}%"
-            clauses.append(
-                "(lower(title) LIKE ? OR lower(company) LIKE ? OR lower(location) LIKE ? OR lower(description) LIKE ? OR lower(source) LIKE ?)"
-            )
-            params.extend(
-                [
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                ]
-            )
-
-        if industry and industry.lower() != "all":
-            clauses.append("(lower(stream) LIKE ? OR lower(data_json) LIKE ?)")
-            params.extend(
-                [f"%{industry.strip().lower()}%", f"%{industry.strip().lower()}%"]
-            )
-
-        if remote is not None:
-            clauses.append("remote = ?")
-            params.append(1 if remote else 0)
-
-        where_sql = " AND ".join(clauses)
-
-        with get_db_connection(self.path) as conn:
-            conn.row_factory = sqlite3.Row
-
-            # Public job reads are intentionally materialized and filtered in
-            # Python: SQLite's lexical ORDER BY would place values such as
-            # "Featured" above ISO dates, and it cannot reliably interpret
-            # provider-relative values such as "9d ago". This also keeps
-            # workflow/email records out of the public index.
-            rows = conn.execute(
-                f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql}",
-                params,
-            ).fetchall()
-
-        jobs = []
-        for row in rows:
-            try:
-                job_data = json.loads(row["data_json"])
-                if str(job_data.get("source") or "").strip().lower() == "gmail":
-                    continue
-                posted = self._parse_posted_timestamp(
-                    job_data.get("posted") or job_data.get("date")
+            if search:
+                search_pattern = f"%{search.strip().lower()}%"
+                clauses.append(
+                    "(lower(title) LIKE ? OR lower(company) LIKE ? OR lower(location) LIKE ? OR lower(description) LIKE ? OR lower(source) LIKE ?)"
                 )
-                if posted is None:
+                params.extend(
+                    [
+                        search_pattern,
+                        search_pattern,
+                        search_pattern,
+                        search_pattern,
+                        search_pattern,
+                    ]
+                )
+
+            if industry and industry.lower() != "all":
+                clauses.append("(lower(stream) LIKE ? OR lower(data_json) LIKE ?)")
+                params.extend(
+                    [f"%{industry.strip().lower()}%", f"%{industry.strip().lower()}%"]
+                )
+
+            if remote is not None:
+                clauses.append("remote = ?")
+                params.append(1 if remote else 0)
+
+            where_sql = " AND ".join(clauses)
+
+            with get_db_connection(self.path) as conn:
+                conn.row_factory = sqlite3.Row
+
+                # Public job reads are intentionally materialized and filtered in
+                # Python: SQLite's lexical ORDER BY would place values such as
+                # "Featured" above ISO dates, and it cannot reliably interpret
+                # provider-relative values such as "9d ago". This also keeps
+                # workflow/email records out of the public index.
+                rows = conn.execute(
+                    f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql}",
+                    params,
+                ).fetchall()
+
+            jobs = []
+            for row in rows:
+                try:
+                    job_data = json.loads(row["data_json"])
+                    if str(job_data.get("source") or "").strip().lower() == "gmail":
+                        continue
+                    posted = self._parse_posted_timestamp(
+                        job_data.get("posted") or job_data.get("date")
+                    )
+                    if posted is None:
+                        continue
+                    job_data["status"] = row["status"]
+                    job_data["_posted_timestamp"] = posted
+                    jobs.append(job_data)
+                except Exception:
                     continue
-                job_data["status"] = row["status"]
-                job_data["_posted_timestamp"] = posted
-                jobs.append(job_data)
-            except Exception:
-                continue
+
+            if is_default_query:
+                self._public_jobs_cache = [dict(j) for j in jobs]
+                self._public_jobs_cache_time = time.time()
 
         if sort_by == "score":
             jobs.sort(
-                key=lambda job: (int(job.get("score") or 0), job["_posted_timestamp"]),
+                key=lambda job: (
+                    int(job.get("score") or 0),
+                    job.get("_posted_timestamp", 0.0),
+                ),
                 reverse=True,
             )
         elif sort_by == "company":
             jobs.sort(
                 key=lambda job: (
                     str(job.get("company") or "").casefold(),
-                    -job["_posted_timestamp"],
+                    -job.get("_posted_timestamp", 0.0),
                 )
             )
         elif sort_by == "title":
             jobs.sort(
                 key=lambda job: (
                     str(job.get("title") or "").casefold(),
-                    -job["_posted_timestamp"],
+                    -job.get("_posted_timestamp", 0.0),
                 )
             )
         else:
-            jobs.sort(key=lambda job: job["_posted_timestamp"], reverse=True)
+            jobs.sort(key=lambda job: job.get("_posted_timestamp", 0.0), reverse=True)
 
         total_count = len(jobs)
-        jobs = jobs[offset : offset + page_size]
-        for job in jobs:
-            job.pop("_posted_timestamp", None)
+        sliced_jobs = jobs[offset : offset + page_size]
+        result_jobs = []
+        for job in sliced_jobs:
+            clean_job = dict(job)
+            clean_job.pop("_posted_timestamp", None)
+            result_jobs.append(clean_job)
 
         total_pages = max(1, (total_count + page_size - 1) // page_size)
 
         return {
-            "jobs": jobs,
+            "jobs": result_jobs,
             "total": total_count,
             "page": page,
             "pageSize": page_size,

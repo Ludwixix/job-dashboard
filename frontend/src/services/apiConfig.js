@@ -12,12 +12,12 @@ export const getBackendApiBase = () => {
     return 'http://127.0.0.1:8787';
   }
   
-  // Local development: use same origin
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  // In the browser, prefer window.location.origin so all requests are same-origin
+  if (window.location.origin && window.location.origin !== 'null') {
     return window.location.origin;
   }
   
-  // Production: use Cloud Run endpoint
+  // Production fallback: use Cloud Run endpoint
   return 'https://job-dashboard-6xrdvjlrcq-ts.a.run.app';
 };
 

@@ -635,3 +635,4 @@ export const generateIntelligenceArtifact = async (toolKey, job, candidateProfil
     generatedAt: new Date().toISOString()
   };
 };
+

@@ -257,6 +257,9 @@ class JobRepository:
                 "ALTER TABLE user_applications ADD COLUMN last_scanned_at TEXT DEFAULT ''",
                 "ALTER TABLE user_applications ADD COLUMN last_email_subject TEXT DEFAULT ''",
                 "ALTER TABLE user_applications ADD COLUMN last_email_date TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN google_id TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN picture TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN passkey_id TEXT DEFAULT ''",
             ]:
                 try:
                     conn.execute(col_sql)

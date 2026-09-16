@@ -392,6 +392,44 @@ export const loadSectorTemplate = (sectorKey = 'technology') => {
   return template;
 };
 
+export const CLEAN_CANDIDATE_PROFILE = {
+  id: '',
+  name: 'Candidate',
+  title: '',
+  industry: 'Technology & IT',
+  seniorityLevel: 'Mid / Senior',
+  yearsOfExperience: 3,
+  marketArchetype: '',
+  email: '',
+  phone: '',
+  location: 'Melbourne, VIC',
+  suburb: 'Melbourne',
+  state: 'VIC',
+  country: 'Australia',
+  workRights: 'Australian Citizen (Unrestricted)',
+  clearance: '',
+  targetSalary: '$100,000 - $130,000 + Super',
+  salaryExpectations: {
+    min: 100000,
+    max: 130000,
+    preferred: 115000,
+    currency: 'AUD',
+    period: 'annual'
+  },
+  linkedin: '',
+  portfolio: '',
+  github: '',
+  keyStrengths: [],
+  managementStyle: '',
+  targetTitles: [],
+  coreSkills: [],
+  certifications: [],
+  projects: [],
+  interviewTalkingPoints: [],
+  workHistorySummary: '',
+  fullWorkExperienceText: ''
+};
+
 /**
  * Returns the single active user profile.
  */
@@ -422,6 +460,18 @@ export const getActiveProfile = () => {
         if (sessionUser) {
           matched = parsedList.find(p => p.id === sessionUser.id || p.id === sessionUser.profileId || (p.email && sessionUser.email && p.email.toLowerCase() === sessionUser.email.toLowerCase()));
         }
+        if (!matched && sessionUser && (sessionUser.name || sessionUser.email)) {
+          const userProfile = {
+            ...CLEAN_CANDIDATE_PROFILE,
+            id: sessionUser.id || sessionUser.profileId || 'user_' + Date.now(),
+            name: sessionUser.name || 'Candidate',
+            email: sessionUser.email || '',
+            industry: sessionUser.industry || 'Technology & IT',
+            updatedAt: new Date().toISOString()
+          };
+          localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));
+          return userProfile;
+        }
         if (!matched) {
           matched = parsedList.find(p => p.name?.toLowerCase().includes('sam') || p.id === 'sam_ludwig') || parsedList[0];
         }
@@ -430,6 +480,19 @@ export const getActiveProfile = () => {
           return matched;
         }
       }
+    }
+
+    if (sessionUser && (sessionUser.name || sessionUser.email)) {
+      const userProfile = {
+        ...CLEAN_CANDIDATE_PROFILE,
+        id: sessionUser.id || sessionUser.profileId || 'user_' + Date.now(),
+        name: sessionUser.name || 'Candidate',
+        email: sessionUser.email || '',
+        industry: sessionUser.industry || 'Technology & IT',
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));
+      return userProfile;
     }
   } catch (e) {
     console.warn('Error reading active profile:', e);
@@ -459,15 +522,23 @@ export const saveProfile = (updatedProfile, options = {}) => {
   if (!updatedProfile || typeof updatedProfile !== 'object') return DEFAULT_USER_PROFILE;
 
   let sessionUserId = null;
+  let sessionUser = null;
   try {
     const rawSession = localStorage.getItem('job_dashboard_current_user_session') || localStorage.getItem('job_dashboard_google_auth_user');
-    if (rawSession) sessionUserId = JSON.parse(rawSession)?.id;
+    if (rawSession) {
+      sessionUser = JSON.parse(rawSession);
+      sessionUserId = sessionUser?.id;
+    }
   } catch {}
 
+  const email = (updatedProfile.email || sessionUser?.email || '').toLowerCase();
+  const isSam = email.includes('sam.ludwig') || updatedProfile.id === 'sam_ludwig' || (!sessionUser && !email);
+  const baseProfile = isSam ? DEFAULT_USER_PROFILE : CLEAN_CANDIDATE_PROFILE;
+
   const profile = {
-    ...DEFAULT_USER_PROFILE,
+    ...baseProfile,
     ...updatedProfile,
-    id: updatedProfile.id || sessionUserId || DEFAULT_USER_PROFILE.id,
+    id: updatedProfile.id || sessionUserId || baseProfile.id || `user_${Date.now()}`,
     updatedAt: updatedProfile.updatedAt || new Date().toISOString()
   };
 

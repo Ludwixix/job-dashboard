@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
- X, LogIn, LogOut, CheckCircle2, ShieldCheck, Mail, 
- Table, Sparkles, Key, AlertCircle, RefreshCw, ExternalLink, Zap, Activity
+  X, LogIn, LogOut, CheckCircle2, ShieldCheck, Mail, 
+  Table, Sparkles, Key, AlertCircle, RefreshCw, ExternalLink, Zap, Activity, Fingerprint
 } from 'lucide-react';
 import { 
- getAuthenticatedUser, setAuthenticatedUser, signOutGoogleUser, 
- requestGoogleAuthToken, getGoogleClientId, setGoogleClientId,
- isValidGoogleClientId, simulateGoogleWorkspaceAuth, loginWithGoogle 
+  getAuthenticatedUser, setAuthenticatedUser, signOutGoogleUser, 
+  requestGoogleAuthToken, getGoogleClientId, setGoogleClientId,
+  isValidGoogleClientId, simulateGoogleWorkspaceAuth, loginWithGoogle 
 } from '../services/googleAuthService';
-import { loginWithBrowserPasskey } from '../services/passkeyService';
+import { loginWithBrowserPasskey, registerDevicePasskey } from '../services/passkeyService';
+import { linkGoogleAccount } from '../services/authService';
 
 export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs = [] }) => {
  const [user, setUser] = useState(() => getAuthenticatedUser());
@@ -52,6 +53,23 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs =
  }
  };
 
+ const handleRegisterPasskey = async () => {
+ if (!user) return;
+ setIsConnecting(true);
+ setErrorMsg('');
+ try {
+ const result = await registerDevicePasskey(user);
+ const updatedUser = { ...user, hasPasskey: true };
+ setUser(updatedUser);
+ setSuccessMsg(result.message || 'Passkey successfully created on this device and bound to your account!');
+ if (onAuthChange) onAuthChange(updatedUser);
+ } catch (err) {
+ setErrorMsg(err.message || 'Passkey setup failed.');
+ } finally {
+ setIsConnecting(false);
+ }
+ };
+
  const handleInstantConnect = () => {
  try {
  const authUser = simulateGoogleWorkspaceAuth(activeProfile || { name: 'Google User', email: 'candidate@gmail.com' });
@@ -77,6 +95,14 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs =
  autoScanGmail: true,
  onStatusUpdate: (msg) => setSuccessMsg(msg)
  });
+
+ if (result?.user) {
+ try {
+ await linkGoogleAccount(result.user);
+ } catch (linkErr) {
+ console.debug('Link Google account status:', linkErr);
+ }
+ }
 
  setUser(result.user);
  setSuccessMsg(`Connected as ${result.user.name} (${result.user.email})! Synced ${result.scanCount || 0} applications from Gmail.`);
@@ -154,6 +180,33 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs =
  </p>
  </div>
  )}
+
+      {/* WebAuthn Passkey Section */}
+      {user && (
+        <div className="p-3.5 rounded-sm bg-[#16120e] border border-[#d48b38]/40 space-y-2 font-mono">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[#d48b38] font-bold text-xs">
+              <Fingerprint size={16} />
+              <span>WEBAUTHN DEVICE PASSKEY</span>
+            </div>
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm ${user.hasPasskey ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+              {user.hasPasskey ? 'ACTIVE' : 'NOT CONFIGURED'}
+            </span>
+          </div>
+          <p className="text-slate-400 text-[10px] leading-relaxed">
+            Bind this device (Touch ID, Face ID, Windows Hello, or hardware key) to your account for 1-click passwordless login.
+          </p>
+          <button
+            type="button"
+            onClick={handleRegisterPasskey}
+            disabled={isConnecting}
+            className="w-full py-2 px-3 bg-[#221b14] hover:bg-[#2e241b] text-[#d48b38] hover:text-[#f2a144] border border-[#d48b38]/60 rounded-sm font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Fingerprint size={14} />
+            <span>{user.hasPasskey ? 'UPDATE / ADD PASSKEY FOR THIS DEVICE' : 'SET UP PASSKEY ON THIS DEVICE'}</span>
+          </button>
+        </div>
+      )}
 
  {/* Scopes Overview */}
  <div className="space-y-2.5 bg-slate-950/80 p-4 rounded-sm border border-slate-800 text-[11px]">
@@ -296,14 +349,26 @@ export const AuthModal = ({ isOpen, onClose, onAuthChange, activeProfile, jobs =
  Close
  </button>
 
- {user ? (
- <button
- onClick={handleSignOut}
- className="px-5 py-2.5 rounded-sm bg-rose-900/80 hover:bg-rose-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
- >
- <LogOut size={14} /> Sign Out
- </button>
- ) : (
+        {user ? (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRegisterPasskey}
+              disabled={isConnecting}
+              className="px-4 py-2.5 rounded-sm bg-[#16120e] hover:bg-[#201913] border border-[#d48b38]/50 text-[#d48b38] hover:text-[#f2a144] font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              title="Register a WebAuthn biometric passkey on this device"
+            >
+              <Fingerprint size={14} className="text-[#d48b38]" />
+              <span>{user.hasPasskey ? "✓ PASSKEY ACTIVE (ADD DEVICE)" : "🔑 SET UP PASSKEY ON THIS DEVICE"}</span>
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="px-5 py-2.5 rounded-sm bg-rose-900/80 hover:bg-rose-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <LogOut size={14} /> Sign Out
+            </button>
+          </div>
+        ) : (
  <div className="flex flex-col sm:flex-row items-center gap-2">
  <button
  type="button"

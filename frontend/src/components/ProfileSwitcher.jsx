@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, ChevronDown, Edit2, Sparkles, MapPin, Briefcase, Mail, Phone, ShieldCheck, DollarSign, Award, RefreshCw, Settings } from 'lucide-react';
+import { User, ChevronDown, Edit2, Sparkles, MapPin, Briefcase, Mail, Phone, ShieldCheck, DollarSign, Award, RefreshCw, Settings, Fingerprint } from 'lucide-react';
 import { getActiveProfile } from '../services/profileService';
 
-export const ProfileSwitcher = ({ activeProfile, onProfileChange, onOpenProfileModal, onOpenSettings }) => {
+export const ProfileSwitcher = ({ activeProfile, onProfileChange, onOpenProfileModal, onOpenSettings, onOpenAuth }) => {
  const [isOpen, setIsOpen] = useState(false);
  const dropdownRef = useRef(null);
  const profile = activeProfile || getActiveProfile();
@@ -129,6 +129,19 @@ export const ProfileSwitcher = ({ activeProfile, onProfileChange, onOpenProfileM
  <Edit2 size={13} className="text-amber-300" />
  <span>Edit Profile & Update Resume</span>
  </button>
+
+ {onOpenAuth && (
+ <button
+ onClick={() => {
+ setIsOpen(false);
+ onOpenAuth();
+ }}
+ className="w-full py-2 px-3 rounded-sm bg-[#16120e] hover:bg-[#221b14] text-[#d48b38] hover:text-[#f2a144] font-bold text-xs flex items-center justify-center gap-2 border border-[#d48b38]/40 transition-all cursor-pointer"
+ >
+ <Fingerprint size={13} className="text-[#d48b38]" />
+ <span>Account &amp; Passkey Setup</span>
+ </button>
+ )}
 
  {onOpenSettings && (
  <button

@@ -11,6 +11,121 @@ const isLocalHost = typeof window !== 'undefined' && (window.location.hostname =
 const getApiBase = () => isLocalHost ? '' : (SCRAPER_BASE_URL || '');
 
 /**
+ * Register a WebAuthn passkey on the current device and bind it to the authenticated user account.
+ * @param {Object} user - The authenticated candidate user object
+ * @returns {Promise<Object>} Backend registration confirmation
+ */
+export const registerDevicePasskey = async (user) => {
+  if (!user || (!user.id && !user.email)) {
+    throw new Error('You must be signed in to configure a passkey.');
+  }
+  if (!isPasskeySupported()) {
+    throw new Error('WebAuthn / Passkeys are not supported by this browser or platform.');
+  }
+
+  const apiBase = getApiBase();
+  const token = localStorage.getItem('job_dashboard_auth_token');
+
+  // Generate cryptographic challenge
+  const challenge = new Uint8Array(32);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(challenge);
+  }
+
+  const userIdStr = user.id || user.email;
+  const userEncoder = new TextEncoder();
+  const userIdBytes = userEncoder.encode(userIdStr);
+
+  const createOptions = {
+    publicKey: {
+      challenge: challenge,
+      rp: {
+        id: (typeof window !== 'undefined' && window.location.hostname) ? window.location.hostname : 'localhost',
+        name: 'Career Agent Dashboard'
+      },
+      user: {
+        id: userIdBytes,
+        name: user.email || 'candidate@example.com',
+        displayName: user.name || user.email || 'Candidate'
+      },
+      pubKeyCredParams: [
+        { type: 'public-key', alg: -7 },  // ES256
+        { type: 'public-key', alg: -257 } // RS256
+      ],
+      authenticatorSelection: {
+        userVerification: 'preferred',
+        residentKey: 'preferred',
+        requireResidentKey: false
+      },
+      timeout: 60000,
+      attestation: 'none'
+    }
+  };
+
+  let credential;
+  try {
+    if (!navigator.credentials || !navigator.credentials.create) {
+      throw new Error('WebAuthn credentials.create is not supported in this environment.');
+    }
+    credential = await navigator.credentials.create(createOptions);
+  } catch (err) {
+    if (err.name === 'NotAllowedError') {
+      throw new Error('Passkey creation was cancelled or timed out.');
+    }
+    throw new Error(err.message || 'Passkey setup failed.');
+  }
+
+  if (!credential) {
+    throw new Error('No credential returned by the device authenticator.');
+  }
+
+  // Base64 encode the credential rawId
+  const rawId = credential.rawId
+    ? btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+    : credential.id;
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (user.id) {
+    headers['X-User-Id'] = user.id;
+  }
+
+  const res = await fetch(`${apiBase}/api/passkey-setup`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      credential_id: rawId,
+      credential_type: 'webauthn_passkey',
+      id: credential.id
+    })
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || 'Failed to save passkey on backend.');
+  }
+
+  const data = await res.json();
+
+  // Update localStorage session to reflect active passkey
+  try {
+    const sessionStr = localStorage.getItem('job_dashboard_current_user_session');
+    if (sessionStr) {
+      const session = JSON.parse(sessionStr);
+      session.hasPasskey = true;
+      session.passkeyUpdatedAt = new Date().toISOString();
+      localStorage.setItem('job_dashboard_current_user_session', JSON.stringify(session));
+    }
+  } catch (e) {
+    console.debug('Failed to update localStorage session for passkey:', e);
+  }
+
+  return data;
+};
+
+/**
  * Checks if WebAuthn or Credential Management is supported by the current browser
  */
 export const isPasskeySupported = () => {

@@ -814,6 +814,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  setIsProfileModalOpen(true);
  }}
  onOpenSettings={() => setIsSettingsOpen(true)}
+ onOpenAuth={() => setIsAuthModalOpen(true)}
  />
 
  {/* Quick Action: + Custom Job */}

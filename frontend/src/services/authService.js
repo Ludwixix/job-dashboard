@@ -171,11 +171,87 @@ export const registerWithEmail = async (name, email, password) => {
   const sessionUser = {
     ...data.user,
     authProvider: 'email',
-    onboardingCompleted: false
+    onboardingCompleted: false,
+    profileId: data.user.id
   };
 
   setSession(sessionUser, data.token);
+  try {
+    localStorage.setItem('career_agent_site_unlocked', 'true');
+  } catch {}
+
+  // Initialize clean candidate profile with user's name & email
+  const initialProfile = {
+    id: data.user.id,
+    name: cleanName,
+    email: cleanEmail,
+    title: '',
+    industry: 'Technology & IT',
+    location: 'Melbourne, VIC',
+    workRights: 'Australian Citizen (Unrestricted)',
+    targetTitles: [],
+    coreSkills: [],
+    keyStrengths: [],
+    updatedAt: new Date().toISOString()
+  };
+  saveProfile(initialProfile);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth-changed', {
+      detail: { user: sessionUser, session: sessionUser, profile: initialProfile }
+    }));
+    window.dispatchEvent(new CustomEvent('profile-updated', {
+      detail: initialProfile
+    }));
+  }
+
   return sessionUser;
+};
+
+/**
+ * Links a Google Account to the currently active authenticated session
+ */
+export const linkGoogleAccount = async (googleAuthData) => {
+  const token = getAuthToken();
+  const apiBase = getApiBase();
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${apiBase}/api/link-google`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      google_id: googleAuthData.id || googleAuthData.sub,
+      email: googleAuthData.email,
+      picture: googleAuthData.picture
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to link Google account');
+  }
+
+  const current = getCurrentSession();
+  if (current) {
+    const updated = {
+      ...current,
+      googleEmail: data.linked_email || googleAuthData.email,
+      picture: googleAuthData.picture || current.picture
+    };
+    setSession(updated, token);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth-changed', {
+        detail: { user: updated, session: updated, profile: getActiveProfile() }
+      }));
+    }
+  }
+
+  return data;
 };
 
 /**

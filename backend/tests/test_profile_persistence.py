@@ -24,7 +24,10 @@ def test_app_and_handler(tmp_path):
                 email TEXT UNIQUE NOT NULL,
                 name TEXT,
                 password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                email_verified INTEGER DEFAULT 0,
+                email_verification_code TEXT,
+                email_verification_expires_at TEXT
             )
         """)
         conn.execute("""
@@ -72,7 +75,7 @@ def test_auth_profile_persistence_lifecycle(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"email": "candidate@example.com", "password": "securepassword123", "name": "Jane Doe"}
+        body={"email": "candidate@example.com", "password": "SecurePassword123!", "name": "Jane Doe"}
     )
     reg_handler.do_POST()
     assert reg_handler.send_response.call_args[0][0] == 200
@@ -123,7 +126,7 @@ def test_auth_profile_persistence_lifecycle(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/login",
-        body={"email": "candidate@example.com", "password": "securepassword123"}
+        body={"email": "candidate@example.com", "password": "SecurePassword123!"}
     )
     login_handler.do_POST()
     assert login_handler.send_response.call_args[0][0] == 200

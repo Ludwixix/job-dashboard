@@ -6,7 +6,10 @@ import {
  TrendingUp, Megaphone, HardHat, Users, Scale, Server, GraduationCap, Check,
  ShoppingBag, Truck, Palette, Compass, Key, Sliders, Award, Target, HelpCircle, Info, ChevronRight
 } from 'lucide-react';
-import { loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPersona } from '../services/authService';
+import { 
+  loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPersona,
+  verifyEmail, resendVerificationCode, validatePasswordStrength 
+} from '../services/authService';
 import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES, saveProfileToBackend } from '../services/profileService';
 import { loginWithBrowserPasskey, isPasskeySupported, storeBrowserCredentials } from '../services/passkeyService';
 import { loginWithGoogle } from '../services/googleAuthService';
@@ -152,127 +155,226 @@ const CLEARANCE_OPTIONS = [
  'White Card / Industry Specific Cleared'
 ];
 
-export const OnboardingFlow = ({ onComplete }) => {
- const [step, setStep] = useState(1); // 1: Auth, 2: Industry, 3: Roles & Skills, 4: Location & Work Style, 5: Review & Launch
- const [authMode, setAuthMode] = useState('login'); // 'login', 'signup'
- 
- // Step 1 Auth state
- const [authName, setAuthName] = useState('');
- const [authEmail, setAuthEmail] = useState('');
- const [authPassword, setAuthPassword] = useState('');
- const [authLoading, setAuthLoading] = useState(false);
- const [authError, setAuthError] = useState('');
+export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = null }) => {
+  const [currentUser, setCurrentUser] = useState(initialUser);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(() => {
+    if (initialUser) {
+      return !initialUser.email_verified;
+    }
+    return false;
+  });
+  const [step, setStep] = useState(() => {
+    if (initialUser) {
+      return initialUser.email_verified ? 2 : 1;
+    }
+    return 1;
+  });
+  const [authMode, setAuthMode] = useState('login'); // 'login', 'signup'
+  
+  // Step 1 Auth state
+  const [authName, setAuthName] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
- // Step 2-4 Profile Builder state
- const [profileData, setProfileData] = useState({
- id: `profile_${Date.now()}`,
- name: '',
- email: '',
- phone: '0400 000 000',
- title: '',
- industry: 'Technology & IT',
- seniorityLevel: 'Senior',
- location: 'Balaclava VIC 3183',
- suburb: 'Balaclava',
- workMode: 'Any / Flexible',
- targetSalary: '$130,000 + Super',
- workRights: 'Australian Citizen (Unrestricted)',
- clearance: 'Citizen / Standard Police Check',
- targetTitles: ['Senior Systems Engineer', 'Cloud Infrastructure Engineer', 'M365 Engineer'],
- coreSkills: ['Microsoft 365', 'Azure', 'PowerShell', 'Active Directory'],
- certifications: [],
- workHistorySummary: '',
- fullWorkExperienceText: ''
- });
+  // Email Verification state
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifySuccess, setVerifySuccess] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [resendStatus, setResendStatus] = useState('');
 
- // Step 3 Resume Parsing state
- const [resumeText, setResumeText] = useState('');
- const [isParsing, setIsParsing] = useState(false);
- const [parseSuccessMsg, setParseSuccessMsg] = useState('');
- const [newTitleInput, setNewTitleInput] = useState('');
- const [newSkillInput, setNewSkillInput] = useState('');
- const [isLaunching, setIsLaunching] = useState(false);
- const [launchMessage, setLaunchMessage] = useState('');
+  // Step 2-4 Profile Builder state
+  const [profileData, setProfileData] = useState(() => ({
+    id: initialUser?.id || initialUser?.profileId || `profile_${Date.now()}`,
+    name: initialUser?.name || '',
+    email: initialUser?.email || '',
+    phone: initialUser?.phone || '0400 000 000',
+    title: initialUser?.title || '',
+    industry: initialUser?.industry || 'Technology & IT',
+    seniorityLevel: initialUser?.seniorityLevel || 'Senior',
+    location: initialUser?.location || 'Balaclava VIC 3183',
+    suburb: initialUser?.suburb || 'Balaclava',
+    workMode: initialUser?.workMode || 'Any / Flexible',
+    targetSalary: initialUser?.targetSalary || '$130,000 + Super',
+    workRights: initialUser?.workRights || 'Australian Citizen (Unrestricted)',
+    clearance: initialUser?.clearance || 'Citizen / Standard Police Check',
+    targetTitles: initialUser?.targetTitles || ['Senior Systems Engineer', 'Cloud Infrastructure Engineer', 'M365 Engineer'],
+    coreSkills: initialUser?.coreSkills || ['Microsoft 365', 'Azure', 'PowerShell', 'Active Directory'],
+    certifications: initialUser?.certifications || [],
+    workHistorySummary: initialUser?.workHistorySummary || '',
+    fullWorkExperienceText: initialUser?.fullWorkExperienceText || '',
+    email_verified: Boolean(initialUser?.email_verified)
+  }));
 
- // Live active industry theme styling
- const activeIndustryTheme = useMemo(() => {
- return getIndustryTheme(profileData.industry);
- }, [profileData.industry]);
+  // Countdown timer for resend code
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
- useEffect(() => {
- applyIndustryTheme(profileData.industry);
- }, [profileData.industry]);
+  // Auth password strength in signup mode
+  const signupPwdStrength = useMemo(() => {
+    return validatePasswordStrength(authPassword);
+  }, [authPassword]);
 
- // Bespoke Setup Readiness Score (0 to 100%) & AI Career Coach Insights
- const readinessAnalysis = useMemo(() => {
- let score = 0;
- const missingItems = [];
- if (profileData.name && profileData.name.trim().length >= 2) {
- score += 15;
- } else {
- missingItems.push('Enter your name');
- }
- if (profileData.email) score += 10;
- if (profileData.industry) score += 15;
- if (profileData.seniorityLevel) score += 10;
- if (profileData.targetTitles?.length >= 2) {
- score += 20;
- } else {
- missingItems.push('Add at least 2 target titles');
- }
- if (profileData.coreSkills?.length >= 6) {
- score += 20;
- } else if (profileData.coreSkills?.length >= 3) {
- score += 10;
- missingItems.push('Add 3 more domain skills for ATS optimization');
- } else {
- missingItems.push('Add skills to reach ATS threshold');
- }
- if (profileData.location) score += 10;
- return {
- score: Math.min(100, score),
- missingItems,
- atsDensity: (profileData.coreSkills?.length || 0) >= 8 ? 'Optimal' : (profileData.coreSkills?.length || 0) >= 4 ? 'Good' : 'Low'
- };
- }, [profileData]);
+  // Handle 6-digit email verification submission
+  const handleVerifyEmail = async (e) => {
+    if (e) e.preventDefault();
+    setVerifyError('');
+    const code = verificationCode.trim();
+    if (!code || code.length < 6) {
+      setVerifyError('Please enter the complete 6-digit verification code.');
+      return;
+    }
 
- const readinessScore = readinessAnalysis.score;
+    const emailToVerify = profileData.email || currentUser?.email || authEmail;
+    setIsVerifying(true);
+    try {
+      await verifyEmail(code, emailToVerify);
+      setVerifySuccess(true);
+      setCurrentUser(prev => ({ ...prev, email_verified: true }));
+      setProfileData(prev => ({ ...prev, email_verified: true }));
+      setTimeout(() => {
+        setIsVerifyingEmail(false);
+        setStep(2);
+      }, 700);
+    } catch (err) {
+      setVerifyError(err.message || 'Verification failed. Please check the code.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
- // STEP 1: AUTH HANDLERS
- const handleAuthSubmit = async (e) => {
- e.preventDefault();
- setAuthError('');
- setAuthLoading(true);
+  const handleResendCode = async () => {
+    if (resendCountdown > 0) return;
+    setVerifyError('');
+    setResendStatus('Sending new verification code...');
+    const emailToResend = profileData.email || currentUser?.email || authEmail;
+    try {
+      const data = await resendVerificationCode(emailToResend);
+      setResendCountdown(30);
+      setResendStatus('A new 6-digit verification code was dispatched to your email.');
+      if (data?.verification_code_preview) {
+        setCurrentUser(prev => ({ ...prev, verificationCodePreview: data.verification_code_preview }));
+      }
+    } catch (err) {
+      setVerifyError(err.message || 'Failed to resend code.');
+      setResendStatus('');
+    }
+  };
 
- try {
- let sessionUser;
- if (authMode === 'signup') {
- sessionUser = await registerWithEmail(authName, authEmail, authPassword);
- storeBrowserCredentials(authEmail, authPassword, authName);
- } else {
- sessionUser = await loginWithEmail(authEmail, authPassword);
- storeBrowserCredentials(authEmail, authPassword, sessionUser.name);
- }
+  // Step 3 Resume Parsing state
+  const [resumeText, setResumeText] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseSuccessMsg, setParseSuccessMsg] = useState('');
+  const [newTitleInput, setNewTitleInput] = useState('');
+  const [newSkillInput, setNewSkillInput] = useState('');
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [launchMessage, setLaunchMessage] = useState('');
 
- setProfileData(prev => ({
- ...prev,
- name: sessionUser.name || prev.name,
- email: sessionUser.email || prev.email
- }));
+  // Live active industry theme styling
+  const activeIndustryTheme = useMemo(() => {
+    return getIndustryTheme(profileData.industry);
+  }, [profileData.industry]);
 
- // If returning user already completed onboarding, finish immediately
- if (sessionUser.onboardingCompleted) {
- if (onComplete) onComplete(sessionUser);
- return;
- }
+  useEffect(() => {
+    applyIndustryTheme(profileData.industry);
+  }, [profileData.industry]);
 
- setStep(2);
- } catch (err) {
- setAuthError(err.message || 'Authentication failed.');
- } finally {
- setAuthLoading(false);
- }
- };
+  // Bespoke Setup Readiness Score (0 to 100%) & AI Career Coach Insights
+  const readinessAnalysis = useMemo(() => {
+    let score = 0;
+    const missingItems = [];
+    if (profileData.name && profileData.name.trim().length >= 2) {
+      score += 15;
+    } else {
+      missingItems.push('Enter your name');
+    }
+    if (profileData.email) score += 10;
+    if (profileData.industry) score += 15;
+    if (profileData.seniorityLevel) score += 10;
+    if (profileData.targetTitles?.length >= 2) {
+      score += 20;
+    } else {
+      missingItems.push('Add at least 2 target titles');
+    }
+    if (profileData.coreSkills?.length >= 6) {
+      score += 20;
+    } else if (profileData.coreSkills?.length >= 3) {
+      score += 10;
+      missingItems.push('Add 3 more domain skills for ATS optimization');
+    } else {
+      missingItems.push('Add skills to reach ATS threshold');
+    }
+    if (profileData.location) score += 10;
+    return {
+      score: Math.min(100, score),
+      missingItems,
+      atsDensity: (profileData.coreSkills?.length || 0) >= 8 ? 'Optimal' : (profileData.coreSkills?.length || 0) >= 4 ? 'Good' : 'Low'
+    };
+  }, [profileData]);
+
+  const readinessScore = readinessAnalysis.score;
+
+  // STEP 1: AUTH HANDLERS
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+
+    if (authMode === 'signup') {
+      const strength = validatePasswordStrength(authPassword);
+      if (!strength.isComplex) {
+        setAuthError('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
+        return;
+      }
+    }
+
+    setAuthLoading(true);
+
+    try {
+      let sessionUser;
+      if (authMode === 'signup') {
+        sessionUser = await registerWithEmail(authName, authEmail, authPassword);
+        storeBrowserCredentials(authEmail, authPassword, authName);
+      } else {
+        sessionUser = await loginWithEmail(authEmail, authPassword);
+        storeBrowserCredentials(authEmail, authPassword, sessionUser.name);
+      }
+
+      setCurrentUser(sessionUser);
+      setProfileData(prev => ({
+        ...prev,
+        id: sessionUser.id || sessionUser.profileId || prev.id,
+        name: sessionUser.name || prev.name,
+        email: sessionUser.email || prev.email,
+        email_verified: Boolean(sessionUser.email_verified)
+      }));
+
+      // If returning user already completed onboarding, finish immediately
+      if (sessionUser.onboardingCompleted) {
+        if (onComplete) onComplete(sessionUser);
+        return;
+      }
+
+      if (!sessionUser.email_verified) {
+        setIsVerifyingEmail(true);
+        setStep(1);
+        return;
+      }
+
+      setStep(2);
+    } catch (err) {
+      setAuthError(err.message || 'Authentication failed.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
  const [showGooglePrompt, setShowGooglePrompt] = useState(false);
 
@@ -435,99 +537,275 @@ export const OnboardingFlow = ({ onComplete }) => {
  </div>
  </div>
 
- {/* Step Indicators with labels */}
- <div className="flex items-center gap-1.5 text-xs font-bold w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
- {[
- { num: 1, label: 'Identity' },
- { num: 2, label: 'Industry' },
- { num: 3, label: 'Skills & Experience' },
- { num: 4, label: 'Location & Work' },
- { num: 5, label: 'Launch' }
- ].map((s) => (
- <div
- key={s.num}
- onClick={() => step > s.num && setStep(s.num)}
- className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-mono transition-all ${
- step > s.num ? 'cursor-pointer hover:bg-slate-800' : ''
- } ${
- step === s.num
- ? 'bg-amber-600 text-white font-black border border-amber-400'
- : step > s.num
- ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
- : 'bg-slate-900 text-slate-500 border border-slate-800'
- }`}
- >
- <span>{step > s.num ? '✓' : s.num}</span>
- <span className="hidden md:inline">{s.label}</span>
- </div>
- ))}
- </div>
- </header>
+  {/* Step Indicators with labels */}
+  <div className="flex items-center gap-1.5 text-xs font-bold w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+  {[
+    { num: 1, label: isVerifyingEmail ? 'Verify Email' : 'Identity' },
+    { num: 2, label: 'Industry' },
+    { num: 3, label: 'Skills & Experience' },
+    { num: 4, label: 'Location & Work' },
+    { num: 5, label: 'Launch' }
+  ].map((s) => (
+    <div
+      key={s.num}
+      onClick={() => {
+        if (step > s.num && !(s.num === 1 && isVerifyingEmail)) {
+          setStep(s.num);
+        }
+      }}
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-mono transition-all ${
+        step > s.num ? 'cursor-pointer hover:bg-slate-800' : ''
+      } ${
+        step === s.num
+          ? 'bg-amber-600 text-white font-black border border-amber-400'
+          : step > s.num
+          ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+          : 'bg-slate-900 text-slate-500 border border-slate-800'
+      }`}
+    >
+      <span>{step > s.num ? '✓' : s.num}</span>
+      <span className="hidden md:inline">{s.label}</span>
+    </div>
+  ))}
+  </div>
+  </header>
 
- {/* Main Wizard Container */}
- <main className="max-w-3xl mx-auto w-full my-auto py-6">
- <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-sm p-6 sm:p-10 space-y-8 animate-in fade-in zoom-in-95 duration-200">
- 
- {/* STEP 1: AUTHENTICATION / ACCESS */}
- {step === 1 && (
- <div className="space-y-6">
- <div className="text-center space-y-2">
- <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
- <ShieldCheck size={14} /> STEP 1 OF 5 // YOUR CANDIDATE IDENTITY
- </div>
- <h1 className="text-2xl sm:text-3xl font-black text-white">
- Welcome to Your Bespoke Job Agent
- </h1>
- <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
- Let's configure your autonomous job discovery engine so every job match, commute calculation, and generated cover letter fits your exact profile.
- </p>
- </div>
+  {/* Main Wizard Container */}
+  <main className="max-w-3xl mx-auto w-full my-auto py-6">
+  <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-sm p-6 sm:p-10 space-y-8 animate-in fade-in zoom-in-95 duration-200">
+  
+  {/* STEP 1A: EMAIL VERIFICATION */}
+  {step === 1 && isVerifyingEmail && (
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
+          <ShieldCheck size={14} /> STEP 1 OF 5 // EMAIL VERIFICATION
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-white">
+          Verify Your Email Address
+        </h1>
+        <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
+          We've sent a 6-digit verification code to <span className="text-amber-400 font-bold">{profileData.email || currentUser?.email || authEmail}</span>. Enter it below to activate your candidate profile.
+        </p>
+      </div>
 
- {/* Email / Password Form */}
- <form onSubmit={handleAuthSubmit} className="space-y-4 max-w-md mx-auto font-mono text-xs">
- {authMode === 'signup' && (
- <div className="space-y-1.5">
- <label className="text-slate-300 font-bold flex items-center gap-1.5">
- <User size={13} className="text-amber-400" /> FULL NAME
- </label>
- <input
- type="text"
- required
- value={authName}
- onChange={(e) => setAuthName(e.target.value)}
- placeholder="e.g. Sam Ludwig"
- className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
- />
- </div>
- )}
+      <form onSubmit={handleVerifyEmail} className="space-y-5 max-w-md mx-auto font-mono text-xs">
+        {/* Development preview banner */}
+        {(currentUser?.verificationCodePreview || initialUser?.verificationCodePreview) && (
+          <div className="p-3 rounded-sm bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/80 text-amber-300 font-bold">DEV CODE</span>
+              <span className="font-mono font-black tracking-widest text-amber-300">
+                {currentUser?.verificationCodePreview || initialUser?.verificationCodePreview}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVerificationCode(currentUser?.verificationCodePreview || initialUser?.verificationCodePreview)}
+              className="text-[10px] text-amber-400 hover:text-amber-300 underline font-bold cursor-pointer"
+            >
+              Auto-fill
+            </button>
+          </div>
+        )}
 
- <div className="space-y-1.5">
- <label className="text-slate-300 font-bold flex items-center gap-1.5">
- <Mail size={13} className="text-amber-400" /> EMAIL ADDRESS
- </label>
- <input
- type="email"
- required
- value={authEmail}
- onChange={(e) => setAuthEmail(e.target.value)}
- placeholder="e.g. user@gmail.com"
- className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
- />
- </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-300 tracking-widest uppercase block text-center">
+            6-DIGIT VERIFICATION CODE
+          </label>
+          <input
+            type="text"
+            maxLength={6}
+            autoFocus
+            value={verificationCode}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '');
+              setVerificationCode(val);
+              if (verifyError) setVerifyError('');
+            }}
+            placeholder="000000"
+            className="w-full text-center text-2xl font-black tracking-[0.5em] p-3.5 rounded-sm bg-slate-950 border border-slate-700 focus:border-amber-500 text-amber-400 focus:outline-none placeholder-slate-700 transition-colors"
+          />
+        </div>
 
- <div className="space-y-1.5">
- <label className="text-slate-300 font-bold flex items-center gap-1.5">
- <Lock size={13} className="text-amber-400" /> PASSWORD
- </label>
- <input
- type="password"
- required
- value={authPassword}
- onChange={(e) => setAuthPassword(e.target.value)}
- placeholder="••••••••"
- className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
- />
- </div>
+        {verifyError && (
+          <div className="p-3 rounded-sm bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
+            <AlertCircle size={15} className="text-rose-400 shrink-0" />
+            <span>{verifyError}</span>
+          </div>
+        )}
+
+        {verifySuccess && (
+          <div className="p-3 rounded-sm bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs flex items-center gap-2">
+            <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+            <span>✓ Email verified! Preparing your setup wizard...</span>
+          </div>
+        )}
+
+        {resendStatus && (
+          <div className="p-2 rounded-sm bg-slate-800/80 text-slate-300 text-[11px] text-center">
+            {resendStatus}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isVerifying || verificationCode.length < 6 || verifySuccess}
+          className="w-full py-3.5 px-4 rounded-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-black text-sm tracking-wider uppercase transition-all cursor-pointer flex items-center justify-center gap-2"
+        >
+          {isVerifying ? (
+            <>
+              <RefreshCw size={15} className="animate-spin text-amber-200" />
+              <span>VERIFYING CODE...</span>
+            </>
+          ) : (
+            <>
+              <span>CONFIRM &amp; PROCEED TO SETUP</span>
+              <ArrowRight size={15} />
+            </>
+          )}
+        </button>
+
+        <div className="flex items-center justify-between pt-2 text-[11px] text-slate-400">
+          <button
+            type="button"
+            onClick={handleResendCode}
+            disabled={resendCountdown > 0 || isVerifying}
+            className="text-amber-400 hover:text-amber-300 disabled:text-slate-600 transition-colors cursor-pointer disabled:cursor-not-allowed"
+          >
+            {resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : "Didn't receive code? Resend"}
+          </button>
+
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+            >
+              Sign Out
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  )}
+
+  {/* STEP 1B: AUTHENTICATION / ACCESS */}
+  {step === 1 && !isVerifyingEmail && (
+  <div className="space-y-6">
+  <div className="text-center space-y-2">
+  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
+  <ShieldCheck size={14} /> STEP 1 OF 5 // YOUR CANDIDATE IDENTITY
+  </div>
+  <h1 className="text-2xl sm:text-3xl font-black text-white">
+  Welcome to Your Bespoke Job Agent
+  </h1>
+  <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
+  Let's configure your autonomous job discovery engine so every job match, commute calculation, and generated cover letter fits your exact profile.
+  </p>
+  </div>
+
+  {/* Email / Password Form */}
+  <form onSubmit={handleAuthSubmit} className="space-y-4 max-w-md mx-auto font-mono text-xs">
+  {authMode === 'signup' && (
+  <div className="space-y-1.5">
+  <label className="text-slate-300 font-bold flex items-center gap-1.5">
+  <User size={13} className="text-amber-400" /> FULL NAME
+  </label>
+  <input
+  type="text"
+  required
+  value={authName}
+  onChange={(e) => setAuthName(e.target.value)}
+  placeholder="e.g. Sam Ludwig"
+  className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
+  />
+  </div>
+  )}
+
+  <div className="space-y-1.5">
+  <label className="text-slate-300 font-bold flex items-center gap-1.5">
+  <Mail size={13} className="text-amber-400" /> EMAIL ADDRESS
+  </label>
+  <input
+  type="email"
+  required
+  value={authEmail}
+  onChange={(e) => setAuthEmail(e.target.value)}
+  placeholder="e.g. user@gmail.com"
+  className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
+  />
+  </div>
+
+  <div className="space-y-1.5">
+  <label className="text-slate-300 font-bold flex items-center gap-1.5">
+  <Lock size={13} className="text-amber-400" /> PASSWORD
+  </label>
+  <input
+  type="password"
+  required
+  value={authPassword}
+  onChange={(e) => setAuthPassword(e.target.value)}
+  placeholder="Min. 8 chars, 1 upper, 1 special"
+  className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
+  />
+  </div>
+
+  {/* Real-time Password Complexity Meter & Checklist for Signup */}
+  {authMode === 'signup' && authPassword.length > 0 && (
+    <div className="p-3 bg-slate-950 border border-slate-800 rounded-sm space-y-2.5 text-[11px] font-mono">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-slate-400">
+          PASSWORD STRENGTH:
+        </span>
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+          signupPwdStrength.isComplex ? 'text-emerald-400' :
+          signupPwdStrength.score >= 3 ? 'text-amber-400' : 'text-rose-400'
+        }`}>
+          {signupPwdStrength.strengthLabel} ({signupPwdStrength.score}/5)
+        </span>
+      </div>
+
+      {/* 5-segment Strength Bar */}
+      <div className="grid grid-cols-5 gap-1.5 h-1">
+        {[1, 2, 3, 4, 5].map((idx) => {
+          let barColor = 'bg-slate-800';
+          if (idx <= signupPwdStrength.score) {
+            if (signupPwdStrength.score === 5) barColor = 'bg-emerald-500';
+            else if (signupPwdStrength.score >= 3) barColor = 'bg-amber-500';
+            else barColor = 'bg-rose-500';
+          }
+          return (
+            <div key={idx} className={`h-full rounded-sm transition-all duration-300 ${barColor}`} />
+          );
+        })}
+      </div>
+
+      {/* Requirements Checklist */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 text-[10px]">
+        <div className={`flex items-center gap-1.5 ${signupPwdStrength.rules.minLength ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
+          <span>{signupPwdStrength.rules.minLength ? '✓' : '•'}</span>
+          <span>8+ characters</span>
+        </div>
+        <div className={`flex items-center gap-1.5 ${signupPwdStrength.rules.hasUpper ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
+          <span>{signupPwdStrength.rules.hasUpper ? '✓' : '•'}</span>
+          <span>1 uppercase (A-Z)</span>
+        </div>
+        <div className={`flex items-center gap-1.5 ${signupPwdStrength.rules.hasLower ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
+          <span>{signupPwdStrength.rules.hasLower ? '✓' : '•'}</span>
+          <span>1 lowercase (a-z)</span>
+        </div>
+        <div className={`flex items-center gap-1.5 ${signupPwdStrength.rules.hasDigit ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
+          <span>{signupPwdStrength.rules.hasDigit ? '✓' : '•'}</span>
+          <span>1 number (0-9)</span>
+        </div>
+        <div className={`flex items-center gap-1.5 col-span-1 sm:col-span-2 ${signupPwdStrength.rules.hasSpecial ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
+          <span>{signupPwdStrength.rules.hasSpecial ? '✓' : '•'}</span>
+          <span>1 special symbol (!@#$%^&*...)</span>
+        </div>
+      </div>
+    </div>
+  )}
 
  {authError && (
  <div className="p-3 rounded-sm bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">

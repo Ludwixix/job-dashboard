@@ -5,6 +5,7 @@ import io
 import json
 import mimetypes
 import os
+import random
 
 import time
 login_attempts = {}
@@ -1390,6 +1391,29 @@ def resolve_user_id(handler, query_params=None) -> str | None:
     return None
 
 
+def validate_password_complexity(password: str) -> tuple[bool, str]:
+    """
+    Validates password complexity:
+    - At least 8 characters
+    - At least one uppercase letter [A-Z]
+    - At least one lowercase letter [a-z]
+    - At least one numeric digit [0-9]
+    - At least one special character / symbol
+    """
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not any(c.isupper() for c in password):
+        return False, "Password must include at least one uppercase letter (A-Z)."
+    if not any(c.islower() for c in password):
+        return False, "Password must include at least one lowercase letter (a-z)."
+    if not any(c.isdigit() for c in password):
+        return False, "Password must include at least one number (0-9)."
+    special_chars = set("!@#$%^&*()_+-=[]{};':\"|,.<>/?~`")
+    if not any(c in special_chars for c in password):
+        return False, "Password must include at least one special character (!@#$%^&* etc.)."
+    return True, ""
+
+
 # Allowed origins — GitHub Pages deployment + localhost dev + Cloud Run
 _ALLOWED_ORIGINS = {
     "https://ludwixix.github.io",
@@ -1494,12 +1518,25 @@ def make_handler(app: DashboardApp):
                     if not user_profile and user_email:
                         user_profile = app.repository.get_user_profile(user_email) or {}
                     has_profile = _is_valid_profile(user_profile)
+                    email_verified = False
+                    if user_id:
+                        try:
+                            with app.db.get_connection() as conn:
+                                cur = conn.cursor()
+                                cur.execute("SELECT email_verified FROM users WHERE id = ?", (user_id,))
+                                urow = cur.fetchone()
+                                if urow and urow[0]:
+                                    email_verified = True
+                        except Exception:
+                            pass
+
                     self.send_json(200, {
                         "success": True,
                         "user": {
                             "id": user_id,
                             "email": user_email,
-                            "name": payload.get("name")
+                            "name": payload.get("name"),
+                            "email_verified": email_verified
                         },
                         "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
@@ -2863,11 +2900,11 @@ def make_handler(app: DashboardApp):
                             existing = cur.fetchone()
                             if existing:
                                 user_id = existing[0]
-                                cur.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+                                cur.execute("UPDATE users SET name = ?, email_verified = 1 WHERE id = ?", (name, user_id))
                             else:
                                 dummy_hash = bcrypt.hashpw(str(uuid.uuid4()).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                                 cur.execute(
-                                    "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                                    "INSERT INTO users (id, email, name, password_hash, created_at, email_verified) VALUES (?, ?, ?, ?, ?, 1)",
                                     (user_id, email, name, dummy_hash, now)
                                 )
                                 if hasattr(app, "repository") and app.repository:
@@ -2896,7 +2933,8 @@ def make_handler(app: DashboardApp):
                         "user": {
                             "id": user_id,
                             "email": email,
-                            "name": name
+                            "name": name,
+                            "email_verified": True
                         },
                         "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
@@ -2980,16 +3018,23 @@ def make_handler(app: DashboardApp):
                         self.send_json(400, {"error": "Missing email or password"})
                         return
 
+                    is_complex, complexity_err = validate_password_complexity(password)
+                    if not is_complex:
+                        self.send_json(400, {"error": complexity_err})
+                        return
+
                     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                     user_id = str(uuid.uuid4())
                     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    verification_code = f"{random.randint(100000, 999999)}"
+                    verification_exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
 
                     try:
                         with app.db.get_connection() as conn:
                             cur = conn.cursor()
                             cur.execute(
-                                "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-                                (user_id, email, name, password_hash, now)
+                                "INSERT INTO users (id, email, name, password_hash, created_at, email_verified, email_verification_code, email_verification_expires_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
+                                (user_id, email, name, password_hash, now, verification_code, verification_exp)
                             )
                             conn.commit()
                     except sqlite3.IntegrityError:
@@ -3014,9 +3059,126 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {
                         "success": True,
                         "token": token,
-                        "user": {"id": user_id, "email": email, "name": name},
+                        "user": {
+                            "id": user_id,
+                            "email": email,
+                            "name": name,
+                            "email_verified": False,
+                            "email_verification_sent": True
+                        },
+                        "verification_code_preview": verification_code if os.environ.get("ENV") != "production" else None,
                         "profile": None,
                         "has_profile": False
+                    })
+                    return
+
+                if path == "/api/verify-email":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    code = str(payload.get("code") or "").strip()
+                    email = (payload.get("email") or "").strip().lower()
+
+                    user_id = resolve_user_id(self)
+                    if not code:
+                        self.send_json(400, {"error": "Missing verification code."})
+                        return
+
+                    with app.db.get_connection() as conn:
+                        cur = conn.cursor()
+                        if user_id:
+                            cur.execute("SELECT id, email, email_verified, email_verification_code, email_verification_expires_at FROM users WHERE id = ?", (user_id,))
+                        elif email:
+                            cur.execute("SELECT id, email, email_verified, email_verification_code, email_verification_expires_at FROM users WHERE email = ?", (email,))
+                        else:
+                            self.send_json(400, {"error": "Authentication or email required to verify."})
+                            return
+                        row = cur.fetchone()
+
+                    if not row:
+                        self.send_json(404, {"error": "User account not found."})
+                        return
+
+                    uid, uemail, is_verified, stored_code, stored_exp = row[0], row[1], bool(row[2]), str(row[3] or ""), str(row[4] or "")
+
+                    if is_verified:
+                        self.send_json(200, {
+                            "success": True,
+                            "message": "Email is already verified.",
+                            "email_verified": True
+                        })
+                        return
+
+                    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    if stored_exp and now_iso > stored_exp:
+                        self.send_json(400, {
+                            "error": "Verification code has expired. Please request a new code.",
+                            "expired": True
+                        })
+                        return
+
+                    if stored_code and code == stored_code:
+                        with app.db.get_connection() as conn:
+                            cur = conn.cursor()
+                            cur.execute(
+                                "UPDATE users SET email_verified = 1, email_verification_code = '', email_verification_expires_at = '' WHERE id = ?",
+                                (uid,)
+                            )
+                            conn.commit()
+                        self.send_json(200, {
+                            "success": True,
+                            "message": "Email verified successfully.",
+                            "email_verified": True
+                        })
+                        return
+                    else:
+                        self.send_json(400, {"error": "Invalid verification code. Please check and try again."})
+                        return
+
+                if path == "/api/resend-verification":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+                    email = (payload.get("email") or "").strip().lower()
+                    user_id = resolve_user_id(self)
+
+                    with app.db.get_connection() as conn:
+                        cur = conn.cursor()
+                        if user_id:
+                            cur.execute("SELECT id, email, email_verified FROM users WHERE id = ?", (user_id,))
+                        elif email:
+                            cur.execute("SELECT id, email, email_verified FROM users WHERE email = ?", (email,))
+                        else:
+                            self.send_json(400, {"error": "Authentication or email required."})
+                            return
+                        row = cur.fetchone()
+
+                    if not row:
+                        self.send_json(404, {"error": "User account not found."})
+                        return
+
+                    uid, uemail, is_verified = row[0], row[1], bool(row[2])
+                    if is_verified:
+                        self.send_json(200, {
+                            "success": True,
+                            "message": "Email is already verified.",
+                            "email_verified": True
+                        })
+                        return
+
+                    new_code = f"{random.randint(100000, 999999)}"
+                    new_exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
+
+                    with app.db.get_connection() as conn:
+                        cur = conn.cursor()
+                        cur.execute(
+                            "UPDATE users SET email_verification_code = ?, email_verification_expires_at = ? WHERE id = ?",
+                            (new_code, new_exp, uid)
+                        )
+                        conn.commit()
+
+                    self.send_json(200, {
+                        "success": True,
+                        "message": f"A new verification code has been dispatched to {uemail}.",
+                        "verification_code_preview": new_code if os.environ.get("ENV") != "production" else None
                     })
                     return
 
@@ -3053,14 +3215,15 @@ def make_handler(app: DashboardApp):
 
                     with app.db.get_connection() as conn:
                         cur = conn.cursor()
-                        cur.execute("SELECT id, name, password_hash FROM users WHERE email = ?", (email,))
+                        cur.execute("SELECT id, name, password_hash, email_verified FROM users WHERE email = ?", (email,))
                         row = cur.fetchone()
 
                     if not row:
                         self.send_json(401, {"error": "Invalid credentials"})
                         return
 
-                    user_id, name, password_hash = row
+                    user_id, name, password_hash = row[0], row[1], row[2]
+                    email_verified = bool(row[3]) if len(row) > 3 and row[3] else False
 
                     if not bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
                         self.send_json(401, {"error": "Invalid credentials"})
@@ -3081,7 +3244,7 @@ def make_handler(app: DashboardApp):
                     self.send_json(200, {
                         "success": True,
                         "token": token,
-                        "user": {"id": user_id, "email": email, "name": name},
+                        "user": {"id": user_id, "email": email, "name": name, "email_verified": email_verified},
                         "profile": user_profile if has_profile else None,
                         "has_profile": has_profile
                     })

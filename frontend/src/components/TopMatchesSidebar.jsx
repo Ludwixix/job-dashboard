@@ -1,262 +1,359 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
- Flame, Award, Sparkles, ArrowRight, MapPin, ExternalLink, Dices, Navigation,
- ChevronDown, ChevronUp, Clock, Activity, DollarSign
+  Flame, Award, Sparkles, ArrowRight, MapPin, ExternalLink, Dices, Navigation,
+  ChevronDown, ChevronUp, Clock, Activity, DollarSign, Filter
 } from 'lucide-react';
 import { getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
+import { matchesSalaryThreshold, parseSalaryNumeric } from '../utils/salaryUtils';
+import { calculateDistanceKm } from '../services/commuteService';
 
-const BALACLAVA_TIER_1 = [
- 'balaclava', 'st kilda', 'prahran', 'windsor', 'elsternwick', 'elwood', 
- 'caulfield', 'malvern', 'armadale', 'toorak', 'south yarra', 'port melbourne', 
- 'south melbourne', 'albert park', 'bentleigh', 'brighton'
-];
-
-const BALACLAVA_TIER_2 = [
- 'melbourne cbd', 'cbd', 'melbourne', 'southbank', 'docklands', 'cremorne', 'richmond'
-];
-
-const getProximityTier = (locationStr = '') => {
- const loc = locationStr.toLowerCase();
- for (const suburb of BALACLAVA_TIER_1) {
- if (loc.includes(suburb)) return 1;
- }
- for (const suburb of BALACLAVA_TIER_2) {
- if (loc.includes(suburb)) return 2;
- }
- return 3;
+export const extractSuburb = (locStr = '') => {
+  if (!locStr) return 'Local';
+  const cleaned = locStr.replace(/,\s*(AU|Australia)/i, '').trim();
+  const parts = cleaned.split(/\s+(?:VIC|NSW|QLD|WA|SA|TAS|ACT|NT)\b/i);
+  if (parts[0] && parts[0].trim().length > 1) return parts[0].trim();
+  return cleaned.split(',')[0].trim() || 'Local';
 };
 
-const COOL_TECH_ARCHETYPES = [
- {
- category: 'AI & Autonomous Robotics',
- emoji: '🤖',
- badge: 'AI & ROBOTICS',
- keywords: ['robotics', 'autonomous', 'drone', 'computer vision', 'machine learning', 'deep learning', 'llm', 'generative ai', 'agentic', 'ros', 'slam', 'perception']
- },
- {
- category: 'DeepTech & Aerospace',
- emoji: '🚀',
- badge: 'DEEPTECH & DEFENSE',
- keywords: ['aerospace', 'defence', 'defense', 'satellite', 'avionics', 'space', 'propulsion', 'radar', 'lidar', 'uav', 'payload', 'spacecraft']
- },
- {
- category: 'Quantum & Frontier Tech',
- emoji: '⚛️',
- badge: 'QUANTUM / FRONTIER',
- keywords: ['quantum', 'qubit', 'supercomputing', 'hpc', 'neuromorphic', 'photonics', 'cryogenic', 'semiconductor', 'superconductor']
- },
- {
- category: 'Creative Tech & Spatial',
- emoji: '🎮',
- badge: 'CREATIVE TECH & VR',
- keywords: ['game', 'gaming', 'unreal engine', 'unity', 'spatial', 'augmented reality', 'virtual reality', 'vr', 'ar', 'creative tech', '3d graphics', 'shader', 'vfx', 'metaverse']
- },
- {
- category: 'GreenTech & BioTech',
- emoji: '🌱',
- badge: 'GREENTECH & BIO',
- keywords: ['biotech', 'bioinformatics', 'genomics', 'greentech', 'cleantech', 'clean energy', 'renewable', 'battery', 'ev', 'climate tech', 'solar']
- },
- {
- category: 'Cyber Intel & Forensics',
- emoji: '🛡️',
- badge: 'CYBER INTEL & FORENSICS',
- keywords: ['forensics', 'threat intel', 'intelligence', 'reverse engineering', 'cryptography', 'incident response', 'red team', 'exploit', 'malware', 'penetration']
- },
- {
- category: 'R&D Labs & Skunkworks',
- emoji: '🧪',
- badge: 'R&D & INNOVATION',
- keywords: ['r&d', 'research', 'innovation lab', 'stealth', 'applied science', 'experimental', 'prototype', 'breakthrough', 'skunkworks', 'futurist', 'novelty', 'incubator']
- }
+export const getDistanceToOrigin = (job, originLoc = '') => {
+  if (!job) return 20;
+  if (typeof job.distanceKm === 'number' && !isNaN(job.distanceKm)) {
+    return job.distanceKm;
+  }
+  const loc = (job.location || '').toLowerCase();
+  if (job.remote || loc.includes('remote') || loc.includes('wfh') || loc.includes('anywhere')) {
+    return 0; // Remote roles have 0km commute
+  }
+  try {
+    return calculateDistanceKm(originLoc || 'Melbourne CBD', job.location || 'Melbourne CBD');
+  } catch {
+    return 15;
+  }
+};
+
+export const getProximityTier = (locOrJob, originLoc = '') => {
+  if (!locOrJob) return 3;
+  const dist = typeof locOrJob === 'number' 
+    ? locOrJob 
+    : getDistanceToOrigin(typeof locOrJob === 'string' ? { location: locOrJob } : locOrJob, originLoc);
+  if (dist <= 5) return 1;
+  if (dist <= 10) return 2;
+  return 3;
+};
+
+export const COOL_TECH_ARCHETYPES = [
+  {
+    category: 'AI & Autonomous Robotics',
+    emoji: '🤖',
+    badge: 'AI & ROBOTICS',
+    keywords: [
+      'robotics', 'autonomous', 'drone', 'computer vision', 'machine learning', 
+      'deep learning', 'llm', 'generative ai', 'agentic', 'ros', 'slam', 
+      'perception', 'humanoid', 'mechatronics'
+    ]
+  },
+  {
+    category: 'DeepTech & Aerospace',
+    emoji: '🚀',
+    badge: 'DEEPTECH & DEFENSE',
+    keywords: [
+      'aerospace', 'defence', 'defense', 'satellite', 'avionics', 'spacecraft', 
+      'orbital', 'propulsion', 'radar', 'lidar', 'uav', 'payload', 'deep space', 'rocketry'
+    ]
+  },
+  {
+    category: 'Quantum & Frontier Tech',
+    emoji: '⚛️',
+    badge: 'QUANTUM / FRONTIER',
+    keywords: [
+      'quantum', 'qubit', 'supercomputing', 'hpc', 'neuromorphic', 'photonics', 
+      'cryogenic', 'semiconductor', 'superconductor', 'nanotechnology'
+    ]
+  },
+  {
+    category: 'Creative Tech & Spatial',
+    emoji: '🎮',
+    badge: 'CREATIVE TECH & VR',
+    keywords: [
+      'game engine', 'unreal engine', 'unity3d', 'spatial computing', 
+      'augmented reality', 'virtual reality', 'creative tech', '3d graphics', 
+      'shader', 'vfx', 'metaverse', 'interactive media'
+    ]
+  },
+  {
+    category: 'GreenTech & BioTech',
+    emoji: '🌱',
+    badge: 'GREENTECH & BIO',
+    keywords: [
+      'biotech', 'bioinformatics', 'genomics', 'greentech', 'cleantech', 
+      'clean energy', 'renewable energy', 'battery storage', 'electric vehicle', 
+      'climate tech', 'synthetic biology'
+    ]
+  },
+  {
+    category: 'Cyber Intel & Forensics',
+    emoji: '🛡️',
+    badge: 'CYBER INTEL & FORENSICS',
+    keywords: [
+      'threat intel', 'cyber forensics', 'reverse engineering', 'cryptography', 
+      'incident response', 'red team', 'exploit development', 'malware analysis', 
+      'penetration testing', 'zero-day'
+    ]
+  },
+  {
+    category: 'R&D Labs & Skunkworks',
+    emoji: '🧪',
+    badge: 'R&D & INNOVATION',
+    keywords: [
+      'r&d', 'applied research', 'innovation lab', 'stealth startup', 
+      'applied science', 'experimental prototype', 'skunkworks', 'futurist', 'advanced research'
+    ]
+  }
 ];
+
+export const matchesKeyword = (text, kw) => {
+  if (!text || !kw) return false;
+  const lowerText = text.toLowerCase();
+  const lowerKw = kw.toLowerCase();
+  // Short keywords or symbols require word boundary matching so e.g. "ev" doesn't match "development"
+  if (lowerKw.length <= 4 || lowerKw.includes('&')) {
+    const escaped = lowerKw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:$|[^a-zA-Z0-9])`, 'i');
+    return regex.test(lowerText);
+  }
+  return lowerText.includes(lowerKw);
+};
+
+export const extractHighlightSnippet = (job, keywords = []) => {
+  const desc = job.description || job.snippet || '';
+  if (!desc) return null;
+  const sentences = desc.split(/(?<=[.!?])\s+/);
+  for (const sentence of sentences) {
+    if (keywords.some(kw => matchesKeyword(sentence, kw))) {
+      const clean = sentence.trim().replace(/^["'\s]+|["'\s]+$/g, '');
+      if (clean.length >= 25 && clean.length <= 180) {
+        return clean;
+      }
+    }
+  }
+  return desc.slice(0, 130).trim() + (desc.length > 130 ? '...' : '');
+};
 
 const detectCoolCategory = (job) => {
- if (!job) return { category: 'Frontier Tech', emoji: '⚡', badge: 'FRONTIER TECH' };
- const text = `${job.title || ''} ${job.stream || ''} ${job.description || ''} ${job.company || ''}`.toLowerCase();
- for (const archetype of COOL_TECH_ARCHETYPES) {
- if (archetype.keywords.some(kw => text.includes(kw))) {
- return archetype;
- }
- }
- return {
- category: 'Frontier Tech',
- emoji: '⚡',
- badge: 'CUTTING-EDGE TECH'
- };
+  if (!job) return { category: 'Frontier Tech', emoji: '⚡', badge: 'FRONTIER TECH' };
+  const text = `${job.title || ''} ${job.stream || ''} ${job.description || ''} ${job.company || ''}`;
+  for (const archetype of COOL_TECH_ARCHETYPES) {
+    if (archetype.keywords.some(kw => matchesKeyword(text, kw))) {
+      return archetype;
+    }
+  }
+  return {
+    category: 'Frontier Tech',
+    emoji: '⚡',
+    badge: 'CUTTING-EDGE TECH'
+  };
 };
 
-export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, baseLocation = 'BALACLAVA VIC 3183' }) => {
- const [showTopMatches, setShowTopMatches] = useState(true); // Open by default
- const [showLiveInsights, setShowLiveInsights] = useState(true);
- const [showLocalJob, setShowLocalJob] = useState(false);
- const [showWildCard, setShowWildCard] = useState(true); // Enhanced discovery open by default
- const [showMostRecent, setShowMostRecent] = useState(false);
- const [showMostLikely, setShowMostLikely] = useState(false);
- const [wildCardIndex, setWildCardIndex] = useState(0);
+export const TopMatchesSidebar = ({ 
+  jobs = [], 
+  onSelectJob, 
+  onOpenGenerator, 
+  baseLocation = 'BALACLAVA VIC 3183',
+  allJobsCount = 0,
+  activeStreamTab = 'All',
+  searchQuery = ''
+}) => {
+  const [showTopMatches, setShowTopMatches] = useState(true); // Open by default
+  const [showLiveInsights, setShowLiveInsights] = useState(true);
+  const [showLocalJob, setShowLocalJob] = useState(false);
+  const [showWildCard, setShowWildCard] = useState(true); // Enhanced discovery open by default
+  const [showMostRecent, setShowMostRecent] = useState(false);
+  const [showMostLikely, setShowMostLikely] = useState(false);
+  const [wildCardIndex, setWildCardIndex] = useState(0);
 
- // Available Active Jobs Pool (Excluding only already applied / closed / rejected records)
- const unsubmittedJobs = useMemo(() => {
- if (!jobs || jobs.length === 0) return [];
- return jobs.filter(job => {
- const s = (job.status || 'sourced').toLowerCase();
- return !s.includes('applied') &&
- !s.includes('confirmation') &&
- !s.includes('interview') &&
- !s.includes('under review') &&
- !s.includes('action required') &&
- !s.includes('verification') &&
- !s.includes('unsuccessful') &&
- !s.includes('rejected') &&
- !s.includes('closed') &&
- !s.includes('expired');
- });
- }, [jobs]);
+  // Available Active Jobs Pool (Excluding only already applied / closed / rejected records)
+  const unsubmittedJobs = useMemo(() => {
+    if (!jobs || jobs.length === 0) return [];
+    return jobs.filter(job => {
+      const s = (job.status || 'sourced').toLowerCase();
+      return !s.includes('applied') &&
+        !s.includes('confirmation') &&
+        !s.includes('interview') &&
+        !s.includes('under review') &&
+        !s.includes('action required') &&
+        !s.includes('verification') &&
+        !s.includes('unsuccessful') &&
+        !s.includes('rejected') &&
+        !s.includes('closed') &&
+        !s.includes('expired');
+    });
+  }, [jobs]);
 
- // Top 10 Best Aligned & Newest Job Ads
- const top10Matches = useMemo(() => {
- return [...unsubmittedJobs]
- .map(job => {
- const score = Number(job.score) || 75;
- const age = getJobAgeInDays(job.date || job.posted);
- const recencyScore = age === null ? 40 : Math.max(0, 100 - (age * 7));
- const compositeRank = (score * 0.65) + (recencyScore * 0.35);
- return { ...job, compositeRank, ageInDays: age };
- })
- .sort((a, b) => b.compositeRank - a.compositeRank || (b.date || '').localeCompare(a.date || ''))
- .slice(0, 10);
- }, [unsubmittedJobs]);
+  // Top 10 Best Aligned & Newest Job Ads
+  const top10Matches = useMemo(() => {
+    return [...unsubmittedJobs]
+      .map(job => {
+        const score = Number(job.score) || 75;
+        const age = getJobAgeInDays(job.date || job.posted);
+        const recencyScore = age === null ? 40 : Math.max(0, 100 - (age * 7));
+        const compositeRank = (score * 0.65) + (recencyScore * 0.35);
+        return { ...job, compositeRank, ageInDays: age };
+      })
+      .sort((a, b) => b.compositeRank - a.compositeRank || (b.date || '').localeCompare(a.date || ''))
+      .slice(0, 10);
+  }, [unsubmittedJobs]);
 
- // Live Analytics & Points of Interest Computation
- const liveInsights = useMemo(() => {
- const totalCount = unsubmittedJobs.length || 1;
- 
- // Near Balaclava & Commute Proximity < 10km
- const nearBalaclava = unsubmittedJobs.filter(j => getProximityTier(j.location) <= 2).length;
- const proximityPct = Math.round((nearBalaclava / totalCount) * 100);
+  // Live Analytics & Points of Interest Computation (Dynamic to candidate's base location)
+  const liveInsights = useMemo(() => {
+    const totalCount = unsubmittedJobs.length || 1;
+    
+    // Proximity < 10km (or remote) relative to active baseLocation
+    const nearLocation = unsubmittedJobs.filter(j => getDistanceToOrigin(j, baseLocation) <= 10).length;
+    const proximityPct = Math.round((nearLocation / totalCount) * 100);
 
- // Top employer & match score
- const sortedByScore = [...unsubmittedJobs].sort((a, b) => (b.score || 0) - (a.score || 0));
- const topEmployer = sortedByScore[0] || null;
+    // Top employer & match score
+    const sortedByScore = [...unsubmittedJobs].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const topEmployer = sortedByScore[0] || null;
 
- // Fresh < 7 days; an unknown date is not a verified fresh listing.
- const fresh7Days = unsubmittedJobs.filter((job) => {
- const age = getJobAgeInDays(job.date || job.posted);
- return age !== null && age <= 7;
- }).length;
+    // Fresh < 7 days; an unknown date is not a verified fresh listing.
+    const fresh7Days = unsubmittedJobs.filter((job) => {
+      const age = getJobAgeInDays(job.date || job.posted);
+      return age !== null && age <= 7;
+    }).length;
 
- // High compensation roles ($100k+)
- const highSalaryCount = unsubmittedJobs.filter(j => {
- const sal = `${j.salary || ''} ${j.compensation || ''} ${j.description || ''}`.toLowerCase();
- return (
- sal.includes('$100') || sal.includes('$110') || sal.includes('$120') || 
- sal.includes('$130') || sal.includes('$140') || sal.includes('$150') ||
- sal.includes('100k') || sal.includes('110k') || sal.includes('120k') ||
- sal.includes('130k') || sal.includes('140k') || sal.includes('150k') ||
- sal.includes('100,000') || sal.includes('110,000') || sal.includes('120,000')
- );
- }).length;
+    // High compensation roles ($100k+) using numerical salary parser
+    const highSalaryCount = unsubmittedJobs.filter(j => matchesSalaryThreshold(j, '100k+')).length;
 
- return {
- nearBalaclava,
- proximityPct,
- topEmployer,
- fresh7Days,
- freshPct: Math.round((fresh7Days / totalCount) * 100),
- highSalaryCount
- };
- }, [unsubmittedJobs]);
+    return {
+      nearLocation,
+      nearBalaclava: nearLocation,
+      proximityPct,
+      topEmployer,
+      fresh7Days,
+      freshPct: Math.round((fresh7Days / totalCount) * 100),
+      highSalaryCount
+    };
+  }, [unsubmittedJobs, baseLocation]);
 
- // Top 3 Most Recent Jobs
- const mostRecentJobs = useMemo(() => {
- return [...unsubmittedJobs]
- .sort((a, b) => (b.date || b.posted || '').localeCompare(a.date || a.posted || ''))
- .slice(0, 3);
- }, [unsubmittedJobs]);
+  // Top 3 Most Recent Jobs
+  const mostRecentJobs = useMemo(() => {
+    return [...unsubmittedJobs]
+      .sort((a, b) => (b.date || b.posted || '').localeCompare(a.date || a.posted || ''))
+      .slice(0, 3);
+  }, [unsubmittedJobs]);
 
- // Highlighted Local Job (Sorted by Proximity Tier to Balaclava, VIC 3183)
- const highlightedLocalJob = useMemo(() => {
- const sortedByProximity = [...unsubmittedJobs].sort((a, b) => {
- const tierA = getProximityTier(a.location);
- const tierB = getProximityTier(b.location);
- if (tierA !== tierB) return tierA - tierB;
- return (b.score || 0) - (a.score || 0);
- });
- return sortedByProximity[0] || unsubmittedJobs[0];
- }, [unsubmittedJobs]);
+  // Highlighted Local Job (Sorted by Proximity to candidate's baseLocation)
+  const baseSuburb = useMemo(() => extractSuburb(baseLocation), [baseLocation]);
 
- // Wild Card Jobs: Curated pool of cool, unusual, cutting-edge, or novelty tech opportunities
- const coolWildCardJobs = useMemo(() => {
- if (!unsubmittedJobs.length) return [];
+  const highlightedLocalJob = useMemo(() => {
+    if (!unsubmittedJobs.length) return null;
+    const sortedByProximity = [...unsubmittedJobs].sort((a, b) => {
+      const distA = getDistanceToOrigin(a, baseLocation);
+      const distB = getDistanceToOrigin(b, baseLocation);
+      if (distA !== distB) return distA - distB;
+      return (b.score || 0) - (a.score || 0);
+    });
+    return sortedByProximity[0] || unsubmittedJobs[0];
+  }, [unsubmittedJobs, baseLocation]);
 
- const scored = unsubmittedJobs.map(job => {
- const text = `${job.title || ''} ${job.stream || ''} ${job.description || ''} ${job.company || ''}`.toLowerCase();
- let matchCount = 0;
- let matchedArchetype = null;
+  const localJobDist = highlightedLocalJob ? getDistanceToOrigin(highlightedLocalJob, baseLocation) : 0;
 
- for (const archetype of COOL_TECH_ARCHETYPES) {
- const matches = archetype.keywords.filter(kw => text.includes(kw));
- if (matches.length > 0) {
- matchCount += matches.length * 3;
- if (!matchedArchetype) matchedArchetype = archetype;
- }
- }
+  // Wild Card Jobs: Curated pool of cool, unusual, cutting-edge, or novelty tech opportunities
+  const coolWildCardJobs = useMemo(() => {
+    if (!unsubmittedJobs.length) return [];
 
- // Outlier salary bonus (applied only if matching cool tech or extreme comp $180k+)
- const sal = `${job.salary || ''} ${job.compensation || ''}`.toLowerCase();
- const hasExtremeSalary = sal.includes('180') || sal.includes('190') || sal.includes('200') || sal.includes('220') || sal.includes('250');
- if (matchCount > 0) {
- if (sal.includes('140') || sal.includes('150') || sal.includes('160') || sal.includes('170') || hasExtremeSalary) {
- matchCount += 4;
- }
- // Freshness bonus for verified recent listings
- const age = getJobAgeInDays(job.date || job.posted);
- if (age !== null && age <= 7) matchCount += 2;
- } else if (hasExtremeSalary) {
- matchCount += 3;
- }
+    const scored = unsubmittedJobs.map(job => {
+      const title = job.title || '';
+      const desc = job.description || job.snippet || '';
+      const stream = job.stream || '';
+      const tags = Array.isArray(job.tags) ? job.tags.join(' ') : '';
 
- return {
- job,
- coolnessScore: matchCount,
- archetype: matchedArchetype || detectCoolCategory(job)
- };
- });
+      let matchScore = 0;
+      let matchedArchetype = null;
+      let matchedKwList = [];
 
- const coolMatches = scored
- .filter(entry => entry.coolnessScore > 0)
- .sort((a, b) => b.coolnessScore - a.coolnessScore || (b.job.date || '').localeCompare(a.job.date || ''))
- .map(entry => ({ ...entry.job, coolArchetype: entry.archetype }));
+      for (const archetype of COOL_TECH_ARCHETYPES) {
+        let archetypeMatches = 0;
+        for (const kw of archetype.keywords) {
+          if (matchesKeyword(title, kw)) {
+            archetypeMatches += 6;
+            matchedKwList.push(kw);
+          } else if (matchesKeyword(stream, kw) || matchesKeyword(tags, kw)) {
+            archetypeMatches += 4;
+            matchedKwList.push(kw);
+          } else if (matchesKeyword(desc, kw)) {
+            archetypeMatches += 2;
+            matchedKwList.push(kw);
+          }
+        }
+        if (archetypeMatches > 0) {
+          matchScore += archetypeMatches;
+          if (!matchedArchetype) matchedArchetype = archetype;
+        }
+      }
 
- if (coolMatches.length > 0) {
- return coolMatches;
- }
+      // Outlier salary bonus
+      const parsedSal = parseSalaryNumeric(job);
+      if (matchScore > 0 && parsedSal.max && parsedSal.max >= 150000) {
+        matchScore += 4;
+      }
 
- // Fallback: Pick highest salary or most unique roles
- return [...unsubmittedJobs]
- .sort((a, b) => (b.score || 0) - (a.score || 0))
- .slice(0, 5)
- .map(j => ({ ...j, coolArchetype: detectCoolCategory(j) }));
- }, [unsubmittedJobs]);
+      // Freshness bonus for verified recent listings that matched an archetype
+      const age = getJobAgeInDays(job.date || job.posted);
+      if (matchScore > 0 && age !== null && age <= 7) matchScore += 2;
 
- const activeWildCardJob = useMemo(() => {
- if (!coolWildCardJobs.length) return null;
- return coolWildCardJobs[wildCardIndex % coolWildCardJobs.length];
- }, [coolWildCardJobs, wildCardIndex]);
+      return {
+        job,
+        coolnessScore: matchScore,
+        archetype: matchedArchetype || detectCoolCategory(job),
+        matchedKeywords: Array.from(new Set(matchedKwList))
+      };
+    });
 
- const handleCycleWildCard = (e) => {
- if (e) e.stopPropagation();
- setWildCardIndex(prev => (prev + 1) % Math.max(1, coolWildCardJobs.length));
- };
+    const coolMatches = scored
+      .filter(entry => entry.coolnessScore > 0)
+      .sort((a, b) => b.coolnessScore - a.coolnessScore || (b.job.date || '').localeCompare(a.job.date || ''))
+      .map(entry => ({
+        ...entry.job,
+        coolArchetype: entry.archetype,
+        matchedKeywords: entry.matchedKeywords,
+        highlightSnippet: extractHighlightSnippet(entry.job, entry.matchedKeywords)
+      }));
 
- // Most Likely to Get (High skill match + Core IT stream)
- const mostLikely = useMemo(() => {
- return [...unsubmittedJobs]
- .filter(j => (j.stream || '').toLowerCase().includes('core') || (j.score || 0) >= 80)
- .sort((a, b) => (b.score || 0) - (a.score || 0))
- .slice(0, 2);
- }, [unsubmittedJobs]);
+    if (coolMatches.length > 0) {
+      return coolMatches;
+    }
+
+    // Fallback: Pick highest salary or most unique roles
+    return [...unsubmittedJobs]
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 5)
+      .map(j => ({
+        ...j,
+        coolArchetype: detectCoolCategory(j),
+        matchedKeywords: [],
+        highlightSnippet: extractHighlightSnippet(j, [])
+      }));
+  }, [unsubmittedJobs]);
+
+  const activeWildCardJob = useMemo(() => {
+    if (!coolWildCardJobs.length) return null;
+    return coolWildCardJobs[wildCardIndex % coolWildCardJobs.length];
+  }, [coolWildCardJobs, wildCardIndex]);
+
+  const handleCycleWildCard = (e) => {
+    if (e) e.stopPropagation();
+    setWildCardIndex(prev => (prev + 1) % Math.max(1, coolWildCardJobs.length));
+  };
+
+  // Most Likely to Get (High skill match + Core IT stream)
+  const mostLikely = useMemo(() => {
+    return [...unsubmittedJobs]
+      .filter(j => (j.stream || '').toLowerCase().includes('core') || (j.score || 0) >= 80)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 2);
+  }, [unsubmittedJobs]);
 
  const proximityTier = highlightedLocalJob ? getProximityTier(highlightedLocalJob.location) : 3;
 
@@ -295,7 +392,8 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <div className="flex items-center gap-2">
  <Navigation size={13} className="text-emerald-400 shrink-0" />
  <div>
- <div className="text-xs font-black text-emerald-300">{liveInsights.nearBalaclava} POSITIONS ({liveInsights.proximityPct}%)</div>
+ <div className="text-[9px] text-slate-400 uppercase font-bold">COMMUTE PROXIMITY (&lt;10KM)</div>
+ <div className="text-xs font-black text-emerald-300">{liveInsights.nearLocation} POSITIONS ({liveInsights.proximityPct}%)</div>
  </div>
  </div>
  <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">&lt;10KM</span>
@@ -315,6 +413,9 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <div className="text-[9px] text-slate-400 uppercase font-bold">TOP MATCH OPPORTUNITY</div>
  <div className="text-xs font-black text-white group-hover:text-amber-300 truncate max-w-[140px]">
  {liveInsights.topEmployer.company}
+ </div>
+ <div className="text-[10px] text-slate-400 truncate max-w-[140px]">
+ {liveInsights.topEmployer.title}
  </div>
  </div>
  </div>
@@ -367,7 +468,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  <h3 className="font-extrabold text-xs text-emerald-300 uppercase tracking-wider group-hover:text-white transition-colors">
  CLOSEST LOCAL JOB
  </h3>
- <div className="text-[9px] text-emerald-400/90 font-bold">BALACLAVA VIC PROXIMITY</div>
+ <div className="text-[9px] text-emerald-400/90 font-bold">{baseSuburb.toUpperCase()} PROXIMITY</div>
  </div>
  </div>
  <div className="flex items-center gap-1.5">
@@ -457,7 +558,7 @@ export const TopMatchesSidebar = ({ jobs = [], onSelectJob, onOpenGenerator, bas
  </div>
 
  <p className="text-[10px] text-cyan-200/90 font-medium italic line-clamp-2 bg-slate-950/70 p-2 rounded border border-cyan-500/20">
- "{activeWildCardJob.stream || activeWildCardJob.coolArchetype?.category || 'Frontier Tech'} — Cutting-edge or unusual opportunity!"
+ "{activeWildCardJob.highlightSnippet || `${activeWildCardJob.stream || activeWildCardJob.coolArchetype?.category || 'Frontier Tech'} — Cutting-edge or unusual opportunity!`}"
  </p>
 
  <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-cyan-900/60 text-slate-300">

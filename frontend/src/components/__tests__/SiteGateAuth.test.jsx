@@ -5,12 +5,16 @@ import SiteGate from '../SiteGate';
 import * as authService from '../../services/authService';
 import * as googleAuthService from '../../services/googleAuthService';
 
-vi.mock('../../services/authService', () => ({
-  loginWithEmail: vi.fn(),
-  registerWithEmail: vi.fn(),
-  setSession: vi.fn(),
-  getAuthToken: vi.fn(() => 'mock-token')
-}));
+vi.mock('../../services/authService', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    loginWithEmail: vi.fn(),
+    registerWithEmail: vi.fn(),
+    setSession: vi.fn(),
+    getAuthToken: vi.fn(() => 'mock-token')
+  };
+});
 
 vi.mock('../../services/googleAuthService', () => ({
   loginWithGoogle: vi.fn()
@@ -41,17 +45,34 @@ describe('SiteGate Authentication Component', () => {
 
     expect(screen.getByPlaceholderText('e.g. Alex Morgan')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('candidate@example.com')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Min. 4 chars')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Min. 8 chars, 1 upper, 1 special')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Repeat password')).toBeInTheDocument();
     expect(screen.getByText(/REGISTER & START DISCOVERY/i)).toBeInTheDocument();
   });
 
-  it('submits registration successfully and calls onUnlock', async () => {
+  it('displays real-time password complexity checklist when typing password', () => {
+    render(<SiteGate onUnlock={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
+
+    const pwdInput = screen.getByPlaceholderText('Min. 8 chars, 1 upper, 1 special');
+    fireEvent.change(pwdInput, { target: { value: 'short' } });
+
+    expect(screen.getByText(/PASSWORD STRENGTH:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Weak/i)).toBeInTheDocument();
+    expect(screen.getByText(/8\+ characters/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 uppercase \(A-Z\)/i)).toBeInTheDocument();
+
+    fireEvent.change(pwdInput, { target: { value: 'StrongPassword123!' } });
+    expect(screen.getByText(/Strong \(5\/5\)/i)).toBeInTheDocument();
+  });
+
+  it('submits registration successfully with complex password and calls onUnlock', async () => {
     const mockUnlock = vi.fn();
     authService.registerWithEmail.mockResolvedValueOnce({
       id: 'new_user_123',
       name: 'Alex Morgan',
-      email: 'alex@example.com'
+      email: 'alex@example.com',
+      email_verified: false
     });
 
     render(<SiteGate onUnlock={mockUnlock} />);
@@ -60,13 +81,13 @@ describe('SiteGate Authentication Component', () => {
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Alex Morgan'), { target: { value: 'Alex Morgan' } });
     fireEvent.change(screen.getByPlaceholderText('candidate@example.com'), { target: { value: 'alex@example.com' } });
-    fireEvent.change(screen.getByPlaceholderText('Min. 4 chars'), { target: { value: 'Password123' } });
-    fireEvent.change(screen.getByPlaceholderText('Repeat password'), { target: { value: 'Password123' } });
+    fireEvent.change(screen.getByPlaceholderText('Min. 8 chars, 1 upper, 1 special'), { target: { value: 'ComplexPass123!' } });
+    fireEvent.change(screen.getByPlaceholderText('Repeat password'), { target: { value: 'ComplexPass123!' } });
 
     fireEvent.click(screen.getByText(/REGISTER & START DISCOVERY/i));
 
     await waitFor(() => {
-      expect(authService.registerWithEmail).toHaveBeenCalledWith('Alex Morgan', 'alex@example.com', 'Password123');
+      expect(authService.registerWithEmail).toHaveBeenCalledWith('Alex Morgan', 'alex@example.com', 'ComplexPass123!');
       expect(mockUnlock).toHaveBeenCalledWith(expect.objectContaining({
         email: 'alex@example.com'
       }));

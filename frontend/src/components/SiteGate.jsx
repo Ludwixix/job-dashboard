@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { 
   Lock, ArrowRight, ShieldCheck, AlertCircle, 
-  User, Mail, Key, Loader2, LogIn, UserPlus, Fingerprint 
+  User, Mail, Key, Loader2, LogIn, UserPlus, Fingerprint, CheckCircle2 
 } from 'lucide-react';
-import { loginWithEmail, registerWithEmail } from '../services/authService';
+import { loginWithEmail, registerWithEmail, validatePasswordStrength } from '../services/authService';
 import { loginWithGoogle } from '../services/googleAuthService';
 import { loginWithBrowserPasskey } from '../services/passkeyService';
 
@@ -40,6 +40,8 @@ export default function SiteGate({ onUnlock = () => {} }) {
   const [error, setError] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const pwdStrength = validatePasswordStrength(password);
 
   // Email & Password Sign In
   const handleSignIn = async (e) => {
@@ -82,8 +84,13 @@ export default function SiteGate({ onUnlock = () => {} }) {
       setError('Please enter a valid email address.');
       return;
     }
-    if (!password || password.length < 4) {
-      setError('Password must be at least 4 characters.');
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+    const strength = validatePasswordStrength(password);
+    if (!strength.isComplex) {
+      setError('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
       return;
     }
     if (password !== confirmPassword) {
@@ -441,7 +448,7 @@ export default function SiteGate({ onUnlock = () => {} }) {
                       required
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
-                      placeholder="Min. 4 chars"
+                      placeholder="Min. 8 chars, 1 upper, 1 special"
                       className="w-full bg-[#090807] border border-[#332b22] focus:border-[#d48b38] text-white pl-9 pr-4 py-2.5 text-xs rounded-sm focus:outline-none transition-colors font-mono"
                     />
                   </div>
@@ -464,6 +471,62 @@ export default function SiteGate({ onUnlock = () => {} }) {
                   </div>
                 </div>
               </div>
+
+              {/* Real-time Password Complexity Meter & Checklist */}
+              {password.length > 0 && (
+                <div className="p-3 bg-[#0d0b09] border border-[#262019] rounded-sm space-y-2.5 text-[11px] font-mono">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider text-[#8c8275]">
+                      PASSWORD STRENGTH:
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                      pwdStrength.isComplex ? 'text-emerald-400' :
+                      pwdStrength.score >= 3 ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      {pwdStrength.strengthLabel} ({pwdStrength.score}/5)
+                    </span>
+                  </div>
+
+                  {/* 5-segment Strength Bar */}
+                  <div className="grid grid-cols-5 gap-1.5 h-1">
+                    {[1, 2, 3, 4, 5].map((idx) => {
+                      let barColor = 'bg-[#262019]';
+                      if (idx <= pwdStrength.score) {
+                        if (pwdStrength.score === 5) barColor = 'bg-emerald-500';
+                        else if (pwdStrength.score >= 3) barColor = 'bg-amber-500';
+                        else barColor = 'bg-rose-500';
+                      }
+                      return (
+                        <div key={idx} className={`h-full rounded-sm transition-all duration-300 ${barColor}`} />
+                      );
+                    })}
+                  </div>
+
+                  {/* Requirements Checklist */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 text-[10px]">
+                    <div className={`flex items-center gap-1.5 ${pwdStrength.rules.minLength ? 'text-emerald-400 font-bold' : 'text-[#706659]'}`}>
+                      <span>{pwdStrength.rules.minLength ? '✓' : '•'}</span>
+                      <span>8+ characters</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdStrength.rules.hasUpper ? 'text-emerald-400 font-bold' : 'text-[#706659]'}`}>
+                      <span>{pwdStrength.rules.hasUpper ? '✓' : '•'}</span>
+                      <span>1 uppercase (A-Z)</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdStrength.rules.hasLower ? 'text-emerald-400 font-bold' : 'text-[#706659]'}`}>
+                      <span>{pwdStrength.rules.hasLower ? '✓' : '•'}</span>
+                      <span>1 lowercase (a-z)</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdStrength.rules.hasDigit ? 'text-emerald-400 font-bold' : 'text-[#706659]'}`}>
+                      <span>{pwdStrength.rules.hasDigit ? '✓' : '•'}</span>
+                      <span>1 number (0-9)</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 col-span-1 sm:col-span-2 ${pwdStrength.rules.hasSpecial ? 'text-emerald-400 font-bold' : 'text-[#706659]'}`}>
+                      <span>{pwdStrength.rules.hasSpecial ? '✓' : '•'}</span>
+                      <span>1 special symbol (!@#$%^&*...)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {error && (
                 <div className="p-2.5 bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs tracking-wide flex items-center gap-2 font-mono rounded-sm">

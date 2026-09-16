@@ -22,7 +22,10 @@ def test_app_and_handler(tmp_path):
                 created_at TEXT NOT NULL,
                 google_id TEXT,
                 picture TEXT,
-                passkey_id TEXT
+                passkey_id TEXT,
+                email_verified INTEGER DEFAULT 0,
+                email_verification_code TEXT,
+                email_verification_expires_at TEXT
             )
         """)
         conn.execute("""
@@ -86,7 +89,7 @@ def test_user_registration_duplicate_email(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "Bob", "email": "bob@example.com", "password": "Password123"}
+        body={"name": "Bob", "email": "bob@example.com", "password": "ComplexPassword123!"}
     )
     handler1.do_POST()
     assert handler1.send_response.call_args[0][0] == 200
@@ -95,7 +98,7 @@ def test_user_registration_duplicate_email(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "Bob Duplicate", "email": "bob@example.com", "password": "DifferentPassword"}
+        body={"name": "Bob Duplicate", "email": "bob@example.com", "password": "AnotherComplexPassword123!"}
     )
     handler2.do_POST()
     assert handler2.send_response.call_args[0][0] == 400
@@ -110,7 +113,7 @@ def test_user_login_success_and_failure(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "Charlie", "email": "charlie@example.com", "password": "CorrectPassword"}
+        body={"name": "Charlie", "email": "charlie@example.com", "password": "CorrectPassword123!"}
     )
     reg_handler.do_POST()
     assert reg_handler.send_response.call_args[0][0] == 200
@@ -120,7 +123,7 @@ def test_user_login_success_and_failure(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/login",
-        body={"email": "charlie@example.com", "password": "WrongPassword"}
+        body={"email": "charlie@example.com", "password": "WrongPassword123!"}
     )
     bad_login.do_POST()
     assert bad_login.send_response.call_args[0][0] == 401
@@ -130,7 +133,7 @@ def test_user_login_success_and_failure(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/login",
-        body={"email": "charlie@example.com", "password": "CorrectPassword"}
+        body={"email": "charlie@example.com", "password": "CorrectPassword123!"}
     )
     good_login.do_POST()
     assert good_login.send_response.call_args[0][0] == 200
@@ -138,6 +141,7 @@ def test_user_login_success_and_failure(test_app_and_handler):
     assert res["success"] is True
     assert "token" in res
     assert res["user"]["email"] == "charlie@example.com"
+    assert "email_verified" in res["user"]
 
 def test_multi_user_profile_isolation(test_app_and_handler):
     """Verify that User B does not receive User A's private profile on registration or fetch."""
@@ -148,11 +152,10 @@ def test_multi_user_profile_isolation(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "User A", "email": "usera@example.com", "password": "PasswordA123"}
+        body={"name": "User A", "email": "usera@example.com", "password": "PasswordA123!"}
     )
     reg_a.do_POST()
     token_a = parse_response(reg_a)["token"]
-    user_a_id = parse_response(reg_a)["user"]["id"]
 
     prof_save_a = create_mock_handler(
         handler_cls,
@@ -169,11 +172,10 @@ def test_multi_user_profile_isolation(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "User B", "email": "userb@example.com", "password": "PasswordB123"}
+        body={"name": "User B", "email": "userb@example.com", "password": "PasswordB123!"}
     )
     reg_b.do_POST()
     token_b = parse_response(reg_b)["token"]
-    user_b_id = parse_response(reg_b)["user"]["id"]
 
     # User B fetches profile -> must NOT see User A's title
     get_prof_b = create_mock_handler(
@@ -197,7 +199,7 @@ def test_link_google_account(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "David", "email": "david@example.com", "password": "Password123"}
+        body={"name": "David", "email": "david@example.com", "password": "Password123!"}
     )
     reg.do_POST()
     token = parse_response(reg)["token"]
@@ -224,7 +226,7 @@ def test_passkey_setup_and_login(test_app_and_handler):
         handler_cls,
         "POST",
         "/api/register",
-        body={"name": "Elena Passkey", "email": "elena@example.com", "password": "Password123"}
+        body={"name": "Elena Passkey", "email": "elena@example.com", "password": "Password123!"}
     )
     reg.do_POST()
     token = parse_response(reg)["token"]
@@ -260,4 +262,124 @@ def test_passkey_setup_and_login(test_app_and_handler):
     assert login_res["user"]["email"] == "elena@example.com"
     assert login_res["user"]["name"] == "Elena Passkey"
     assert login_res["user"]["id"] == user_id
+
+def test_password_complexity_enforcement(test_app_and_handler):
+    app, handler_cls = test_app_and_handler
+
+    weak_passwords = [
+        ("short", "Password must be at least 8 characters"),
+        ("alllowercase123!", "Password must include at least one uppercase letter"),
+        ("ALLUPPERCASE123!", "Password must include at least one lowercase letter"),
+        ("NoDigitsInPass!", "Password must include at least one number"),
+        ("NoSpecialChar123", "Password must include at least one special character")
+    ]
+
+    for pwd, expected_err in weak_passwords:
+        h = create_mock_handler(
+            handler_cls,
+            "POST",
+            "/api/register",
+            body={"name": "Weak User", "email": f"weak_{hash(pwd)}@example.com", "password": pwd}
+        )
+        h.do_POST()
+        assert h.send_response.call_args[0][0] == 400
+        res = parse_response(h)
+        assert expected_err.lower() in res["error"].lower()
+
+def test_email_verification_flow(test_app_and_handler):
+    app, handler_cls = test_app_and_handler
+
+    # 1. Register user
+    reg = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/register",
+        body={"name": "Frank Verify", "email": "frank@example.com", "password": "ComplexPassword123!"}
+    )
+    reg.do_POST()
+    assert reg.send_response.call_args[0][0] == 200
+    reg_data = parse_response(reg)
+    token = reg_data["token"]
+    assert reg_data["user"]["email_verified"] is False
+    assert "verification_code_preview" in reg_data
+    code = reg_data["verification_code_preview"]
+    assert len(code) == 6
+
+    # 2. Verify with wrong code
+    bad_verify = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/verify-email",
+        body={"code": "000000"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    bad_verify.do_POST()
+    assert bad_verify.send_response.call_args[0][0] == 400
+
+    # 3. Verify with correct code
+    good_verify = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/verify-email",
+        body={"code": code},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    good_verify.do_POST()
+    assert good_verify.send_response.call_args[0][0] == 200
+    verify_res = parse_response(good_verify)
+    assert verify_res["success"] is True
+    assert verify_res["email_verified"] is True
+
+    # 4. Login after verification should reflect email_verified = True
+    login_h = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/login",
+        body={"email": "frank@example.com", "password": "ComplexPassword123!"}
+    )
+    login_h.do_POST()
+    assert login_h.send_response.call_args[0][0] == 200
+    login_data = parse_response(login_h)
+    assert login_data["user"]["email_verified"] is True
+
+def test_resend_verification_flow(test_app_and_handler):
+    app, handler_cls = test_app_and_handler
+
+    # 1. Register user
+    reg = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/register",
+        body={"name": "Grace Resend", "email": "grace@example.com", "password": "ComplexPassword123!"}
+    )
+    reg.do_POST()
+    reg_data = parse_response(reg)
+    token = reg_data["token"]
+
+    # 2. Resend verification code
+    resend_h = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/resend-verification",
+        body={},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    resend_h.do_POST()
+    assert resend_h.send_response.call_args[0][0] == 200
+    resend_data = parse_response(resend_h)
+    assert resend_data["success"] is True
+    new_code = resend_data["verification_code_preview"]
+    assert len(new_code) == 6
+
+    # 3. Verify with newly resent code
+    verify_h = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/verify-email",
+        body={"code": new_code},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    verify_h.do_POST()
+    assert verify_h.send_response.call_args[0][0] == 200
+    assert parse_response(verify_h)["email_verified"] is True
 

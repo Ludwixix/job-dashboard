@@ -947,15 +947,18 @@ export const JobSeeker = ({
 
  {/* 2-Column Workspace Layout (Left Sidebar + Right Main Grid) */}
  <div className="flex flex-col lg:flex-row items-start gap-3.5" ref={gridTopRef}>
- {/* Left Column Sidebar */}
- {showSidebar && (
- <TopMatchesSidebar 
- jobs={jobs} 
- onSelectJob={onSelectJob} 
- onOpenGenerator={(job) => setSelectedForGenerator(job)} 
- baseLocation={baseLocation}
- />
- )}
+        {/* Left Column Sidebar */}
+        {showSidebar && (
+          <TopMatchesSidebar 
+            jobs={seekerJobs.length > 0 ? seekerJobs : jobs} 
+            allJobsCount={jobs.length}
+            onSelectJob={onSelectJob} 
+            onOpenGenerator={(job) => setSelectedForGenerator(job)} 
+            baseLocation={currentProfile?.location || baseLocation}
+            activeStreamTab={activeStreamTab}
+            searchQuery={search}
+          />
+        )}
 
  {/* Right Main Content */}
  <div className="flex-1 space-y-3.5 w-full">

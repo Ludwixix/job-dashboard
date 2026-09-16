@@ -146,6 +146,95 @@ export const loginWithEmail = async (email, password) => {
 };
 
 /**
+ * Evaluates password complexity against security standards:
+ * - At least 8 characters
+ * - Uppercase letter [A-Z]
+ * - Lowercase letter [a-z]
+ * - Number [0-9]
+ * - Special character / symbol
+ */
+export const validatePasswordStrength = (password = '') => {
+  const pwd = String(password || '');
+  const rules = {
+    minLength: pwd.length >= 8,
+    hasUpper: /[A-Z]/.test(pwd),
+    hasLower: /[a-z]/.test(pwd),
+    hasDigit: /[0-9]/.test(pwd),
+    hasSpecial: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(pwd)
+  };
+
+  const passedCount = Object.values(rules).filter(Boolean).length;
+  const isComplex = passedCount === 5;
+
+  let strengthLabel = 'Weak';
+  if (passedCount >= 5) strengthLabel = 'Strong';
+  else if (passedCount >= 3) strengthLabel = 'Medium';
+
+  return {
+    isComplex,
+    score: passedCount,
+    strengthLabel,
+    rules
+  };
+};
+
+/**
+ * Verify Email with 6-digit code
+ */
+export const verifyEmail = async (code, email) => {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) throw new Error('Please enter the 6-digit verification code.');
+
+  const apiBase = getApiBase();
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${apiBase}/api/verify-email`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ code: cleanCode, email: email || undefined })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Email verification failed.');
+  }
+
+  // Update stored session if email_verified is confirmed
+  const current = getCurrentSession();
+  if (current) {
+    const updated = { ...current, email_verified: true };
+    setSession(updated, token);
+  }
+
+  return data;
+};
+
+/**
+ * Resend Email Verification Code
+ */
+export const resendVerificationCode = async (email) => {
+  const apiBase = getApiBase();
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${apiBase}/api/resend-verification`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ email: email || undefined })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to resend verification code.');
+  }
+
+  return data;
+};
+
+/**
  * Sign Up with Full Name, Email & Password
  */
 export const registerWithEmail = async (name, email, password) => {
@@ -154,7 +243,11 @@ export const registerWithEmail = async (name, email, password) => {
 
   if (!cleanName) throw new Error('Please enter your full name.');
   if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('Please enter a valid email address.');
-  if (!password || password.length < 4) throw new Error('Password must be at least 4 characters.');
+  
+  const complexity = validatePasswordStrength(password);
+  if (!complexity.isComplex) {
+    throw new Error('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
+  }
 
   const apiBase = getApiBase();
   const res = await fetch(`${apiBase}/api/register`, {
@@ -172,6 +265,8 @@ export const registerWithEmail = async (name, email, password) => {
     ...data.user,
     authProvider: 'email',
     onboardingCompleted: false,
+    email_verified: Boolean(data.user?.email_verified),
+    verificationCodePreview: data.verification_code_preview,
     profileId: data.user.id
   };
 

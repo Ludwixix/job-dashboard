@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import SiteGate, { isSiteUnlocked, setSiteUnlocked } from './components/SiteGate';
+import { OnboardingFlow } from './components/OnboardingFlow';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getCurrentSession, validateSession, logoutUser } from './services/authService';
 import { Loader2 } from 'lucide-react';
@@ -57,6 +58,25 @@ function App() {
             setIsUnlocked(true);
             setSession(newSession);
           }} 
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  if (session && !session.onboardingCompleted) {
+    return (
+      <ErrorBoundary>
+        <OnboardingFlow 
+          initialUser={session}
+          onComplete={(updatedSession) => {
+            setSession(updatedSession || { ...session, onboardingCompleted: true });
+          }}
+          onSignOut={() => {
+            setSiteUnlocked(false);
+            logoutUser();
+            setSession(null);
+            setIsUnlocked(false);
+          }}
         />
       </ErrorBoundary>
     );

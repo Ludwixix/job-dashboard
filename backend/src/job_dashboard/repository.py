@@ -105,7 +105,13 @@ class JobRepository:
                     email TEXT UNIQUE NOT NULL,
                     name TEXT,
                     password_hash TEXT NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    google_id TEXT DEFAULT '',
+                    picture TEXT DEFAULT '',
+                    passkey_id TEXT DEFAULT '',
+                    email_verified INTEGER DEFAULT 0,
+                    email_verification_code TEXT DEFAULT '',
+                    email_verification_expires_at TEXT DEFAULT ''
                 );
                 CREATE TABLE IF NOT EXISTS user_applications (
                     id TEXT PRIMARY KEY,
@@ -260,6 +266,9 @@ class JobRepository:
                 "ALTER TABLE users ADD COLUMN google_id TEXT DEFAULT ''",
                 "ALTER TABLE users ADD COLUMN picture TEXT DEFAULT ''",
                 "ALTER TABLE users ADD COLUMN passkey_id TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN email_verification_code TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN email_verification_expires_at TEXT DEFAULT ''",
             ]:
                 try:
                     conn.execute(col_sql)

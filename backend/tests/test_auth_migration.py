@@ -104,7 +104,7 @@ def test_api_register_auto_migrates_default_user_data(tmp_path):
         handler_cls,
         "POST",
         "/api/register",
-        body={"email": "newuser@example.com", "password": "password123", "name": "New User"}
+        body={"email": "newuser@example.com", "password": "ComplexPassword123!", "name": "New User"}
     )
     reg_handler.do_POST()
     assert reg_handler.send_response.call_args[0][0] == 200

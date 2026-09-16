@@ -422,24 +422,167 @@ ${desc || '(Infer core deliverables from job title and company reputation)'}`;
 
     case 'master_cheat_sheet':
       return {
-        system: `You are a high-performance executive interview coach. Build a 3-column Master Interview Cheat Sheet Cockpit designed for real-time reference during technical and executive panel interviews. Return strictly valid JSON:
+        system: `You are an elite executive interview coach and technical hiring director. Build a complete, bespoke 3-column Master Interview Cheat Sheet Cockpit for this exact candidate and target job ad, modeled on the benchmark KBR Cockpit architecture (3 columns, 90-second pacing, 5-second brain glances, and conversational spoken scripts with HTML highlights <span class="hl">).
+
+Return strictly valid JSON matching this exact structure:
 {
-  "col1CompanyIntelligence": {
-    "missionAndPressures": "Core operational priority of the company right now.",
-    "keyMetricsToQuote": ["Metric / tech stack fact 1", "Fact 2"],
-    "insiderQuestionsForPanel": ["Disarming strategic question to ask the interviewer 1", "Question 2"]
-  },
-  "col2PacingAndKeyAccomplishments": [
-    { "theme": "Technical Mastery", "talkingPoint": "90-second structured answer summary with metric" },
-    { "theme": "Crisis / Incident Resolution", "talkingPoint": "90-second structured answer summary" },
-    { "theme": "Executive Influence", "talkingPoint": "90-second structured answer summary" }
+  "traps": [
+    "Specific high-risk landmine 1 to avoid during this company's interview (e.g. legacy bias, security shortcut, theoretical babble)",
+    "Specific landmine 2",
+    "Specific landmine 3"
   ],
-  "col3EmergencyRedirection": [
-    { "toughScenario": "If asked about unfamiliar legacy tool", "pivotScript": "Graceful executive pivot script" },
-    { "toughScenario": "If asked about conflicting priorities", "pivotScript": "Calm governance-first pivot script" }
+  "numbersToDrop": [
+    { "value": "99.99%", "label": "Production Uptime" },
+    { "value": "660k+", "label": "Enterprise Users" },
+    { "value": "87%", "label": "Cutover Cycle Time" },
+    { "value": "0", "label": "Unplanned Outages" },
+    { "value": "12+", "label": "Years Track Record" },
+    { "value": "100h/mo", "label": "Automation Savings" }
+  ],
+  "reverseQuestions": [
+    {
+      "category": "Strategic Alignment",
+      "question": "Looking at the company roadmap for the next 6 to 12 months, what is the single biggest operational bottleneck you want the person in this role to solve first?",
+      "targetAudience": "Hiring Manager / Team Lead",
+      "rationale": "Shows immediate desire to create business impact and prioritize executive pain."
+    },
+    {
+      "category": "Technical Architecture & Governance",
+      "question": "Bespoke question addressing this job's specific technology stack and governance balance",
+      "targetAudience": "Technical Evaluator / Lead Architect",
+      "rationale": "Signals respect for both delivery speed and enterprise security guardrails."
+    },
+    {
+      "category": "Team Velocity & Tooling",
+      "question": "Bespoke question on day-to-day deployment lifecycle, CI/CD, and release friction",
+      "targetAudience": "Senior Engineers / Peers",
+      "rationale": "Reveals engineering maturity and real-world deployment practices."
+    },
+    {
+      "category": "Definition of Success",
+      "question": "If we look back 12 months from now, what would have to happen for you to say, 'Hiring this person was the best decision we made this year'?",
+      "targetAudience": "Full Panel",
+      "rationale": "Forces the panel to visualize candidate thriving and defines the scorecard."
+    }
+  ],
+  "starStories": [
+    {
+      "title": "Bespoke Headline Aligned to Job Priority 1",
+      "company": "Capgemini / Victorian Dept of Education",
+      "color": "#7c3aed",
+      "situation": "1-sentence concise enterprise context and business pain.",
+      "action": "1-2 sentences detailing exact technical methodology and automation built.",
+      "result": "Quantified business result with concrete metrics."
+    },
+    {
+      "title": "Bespoke Headline Aligned to Job Priority 2",
+      "company": "Knosys / GreenOrbit Intranet",
+      "color": "#0284c7",
+      "situation": "1-sentence situation.",
+      "action": "1-2 sentences action.",
+      "result": "Quantified result."
+    },
+    {
+      "title": "Bespoke Headline Aligned to Job Priority 3",
+      "company": "Australia Post via Capgemini",
+      "color": "#059669",
+      "situation": "1-sentence situation.",
+      "action": "1-2 sentences action.",
+      "result": "Quantified result."
+    },
+    {
+      "title": "Bespoke Headline Aligned to Job Priority 4",
+      "company": "Engage Squared / Cimic Group & Transurban",
+      "color": "#d97706",
+      "situation": "1-sentence situation.",
+      "action": "1-2 sentences action.",
+      "result": "Quantified result."
+    },
+    {
+      "title": "Bespoke Headline Aligned to Job Priority 5",
+      "company": "St John of God Health Care",
+      "color": "#e11d48",
+      "situation": "1-sentence situation.",
+      "action": "1-2 sentences action.",
+      "result": "Quantified result."
+    }
+  ],
+  "qnaCards": [
+    {
+      "id": "pitch",
+      "category": "cat-pitch",
+      "categoryLabel": "🎯 Pitch",
+      "title": "1. Opening Pitch: 'Tell Me About Yourself'",
+      "badge": "Conversational • ~90 Seconds",
+      "badgeColor": "green",
+      "scanLabel": "⚡ 5-Second Brain Glances:",
+      "scanBar": "Years Exp &rarr; Core Track Record &rarr; Quantified Win &rarr; Why Target Employer",
+      "spokenLabel": "🗣️ What to Actually Say (Human & Conversational):",
+      "spokenScript": "<p>Conversational spoken script formatted in HTML with <span class=\\"hl\\">highlighted phrases</span> and <span class=\\"hl-green\\">quantified metrics</span>.</p>"
+    },
+    {
+      "id": "tech1",
+      "category": "cat-tech",
+      "categoryLabel": "⚡ Tech Deep Dive",
+      "title": "2. Technical Deep Dive: Primary Technology / Core Mandate",
+      "badge": "Architecture & Resilience",
+      "badgeColor": "blue",
+      "scanLabel": "⚡ 5-Second Brain Glances:",
+      "scanBar": "Core Methodology &rarr; Security / Least Privilege &rarr; Automated Telemetry",
+      "likelyQuestion": "Likely Question: 'How do you approach this core technical requirement in production?'",
+      "spokenLabel": "🗣️ What to Actually Say:",
+      "spokenScript": "<p>Conversational technical answer anchored to production reality.</p>"
+    },
+    {
+      "id": "tech2",
+      "category": "cat-architecture",
+      "categoryLabel": "🏗️ Architecture & Scale",
+      "title": "3. Architecture & Reliability: Secondary Mandate / Scale",
+      "badge": "Enterprise Scale",
+      "badgeColor": "purple",
+      "scanLabel": "⚡ 5-Second Brain Glances:",
+      "scanBar": "Zero Downtime &rarr; Idempotency &rarr; Health Gates &rarr; Automated Recovery",
+      "likelyQuestion": "Likely Question: 'How do you handle zero-downtime cutovers, migration, or infrastructure scale?'",
+      "spokenLabel": "🗣️ What to Actually Say:",
+      "spokenScript": "<p>Conversational architectural answer.</p>"
+    },
+    {
+      "id": "behavioral",
+      "category": "cat-behavioral",
+      "categoryLabel": "🤝 Leadership & Crisis",
+      "title": "4. Behavioral: Incident Triage & Stakeholder Friction",
+      "badge": "Executive Empathy",
+      "badgeColor": "amber",
+      "scanLabel": "⚡ 5-Second Brain Glances:",
+      "scanBar": "Stop Bleeding &rarr; Transparent Comms &rarr; Blameless Post-Mortem &rarr; Permanent Guardrail",
+      "likelyQuestion": "Likely Question: 'Tell me about a production incident or conflict with stakeholders and how you handled it.'",
+      "spokenLabel": "🗣️ What to Actually Say:",
+      "spokenScript": "<p>Conversational behavioral STAR answer.</p>"
+    },
+    {
+      "id": "why_company",
+      "category": "cat-company",
+      "categoryLabel": "🏢 Company Fit",
+      "title": "5. Why This Employer? (Strategic Alignment)",
+      "badge": "High Conviction",
+      "badgeColor": "green",
+      "scanLabel": "⚡ 5-Second Brain Glances:",
+      "scanBar": "Scale of Mission &rarr; Engineering Culture &rarr; Immediate Value Delivery &rarr; Long-Term Home",
+      "likelyQuestion": "Likely Question: 'Why do you want to join us and why this role specifically?'",
+      "spokenLabel": "🗣️ What to Actually Say:",
+      "spokenScript": "<p>Conversational alignment answer showing deep knowledge of the employer.</p>"
+    }
+  ],
+  "interviewers": [
+    {
+      "name": "Hiring Lead / Manager",
+      "role": "Direct Manager",
+      "focus": "Autonomy, team velocity & delivery execution",
+      "dropTerms": "Key technical terms to drop"
+    }
   ]
 }`,
-        user: `Generate Master Interview Cockpit for ${jobTitle} at ${company}.\n\n${commonContext}`
+        user: `Generate a 100% bespoke Master Interview Cockpit for ${jobTitle} at ${company}.\n\n${commonContext}`
       };
 
     case 'star_prep_guide':

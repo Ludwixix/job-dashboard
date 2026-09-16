@@ -1,6 +1,6 @@
-import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typeof e!=`string`)return{platform:`unknown`,meetingUrl:``,meetingId:``,passcode:``,scheduledTime:``};let t=e.replace(/=\r?\n/g,``).replace(/=3D/gi,`=`),n=`unknown`,r=``,i=t.match(/https:\/\/teams\.microsoft\.com\/(?:l\/meetup-join|meet)\/[^\s<>"]+/i),a=t.match(/https:\/\/[a-zA-Z0-9.-]*zoom\.us\/[jsw]\/[^\s<>"]+/i),o=t.match(/https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}[^\s<>"]*/i),s=t.match(/https:\/\/[a-zA-Z0-9.-]*webex\.com\/[^\s<>"]+/i);i?(n=`teams`,r=i[0]):a?(n=`zoom`,r=a[0]):o?(n=`meet`,r=o[0]):s&&(n=`webex`,r=s[0]);let c=``,l=t.match(/(?:Meeting\s*ID|Meeting\s*Number|ID):?\s*([0-9\s-]{8,22})/i);l&&(c=l[1].trim());let u=``,d=t.match(/(?:Passcode|Password|Pass|PIN|Code):?\s*([a-zA-Z0-9!@#$%^&*_-]{4,20})/i);d&&(u=d[1].trim());let f=``,p=t.match(/(?:at|for|time:?)\s*([0-1]?[0-9](?::[0-5][0-9])?\s*(?:am|pm)\b(?:\s*(?:AEST|AEDT|AWST|ACST|UTC|GMT|EST|EDT|CST|CDT|PST|PDT))?)/i);return p&&(f=p[1].trim()),{platform:n,meetingUrl:r,meetingId:c,passcode:u,scheduledTime:f}}function r(e={}){let t={platform:e.meetingPlatform||`unknown`,meetingUrl:e.meetingUrl||e.meeting_url||e.meetingLink||``,meetingId:e.meetingId||e.meeting_id||``,passcode:e.passcode||e.password||e.meetingPasscode||``,scheduledTime:e.scheduledTime||e.interviewTime||``,scheduledDate:e.scheduledDate||e.interviewDate||``,interviewers:Array.isArray(e.interviewers)?[...e.interviewers]:[]},r=[];e.notes&&r.push(e.notes),e.rawEmail&&r.push(e.rawEmail),e.email_text&&r.push(e.email_text),e.interviewInvite&&r.push(typeof e.interviewInvite==`string`?e.interviewInvite:JSON.stringify(e.interviewInvite));let i=e.email_events||e.emailEvents||e.emailHistory||[];Array.isArray(i)&&i.forEach(e=>{e.body&&r.push(e.body),e.snippet&&r.push(e.snippet),e.subject&&r.push(e.subject),(e.from||e.sender)&&r.push(`From: ${e.from||e.sender}`),(e.to||e.recipients)&&r.push(`To: ${Array.isArray(e.to)?e.to.join(`, `):e.to||e.recipients}`)});let a=r.join(`
+import{o as e,r as t}from"./profileService-DIDKSAaQ.js";import{i as n,n as r,t as i}from"./jobIntelligenceService-DIuVd0jl.js";function a(e){if(!e||typeof e!=`string`)return{platform:`unknown`,meetingUrl:``,meetingId:``,passcode:``,scheduledTime:``};let t=e.replace(/=\r?\n/g,``).replace(/=3D/gi,`=`),n=`unknown`,r=``,i=t.match(/https:\/\/teams\.microsoft\.com\/(?:l\/meetup-join|meet)\/[^\s<>"]+/i),a=t.match(/https:\/\/[a-zA-Z0-9.-]*zoom\.us\/[jsw]\/[^\s<>"]+/i),o=t.match(/https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}[^\s<>"]*/i),s=t.match(/https:\/\/[a-zA-Z0-9.-]*webex\.com\/[^\s<>"]+/i);i?(n=`teams`,r=i[0]):a?(n=`zoom`,r=a[0]):o?(n=`meet`,r=o[0]):s&&(n=`webex`,r=s[0]);let c=``,l=t.match(/(?:Meeting\s*ID|Meeting\s*Number|ID):?\s*([0-9\s-]{8,22})/i);l&&(c=l[1].trim());let u=``,d=t.match(/(?:Passcode|Password|Pass|PIN|Code):?\s*([a-zA-Z0-9!@#$%^&*_-]{4,20})/i);d&&(u=d[1].trim());let f=``,p=t.match(/(?:at|for|time:?)\s*([0-1]?[0-9](?::[0-5][0-9])?\s*(?:am|pm)\b(?:\s*(?:AEST|AEDT|AWST|ACST|UTC|GMT|EST|EDT|CST|CDT|PST|PDT))?)/i);return p&&(f=p[1].trim()),{platform:n,meetingUrl:r,meetingId:c,passcode:u,scheduledTime:f}}function o(e={}){let t={platform:e.meetingPlatform||`unknown`,meetingUrl:e.meetingUrl||e.meeting_url||e.meetingLink||``,meetingId:e.meetingId||e.meeting_id||``,passcode:e.passcode||e.password||e.meetingPasscode||``,scheduledTime:e.scheduledTime||e.interviewTime||``,scheduledDate:e.scheduledDate||e.interviewDate||``,interviewers:Array.isArray(e.interviewers)?[...e.interviewers]:[]},n=[];e.notes&&n.push(e.notes),e.rawEmail&&n.push(e.rawEmail),e.email_text&&n.push(e.email_text),e.interviewInvite&&n.push(typeof e.interviewInvite==`string`?e.interviewInvite:JSON.stringify(e.interviewInvite));let r=e.email_events||e.emailEvents||e.emailHistory||[];Array.isArray(r)&&r.forEach(e=>{e.body&&n.push(e.body),e.snippet&&n.push(e.snippet),e.subject&&n.push(e.subject),(e.from||e.sender)&&n.push(`From: ${e.from||e.sender}`),(e.to||e.recipients)&&n.push(`To: ${Array.isArray(e.to)?e.to.join(`, `):e.to||e.recipients}`)});let i=n.join(`
 
-`);if(a){let e=n(a);if(!t.meetingUrl&&e.meetingUrl&&(t.meetingUrl=e.meetingUrl,t.platform=e.platform),!t.meetingId&&e.meetingId&&(t.meetingId=e.meetingId),!t.passcode&&e.passcode&&(t.passcode=e.passcode),!t.scheduledTime&&e.scheduledTime&&(t.scheduledTime=e.scheduledTime),t.interviewers.length===0)for(let e of[/(?:meeting with|interview with|meet with|attendees?:?)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:\s+(?:and|&)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)?)/i,/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:and|&)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:aren’t|will join|are on the panel)/i,/([A-Z][a-z]+\s+[A-Z][a-z]+)\s*will\s+also\s+join/i]){let n=a.match(e);n&&(n[1]&&!n[2]?n[1].split(/(?:,\s*|\s+(?:and|&)\s+)/i).filter(Boolean).forEach(e=>{let n=e.trim();n&&![`The`,`Our`,`Your`,`Tomorrow`,`Please`].includes(n)&&t.interviewers.push({name:n,role:`Hiring Panelist`,focus:`Role alignment & operational impact`,dropTerms:`Governance, Automation, Delivery`})}):n[1]&&n[2]&&[n[1],n[2]].forEach(e=>{let n=e.trim();n&&!t.interviewers.some(e=>e.name===n)&&t.interviewers.push({name:n,role:`Hiring Panelist`,focus:`Core requirements & team fit`,dropTerms:`Best practices, Production metrics`})}))}}return t.interviewers.length===0&&(t.interviewers=[{name:`Hiring Manager / Team Lead`,role:`Direct Manager`,focus:`Autonomy, operational velocity & reliable execution`,dropTerms:`Scrum, Root Cause Analysis, Documentation, SRE`},{name:`Technical Architect / Principal`,role:`Technical Architect`,focus:`Architectural rigor, edge cases & zero-downtime governance`,dropTerms:`Idempotency, Decoupled State, CI/CD, Least Privilege`},{name:`Talent & Culture Lead`,role:`People Partner`,focus:`Communication, stakeholder empathy & growth mindset`,dropTerms:`Cross-functional enablement, Mentorship, Continuous improvement`}]),t}function i(e={}){let t=`${e.title||``} ${e.description||``} ${e.requirements?e.requirements.join(` `):``}`.toLowerCase();return t.includes(`sharepoint`)||t.includes(`nintex`)||t.includes(`m365`)||t.includes(`power automate`)?[`Never call legacy systems "broken" or dismiss existing Nintex workflows—respect the years of investment and praise their reliability before proposing modernization.`,`Never propose managing user access via item/folder permissions—always emphasize Entra ID security groups and M365 role-based governance.`,`Never advocate building production flows under personal accounts—strictly enforce Service Principals, Key Vault secrets, and tenant ALM.`]:t.includes(`devops`)||t.includes(`cloud`)||t.includes(`aws`)||t.includes(`azure`)||t.includes(`terraform`)?[`Never suggest manual console modifications in production—always anchor every change to IaC (Terraform/Bicep) with version-controlled pull requests.`,`Never dismiss legacy on-prem systems or technical debt—frame hybrid infrastructure as a deliberate business decision requiring thoughtful bridge architectures.`,`Never prioritize raw deployment velocity over security boundaries and rollback plans—emphasize canary deployments and automated health gates.`]:t.includes(`data`)||t.includes(`python`)||t.includes(`sql`)||t.includes(`etl`)||t.includes(`analytics`)?[`Never assume source data is clean or static—always discuss defensive schema validation, idempotency, and retry mechanisms.`,`Never treat query optimization as an afterthought—cite partition pruning, indexing, and cost control limits.`,`Never present technical findings in a vacuum—always connect data pipelines to business KPIs and decision velocity.`]:[`Never answer in pure abstract theory without anchoring to a real production metric or quantifiable business outcome.`,`Never point fingers at past teams or stakeholders—always frame previous friction around misaligned incentives and how you unified them.`,`Never exceed 90 seconds without checking in or grounding your answer back in their specific organizational reality.`]}function a(e={},t={}){e.interviewTalkingPoints;let n=`${t.title||``} ${t.description||``}`.toLowerCase();return n.includes(`sharepoint`)||n.includes(`m365`)?[{value:`5,000`,label:`SQL List Threshold`},{value:`300k`,label:`Sync Limit`},{value:`30 Days`,label:`Power Automate Flow Cap`},{value:`400`,label:`URL Path Cap`},{value:`660k`,label:`Dept of Ed Users`},{value:`87%`,label:`Cutover Time Reduction`}]:n.includes(`cloud`)||n.includes(`devops`)||n.includes(`aws`)||n.includes(`azure`)?[{value:`99.99%`,label:`Production Uptime`},{value:`85%`,label:`Provisioning Cut`},{value:`660k`,label:`Identities Migrated`},{value:`0`,label:`Unplanned Downtime`},{value:`12+`,label:`Years Experience`},{value:`100h/mo`,label:`Automation Savings`}]:[{value:`660k+`,label:`Enterprise Users`},{value:`87%`,label:`Cycle Time Reduction`},{value:`1,000+`,label:`Managed Environments`},{value:`100%`,label:`On-Time Delivery`},{value:`12+`,label:`Years Track Record`},{value:`100h/mo`,label:`Manual Time Eliminated`}]}function o(e={},t={}){return[{title:`Incident Reduction & Automated Auditing`,company:`Capgemini / Victorian Dept of Education`,color:`#7c3aed`,situation:`Constant access breakages and permission tickets across 660k users & 1,000+ sites.`,action:`Built unattended PnP PowerShell scripts performing continuous automated permission audits and alerting.`,result:`Cut repeat access incidents by 15% and saved 160 hours of manual audit time per month.`},{title:`Migration Speed & Batch Automation`,company:`Knosys / GreenOrbit Intranet`,color:`#0284c7`,situation:`Stalling cutovers taking 2+ hours per batch with frequent path and character limit errors.`,action:`Automated pre-flight path validation, chunking, and multithreaded retry execution via PowerShell.`,result:`Cut batch cutover processing time by 87% (from 2 hours down to 15 minutes).`},{title:`ServiceNow & Workflow Automation`,company:`Australia Post via Capgemini`,color:`#059669`,situation:`Hundreds of hours lost cross-referencing ServiceNow queues and manual roster assignments.`,action:`Engineered custom automation scripts bridging ServiceNow API with SharePoint tracking rosters.`,result:`Eliminated over 100 hours of manual ticket triage and data entry every month.`},{title:`Enterprise Intranet Modernization`,company:`Engage Squared / Cimic Group & Transurban`,color:`#d97706`,situation:`Alliance civil infrastructure teams suffered from chaotic file shares and scattered project docs.`,action:`Delivered modern SharePoint Online hub-and-spoke site architecture with automated provisioning.`,result:`Cut project site onboarding time by 25% with 94% first-month stakeholder adoption.`},{title:`Zero-Disruption Clinical Cutover`,company:`St John of God Health Care`,color:`#e11d48`,situation:`Clinical staff highly apprehensive about operating system upgrades disrupting acute workflows.`,action:`Ran hands-on application validation workshops and 1-on-1 clinician handovers before cutover day.`,result:`Achieved 100% on-time cutover with zero clinical disruption or patient care impact.`}]}function s(e={},t={}){let n=e.company||`the team`;return e.title,[{category:`Strategic Alignment`,question:`Looking at ${n}’s roadmap for the next 6 to 12 months, what is the single biggest operational bottleneck you want the person in this role to solve first?`,targetAudience:`Hiring Manager / Team Lead`,rationale:`Shows immediate desire to create business impact and prioritize where leadership feels pain.`},{category:`Technical Architecture & Governance`,question:`How does the team currently strike the balance between rapid workflow delivery for users and long-term security/governance compliance?`,targetAudience:`Technical Evaluator / Lead Architect`,rationale:`Signals that you respect both business speed and enterprise security guardrails.`},{category:`Team Velocity & Tooling`,question:`What does the current deployment and release lifecycle look like when modernizing workflows or releasing new scripts to production?`,targetAudience:`Senior Engineers / Peers`,rationale:`Reveals day-to-day engineering maturity, CI/CD adoption, and change management friction.`},{category:`Definition of Success`,question:`If we look back 12 months from now, what would have to happen for you to say, "Hiring this person was the best decision we made this year"?`,targetAudience:`Full Panel`,rationale:`Forces the panel to visualize you already thriving in the role and defines the exact scorecard.`}]}function c(e={},t={},n={}){let r=e.company||`your organization`,i=e.title||`Senior Systems Specialist`,a=t.name||`Sam Ludwig`;t.title;let o=t.yearsOfExperience||12,s=n.interviewers&&n.interviewers[0]&&n.interviewers[0].name?n.interviewers[0].name.split(` `)[0]:`everyone`;return[{id:`pitch`,category:`cat-pitch`,categoryLabel:`🎯 Pitch`,title:`1. Opening Pitch: "Tell Me About Yourself"`,badge:`Conversational • ~90 Seconds`,badgeColor:`green`,scanLabel:`⚡ 5-Second Brain Glances:`,scanBar:`<strong>${o}+ yrs Systems & Infrastructure</strong> &rarr; <strong>Enterprise M365 & Automation</strong> (Capgemini / Dept of Ed) &rarr; <strong>660k users / 1,000+ sites</strong> &rarr; <strong>ServiceNow & Scripting</strong> (AusPost).`,spokenLabel:`🗣️ What to Actually Say (Human & Conversational):`,spokenScript:`
+`);if(i){let e=a(i);if(!t.meetingUrl&&e.meetingUrl&&(t.meetingUrl=e.meetingUrl,t.platform=e.platform),!t.meetingId&&e.meetingId&&(t.meetingId=e.meetingId),!t.passcode&&e.passcode&&(t.passcode=e.passcode),!t.scheduledTime&&e.scheduledTime&&(t.scheduledTime=e.scheduledTime),t.interviewers.length===0)for(let e of[/(?:meeting with|interview with|meet with|attendees?:?)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:\s+(?:and|&)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)?)/i,/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:and|&)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:aren’t|will join|are on the panel)/i,/([A-Z][a-z]+\s+[A-Z][a-z]+)\s*will\s+also\s+join/i]){let n=i.match(e);n&&(n[1]&&!n[2]?n[1].split(/(?:,\s*|\s+(?:and|&)\s+)/i).filter(Boolean).forEach(e=>{let n=e.trim();n&&![`The`,`Our`,`Your`,`Tomorrow`,`Please`].includes(n)&&t.interviewers.push({name:n,role:`Hiring Panelist`,focus:`Role alignment & operational impact`,dropTerms:`Governance, Automation, Delivery`})}):n[1]&&n[2]&&[n[1],n[2]].forEach(e=>{let n=e.trim();n&&!t.interviewers.some(e=>e.name===n)&&t.interviewers.push({name:n,role:`Hiring Panelist`,focus:`Core requirements & team fit`,dropTerms:`Best practices, Production metrics`})}))}}return t.interviewers.length===0&&(t.interviewers=[{name:`Hiring Manager / Team Lead`,role:`Direct Manager`,focus:`Autonomy, operational velocity & reliable execution`,dropTerms:`Scrum, Root Cause Analysis, Documentation, SRE`},{name:`Technical Architect / Principal`,role:`Technical Architect`,focus:`Architectural rigor, edge cases & zero-downtime governance`,dropTerms:`Idempotency, Decoupled State, CI/CD, Least Privilege`},{name:`Talent & Culture Lead`,role:`People Partner`,focus:`Communication, stakeholder empathy & growth mindset`,dropTerms:`Cross-functional enablement, Mentorship, Continuous improvement`}]),t}function s(e={}){let t=`${e.title||``} ${e.description||``} ${e.requirements?e.requirements.join(` `):``}`.toLowerCase();return t.includes(`sharepoint`)||t.includes(`nintex`)||t.includes(`m365`)||t.includes(`power automate`)?[`Never call legacy systems "broken" or dismiss existing Nintex workflows—respect the years of investment and praise their reliability before proposing modernization.`,`Never propose managing user access via item/folder permissions—always emphasize Entra ID security groups and M365 role-based governance.`,`Never advocate building production flows under personal accounts—strictly enforce Service Principals, Key Vault secrets, and tenant ALM.`]:t.includes(`devops`)||t.includes(`cloud`)||t.includes(`aws`)||t.includes(`azure`)||t.includes(`terraform`)?[`Never suggest manual console modifications in production—always anchor every change to IaC (Terraform/Bicep) with version-controlled pull requests.`,`Never dismiss legacy on-prem systems or technical debt—frame hybrid infrastructure as a deliberate business decision requiring thoughtful bridge architectures.`,`Never prioritize raw deployment velocity over security boundaries and rollback plans—emphasize canary deployments and automated health gates.`]:t.includes(`data`)||t.includes(`python`)||t.includes(`sql`)||t.includes(`etl`)||t.includes(`analytics`)?[`Never assume source data is clean or static—always discuss defensive schema validation, idempotency, and retry mechanisms.`,`Never treat query optimization as an afterthought—cite partition pruning, indexing, and cost control limits.`,`Never present technical findings in a vacuum—always connect data pipelines to business KPIs and decision velocity.`]:[`Never answer in pure abstract theory without anchoring to a real production metric or quantifiable business outcome.`,`Never point fingers at past teams or stakeholders—always frame previous friction around misaligned incentives and how you unified them.`,`Never exceed 90 seconds without checking in or grounding your answer back in their specific organizational reality.`]}function c(e={},t={}){e.interviewTalkingPoints;let n=`${t.title||``} ${t.description||``}`.toLowerCase();return n.includes(`sharepoint`)||n.includes(`m365`)?[{value:`5,000`,label:`SQL List Threshold`},{value:`300k`,label:`Sync Limit`},{value:`30 Days`,label:`Power Automate Flow Cap`},{value:`400`,label:`URL Path Cap`},{value:`660k`,label:`Dept of Ed Users`},{value:`87%`,label:`Cutover Time Reduction`}]:n.includes(`cloud`)||n.includes(`devops`)||n.includes(`aws`)||n.includes(`azure`)?[{value:`99.99%`,label:`Production Uptime`},{value:`85%`,label:`Provisioning Cut`},{value:`660k`,label:`Identities Migrated`},{value:`0`,label:`Unplanned Downtime`},{value:`12+`,label:`Years Experience`},{value:`100h/mo`,label:`Automation Savings`}]:[{value:`660k+`,label:`Enterprise Users`},{value:`87%`,label:`Cycle Time Reduction`},{value:`1,000+`,label:`Managed Environments`},{value:`100%`,label:`On-Time Delivery`},{value:`12+`,label:`Years Track Record`},{value:`100h/mo`,label:`Manual Time Eliminated`}]}function l(e={},t={}){return[{title:`Incident Reduction & Automated Auditing`,company:`Capgemini / Victorian Dept of Education`,color:`#7c3aed`,situation:`Constant access breakages and permission tickets across 660k users & 1,000+ sites.`,action:`Built unattended PnP PowerShell scripts performing continuous automated permission audits and alerting.`,result:`Cut repeat access incidents by 15% and saved 160 hours of manual audit time per month.`},{title:`Migration Speed & Batch Automation`,company:`Knosys / GreenOrbit Intranet`,color:`#0284c7`,situation:`Stalling cutovers taking 2+ hours per batch with frequent path and character limit errors.`,action:`Automated pre-flight path validation, chunking, and multithreaded retry execution via PowerShell.`,result:`Cut batch cutover processing time by 87% (from 2 hours down to 15 minutes).`},{title:`ServiceNow & Workflow Automation`,company:`Australia Post via Capgemini`,color:`#059669`,situation:`Hundreds of hours lost cross-referencing ServiceNow queues and manual roster assignments.`,action:`Engineered custom automation scripts bridging ServiceNow API with SharePoint tracking rosters.`,result:`Eliminated over 100 hours of manual ticket triage and data entry every month.`},{title:`Enterprise Intranet Modernization`,company:`Engage Squared / Cimic Group & Transurban`,color:`#d97706`,situation:`Alliance civil infrastructure teams suffered from chaotic file shares and scattered project docs.`,action:`Delivered modern SharePoint Online hub-and-spoke site architecture with automated provisioning.`,result:`Cut project site onboarding time by 25% with 94% first-month stakeholder adoption.`},{title:`Zero-Disruption Clinical Cutover`,company:`St John of God Health Care`,color:`#e11d48`,situation:`Clinical staff highly apprehensive about operating system upgrades disrupting acute workflows.`,action:`Ran hands-on application validation workshops and 1-on-1 clinician handovers before cutover day.`,result:`Achieved 100% on-time cutover with zero clinical disruption or patient care impact.`}]}function u(e={},t={}){let n=e.company||`the team`;return e.title,[{category:`Strategic Alignment`,question:`Looking at ${n}’s roadmap for the next 6 to 12 months, what is the single biggest operational bottleneck you want the person in this role to solve first?`,targetAudience:`Hiring Manager / Team Lead`,rationale:`Shows immediate desire to create business impact and prioritize where leadership feels pain.`},{category:`Technical Architecture & Governance`,question:`How does the team currently strike the balance between rapid workflow delivery for users and long-term security/governance compliance?`,targetAudience:`Technical Evaluator / Lead Architect`,rationale:`Signals that you respect both business speed and enterprise security guardrails.`},{category:`Team Velocity & Tooling`,question:`What does the current deployment and release lifecycle look like when modernizing workflows or releasing new scripts to production?`,targetAudience:`Senior Engineers / Peers`,rationale:`Reveals day-to-day engineering maturity, CI/CD adoption, and change management friction.`},{category:`Definition of Success`,question:`If we look back 12 months from now, what would have to happen for you to say, "Hiring this person was the best decision we made this year"?`,targetAudience:`Full Panel`,rationale:`Forces the panel to visualize you already thriving in the role and defines the exact scorecard.`}]}function d(e={},t={},n={}){let r=e.company||`your organization`,i=e.title||`Senior Systems Specialist`,a=t.name||`Sam Ludwig`;t.title;let o=t.yearsOfExperience||12,s=n.interviewers&&n.interviewers[0]&&n.interviewers[0].name?n.interviewers[0].name.split(` `)[0]:`everyone`;return[{id:`pitch`,category:`cat-pitch`,categoryLabel:`🎯 Pitch`,title:`1. Opening Pitch: "Tell Me About Yourself"`,badge:`Conversational • ~90 Seconds`,badgeColor:`green`,scanLabel:`⚡ 5-Second Brain Glances:`,scanBar:`<strong>${o}+ yrs Systems & Infrastructure</strong> &rarr; <strong>Enterprise M365 & Automation</strong> (Capgemini / Dept of Ed) &rarr; <strong>660k users / 1,000+ sites</strong> &rarr; <strong>ServiceNow & Scripting</strong> (AusPost).`,spokenLabel:`🗣️ What to Actually Say (Human & Conversational):`,spokenScript:`
         <p>"Thanks ${s}. So, I’m ${a}—a senior systems and infrastructure engineer with over ${o} years of hands-on enterprise experience, focusing heavily on cloud platforms, automation with PowerShell and Python, and modern workplace environments.</p>
         <p>My career has really been a blend of high-impact consulting delivery and large-scale enterprise operations. Working with <span class="hl">Capgemini consulting to the Victorian Department of Education</span>, I was supporting a massive government environment—over <span class="hl-green">660,000 users and 1,000 site collections</span>. A major win there was designing unattended automation scripts that performed continuous permission and MFA audits across more than <span class="hl-green">200 sensitive repositories</span>, eliminating what previously took weeks of manual effort.</p>
         <p>Earlier this year at <span class="hl">Australia Post</span>, I developed automations bridging ServiceNow queues directly with team workflow rosters, eliminating over <span class="hl-green">100 hours of manual ticket sorting every month</span>. Prior to that at <span class="hl">Knosys</span>, I built multithreaded migration scripts that cut batch cutover times by <span class="hl-green">87%</span>.</p>
@@ -23,7 +23,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
         <p>"Two key things drew me directly to <span class="hl">${r}</span>.</p>
         <p>First, the scale and tangible real-world impact of your projects. When you support infrastructure and engineering systems at this level, technical reliability directly enables mission-critical work. I thrive in environments where downtime isn't just an inconvenience, but something that truly matters.</p>
         <p>Second, the timing of this role: reading through the mandate for <span class="hl">${i}</span>, you aren't just looking for someone to maintain status quo tickets; you're looking for someone to modernize workflows, optimize architecture, and build sustainable automation. That exact combination is where I have spent the last decade delivering measurable wins."</p>
-      `,notesId:`note-why`,statusId:`status-why`,placeholder:`Jot notes on ${r} alignment...`}]}function l(n={},l=null,u={}){let d=l||e()||t,f={...r(n),...u.meetingInfo||{}};u.meetingUrl&&(f.meetingUrl=u.meetingUrl),u.meetingId&&(f.meetingId=u.meetingId),u.passcode&&(f.passcode=u.passcode),u.scheduledTime&&(f.scheduledTime=u.scheduledTime),u.interviewers&&Array.isArray(u.interviewers)&&(f.interviewers=u.interviewers);let p=n.company||`Enterprise Partner`,m=n.title||`Technical Specialist`,h=`${p} Master Interview Command Center — ${d.name||`Candidate`}`,g=i(n),_=a(d,n),v=o(d,n),y=s(n,f),b=c(n,d,f),x=`Video Conference`,S=`#4f46e5`,C=`#eef2ff`;f.platform===`teams`||f.meetingUrl&&f.meetingUrl.includes(`teams.microsoft.com`)?(x=`📹 Microsoft Teams`,S=`#4f46e5`,C=`#eef2ff`):f.platform===`zoom`||f.meetingUrl&&f.meetingUrl.includes(`zoom.us`)?(x=`📹 Zoom Meeting`,S=`#0284c7`,C=`#e0f2fe`):(f.platform===`meet`||f.meetingUrl&&f.meetingUrl.includes(`meet.google.com`))&&(x=`📹 Google Meet`,S=`#059669`,C=`#ecfdf5`);let w=f.interviewers.map((e,t)=>{let n=[`var(--primary)`,`var(--success)`,`var(--warning)`,`var(--purple)`],r=[`var(--primary-dark)`,`var(--success)`,`var(--warning)`,`var(--purple)`];return`
+      `,notesId:`note-why`,statusId:`status-why`,placeholder:`Jot notes on ${r} alignment...`}]}function f(n={},i=null,a={}){let f=i,p=a;i&&typeof i==`object`&&(`bespokeData`in i||`meetingUrl`in i||`candidateProfile`in i||`meetingInfo`in i||`scheduledTime`in i||`interviewers`in i||`panelMembers`in i)&&(p=i,f=i.candidateProfile||null),f=f||e()||t;let m={...o(n),...p.meetingInfo||{}};p.meetingUrl&&(m.meetingUrl=p.meetingUrl),p.meetingId&&(m.meetingId=p.meetingId),p.passcode&&(m.passcode=p.passcode),p.scheduledTime&&(m.scheduledTime=p.scheduledTime),p.interviewers&&Array.isArray(p.interviewers)&&(m.interviewers=p.interviewers),p.panelMembers&&Array.isArray(p.panelMembers)&&(m.interviewers=p.panelMembers);let h=n.company||`Enterprise Partner`,g=n.title||`Technical Specialist`,_=`${h} Master Interview Command Center — ${f.name||`Candidate`}`,v=p.bespokeData||n.masterCheatSheet||n.intelligence?.master_cheat_sheet||r(n,`master_cheat_sheet`);v&&Array.isArray(v.interviewers)&&v.interviewers.length>0&&(!p.interviewers||p.interviewers.length===0)&&(m.interviewers=v.interviewers);let y=v&&Array.isArray(v.traps)&&v.traps.length>0?v.traps:s(n),b=v&&Array.isArray(v.numbersToDrop)&&v.numbersToDrop.length>0?v.numbersToDrop:c(f,n),x=v&&Array.isArray(v.starStories)&&v.starStories.length>0?v.starStories:l(f,n),S=v&&Array.isArray(v.reverseQuestions)&&v.reverseQuestions.length>0?v.reverseQuestions:u(n,m),C=v&&Array.isArray(v.qnaCards)&&v.qnaCards.length>0?v.qnaCards:d(n,f,m),w=`Video Conference`,T=`#4f46e5`,E=`#eef2ff`;m.platform===`teams`||m.meetingUrl&&m.meetingUrl.includes(`teams.microsoft.com`)?(w=`📹 Microsoft Teams`,T=`#4f46e5`,E=`#eef2ff`):m.platform===`zoom`||m.meetingUrl&&m.meetingUrl.includes(`zoom.us`)?(w=`📹 Zoom Meeting`,T=`#0284c7`,E=`#e0f2fe`):(m.platform===`meet`||m.meetingUrl&&m.meetingUrl.includes(`meet.google.com`))&&(w=`📹 Google Meet`,T=`#059669`,E=`#ecfdf5`);let D=m.interviewers.map((e,t)=>{let n=[`var(--primary)`,`var(--success)`,`var(--warning)`,`var(--purple)`],r=[`var(--primary-dark)`,`var(--success)`,`var(--warning)`,`var(--purple)`];return`
       <div style="border-left: 3px solid ${n[t%n.length]}; padding-left: 8px;">
         <strong style="color: ${r[t%r.length]};">${e.name} (${e.role||`Panelist`}):</strong>
         <div style="color: var(--text-subtle); margin-top: 2px;">
@@ -32,64 +32,65 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
         </div>
       </div>
     `}).join(`
-`),T=_.map(e=>`
-    <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
-      <strong style="color: #0f172a; font-size: 0.95rem;">${e.value}</strong>
-      <div style="color:#64748b; font-size: 0.72rem; line-height: 1.2;">${e.label}</div>
-    </div>
-  `).join(`
-`),E=b.map(e=>`
-    <div class="card qa-card ${e.category}" id="sec-${e.id}">
-      <div class="card-header">
-        <h3 class="card-title">${e.title}</h3>
-        <span class="badge badge-${e.badgeColor}">${e.badge}</span>
+`),O=y.map(e=>{if(typeof e==`string`)return`<li>${e}</li>`;if(e&&typeof e==`object`){let t=e.trap||e.text||e.title||``,n=e.reason||e.description||``;return`<li><strong>${t}</strong>${n?` — <span style="color: #64748b;">${n}</span>`:``}</li>`}return``}).filter(Boolean).join(`
+`),k=b.map(e=>`
+      <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
+        <strong style="color: #0f172a; font-size: 0.95rem;">${e.value||e.number||``}</strong>
+        <div style="color:#64748b; font-size: 0.72rem; line-height: 1.2;">${e.label||e.context||e.description||``}</div>
       </div>
+    `).join(`
+`),A=C.map((e,t)=>{let n=e.id||`card-${t}`,r=e.badgeColor||(e.badgeClass?e.badgeClass.replace(`badge-`,``):`blue`),i=e.badge||e.categoryLabel||e.category||`Core Question`,a=e.scanLabel||`⚡ 5-Second Brain Glances:`,o=e.scanBar||e.adhdScan||e.glance||``,s=e.spokenLabel||`🗣️ What to Actually Say:`,c=e.spokenScript||e.script||e.answer||``,l=e.notesId||`note-${n}`,u=e.statusId||`status-${n}`,d=e.placeholder||`Type quick keywords or personal notes for this question...`,f=e.likelyQuestion||(e.question?`Likely Question: '${e.question}'`:``),p=e.title||e.question||`Question ${t+1}`;return`
+      <div class="card qa-card ${e.category||`all`}" id="sec-${n}">
+        <div class="card-header">
+          <h3 class="card-title">${p}</h3>
+          <span class="badge badge-${r}">${i}</span>
+        </div>
 
-      <div class="scan-bar ${e.badgeColor===`green`?`green-bar`:e.badgeColor===`amber`?`amber-bar`:e.badgeColor===`purple`?`purple-bar`:``}">
-        <div class="scan-label">${e.scanLabel}</div>
-        <div>${e.scanBar}</div>
-      </div>
+        <div class="scan-bar ${r===`green`?`green-bar`:r===`amber`?`amber-bar`:r===`purple`?`purple-bar`:``}">
+          <div class="scan-label">${a}</div>
+          <div>${o}</div>
+        </div>
 
-      ${e.likelyQuestion?`<p style="font-size:0.88rem; color:#475569; margin: 0 0 10px 0;"><strong>${e.likelyQuestion}</strong></p>`:``}
+        ${f?`<p style="font-size:0.88rem; color:#475569; margin: 0 0 10px 0;"><strong>${f}</strong></p>`:``}
 
-      <div class="spoken-script">
-        <div class="spoken-label">${e.spokenLabel}</div>
-        ${e.spokenScript}
-      </div>
+        <div class="spoken-script">
+          <div class="spoken-label">${s}</div>
+          ${c}
+        </div>
 
-      <textarea id="${e.notesId}" placeholder="${e.placeholder}"></textarea>
-      <span class="save-status" id="${e.statusId}">Saved to Local Storage!</span>
-    </div>
-  `).join(`
-`),D=v.map((e,t)=>`
-    <div style="background: #f8fafc; border-left: 3px solid ${e.color}; padding: 8px 10px; border-radius: 0 6px 6px 0;">
-      <strong style="color: ${e.color}; font-size: 0.82rem;">${t+1}. ${e.title}</strong>
-      <div style="color: #64748b; font-size: 0.72rem; font-weight: 600; margin-bottom: 3px;">${e.company}</div>
-      <div style="font-size: 0.76rem; color: #334155;"><strong>S:</strong> ${e.situation}</div>
-      <div style="font-size: 0.76rem; color: #334155;"><strong>A:</strong> ${e.action}</div>
-      <div style="font-size: 0.76rem; color: #047857; font-weight: 600;"><strong>R:</strong> ${e.result}</div>
-    </div>
-  `).join(`
-`),O=y.map((e,t)=>`
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-        <span class="badge badge-blue" style="font-size: 0.65rem;">${e.category}</span>
-        <span style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Target: ${e.targetAudience}</span>
+        <textarea id="${l}" placeholder="${d}"></textarea>
+        <span class="save-status" id="${u}">Saved to Local Storage!</span>
       </div>
-      <div style="font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
-        "${e.question}"
+    `}).join(`
+`),j=[`#7c3aed`,`#0284c7`,`#059669`,`#d97706`,`#dc2626`],M=x.map((e,t)=>{let n=e.color||j[t%j.length],r=e.company||e.tag||`Track Record`;return`
+      <div style="background: #f8fafc; border-left: 3px solid ${n}; padding: 8px 10px; border-radius: 0 6px 6px 0;">
+        <strong style="color: ${n}; font-size: 0.82rem;">${t+1}. ${e.title||`Accomplishment`}</strong>
+        <div style="color: #64748b; font-size: 0.72rem; font-weight: 600; margin-bottom: 3px;">${r}</div>
+        <div style="font-size: 0.76rem; color: #334155;"><strong>S:</strong> ${e.situation||``}</div>
+        <div style="font-size: 0.76rem; color: #334155;"><strong>A:</strong> ${e.action||``}</div>
+        <div style="font-size: 0.76rem; color: #047857; font-weight: 600;"><strong>R:</strong> ${e.result||``}</div>
       </div>
-      <div style="font-size: 0.73rem; color: #475569; font-style: italic;">
-        💡 ${e.rationale}
+    `}).join(`
+`),N=S.map((e,t)=>{let n=typeof e==`string`?e:e.question||e.text||``;return`
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+          <span class="badge badge-blue" style="font-size: 0.65rem;">${typeof e==`object`&&e.category?e.category:`Strategic Value`}</span>
+          <span style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Target: ${typeof e==`object`&&e.targetAudience?e.targetAudience:`Interview Panel`}</span>
+        </div>
+        <div style="font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+          "${n}"
+        </div>
+        <div style="font-size: 0.73rem; color: #475569; font-style: italic;">
+          💡 ${typeof e==`object`&&(e.rationale||e.why)?e.rationale||e.why:`Signals strategic domain depth and execution focus.`}
+        </div>
       </div>
-    </div>
-  `).join(`
-`),k=`cheat-sheet-${(p+`-`+m).toLowerCase().replace(/[^a-z0-9]/g,`-`)}`;return`<!DOCTYPE html>
+    `}).join(`
+`),P=`cheat-sheet-${(h+`-`+g).toLowerCase().replace(/[^a-z0-9]/g,`-`)}`;return`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${h}</title>
+    <title>${_}</title>
     <style>
         :root {
             --bg-body: #f1f5f9;
@@ -407,18 +408,18 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
     <aside class="sidebar sidebar-left">
 
         <!-- 1-CLICK CALL CARD -->
-        <div class="card" style="border-top: 4px solid #4f46e5; background: ${C}; padding: 14px;">
+        <div class="card" style="border-top: 4px solid #4f46e5; background: ${E}; padding: 14px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                <strong style="color: ${S}; font-size: 0.95rem;">${x} ${f.scheduledTime?`(${f.scheduledTime})`:``}</strong>
-                <span class="badge" style="background: ${S}; color: #fff;">READY</span>
+                <strong style="color: ${T}; font-size: 0.95rem;">${w} ${m.scheduledTime?`(${m.scheduledTime})`:``}</strong>
+                <span class="badge" style="background: ${T}; color: #fff;">READY</span>
             </div>
             <div style="font-size: 0.8rem; color: #334155; margin-bottom: 8px;">
-                ${f.meetingId?`<div><strong>ID:</strong> ${f.meetingId}</div>`:``}
-                ${f.passcode?`<div><strong>Pass:</strong> <code style="background: #e2e8f0; padding: 1px 5px; border-radius: 3px; font-weight: bold;">${f.passcode}</code></div>`:``}
-                ${f.scheduledDate?`<div><strong>Date:</strong> ${f.scheduledDate}</div>`:``}
+                ${m.meetingId?`<div><strong>ID:</strong> ${m.meetingId}</div>`:``}
+                ${m.passcode?`<div><strong>Pass:</strong> <code style="background: #e2e8f0; padding: 1px 5px; border-radius: 3px; font-weight: bold;">${m.passcode}</code></div>`:``}
+                ${m.scheduledDate?`<div><strong>Date:</strong> ${m.scheduledDate}</div>`:``}
             </div>
-            ${f.meetingUrl?`
-            <a href="${f.meetingUrl}" target="_blank" rel="noopener noreferrer" style="display: block; text-align: center; background: ${S}; color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 9px; border-radius: 6px; text-decoration: none;">
+            ${m.meetingUrl?`
+            <a href="${m.meetingUrl}" target="_blank" rel="noopener noreferrer" style="display: block; text-align: center; background: ${T}; color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 9px; border-radius: 6px; text-decoration: none;">
                 🚀 Join Video Call Now &rarr;
             </a>
             `:`
@@ -452,7 +453,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
                 🎯 Who is Asking? (Panel Cues)
             </div>
             <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
-                ${w}
+                ${D}
             </div>
         </div>
 
@@ -462,8 +463,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
                 🚫 3 Traps to Avoid
             </div>
             <ul style="margin: 0; padding-left: 16px; font-size: 0.78rem; color: #7f1d1d; display:flex; flex-direction:column; gap:6px;">
-                ${g.map(e=>`<li>${e}</li>`).join(`
-`)}
+                ${O}
             </ul>
         </div>
 
@@ -473,7 +473,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
                 🔢 Numbers to Drop
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.78rem;">
-                ${T}
+                ${k}
             </div>
         </div>
 
@@ -493,7 +493,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
                 <button class="filter-btn" onclick="filterCategory('cat-tech', this)">⚡ Tech</button>
                 <button class="filter-btn" onclick="filterCategory('cat-gov', this)">🛡️ Governance</button>
                 <button class="filter-btn" onclick="filterCategory('cat-behavioral', this)">🚨 Incidents</button>
-                <button class="filter-btn" onclick="filterCategory('cat-company', this)">🏢 Why ${p.split(` `)[0]}</button>
+                <button class="filter-btn" onclick="filterCategory('cat-company', this)">🏢 Why ${h.split(` `)[0]}</button>
             </div>
             <div>
                 <button class="view-btn" onclick="toggleFocusMode()" id="focusToggleBtn">🔲 Focus View (Hide Sides)</button>
@@ -501,7 +501,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
         </div>
 
         <!-- MODULAR Q&A CARDS -->
-        ${E}
+        ${A}
 
     </main>
 
@@ -518,7 +518,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
-                ${D}
+                ${M}
             </div>
         </div>
 
@@ -529,7 +529,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
-                ${O}
+                ${N}
             </div>
         </div>
 
@@ -641,7 +641,7 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
     // 4. LOCALSTORAGE PERSISTENT NOTES SCRATCHPAD
     const textareas = document.querySelectorAll('textarea');
     textareas.forEach((textarea) => {
-        const key = '${k}:' + textarea.id;
+        const key = '${P}:' + textarea.id;
         const statusSpan = document.getElementById('status-' + textarea.id.replace('note-', ''));
 
         try {
@@ -666,4 +666,4 @@ import{o as e,r as t}from"./profileService-DIDKSAaQ.js";function n(e){if(!e||typ
 <\/script>
 
 </body>
-</html>`}function u(e,t=`Interview Cheat Sheet`){try{let n=new Blob([e],{type:`text/html;charset=utf-8`}),r=URL.createObjectURL(n),i=window.open(r,`_blank`);if(i)return i.document.title=t,setTimeout(()=>URL.revokeObjectURL(r),1e4),i}catch(e){console.error(`Failed to open cheat sheet in new tab:`,e)}try{let t=window.open(``,`_blank`);if(t)return t.document.open(),t.document.write(e),t.document.close(),t}catch(e){console.error(`Fallback window open also failed:`,e)}return null}function d(e={},t){try{let n=`${(e.company||`Company`).replace(/[^a-zA-Z0-9_-]/g,`_`)}_${(e.title||`Role`).replace(/[^a-zA-Z0-9_-]/g,`_`)}_Interview_Cheat_Sheet.html`,r=new Blob([t],{type:`text/html;charset=utf-8`}),i=URL.createObjectURL(r),a=document.createElement(`a`);a.href=i,a.download=n,document.body.appendChild(a),a.click(),document.body.removeChild(a),setTimeout(()=>URL.revokeObjectURL(i),1e3)}catch(e){console.error(`Failed to download cheat sheet HTML:`,e)}}export{u as i,r as n,l as r,d as t};
+</html>`}function p(e,t=`Interview Cheat Sheet`){try{let n=new Blob([e],{type:`text/html;charset=utf-8`}),r=URL.createObjectURL(n),i=window.open(r,`_blank`);if(i)return i.document.title=t,setTimeout(()=>URL.revokeObjectURL(r),1e4),i}catch(e){console.error(`Failed to open cheat sheet in new tab:`,e)}try{let t=window.open(``,`_blank`);if(t)return t.document.open(),t.document.write(e),t.document.close(),t}catch(e){console.error(`Fallback window open also failed:`,e)}return null}function m(e={},t){try{let n=`${(e.company||`Company`).replace(/[^a-zA-Z0-9_-]/g,`_`)}_${(e.title||`Role`).replace(/[^a-zA-Z0-9_-]/g,`_`)}_Interview_Cheat_Sheet.html`,r=new Blob([t],{type:`text/html;charset=utf-8`}),i=URL.createObjectURL(r),a=document.createElement(`a`);a.href=i,a.download=n,document.body.appendChild(a),a.click(),document.body.removeChild(a),setTimeout(()=>URL.revokeObjectURL(i),1e3)}catch(e){console.error(`Failed to download cheat sheet HTML:`,e)}}async function h(r={},a=null,o=null){let s=a||e()||t,c=await i(`master_cheat_sheet`,r,s);return await n(r,`master_cheat_sheet`,c,o),c}export{p as a,f as i,o as n,h as r,m as t};

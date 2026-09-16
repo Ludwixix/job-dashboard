@@ -104,5 +104,40 @@ describe('InterviewCheatSheetModal Component', () => {
 
     expect(onCloseMock).toHaveBeenCalled();
   });
+
+  it('triggers generateBespokeCheatSheet when Generate Bespoke Cockpit button is clicked', async () => {
+    const bespokeSpy = vi.spyOn(cheatSheetService, 'generateBespokeCheatSheet').mockResolvedValue({
+      traps: [{ trap: 'Bespoke trap' }],
+      numbersToDrop: [{ value: '99.99%', label: 'Uptime' }],
+    });
+
+    renderWithToast(
+      <InterviewCheatSheetModal isOpen={true} onClose={vi.fn()} job={mockJob} />
+    );
+
+    const generateBtn = screen.getByRole('button', { name: /Generate Bespoke Cockpit/i });
+    expect(generateBtn).toBeInTheDocument();
+
+    fireEvent.click(generateBtn);
+
+    expect(bespokeSpy).toHaveBeenCalledWith(mockJob, undefined, undefined);
+  });
+
+  it('displays bespoke badge and regenerate button when bespoke data is present', () => {
+    const jobWithBespoke = {
+      ...mockJob,
+      masterCheatSheet: {
+        traps: ['Custom landmine'],
+        numbersToDrop: [{ value: '99.9%', label: 'Uptime' }],
+      },
+    };
+
+    renderWithToast(
+      <InterviewCheatSheetModal isOpen={true} onClose={vi.fn()} job={jobWithBespoke} />
+    );
+
+    expect(screen.getAllByText(/Bespoke AI Cockpit/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Regenerate Bespoke/i })).toBeInTheDocument();
+  });
 });
 

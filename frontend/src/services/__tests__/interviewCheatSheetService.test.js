@@ -8,9 +8,11 @@ import {
   deriveReverseQuestions,
   deriveQnACards,
   generateInterviewCheatSheetHtml,
+  generateBespokeCheatSheet,
   openCheatSheetInNewTab,
   downloadCheatSheetHtml,
 } from '../interviewCheatSheetService';
+import * as jobIntelligenceService from '../jobIntelligenceService';
 
 describe('interviewCheatSheetService', () => {
   beforeEach(() => {
@@ -224,6 +226,77 @@ describe('interviewCheatSheetService', () => {
       expect(html).toContain('5 Verified STAR Stories');
       expect(html).toContain('660,000 users');
       expect(html).toContain('localStorage.setItem');
+    });
+
+    it('injects bespoke traps, metrics, star stories, and cards when bespokeData is provided', () => {
+      const job = {
+        id: 'job-custom-99',
+        title: 'Principal Cloud Architect',
+        company: 'Atlassian',
+      };
+
+      const bespokeData = {
+        traps: [
+          { trap: 'Never suggest full on-prem migration', reason: 'Atlassian is pure cloud' },
+        ],
+        numbersToDrop: [
+          { number: '99.999% SLA', context: 'Multi-region enterprise reliability' },
+        ],
+        starStories: [
+          {
+            tag: 'Scale',
+            title: 'Project Apex Cloud Migration',
+            situation: 'Legacy datacenter bottlenecking peak deploys',
+            action: 'Architected serverless orchestrator in AWS ECS',
+            result: 'Reduced p99 latency by 74%',
+          },
+        ],
+        reverseQuestions: [
+          'How does Atlassian handle cross-region telemetry consistency?',
+        ],
+        qnaCards: [
+          {
+            id: 'qna-bespoke-1',
+            question: 'Tell me about an architectural trade-off you made recently.',
+            category: 'Architecture',
+            badgeClass: 'badge-purple',
+            spokenScript: 'In my last platform overhaul, we chose event-driven asynchronous processing...',
+            adhdScan: 'Event-driven vs polling: chose Kafka for guaranteed delivery despite higher cold-start.',
+            metricGlance: '74% lower latency',
+          },
+        ],
+      };
+
+      const html = generateInterviewCheatSheetHtml(job, { bespokeData });
+
+      expect(html).toContain('Never suggest full on-prem migration');
+      expect(html).toContain('99.999% SLA');
+      expect(html).toContain('Project Apex Cloud Migration');
+      expect(html).toContain('How does Atlassian handle cross-region telemetry consistency?');
+      expect(html).toContain('Tell me about an architectural trade-off you made recently.');
+      expect(html).toContain('In my last platform overhaul');
+    });
+  });
+
+  describe('generateBespokeCheatSheet', () => {
+    it('calls generateIntelligenceArtifact with master_cheat_sheet and persists to job intelligence', async () => {
+      const mockJob = { id: 'job-123', title: 'Senior Engineer', company: 'Canva' };
+      const mockArtifact = {
+        traps: [{ trap: 'Bespoke trap', reason: 'Bespoke reason' }],
+        numbersToDrop: [{ number: '100M MAU', context: 'High traffic' }],
+      };
+
+      const genSpy = vi.spyOn(jobIntelligenceService, 'generateIntelligenceArtifact')
+        .mockResolvedValue(mockArtifact);
+      const saveSpy = vi.spyOn(jobIntelligenceService, 'saveJobIntelligence')
+        .mockResolvedValue(mockArtifact);
+      const onUpdateJob = vi.fn();
+
+      const result = await generateBespokeCheatSheet(mockJob, null, onUpdateJob);
+
+      expect(genSpy).toHaveBeenCalledWith('master_cheat_sheet', mockJob, expect.any(Object));
+      expect(saveSpy).toHaveBeenCalledWith(mockJob, 'master_cheat_sheet', mockArtifact, onUpdateJob);
+      expect(result).toEqual(mockArtifact);
     });
   });
 

@@ -239,6 +239,8 @@ export const getLlmConfig = () => {
   };
 };
 
+export const getActiveLlmConfig = getLlmConfig;
+
 /**
  * Save LLM configuration
  */

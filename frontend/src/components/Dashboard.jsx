@@ -49,6 +49,7 @@ const SkillGapModal = lazy(() => import('./SkillGapModal').then(m => ({ default:
 const JobCompareModal = lazy(() => import('./JobCompareModal').then(m => ({ default: m.JobCompareModal || m.default })));
 const PdfPreviewModal = lazy(() => import('./PdfPreviewModal').then(m => ({ default: m.PdfPreviewModal || m.default })));
 const ScoringTunerModal = lazy(() => import('./ScoringTunerModal').then(m => ({ default: m.ScoringTunerModal || m.default })));
+const VoiceMockInterviewModal = lazy(() => import('./VoiceMockInterviewModal').then(m => ({ default: m.VoiceMockInterviewModal || m.default })));
 
 // Client routing path mappings
 const SECTION_ROUTES = {
@@ -147,7 +148,7 @@ import {
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, ChevronUp, Layers, Award, FileText
+  ChevronDown, ChevronUp, Layers, Award, FileText, Mic
 } from 'lucide-react';
 
 
@@ -190,6 +191,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [isWorkforceEnabled, setIsWorkforceEnabled] = useState(() => getWorkforceSettings().enabled);
  const [isPdfStudioOpen, setIsPdfStudioOpen] = useState(false);
  const [isScoringTunerOpen, setIsScoringTunerOpen] = useState(false);
+ const [isVoiceInterviewOpen, setIsVoiceInterviewOpen] = useState(false);
  const [activeScoringWeights, setActiveScoringWeights] = useState(null);
 
  const handleApplyCustomWeights = useCallback((recalculatedJobs, weights) => {
@@ -1031,6 +1033,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  >
  <Sliders size={13} className="text-blue-400" />
  <span>Scoring Matrix Tuner</span>
+ </button>
+
+ <button
+ type="button"
+ onClick={() => { setIsToolsMenuOpen(false); setIsVoiceInterviewOpen(true); }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-purple-950/70 text-slate-200 hover:text-purple-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <Mic size={13} className="text-purple-400" />
+ <span>Voice Mock Interview Studio</span>
  </button>
 
  {authUser ? (
@@ -2044,6 +2055,18 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   jobs={jobs}
   currentWeights={activeScoringWeights}
   onApply={handleApplyCustomWeights}
+  />
+  </Suspense>
+  </SafeErrorBoundary>
+  )}
+
+  {/* Phase 6.1: Voice Mock Interview Studio Modal */}
+  {isVoiceInterviewOpen && (
+  <SafeErrorBoundary sectionName="Voice Mock Interview Studio" onClose={() => setIsVoiceInterviewOpen(false)}>
+  <Suspense fallback={<ModalSkeleton />}>
+  <VoiceMockInterviewModal
+  isOpen={isVoiceInterviewOpen}
+  onClose={() => setIsVoiceInterviewOpen(false)}
   />
   </Suspense>
   </SafeErrorBoundary>

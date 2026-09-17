@@ -3534,6 +3534,12 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, **stats})
                 return
 
+            if path == "/api/metrics/system":
+                from job_dashboard.system_metrics import get_system_telemetry
+
+                self.send_json(200, get_system_telemetry(app.repository))
+                return
+
             if path == "/api/openapi.json":
                 from job_dashboard.openapi import generate_openapi_spec
 

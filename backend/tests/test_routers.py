@@ -93,3 +93,16 @@ def test_digest_routes(client):
     assert dispatch_res.status_code == 200
     dispatch_data = dispatch_res.json()
     assert dispatch_data["status"] == "dry_run"
+
+
+def test_system_metrics_route(client):
+    res = client.get("/api/metrics/system")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["service"] == "career-agent"
+    assert "uptime_seconds" in data
+    assert "runtime" in data
+    assert "memory_rss_mb" in data["runtime"]
+    assert "database" in data
+    assert data["database"]["healthy"] is True

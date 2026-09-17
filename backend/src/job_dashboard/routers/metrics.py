@@ -42,7 +42,9 @@ async def get_health(repo: JobRepository = Depends(get_repo)) -> Dict[str, Any]:
 
 @router.get("/api/metrics/summary")
 @router.get("/api/stats")
-async def get_metrics_summary(repo: JobRepository = Depends(get_repo)) -> Dict[str, Any]:
+async def get_metrics_summary(
+    repo: JobRepository = Depends(get_repo),
+) -> Dict[str, Any]:
     """Summary of indexed jobs, applications, and ingestion velocity."""
     metrics = repo.metrics()
     return metrics
@@ -58,8 +60,17 @@ async def get_metrics_hourly(
     return {"success": True, **stats}
 
 
+@router.get("/api/metrics/system")
+async def get_metrics_system(
+    repo: JobRepository = Depends(get_repo),
+) -> Dict[str, Any]:
+    """System-level process health, memory usage, uptime, and telemetry."""
+    from ..system_metrics import get_system_telemetry
+
+    return get_system_telemetry(repo)
+
+
 @router.get("/api/openapi.json")
 async def get_openapi() -> Dict[str, Any]:
     """Serve full OpenAPI 3.1.0 specification schema."""
     return generate_openapi_spec()
-

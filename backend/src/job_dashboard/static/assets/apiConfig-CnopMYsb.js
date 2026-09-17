@@ -1,0 +1,1 @@
+var e=()=>typeof window>`u`||!window.location||!window.location.origin?`http://127.0.0.1:8787`:window.location.origin&&window.location.origin!==`null`?window.location.origin:`https://job-dashboard-6xrdvjlrcq-ts.a.run.app`,t=e();export{e as n,t};

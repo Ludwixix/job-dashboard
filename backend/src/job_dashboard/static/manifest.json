@@ -1,0 +1,24 @@
+{
+  "short_name": "CAREER.AGENT",
+  "name": "CAREER.AGENT — Autonomous Job Discovery",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/social-preview.png",
+      "type": "image/png",
+      "sizes": "1200x630"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#101217",
+  "theme_color": "#101217",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "description": "Autonomous Job Discovery, Bespoke Application Dispatcher & Telemetry Dashboard."
+}

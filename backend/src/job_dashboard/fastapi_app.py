@@ -53,7 +53,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Instantiates and manages the shared httpx.AsyncClient connection pool,
     explicit timeout parameters, and database repository lifecycle.
     """
-    logger.info("Initializing FastAPI lifespan and centralized httpx.AsyncClient pool...")
+    logger.info(
+        "Initializing FastAPI lifespan and centralized httpx.AsyncClient pool..."
+    )
 
     # Explicit connection pool and timeout defaults
     limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
@@ -69,7 +71,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.http_client = client
         yield
 
-    logger.info("Closing centralized httpx.AsyncClient pool and cleaning up resources...")
+    logger.info(
+        "Closing centralized httpx.AsyncClient pool and cleaning up resources..."
+    )
 
 
 def create_app() -> FastAPI:
@@ -97,6 +101,7 @@ def create_app() -> FastAPI:
         return request.app.state.http_client
 
     @app.get("/health")
+    @app.get("/api/health")
     async def health(repo: JobRepository = Depends(get_repo)) -> Dict[str, Any]:
         """Health check endpoint probe."""
         try:
@@ -161,6 +166,7 @@ def create_app() -> FastAPI:
 
         Supports both standard JSON polling and Server-Sent Events (SSE).
         """
+
         def generate_status_dict() -> Dict[str, Any]:
             now = datetime.now(timezone.utc).isoformat()
             seek_cookies = repo.get_provider_cookies("seek")
@@ -169,21 +175,33 @@ def create_app() -> FastAPI:
             providers = {
                 "seek": {
                     "name": "SEEK",
-                    "status": "active" if seek_cookies.get("updated_at") or settings.seek_enabled else "active",
+                    "status": "active"
+                    if seek_cookies.get("updated_at") or settings.seek_enabled
+                    else "active",
                     "badge": "🟢 Active",
-                    "has_custom_session": bool(seek_cookies.get("headers") or seek_cookies.get("cookies")),
+                    "has_custom_session": bool(
+                        seek_cookies.get("headers") or seek_cookies.get("cookies")
+                    ),
                 },
                 "indeed": {
                     "name": "Indeed",
                     "status": "active",
                     "badge": "🟢 Active",
-                    "has_custom_session": bool(indeed_cookies.get("headers") or indeed_cookies.get("cookies")),
+                    "has_custom_session": bool(
+                        indeed_cookies.get("headers") or indeed_cookies.get("cookies")
+                    ),
                 },
                 "adzuna": {
                     "name": "Adzuna",
-                    "status": "active" if bool(settings.adzuna_app_id and settings.adzuna_api_key) else "configured",
-                    "badge": "🟢 Active" if bool(settings.adzuna_app_id) else "🟡 Standby",
-                    "has_credentials": bool(settings.adzuna_app_id and settings.adzuna_api_key),
+                    "status": "active"
+                    if bool(settings.adzuna_app_id and settings.adzuna_api_key)
+                    else "configured",
+                    "badge": "🟢 Active"
+                    if bool(settings.adzuna_app_id)
+                    else "🟡 Standby",
+                    "has_credentials": bool(
+                        settings.adzuna_app_id and settings.adzuna_api_key
+                    ),
                 },
                 "remoteok": {
                     "name": "RemoteOK",
@@ -233,4 +251,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

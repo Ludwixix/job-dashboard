@@ -3375,7 +3375,7 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, res)
                 return
 
-            if path == "/health":
+            if path in ("/health", "/api/health"):
                 import time
 
                 self.send_json(
@@ -3488,7 +3488,7 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "jobs": jobs})
                 return
 
-            if path == "/api/metrics/summary":
+            if path in ("/api/metrics/summary", "/api/stats"):
                 metrics = app.repository.metrics()
                 metrics["tracker_state"] = app.tracker_state
                 self.send_json(200, metrics)

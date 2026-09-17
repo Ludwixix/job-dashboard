@@ -3136,6 +3136,40 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, {"success": True, "document": doc})
                 return
 
+            if path == "/api/digest/preview":
+                try:
+                    min_score = int(query_params.get("min_score", ["85"])[0])
+                except (ValueError, IndexError):
+                    min_score = 85
+                try:
+                    limit = int(query_params.get("limit", ["5"])[0])
+                except (ValueError, IndexError):
+                    limit = 5
+
+                from .digest import (
+                    generate_morning_digest,
+                    format_slack_digest_blocks,
+                    format_markdown_digest,
+                )
+
+                jobs = app.repository.list_jobs(match_score_min=min_score)
+                digest_data = generate_morning_digest(
+                    jobs, min_score=min_score, limit=limit
+                )
+                slack_blocks = format_slack_digest_blocks(digest_data)
+                markdown_text = format_markdown_digest(digest_data)
+
+                self.send_json(
+                    200,
+                    {
+                        "status": "success",
+                        "digest": digest_data,
+                        "slack_blocks": slack_blocks,
+                        "markdown": markdown_text,
+                    },
+                )
+                return
+
             if path == "/api/export-ats-resume":
                 job_id = query_params.get("job_id", [""])[0].strip()
                 format_type = query_params.get("format", ["docx"])[0].lower()
@@ -3753,6 +3787,64 @@ def make_handler(app: DashboardApp):
                             "success": True,
                             "provider": provider,
                             "message": f"Successfully stored session cookies for {provider}",
+                        },
+                    )
+                    return
+
+                if path == "/api/digest/dispatch":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    min_score = int(body.get("min_score", 85))
+                    limit = int(body.get("limit", 5))
+                    webhook_url = body.get("webhook_url") or os.environ.get(
+                        "SLACK_WEBHOOK_URL"
+                    )
+
+                    from .digest import (
+                        generate_morning_digest,
+                        format_slack_digest_blocks,
+                    )
+                    import urllib.request
+
+                    jobs = app.repository.list_jobs(match_score_min=min_score)
+                    digest_data = generate_morning_digest(
+                        jobs, min_score=min_score, limit=limit
+                    )
+                    slack_blocks = format_slack_digest_blocks(digest_data)
+
+                    if not webhook_url:
+                        self.send_json(
+                            200,
+                            {
+                                "status": "dry_run",
+                                "message": "No webhook URL provided or configured in environment. Digest rendered successfully.",
+                                "digest": digest_data,
+                                "slack_blocks": slack_blocks,
+                            },
+                        )
+                        return
+
+                    req = urllib.request.Request(
+                        webhook_url,
+                        data=json.dumps({"blocks": slack_blocks}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        status_code = response.getcode()
+
+                    self.send_json(
+                        200,
+                        {
+                            "status": "dispatched",
+                            "http_code": status_code,
+                            "total_opportunities": len(
+                                digest_data.get("top_opportunities", [])
+                            ),
                         },
                     )
                     return

@@ -96,4 +96,42 @@ describe('SettingsModal Component', () => {
     expect(screen.getByText('registered nurse')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/e\.g\. registered nurse/i)).toBeInTheDocument();
   });
+
+  it('allows searching and selecting an OpenRouter model from the dropdown', async () => {
+    const saveSpy = vi.spyOn(llmConfigModule, 'saveLlmConfig');
+
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Verify OpenRouter dropdown exists
+    const select = screen.getByLabelText(/Select OpenRouter Model/i);
+    expect(select).toBeInTheDocument();
+
+    // Type in search box to filter
+    const searchInput = screen.getByPlaceholderText(/Search 440\+ OpenRouter models/i);
+    fireEvent.change(searchInput, { target: { value: 'llama' } });
+
+    // Pick a model from the dropdown
+    fireEvent.change(select, { target: { value: 'meta-llama/llama-3.3-70b-instruct:free' } });
+
+    // Click Save Settings
+    const saveBtn = screen.getByText(/SAVE SETTINGS/i);
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'openrouter',
+        model: 'meta-llama/llama-3.3-70b-instruct:free'
+      }));
+    });
+  });
+
+  it('filters models when Free Tier pill is clicked', () => {
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const freePill = screen.getByRole('button', { name: /Free Tier/i });
+    fireEvent.click(freePill);
+
+    const select = screen.getByLabelText(/Select OpenRouter Model/i);
+    expect(select).toBeInTheDocument();
+  });
 });

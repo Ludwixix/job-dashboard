@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
  X, Settings, Cpu, KeyRound, Check, CheckCircle2, AlertCircle, 
@@ -9,7 +9,9 @@ import {
  PROVIDERS, 
  getLlmConfig, 
  saveLlmConfig, 
- testLlmConnection 
+ testLlmConnection,
+ fetchOpenRouterModels,
+ getOpenRouterModels 
 } from '../services/llmConfig';
 import { buildQueriesFromProfile, SCRAPER_BASE_URL } from '../services/jobQueryService';
 import { getProfiles } from '../services/profileService';
@@ -29,6 +31,12 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  const [showApiKey, setShowApiKey] = useState(false);
  const [endpointInput, setEndpointInput] = useState('');
  
+ // OpenRouter Dynamic Models State
+ const [openRouterModels, setOpenRouterModels] = useState(() => getOpenRouterModels());
+ const [isSyncingOpenRouter, setIsSyncingOpenRouter] = useState(false);
+ const [modelSearchQuery, setModelSearchQuery] = useState('');
+ const [modelFilterTab, setModelFilterTab] = useState('all'); // 'all' | 'free' | 'featured'
+
  // Platform preferences
  const [auEnglish, setAuEnglish] = useState(() => {
  return localStorage.getItem('pref_au_english') !== 'false';
@@ -71,8 +79,16 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  setCustomModelInput(config.customModel || '');
 
  const currentProviderMeta = PROVIDERS[config.provider || 'openrouter'];
- const isPreset = currentProviderMeta?.models?.some(m => m.id === config.model);
- setIsCustomModel(!isPreset && Boolean(config.model));
+ const isPreset = (config.provider === 'openrouter' ? openRouterModels : currentProviderMeta?.models)?.some(m => m.id === config.model);
+ setIsCustomModel(!isPreset && Boolean(config.customModel));
+
+ if ((config.provider || 'openrouter') === 'openrouter') {
+ fetchOpenRouterModels().then((models) => {
+ if (models && models.length > 0) {
+ setOpenRouterModels(models);
+ }
+ });
+ }
 
  setAuEnglish(localStorage.getItem('pref_au_english') !== 'false');
  setDefaultLocation(localStorage.getItem('job_dashboard_base_location') || 'Melbourne, VIC');
@@ -111,10 +127,33 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  setSelectedModel(storedCustomModel);
  } else {
  setIsCustomModel(false);
- setSelectedModel(meta.defaultModel);
+ const storedModel = localStorage.getItem(`llm_model_${providerId}`) || (providerId === 'openrouter' ? localStorage.getItem('openrouter_model') : '') || meta.defaultModel;
+ setSelectedModel(storedModel);
+ }
+
+ if (providerId === 'openrouter') {
+ fetchOpenRouterModels().then((models) => {
+ if (models && models.length > 0) {
+ setOpenRouterModels(models);
+ }
+ });
  }
 
  setTestResult(null);
+ };
+
+ const handleSyncOpenRouterModels = async () => {
+ setIsSyncingOpenRouter(true);
+ try {
+ const models = await fetchOpenRouterModels({ force: true });
+ if (models && models.length > 0) {
+ setOpenRouterModels(models);
+ }
+ } catch (e) {
+ console.warn('Sync OpenRouter models error:', e);
+ } finally {
+ setIsSyncingOpenRouter(false);
+ }
  };
 
  const handleTestConnection = async () => {
@@ -243,6 +282,53 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  } catch { /* graceful degradation */ }
  setIsRegenerating(false);
  };
+
+  const freeModelsCount = useMemo(() => {
+    return (openRouterModels || []).filter(m => m.isFree).length;
+  }, [openRouterModels]);
+
+  const featuredModelsCount = useMemo(() => {
+    const ids = (PROVIDERS.openrouter.models || []).map(p => p.id);
+    return (openRouterModels || []).filter(m => ids.includes(m.id)).length;
+  }, [openRouterModels]);
+
+  const filteredOpenRouterModels = useMemo(() => {
+    const list = openRouterModels || [];
+    const query = (modelSearchQuery || '').toLowerCase().trim();
+
+    return list.filter((m) => {
+      if (modelFilterTab === 'free' && !m.isFree) return false;
+      if (modelFilterTab === 'featured') {
+        const featuredIds = (PROVIDERS.openrouter.models || []).map(p => p.id);
+        if (!featuredIds.includes(m.id)) return false;
+      }
+      if (!query) return true;
+      const idMatch = m.id.toLowerCase().includes(query);
+      const nameMatch = (m.name || '').toLowerCase().includes(query);
+      const descMatch = (m.description || '').toLowerCase().includes(query);
+      return idMatch || nameMatch || descMatch;
+    });
+  }, [openRouterModels, modelSearchQuery, modelFilterTab]);
+
+  const selectedModelMeta = useMemo(() => {
+    if (activeProvider === 'openrouter') {
+      const found = (openRouterModels || []).find(m => m.id === selectedModel);
+      if (found) return found;
+    }
+    const meta = PROVIDERS[activeProvider] || PROVIDERS.openrouter;
+    return meta.models?.find(m => m.id === selectedModel) || null;
+  }, [activeProvider, openRouterModels, selectedModel]);
+
+  const formatModelPrice = (m) => {
+    if (!m) return '';
+    if (m.isFree || m.id?.endsWith(':free')) {
+      return '✨ Free Tier ($0.00)';
+    }
+    const pIn = parseFloat(m.pricing?.prompt ?? 0) * 1_000_000;
+    const pOut = parseFloat(m.pricing?.completion ?? 0) * 1_000_000;
+    if (pIn === 0 && pOut === 0) return '✨ Free Tier ($0.00)';
+    return `$${pIn < 0.01 ? pIn.toFixed(3) : pIn.toFixed(2)} in / $${pOut < 0.01 ? pOut.toFixed(3) : pOut.toFixed(2)} out per 1M`;
+  };
 
  if (!isOpen) return null;
 
@@ -462,30 +548,167 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  </button>
  </div>
 
- {!isCustomModel ? (
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
- {currentMeta.models?.map((m) => {
- const isChosen = selectedModel === m.id;
- return (
- <div
- key={m.id}
- onClick={() => setSelectedModel(m.id)}
- className={`p-3 rounded-sm border cursor-pointer transition-all ${
- isChosen
- ? 'bg-amber-950/60 border-amber-500 text-white '
- : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700 hover:bg-slate-900'
- }`}
- >
- <div className="flex items-center justify-between mb-1">
- <span className="text-xs font-bold text-slate-200">{m.name}</span>
- {isChosen && <Check size={14} className="text-amber-400 shrink-0" />}
- </div>
- <p className="text-[10px] text-slate-500 leading-snug">{m.description}</p>
- </div>
- );
- })}
- </div>
- ) : (
+          {!isCustomModel ? (
+            activeProvider === 'openrouter' ? (
+              <div className="space-y-3">
+                {/* Search, Filter Tabs & Sync Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                  {/* Filter Tabs */}
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-950/60 border border-slate-800 rounded-sm">
+                    <button
+                      type="button"
+                      onClick={() => setModelFilterTab('all')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+                        modelFilterTab === 'all'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      All Models ({openRouterModels.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModelFilterTab('free')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+                        modelFilterTab === 'free'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'text-slate-400 hover:text-emerald-300'
+                      }`}
+                    >
+                      ✨ Free Tier ({freeModelsCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModelFilterTab('featured')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+                        modelFilterTab === 'featured'
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                          : 'text-slate-400 hover:text-purple-300'
+                      }`}
+                    >
+                      ⭐ Featured ({featuredModelsCount})
+                    </button>
+                  </div>
+
+                  {/* Sync Live Models Button */}
+                  <button
+                    type="button"
+                    onClick={handleSyncOpenRouterModels}
+                    disabled={isSyncingOpenRouter}
+                    className="text-[11px] font-mono text-slate-400 hover:text-amber-300 flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-slate-800 hover:border-amber-500/40 bg-slate-950/40 cursor-pointer disabled:opacity-50 transition-all"
+                    title="Fetch live updated model catalog from OpenRouter"
+                  >
+                    <RefreshCw size={12} className={isSyncingOpenRouter ? 'animate-spin text-amber-400' : ''} />
+                    <span>{isSyncingOpenRouter ? 'Syncing...' : 'Sync Live Models'}</span>
+                  </button>
+                </div>
+
+                {/* Real-time Search Box */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={modelSearchQuery}
+                    onChange={(e) => setModelSearchQuery(e.target.value)}
+                    placeholder="Search 440+ OpenRouter models (e.g. claude-3.7, deepseek, gemini, llama-3.3, free)..."
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-sm pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500"
+                  />
+                  {modelSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setModelSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Dropdown Select Element */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <label htmlFor="openrouter-model-dropdown">
+                      Select OpenRouter Model ({filteredOpenRouterModels.length} available):
+                    </label>
+                    {selectedModel && (
+                      <span className="text-amber-300 font-bold truncate max-w-[280px]">Active: {selectedModel}</span>
+                    )}
+                  </div>
+
+                  <select
+                    id="openrouter-model-dropdown"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-sm px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    {filteredOpenRouterModels.map((m) => (
+                      <option key={m.id} value={m.id} className="bg-slate-900 text-white py-1">
+                        {m.isFree ? '✨ [FREE] ' : ''}{m.name || m.id} — ({m.id})
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Selected Model Details Card */}
+                  {selectedModelMeta && (
+                    <div className="p-3.5 rounded-sm bg-gradient-to-r from-amber-950/40 via-slate-950 to-slate-950 border border-amber-500/40 text-xs space-y-2 mt-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-xs">{selectedModelMeta.name || selectedModelMeta.id}</span>
+                          {selectedModelMeta.isFree ? (
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                              ✨ ZERO COST / FREE
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-500/30">
+                              {formatModelPrice(selectedModelMeta)}
+                            </span>
+                          )}
+                        </div>
+                        {selectedModelMeta.context_length > 0 && (
+                          <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                            {(selectedModelMeta.context_length / 1000).toFixed(0)}k max context
+                          </span>
+                        )}
+                      </div>
+                      {selectedModelMeta.description && (
+                        <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-2">
+                          {selectedModelMeta.description}
+                        </p>
+                      )}
+                      <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1">
+                        <span>API Model ID:</span>
+                        <code className="text-amber-300/90 font-semibold">{selectedModelMeta.id}</code>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {currentMeta.models?.map((m) => {
+                  const isChosen = selectedModel === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => setSelectedModel(m.id)}
+                      className={`p-3 rounded-sm border cursor-pointer transition-all ${
+                        isChosen
+                          ? 'bg-amber-950/60 border-amber-500 text-white '
+                          : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-200">{m.name}</span>
+                        {isChosen && <Check size={14} className="text-amber-400 shrink-0" />}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-snug">{m.description}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
  <div className="p-3.5 rounded-sm bg-slate-950/60 border border-slate-800 space-y-2">
  <span className="text-[11px] font-mono text-slate-400 block">Enter Custom Model Identifier:</span>
  <input

@@ -1,8 +1,124 @@
+import { registerDynamicModelPricing } from './llmCostService';
+
+export const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
+export const STORAGE_KEY_OR_MODELS = 'openrouter_cached_models';
+export const STORAGE_KEY_OR_TIMESTAMP = 'openrouter_models_last_fetched';
+
+let inMemoryOpenRouterModels = null;
+
 /**
- * llmConfig.js
- * Centralized LLM Provider, Model, and API Key management system.
- * Supports OpenRouter, OpenAI, Google Gemini, Anthropic, DeepSeek, Groq, Ollama, and Custom OpenAI-compatible endpoints.
+ * Normalizes an OpenRouter model API item into a standard structure.
+ *
+ * @param {Object} m - Raw OpenRouter model object.
+ * @returns {Object} Normalized model object.
  */
+export const normalizeOpenRouterModel = (m = {}) => {
+  const promptPrice = parseFloat(m.pricing?.prompt ?? 0);
+  const completionPrice = parseFloat(m.pricing?.completion ?? 0);
+  const isFree = Boolean(
+    (m.id && m.id.endsWith(':free')) ||
+    (promptPrice === 0 && completionPrice === 0)
+  );
+
+  return {
+    id: m.id,
+    name: m.name || m.id,
+    description: m.description || '',
+    context_length: m.context_length || 0,
+    pricing: {
+      prompt: String(m.pricing?.prompt ?? '0'),
+      completion: String(m.pricing?.completion ?? '0'),
+    },
+    isFree,
+    architecture: m.architecture || null,
+  };
+};
+
+/**
+ * Synchronously returns cached OpenRouter models or fallback presets.
+ *
+ * @returns {Array<Object>} List of models.
+ */
+export const getOpenRouterModels = () => {
+  if (inMemoryOpenRouterModels && inMemoryOpenRouterModels.length > 0) {
+    return inMemoryOpenRouterModels;
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_OR_MODELS);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryOpenRouterModels = parsed;
+          registerDynamicModelPricing(parsed);
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  return PROVIDERS.openrouter.models;
+};
+
+/**
+ * Asynchronously fetches all available models from OpenRouter's public endpoint.
+ *
+ * @param {Object} [options]
+ * @param {boolean} [options.force=false]
+ * @returns {Promise<Array<Object>>}
+ */
+export const fetchOpenRouterModels = async ({ force = false } = {}) => {
+  if (typeof window !== 'undefined' && !force) {
+    const cached = getOpenRouterModels();
+    const lastFetched = Number(localStorage.getItem(STORAGE_KEY_OR_TIMESTAMP) || 0);
+    const now = Date.now();
+    const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    if (cached && cached.length > PROVIDERS.openrouter.models.length && now - lastFetched < CACHE_TTL_MS) {
+      return cached;
+    }
+  }
+
+  try {
+    const res = await fetch(OPENROUTER_MODELS_ENDPOINT, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`OpenRouter models API returned HTTP ${res.status}`);
+    }
+
+    const body = await res.json();
+    const rawList = Array.isArray(body?.data) ? body.data : [];
+
+    if (rawList.length > 0) {
+      const normalized = rawList.map(normalizeOpenRouterModel).filter(m => Boolean(m.id));
+
+      inMemoryOpenRouterModels = normalized;
+      registerDynamicModelPricing(normalized);
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY_OR_MODELS, JSON.stringify(normalized));
+          localStorage.setItem(STORAGE_KEY_OR_TIMESTAMP, String(Date.now()));
+        } catch (storageErr) {
+          console.warn('Could not cache OpenRouter models in localStorage:', storageErr);
+        }
+      }
+
+      return normalized;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch live OpenRouter models, falling back to cache/presets:', err);
+  }
+
+  return getOpenRouterModels();
+};
 
 export const PROVIDERS = {
   openrouter: {

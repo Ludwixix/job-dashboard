@@ -62,6 +62,38 @@ export const estimateTokenCount = (text = '') => {
   return Math.max(1, Math.ceil(text.trim().length / 4));
 };
 
+export const DYNAMIC_PRICING = {};
+
+/**
+ * Register dynamic pricing rates fetched from model catalogs (e.g. OpenRouter API)
+ *
+ * @param {Array<Object>} modelsList - List of models from catalog
+ */
+export const registerDynamicModelPricing = (modelsList = []) => {
+  if (!Array.isArray(modelsList)) return;
+
+  modelsList.forEach((m) => {
+    if (!m || !m.id) return;
+    const promptPrice = parseFloat(m.pricing?.prompt ?? 0);
+    const completionPrice = parseFloat(m.pricing?.completion ?? 0);
+
+    const inputRate = Number((promptPrice * 1_000_000).toFixed(4));
+    const outputRate = Number((completionPrice * 1_000_000).toFixed(4));
+    const isFree = Boolean(
+      m.id.endsWith(':free') ||
+      m.isFree ||
+      (inputRate === 0 && outputRate === 0)
+    );
+
+    DYNAMIC_PRICING[m.id] = {
+      input: inputRate,
+      output: outputRate,
+      isFree,
+      dynamic: true,
+    };
+  });
+};
+
 /**
  * Look up pricing rates for a given model ID
  */
@@ -73,8 +105,21 @@ export const getModelPricing = (model = '') => {
     return { input: 0.0, output: 0.0, isFree: true };
   }
 
+  // Check dynamic registry first
+  if (DYNAMIC_PRICING[model]) {
+    return DYNAMIC_PRICING[model];
+  }
+
+  // Check static predefined registry
   if (MODEL_PRICING[model]) {
     return MODEL_PRICING[model];
+  }
+
+  // Substring match dynamic registry
+  for (const [key, rate] of Object.entries(DYNAMIC_PRICING)) {
+    if (clean.includes(key.toLowerCase()) || key.toLowerCase().includes(clean)) {
+      return rate;
+    }
   }
 
   // Substring match fallback

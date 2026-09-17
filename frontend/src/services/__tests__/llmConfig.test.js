@@ -5,6 +5,9 @@ import {
   getActiveApiKey, 
   getActiveModel, 
   testLlmConnection,
+  fetchOpenRouterModels,
+  getOpenRouterModels,
+  normalizeOpenRouterModel,
   PROVIDERS 
 } from '../llmConfig';
 
@@ -105,5 +108,75 @@ describe('llmConfig service', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Invalid API Key');
+  });
+
+  describe('OpenRouter dynamic models catalog', () => {
+    it('normalizes model items and detects free tier', () => {
+      const freeModel = normalizeOpenRouterModel({
+        id: 'meta-llama/llama-3.3-70b-instruct:free',
+        name: 'Meta Llama 3.3 70B (free)',
+        pricing: { prompt: '0', completion: '0' },
+        context_length: 131072,
+      });
+
+      expect(freeModel.isFree).toBe(true);
+      expect(freeModel.context_length).toBe(131072);
+
+      const paidModel = normalizeOpenRouterModel({
+        id: 'anthropic/claude-3.7-sonnet',
+        name: 'Claude 3.7 Sonnet',
+        pricing: { prompt: '0.000003', completion: '0.000015' },
+        context_length: 200000,
+      });
+
+      expect(paidModel.isFree).toBe(false);
+      expect(paidModel.pricing.prompt).toBe('0.000003');
+    });
+
+    it('returns default presets synchronously when cache is empty', () => {
+      const models = getOpenRouterModels();
+      expect(models.length).toBeGreaterThanOrEqual(10);
+      expect(models.some(m => m.id === 'z-ai/glm-5.3-flash')).toBe(true);
+    });
+
+    it('fetches live models from OpenRouter endpoint and caches in localStorage', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: 'custom/model-abc',
+              name: 'Custom ABC',
+              context_length: 64000,
+              pricing: { prompt: '0.000001', completion: '0.000002' },
+            },
+            {
+              id: 'custom/free-model:free',
+              name: 'Free Model',
+              context_length: 32000,
+              pricing: { prompt: '0', completion: '0' },
+            },
+          ],
+        }),
+      });
+
+      const models = await fetchOpenRouterModels({ force: true });
+      expect(models).toHaveLength(2);
+      expect(models[0].id).toBe('custom/model-abc');
+      expect(models[1].isFree).toBe(true);
+
+      // Verify cached in localStorage
+      const cached = JSON.parse(localStorage.getItem('openrouter_cached_models'));
+      expect(cached).toHaveLength(2);
+      expect(cached[0].id).toBe('custom/model-abc');
+    });
+
+    it('falls back gracefully to cache or presets if fetch fails', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network offline'));
+
+      const models = await fetchOpenRouterModels({ force: true });
+      expect(models).toBeDefined();
+      expect(models.length).toBeGreaterThan(0);
+    });
   });
 });

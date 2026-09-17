@@ -505,3 +505,4 @@ export default function VoiceMockInterviewModal({ isOpen, onClose }) {
     </div>
   );
 }
+

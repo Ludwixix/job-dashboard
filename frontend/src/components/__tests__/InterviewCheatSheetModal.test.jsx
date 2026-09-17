@@ -139,5 +139,20 @@ describe('InterviewCheatSheetModal Component', () => {
     expect(screen.getAllByText(/Bespoke AI Cockpit/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Regenerate Bespoke/i })).toBeInTheDocument();
   });
+
+  it('renders Google Calendar and .ics export buttons with pre-briefing links', () => {
+    renderWithToast(
+      <InterviewCheatSheetModal isOpen={true} onClose={vi.fn()} job={mockJob} />
+    );
+
+    const gcalLink = screen.getByTitle(/Add interview to Google Calendar/i);
+    expect(gcalLink).toBeInTheDocument();
+    expect(gcalLink.tagName).toBe('A');
+    expect(gcalLink.href).toContain('calendar.google.com');
+    expect(gcalLink.href).toContain('KBR');
+
+    const icsBtn = screen.getByTitle(/Download universal .ics calendar event/i);
+    expect(icsBtn).toBeInTheDocument();
+  });
 });
 

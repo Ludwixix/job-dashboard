@@ -3540,6 +3540,15 @@ def make_handler(app: DashboardApp):
                 self.send_json(200, get_system_telemetry(app.repository))
                 return
 
+            if path == "/api/backup/status":
+                from job_dashboard.gcs_backup import get_backup_status
+
+                bucket = os.getenv("JOB_DASHBOARD_GCS_BUCKET") or os.getenv(
+                    "GCS_BUCKET_NAME"
+                )
+                self.send_json(200, get_backup_status(bucket, Path(app.data_dir)))
+                return
+
             if path == "/api/openapi.json":
                 from job_dashboard.openapi import generate_openapi_spec
 
@@ -3853,6 +3862,25 @@ def make_handler(app: DashboardApp):
                             ),
                         },
                     )
+                    return
+
+                if path == "/api/backup/snapshot":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    snapshot_tag = body.get("snapshot_tag")
+                    from .gcs_backup import create_backup_snapshot
+
+                    bucket = os.getenv("JOB_DASHBOARD_GCS_BUCKET") or os.getenv(
+                        "GCS_BUCKET_NAME"
+                    )
+                    result = create_backup_snapshot(
+                        bucket, Path(app.data_dir), snapshot_tag=snapshot_tag
+                    )
+                    self.send_json(200, result)
                     return
 
                 if path.startswith("/api/jobs/") and path.endswith("/compare"):

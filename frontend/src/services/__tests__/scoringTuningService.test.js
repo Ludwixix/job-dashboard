@@ -97,5 +97,21 @@ describe('scoringTuningService', () => {
       expect(results[1].id).toBe('job-1');
       expect(results[1].score).toBe(70);
     });
+
+    it('recalculateJobScoresAsync produces identical ranked output asynchronously', async () => {
+      const { recalculateJobScoresAsync } = await import('../scoringTuningService');
+      const weights = {
+        semantic_density: 100,
+        title_alignment: 0,
+        recency: 0,
+        star_impact: 0,
+        clearances: 0
+      };
+
+      const results = await recalculateJobScoresAsync(mockJobs, weights);
+      expect(results[0].id).toBe('job-1');
+      expect(results[0].score).toBe(95);
+    });
   });
 });
+

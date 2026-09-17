@@ -57,3 +57,4 @@ def get_system_telemetry(repo: Any = None) -> Dict[str, Any]:
             "jobs_count": jobs_count,
         },
     }
+

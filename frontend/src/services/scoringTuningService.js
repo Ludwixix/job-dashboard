@@ -87,3 +87,43 @@ export function recalculateJobScores(jobs = [], customWeights = {}) {
   // Sort descending by calculated score
   return updatedJobs.sort((a, b) => b.score - a.score);
 }
+
+/**
+ * Asynchronously re-scores jobs, utilizing a dedicated Web Worker when supported
+ * or falling back synchronously to recalculateJobScores.
+ *
+ * @param {Array<Object>} jobs - List of opportunity objects.
+ * @param {Object} customWeights - Dimension weights.
+ * @returns {Promise<Array<Object>>} Re-scored and sorted jobs.
+ */
+export async function recalculateJobScoresAsync(jobs = [], customWeights = {}) {
+  if (!Array.isArray(jobs) || jobs.length === 0) {
+    return [];
+  }
+
+  if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+    try {
+      return await new Promise((resolve) => {
+        const worker = new Worker(
+          new URL('../workers/scoreWorker.js', import.meta.url),
+          { type: 'module' }
+        );
+        worker.onmessage = (e) => {
+          worker.terminate();
+          resolve(e.data?.jobs || []);
+        };
+        worker.onerror = () => {
+          worker.terminate();
+          resolve(recalculateJobScores(jobs, customWeights));
+        };
+        worker.postMessage({ jobs, weights: customWeights });
+      });
+    } catch {
+      return recalculateJobScores(jobs, customWeights);
+    }
+  }
+
+  return recalculateJobScores(jobs, customWeights);
+}
+
+

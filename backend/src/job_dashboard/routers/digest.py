@@ -58,9 +58,7 @@ async def dispatch_digest(
 ) -> Dict[str, Any]:
     """Dispatches the morning opportunity digest to an external webhook (e.g. Slack)."""
     jobs = repo.list_jobs(match_score_min=payload.min_score)
-    digest_data = generate_morning_digest(
-        jobs, min_score=payload.min_score, limit=payload.limit
-    )
+    digest_data = generate_morning_digest(jobs, min_score=payload.min_score, limit=payload.limit)
     slack_blocks = format_slack_digest_blocks(digest_data)
 
     target_webhook = payload.webhook_url or os.environ.get("SLACK_WEBHOOK_URL")

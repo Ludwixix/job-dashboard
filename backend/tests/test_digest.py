@@ -124,3 +124,4 @@ def test_format_html_digest(mock_jobs_pool):
     assert "Canva" in html
     assert "Atlassian" in html
     assert "94%" in html
+

@@ -9,7 +9,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, ExternalLink, Download, Copy, Check, Sparkles, 
-  Video, Clock, Users, RefreshCw, Eye, Edit3, Loader2
+  Video, Clock, Users, RefreshCw, Eye, Edit3, Loader2,
+  Calendar, CalendarPlus
 } from 'lucide-react';
 import { 
   extractInterviewMeetingInfo, 
@@ -18,6 +19,11 @@ import {
   openCheatSheetInNewTab, 
   downloadCheatSheetHtml 
 } from '../services/interviewCheatSheetService';
+import {
+  generateGoogleCalendarUrl,
+  downloadIcsFile,
+  formatCalendarBriefing
+} from '../services/calendarService';
 import { getJobIntelligence } from '../services/jobIntelligenceService';
 import { getActiveProfile } from '../services/profileService';
 import { getLlmConfig } from '../services/llmConfig';
@@ -91,6 +97,41 @@ export default function InterviewCheatSheetModal({
       candidateProfile: userProfile || getActiveProfile(),
     });
   }, [job, meetingUrl, meetingId, passcode, scheduledTime, panelString, bespokeData, userProfile]);
+
+  const calendarBriefing = useMemo(() => {
+    if (!job) return '';
+    return formatCalendarBriefing(job, {
+      interviewType: 'Master Interview Cockpit',
+      candidateName: userProfile?.name || getActiveProfile()?.name,
+      panelMembers: panelString ? panelString.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      scheduledTime,
+      meetingUrl,
+      meetingId,
+      passcode,
+      notes: bespokeData?.tactical_notes || job?.notes || '',
+    });
+  }, [job, userProfile, panelString, scheduledTime, meetingUrl, meetingId, passcode, bespokeData]);
+
+  const googleCalendarUrl = useMemo(() => {
+    if (!job) return '#';
+    return generateGoogleCalendarUrl({
+      title: `Interview: ${job.company || 'Target Company'} · ${job.title || 'Role'}`,
+      description: calendarBriefing,
+      location: meetingUrl || 'Video Conference',
+    });
+  }, [job, calendarBriefing, meetingUrl]);
+
+  const handleDownloadIcs = () => {
+    if (!job) return;
+    downloadIcsFile({
+      title: `Interview: ${job.company || 'Target Company'} · ${job.title || 'Role'}`,
+      description: calendarBriefing,
+      location: meetingUrl || 'Video Conference',
+    }, `${(job.company || 'Interview').toLowerCase().replace(/[^a-z0-9]/g, '_')}_interview.ics`);
+    if (addToast) {
+      addToast('📅 .ics calendar invite downloaded!', 'success');
+    }
+  };
 
   const handleGenerateBespoke = async () => {
     if (isGenerating) return;
@@ -184,6 +225,27 @@ export default function InterviewCheatSheetModal({
 
           {/* QUICK ACTION BUTTONS */}
           <div className="flex items-center gap-2">
+            <a
+              href={googleCalendarUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 rounded-sm bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Add interview to Google Calendar with pre-briefing notes"
+            >
+              <CalendarPlus size={14} />
+              <span className="hidden sm:inline">Add to Cal</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={handleDownloadIcs}
+              className="px-3 py-2 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Download universal .ics calendar event"
+            >
+              <Calendar size={14} />
+              <span className="hidden sm:inline">.ics</span>
+            </button>
+
             <button
               onClick={handleLaunchNewTab}
               className="px-3.5 py-2 rounded-sm bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-amber-950/50 cursor-pointer active:scale-95"
@@ -443,7 +505,26 @@ export default function InterviewCheatSheetModal({
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
+              <div className="pt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800">
+                <div className="flex items-center gap-2">
+                  <a
+                    href={googleCalendarUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-sm bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <CalendarPlus size={14} />
+                    <span>Sync to Google Calendar</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleDownloadIcs}
+                    className="px-3.5 py-2 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Calendar size={14} />
+                    <span>Download .ics</span>
+                  </button>
+                </div>
                 <button
                   onClick={() => setActiveTab('preview')}
                   className="px-4 py-2 rounded-sm bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"

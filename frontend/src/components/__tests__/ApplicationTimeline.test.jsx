@@ -57,8 +57,24 @@ describe('ApplicationTimeline Component', () => {
         application={{ company: 'Canva', status: 'Submitted', applied_at: '2026-09-10T12:00:00Z' }} 
       />
     );
-
     expect(screen.getByText(/Application tracking initiated for Canva/i)).toBeInTheDocument();
+  });
+
+  it('renders Google Calendar and ICS download buttons for interview events', () => {
+    render(
+      <ApplicationTimeline
+        jobId="job-123"
+        application={{ company: 'Atlassian', title: 'Senior Engineer' }}
+        events={mockEvents}
+      />
+    );
+
+    const gcalLink = screen.getByRole('link', { name: /Add to Google Calendar/i });
+    expect(gcalLink).toBeInTheDocument();
+    expect(gcalLink).toHaveAttribute('href', expect.stringContaining('calendar.google.com/calendar/render'));
+
+    const icsBtn = screen.getByRole('button', { name: /Download \.ics/i });
+    expect(icsBtn).toBeInTheDocument();
   });
 });
 

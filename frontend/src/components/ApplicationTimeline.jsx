@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Clock, Plus, Calendar, CheckCircle2, MessageSquare, 
-  FileText, Send, AlertCircle, Sparkles, ChevronDown, ChevronUp 
+  FileText, Send, AlertCircle, Sparkles, ChevronDown, ChevronUp,
+  CalendarPlus, Download
 } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
+import { 
+  generateGoogleCalendarUrl, 
+  downloadIcsFile, 
+  formatCalendarBriefing 
+} from '../services/calendarService';
 
 const formatTimestamp = (ts) => {
   if (!ts) return 'Just now';
@@ -212,6 +218,42 @@ export const ApplicationTimeline = ({
               <p className="text-slate-300 text-xs leading-relaxed">
                 {evt.note || evt.message || 'No additional details logged.'}
               </p>
+
+              {(evt.event_type === 'interview' || evt.event_type === 'screening') && (
+                <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                  <a
+                    href={generateGoogleCalendarUrl({
+                      title: `Interview: ${application?.company || 'Target Role'}`,
+                      description: formatCalendarBriefing(application || {}, {
+                        interviewType: badge.label,
+                        notes: evt.note,
+                      }),
+                      startTime: evt.timestamp ? new Date(evt.timestamp) : null,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-[10px] transition-colors cursor-pointer"
+                  >
+                    <CalendarPlus size={12} /> Add to Google Calendar
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadIcsFile({
+                        title: `Interview: ${application?.company || 'Target Role'}`,
+                        description: formatCalendarBriefing(application || {}, {
+                          interviewType: badge.label,
+                          notes: evt.note,
+                        }),
+                        startTime: evt.timestamp ? new Date(evt.timestamp) : null,
+                      });
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold text-[10px] transition-colors cursor-pointer"
+                  >
+                    <Download size={12} /> Download .ics
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

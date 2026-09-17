@@ -75,3 +75,21 @@ def test_auth_routes(client):
     assert session_res.status_code == 200
     assert session_res.json()["authenticated"] is True
 
+
+def test_digest_routes(client):
+    res = client.get("/api/digest/preview?min_score=80&limit=3")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "digest" in data
+    assert "slack_blocks" in data
+    assert "markdown" in data
+
+    # Test dry-run dispatch
+    dispatch_res = client.post(
+        "/api/digest/dispatch",
+        json={"min_score": 80, "limit": 3},
+    )
+    assert dispatch_res.status_code == 200
+    dispatch_data = dispatch_res.json()
+    assert dispatch_data["status"] == "dry_run"

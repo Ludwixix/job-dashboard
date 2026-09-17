@@ -47,6 +47,8 @@ const RemoteRolesSection = lazy(() => import('./RemoteRolesSection').then(m => (
 const InterviewCheatSheetModal = lazy(() => import('./InterviewCheatSheetModal'));
 const SkillGapModal = lazy(() => import('./SkillGapModal').then(m => ({ default: m.SkillGapModal || m.default })));
 const JobCompareModal = lazy(() => import('./JobCompareModal').then(m => ({ default: m.JobCompareModal || m.default })));
+const PdfPreviewModal = lazy(() => import('./PdfPreviewModal').then(m => ({ default: m.PdfPreviewModal || m.default })));
+const ScoringTunerModal = lazy(() => import('./ScoringTunerModal').then(m => ({ default: m.ScoringTunerModal || m.default })));
 
 // Client routing path mappings
 const SECTION_ROUTES = {
@@ -144,8 +146,8 @@ import { getSpendSummary, subscribeToSpendUpdates } from '../services/llmCostSer
 import { 
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
- Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
- ChevronDown, ChevronUp, Layers, Award
+  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
+  ChevronDown, ChevronUp, Layers, Award, FileText
 } from 'lucide-react';
 
 
@@ -186,6 +188,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
  const [isWorkforceModalOpen, setIsWorkforceModalOpen] = useState(false);
  const [isWorkforceEnabled, setIsWorkforceEnabled] = useState(() => getWorkforceSettings().enabled);
+ const [isPdfStudioOpen, setIsPdfStudioOpen] = useState(false);
+ const [isScoringTunerOpen, setIsScoringTunerOpen] = useState(false);
+ const [activeScoringWeights, setActiveScoringWeights] = useState(null);
+
+ const handleApplyCustomWeights = useCallback((recalculatedJobs, weights) => {
+   setActiveScoringWeights(weights);
+   setJobs(recalculatedJobs);
+   addToast('Custom scoring matrix applied across all opportunities', 'success');
+ }, [addToast]);
 
  // Helper: announce dynamic changes to screen readers
  const announce = useCallback((msg) => {
@@ -1002,6 +1013,24 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  >
  <Compass size={13} className="text-amber-400" />
  <span>Career Vector Compass</span>
+ </button>
+
+ <button
+ type="button"
+ onClick={() => { setIsToolsMenuOpen(false); setIsPdfStudioOpen(true); }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <FileText size={13} className="text-amber-400" />
+ <span>Visual ATS PDF Studio</span>
+ </button>
+
+ <button
+ type="button"
+ onClick={() => { setIsToolsMenuOpen(false); setIsScoringTunerOpen(true); }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-blue-950/70 text-slate-200 hover:text-blue-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <Sliders size={13} className="text-blue-400" />
+ <span>Scoring Matrix Tuner</span>
  </button>
 
  {authUser ? (
@@ -1991,6 +2020,34 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  </Suspense>
  </SafeErrorBoundary>
  )}
+
+  {/* Phase 5.3: Real-Time Visual ATS PDF Studio Modal */}
+  {isPdfStudioOpen && (
+  <SafeErrorBoundary sectionName="Visual ATS PDF Studio" onClose={() => setIsPdfStudioOpen(false)}>
+  <Suspense fallback={<ModalSkeleton />}>
+  <PdfPreviewModal
+  isOpen={isPdfStudioOpen}
+  onClose={() => setIsPdfStudioOpen(false)}
+  initialProfile={activeProfile}
+  />
+  </Suspense>
+  </SafeErrorBoundary>
+  )}
+
+  {/* Phase 5.4: Interactive Scoring Matrix Tuner Modal */}
+  {isScoringTunerOpen && (
+  <SafeErrorBoundary sectionName="Scoring Matrix Tuner" onClose={() => setIsScoringTunerOpen(false)}>
+  <Suspense fallback={<ModalSkeleton />}>
+  <ScoringTunerModal
+  isOpen={isScoringTunerOpen}
+  onClose={() => setIsScoringTunerOpen(false)}
+  jobs={jobs}
+  currentWeights={activeScoringWeights}
+  onApply={handleApplyCustomWeights}
+  />
+  </Suspense>
+  </SafeErrorBoundary>
+  )}
 
 
  {/* Fixed Bottom Status Bar */}

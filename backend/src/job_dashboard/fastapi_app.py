@@ -32,6 +32,7 @@ from .repository import JobRepository
 from .routers import (
     applications_router,
     auth_router,
+    digest_router,
     jobs_router,
     metrics_router,
     search_router,
@@ -255,6 +256,7 @@ def create_app() -> FastAPI:
     app.include_router(applications_router)
     app.include_router(auth_router)
     app.include_router(search_router)
+    app.include_router(digest_router)
 
     # Serve static assets if compiled React build exists
     static_dir = Path(__file__).resolve().parent / "static"

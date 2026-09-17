@@ -56,3 +56,4 @@ describe('JobCompareModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+

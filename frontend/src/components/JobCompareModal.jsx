@@ -157,3 +157,4 @@ export const JobCompareModal = ({ jobs = [], onClose, onSelectForApply }) => {
     </div>
   );
 };
+

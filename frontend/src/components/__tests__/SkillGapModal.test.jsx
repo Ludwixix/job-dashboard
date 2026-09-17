@@ -44,3 +44,4 @@ describe('SkillGapModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+

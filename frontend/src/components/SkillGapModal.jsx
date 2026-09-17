@@ -165,3 +165,4 @@ export const SkillGapModal = ({ jobs = [], userProfile = {}, onClose }) => {
     </div>
   );
 };
+

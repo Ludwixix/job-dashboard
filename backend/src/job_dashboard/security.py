@@ -1,6 +1,7 @@
 """
 Basic security and authentication module.
 """
+
 import hashlib
 import os
 import secrets
@@ -9,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 try:
     import jwt
     from jwt import PyJWTError as JWTError
+
     JWT_AVAILABLE = True
 except ImportError:
     JWT_AVAILABLE = False
@@ -16,12 +18,14 @@ except ImportError:
 
 try:
     import bcrypt
+
     BCRYPT_AVAILABLE = True
 except ImportError:
     BCRYPT_AVAILABLE = False
 
 try:
     from passlib.context import CryptContext
+
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     PASSLIB_AVAILABLE = True
 except ImportError:
@@ -34,7 +38,7 @@ logger = get_logger("job_dashboard.security")
 
 class SecurityManager:
     """Simple security manager."""
-    
+
     def __init__(self):
         is_production = (
             os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
@@ -54,7 +58,7 @@ class SecurityManager:
         self.secret_key = jwt_key or secrets.token_urlsafe(32)
         self.algorithm = "HS256"
         logger.info("Security manager initialized")
-    
+
     def hash_password(self, password: str) -> str:
         if BCRYPT_AVAILABLE:
             salt = bcrypt.gensalt()
@@ -64,14 +68,16 @@ class SecurityManager:
         raise RuntimeError(
             "Insecure password hashing fallback is disabled. Install bcrypt or passlib."
         )
-    
+
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         if not hashed_password:
             return False
         if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
             if BCRYPT_AVAILABLE:
                 try:
-                    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+                    return bcrypt.checkpw(
+                        plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+                    )
                 except (ValueError, TypeError):
                     return False
             if PASSLIB_AVAILABLE:
@@ -89,10 +95,12 @@ class SecurityManager:
             parts = hashed_password.split(":")
             if len(parts) == 3:
                 _, salt, stored_hash = parts
-                computed_hash = hashlib.sha256((plain_password + salt).encode()).hexdigest()
+                computed_hash = hashlib.sha256(
+                    (plain_password + salt).encode()
+                ).hexdigest()
                 return computed_hash == stored_hash
         return False
-    
+
     def create_token(self, data: dict, expires_minutes: int = 30) -> str:
         if JWT_AVAILABLE:
             to_encode = data.copy()
@@ -103,13 +111,16 @@ class SecurityManager:
             # Simple simulation
             import base64
             import json
+
             payload = {
                 "data": data,
-                "exp": (datetime.now(UTC) + timedelta(minutes=expires_minutes)).timestamp(),
-                "signature": hashlib.sha256(str(data).encode()).hexdigest()[:32]
+                "exp": (
+                    datetime.now(UTC) + timedelta(minutes=expires_minutes)
+                ).timestamp(),
+                "signature": hashlib.sha256(str(data).encode()).hexdigest()[:32],
             }
             return base64.b64encode(json.dumps(payload).encode()).decode()
-    
+
     def verify_token(self, token: str) -> dict | None:
         if JWT_AVAILABLE:
             try:
@@ -122,6 +133,7 @@ class SecurityManager:
                 import base64
                 import json
                 from datetime import datetime
+
                 payload = json.loads(base64.b64decode(token).decode())
                 if payload.get("exp", 0) < datetime.now(UTC).timestamp():
                     return None
@@ -139,3 +151,15 @@ def get_security() -> SecurityManager:
     if _security is None:
         _security = SecurityManager()
     return _security
+
+
+def create_access_token(data: dict, expires_hours: int = 24) -> str:
+    """Create a signed JWT access token."""
+    sec = get_security()
+    return sec.create_token(data, expires_minutes=expires_hours * 60)
+
+
+def decode_token(token: str) -> dict | None:
+    """Verify and decode a signed JWT access token."""
+    sec = get_security()
+    return sec.verify_token(token)

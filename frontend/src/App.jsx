@@ -5,6 +5,8 @@ import { OnboardingFlow } from './components/OnboardingFlow';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getCurrentSession, validateSession, logoutUser } from './services/authService';
 import { Loader2 } from 'lucide-react';
+import { BrowserRouter } from 'react-router-dom';
+import { ModalProvider } from './context/ModalContext';
 
 function App() {
   const [session, setSession] = useState(() => getCurrentSession());
@@ -84,17 +86,21 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="App">
-        <Dashboard 
-          currentUser={session}
-          onSignOut={() => {
-            setSiteUnlocked(false);
-            logoutUser();
-            setSession(null);
-            setIsUnlocked(false);
-          }}
-        />
-      </div>
+      <BrowserRouter>
+        <ModalProvider>
+          <div className="App">
+            <Dashboard 
+              currentUser={session}
+              onSignOut={() => {
+                setSiteUnlocked(false);
+                logoutUser();
+                setSession(null);
+                setIsUnlocked(false);
+              }}
+            />
+          </div>
+        </ModalProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

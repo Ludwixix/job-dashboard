@@ -158,3 +158,4 @@ export const JobCompareModal = ({ jobs = [], onClose, onSelectForApply }) => {
   );
 };
 
+export default JobCompareModal;

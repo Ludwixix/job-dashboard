@@ -29,6 +29,13 @@ from pydantic import BaseModel, Field
 from .config import settings
 from .logging import get_logger
 from .repository import JobRepository
+from .routers import (
+    applications_router,
+    auth_router,
+    jobs_router,
+    metrics_router,
+    search_router,
+)
 
 logger = get_logger("job_dashboard.fastapi")
 
@@ -241,6 +248,13 @@ def create_app() -> FastAPI:
                 await asyncio.sleep(2)
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    # Modular Domain Routers
+    app.include_router(metrics_router)
+    app.include_router(jobs_router)
+    app.include_router(applications_router)
+    app.include_router(auth_router)
+    app.include_router(search_router)
 
     # Serve static assets if compiled React build exists
     static_dir = Path(__file__).resolve().parent / "static"

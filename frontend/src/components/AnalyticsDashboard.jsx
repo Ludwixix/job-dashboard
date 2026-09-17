@@ -94,19 +94,38 @@ export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus, onSelectJob, onO
  applications: timelineMap[k]
  }));
 
- return {
- total,
- active: stages.Applied + stages.Interviewing,
- interviewRate: Math.round(interviewRate),
- offerRate: Math.round(offerRate),
- funnel: [
- { name: 'Applied', value: appliedCount, color: '#6366f1' },
- { name: 'Interviewing', value: Math.round(interviewCount), color: '#f59e0b' },
- { name: 'Offers', value: offerCount, color: '#10b981' }
- ],
- timeline
- };
- }, [trackedJobs]);
+    const sourceStats = {};
+    trackedJobs.forEach(j => {
+      const src = (j.source || 'Direct').toLowerCase();
+      const cleanSrc = src.includes('seek') ? 'Seek' : src.includes('linkedin') ? 'LinkedIn' : src.includes('indeed') ? 'Indeed' : 'Direct / Other';
+      if (!sourceStats[cleanSrc]) sourceStats[cleanSrc] = { total: 0, interviews: 0, offers: 0 };
+      sourceStats[cleanSrc].total++;
+      const stage = getJobStage(j);
+      if (stage === 'Interviewing' || stage === 'Offer') sourceStats[cleanSrc].interviews++;
+      if (stage === 'Offer') sourceStats[cleanSrc].offers++;
+    });
+
+    const sourceConversion = Object.entries(sourceStats).map(([name, data]) => ({
+      name,
+      total: data.total,
+      interviews: data.interviews,
+      rate: data.total > 0 ? Math.round((data.interviews / data.total) * 100) : 0,
+    }));
+
+    return {
+      total,
+      active: stages.Applied + stages.Interviewing,
+      interviewRate: Math.round(interviewRate),
+      offerRate: Math.round(offerRate),
+      funnel: [
+        { name: 'Applied', value: appliedCount, color: '#6366f1' },
+        { name: 'Interviewing', value: Math.round(interviewCount), color: '#f59e0b' },
+        { name: 'Offers', value: offerCount, color: '#10b981' }
+      ],
+      timeline,
+      sourceConversion
+    };
+  }, [trackedJobs]);
 
  // Filtered & Sorted Applied Jobs List
  const filteredAppliedJobs = useMemo(() => {
@@ -250,6 +269,24 @@ export const AnalyticsDashboard = ({ jobs = [], onUpdateStatus, onSelectJob, onO
  );
  })}
  </div>
+
+        {/* Source Channel Conversion Metrics */}
+        {metrics.sourceConversion && metrics.sourceConversion.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-800">
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">
+              Conversion by Sourcing Channel
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {metrics.sourceConversion.map((src) => (
+                <div key={src.name} className="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 block font-bold truncate">{src.name}</span>
+                  <span className="text-xs font-black text-amber-400">{src.rate}%</span>
+                  <span className="text-[9px] text-slate-500 block">({src.interviews}/{src.total})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
  </div>
  </div>
 

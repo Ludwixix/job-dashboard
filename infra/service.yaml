@@ -1,0 +1,59 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: job-dashboard
+  namespace: acaa-agent
+  labels:
+    cloud.googleapis.com/location: australia-southeast1
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '5'
+        run.googleapis.com/cpu-throttling: 'true'
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 10
+      timeoutSeconds: 3600
+      containers:
+        - name: job-dashboard
+          image: australia-southeast1-docker.pkg.dev/acaa-agent/cloud-run-source-deploy/job-dashboard:latest
+          resources:
+            limits:
+              cpu: '2'
+              memory: 2Gi
+          ports:
+            - containerPort: 8080
+              name: http1
+          env:
+            - name: HOST
+              value: 0.0.0.0
+            - name: ENVIRONMENT
+              value: production
+            - name: JOB_DASHBOARD_DATA_DIR
+              value: /app/data
+            - name: JOB_DASHBOARD_GCS_DATA_BUCKET
+              value: acaa-agent-job-dashboard-data
+            - name: JOB_DASHBOARD_SEEK_CACHE_PATH
+              value: /app/data/seek_cache.json
+            - name: JOB_DASHBOARD_SEEK_CACHE_FALLBACK
+              value: 'true'
+            - name: JOB_DASHBOARD_LINKEDIN_ENABLED
+              value: 'false'
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 30
+            timeoutSeconds: 5
+

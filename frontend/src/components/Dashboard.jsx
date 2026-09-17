@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
+import { useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from './ToastContext';
 import { useJobs } from '../hooks/useJobs';
 import { JobSeeker } from './JobSeeker';
@@ -44,6 +45,74 @@ const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ 
 const SeekPassModal = lazy(() => import('./SeekPassModal').then(m => ({ default: m.SeekPassModal })));
 const RemoteRolesSection = lazy(() => import('./RemoteRolesSection').then(m => ({ default: m.RemoteRolesSection })));
 const InterviewCheatSheetModal = lazy(() => import('./InterviewCheatSheetModal'));
+const SkillGapModal = lazy(() => import('./SkillGapModal').then(m => ({ default: m.SkillGapModal || m.default })));
+const JobCompareModal = lazy(() => import('./JobCompareModal').then(m => ({ default: m.JobCompareModal || m.default })));
+
+// Client routing path mappings
+const SECTION_ROUTES = {
+  seeker: '/',
+  highlights: '/highlights',
+  kanban: '/pipeline',
+  remote: '/remote',
+  market: '/market',
+  analytics: '/analytics',
+  operations: '/operations',
+};
+
+const ROUTE_SECTIONS = {
+  '/': 'seeker',
+  '/seeker': 'seeker',
+  '/highlights': 'highlights',
+  '/pipeline': 'kanban',
+  '/kanban': 'kanban',
+  '/remote': 'remote',
+  '/market': 'market',
+  '/analytics': 'analytics',
+  '/operations': 'operations',
+};
+
+// Safe bridge for React Router DOM (no-ops gracefully if rendered without Router context in unit tests)
+function ActiveRouteSync({ activeSection, setActiveSection, jobs, setSelectedJob }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.startsWith('/job/')) {
+      const jobId = decodeURIComponent(path.replace('/job/', '').trim());
+      if (jobId && jobs && jobs.length > 0) {
+        const found = jobs.find(j => String(j.id) === jobId || `${j.company}_${j.title}` === jobId);
+        if (found) {
+          setSelectedJob(found);
+        }
+      }
+    } else if (ROUTE_SECTIONS[path] && ROUTE_SECTIONS[path] !== activeSection) {
+      setActiveSection(ROUTE_SECTIONS[path]);
+    }
+  }, [location.pathname, jobs, activeSection, setActiveSection, setSelectedJob]);
+
+  useEffect(() => {
+    const targetPath = SECTION_ROUTES[activeSection];
+    if (targetPath && !location.pathname.startsWith('/job/') && location.pathname !== targetPath) {
+      navigate(targetPath, { replace: false });
+    }
+  }, [activeSection, location.pathname, navigate]);
+
+  return null;
+}
+
+function RouteSync({ activeSection, setActiveSection, jobs, setSelectedJob }) {
+  const inRouter = useInRouterContext();
+  if (!inRouter) return null;
+  return (
+    <ActiveRouteSync
+      activeSection={activeSection}
+      setActiveSection={setActiveSection}
+      jobs={jobs}
+      setSelectedJob={setSelectedJob}
+    />
+  );
+}
 
 import { TelemetryDesk } from './TelemetryDesk';
 import { getWorkforceSettings } from '../services/workforceAustraliaService';
@@ -148,6 +217,9 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+ const [isSkillGapModalOpen, setIsSkillGapModalOpen] = useState(false);
+ const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+ const [compareJobs, setCompareJobs] = useState([]);
  const [editingProfile, setEditingProfile] = useState(null);
  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
  const toolsMenuRef = useRef(null);
@@ -737,6 +809,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
  return (
  <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-amber-600 selection:text-white">
+ {/* React Router Bidirectional Synchronization */}
+ <RouteSync
+ activeSection={activeSection}
+ setActiveSection={setActiveSection}
+ jobs={jobs}
+ setSelectedJob={setSelectedJob}
+ />
+
  {/* Screen-reader live announcement region */}
  <div
  role="status"
@@ -946,6 +1026,28 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <span>Workforce Australia</span>
  </button>
  )}
+
+ <button
+ type="button"
+ onClick={() => { setIsToolsMenuOpen(false); setIsSkillGapModalOpen(true); }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <TrendingUp size={13} className="text-emerald-400" />
+ <span>Market Skill Gap Intelligence</span>
+ </button>
+
+ <button
+ type="button"
+ onClick={() => {
+ setIsToolsMenuOpen(false);
+ setCompareJobs(jobs.slice(0, 2));
+ setIsCompareModalOpen(true);
+ }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <Sparkles size={13} className="text-amber-400" />
+ <span>Compare Top Opportunities</span>
+ </button>
 
  <div className="pt-1 border-t border-slate-800">
  <button
@@ -1851,6 +1953,32 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <SettingsModal
  isOpen={isSettingsOpen}
  onClose={() => setIsSettingsOpen(false)}
+ />
+ </Suspense>
+ </SafeErrorBoundary>
+ )}
+
+ {/* Market Skill Gap Intelligence Modal */}
+ {isSkillGapModalOpen && (
+ <SafeErrorBoundary sectionName="Skill Gap Modal">
+ <Suspense fallback={<ModalSkeleton />}>
+ <SkillGapModal
+ jobs={jobs}
+ userProfile={activeProfile}
+ onClose={() => setIsSkillGapModalOpen(false)}
+ />
+ </Suspense>
+ </SafeErrorBoundary>
+ )}
+
+ {/* Comparative Opportunity Matrix Modal */}
+ {isCompareModalOpen && (
+ <SafeErrorBoundary sectionName="Job Compare Modal">
+ <Suspense fallback={<ModalSkeleton />}>
+ <JobCompareModal
+ jobs={compareJobs}
+ onClose={() => setIsCompareModalOpen(false)}
+ onSelectForApply={(j) => setSelectedForGenerator(j)}
  />
  </Suspense>
  </SafeErrorBoundary>

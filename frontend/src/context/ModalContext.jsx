@@ -116,7 +116,20 @@ export const ModalProvider = ({ children }) => {
 export const useModals = () => {
   const context = useContext(ModalContext);
   if (!context) {
-    throw new Error('useModals must be used within a ModalProvider');
+    return {
+      selectedJob: null,
+      setSelectedJob: () => {},
+      selectedForGenerator: null,
+      setSelectedForGenerator: () => {},
+      isCompareModalOpen: false,
+      setIsCompareModalOpen: () => {},
+      compareJobs: [],
+      setCompareJobs: () => {},
+      openComparison: () => {},
+      isSkillGapModalOpen: false,
+      setIsSkillGapModalOpen: () => {},
+      closeAllModals: () => {},
+    };
   }
   return context;
 };

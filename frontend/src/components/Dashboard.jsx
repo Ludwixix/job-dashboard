@@ -75,7 +75,9 @@ const ROUTE_SECTIONS = {
 function ActiveRouteSync({ activeSection, setActiveSection, jobs, setSelectedJob }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const lastSectionRef = useRef(activeSection);
 
+  // 1. URL Path -> State synchronization (driven strictly when location.pathname changes)
   useEffect(() => {
     const path = location.pathname;
     if (path.startsWith('/job/')) {
@@ -86,12 +88,18 @@ function ActiveRouteSync({ activeSection, setActiveSection, jobs, setSelectedJob
           setSelectedJob(found);
         }
       }
-    } else if (ROUTE_SECTIONS[path] && ROUTE_SECTIONS[path] !== activeSection) {
-      setActiveSection(ROUTE_SECTIONS[path]);
+    } else if (ROUTE_SECTIONS[path]) {
+      const targetSection = ROUTE_SECTIONS[path];
+      lastSectionRef.current = targetSection;
+      setActiveSection(prev => (prev === targetSection ? prev : targetSection));
     }
-  }, [location.pathname, jobs, activeSection, setActiveSection, setSelectedJob]);
+  }, [location.pathname, jobs, setActiveSection, setSelectedJob]);
 
+  // 2. ActiveSection -> URL synchronization (driven strictly when activeSection state changes)
   useEffect(() => {
+    if (activeSection === lastSectionRef.current) return;
+    lastSectionRef.current = activeSection;
+
     const targetPath = SECTION_ROUTES[activeSection];
     if (targetPath && !location.pathname.startsWith('/job/') && location.pathname !== targetPath) {
       navigate(targetPath, { replace: false });

@@ -218,7 +218,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
     expect(screen.getByText('Richmond VIC 3121')).toBeInTheDocument();
 
     // Click Launch
-    const launchBtn = screen.getByRole('button', { name: /LAUNCH MY BESPOKE JOB MATRIX/i });
+    const launchBtn = screen.getByRole('button', { name: /LAUNCH.*BESPOKE.*MATRIX/i });
     fireEvent.click(launchBtn);
 
     // Verify sessionStorage has 'trigger_initial_scrape' set to 'true'
@@ -226,6 +226,105 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
       expect(sessionStorage.getItem('trigger_initial_scrape')).toBe('true');
       expect(onCompleteMock).toHaveBeenCalled();
     });
+  });
+
+  it('allows skipping Step 2 (AI Engine) and advances to Step 3 without an API key', () => {
+    const verifiedUser = {
+      id: 'candidate_skip_llm',
+      name: 'Sam Taylor',
+      email: 'sam@example.com',
+      email_verified: true
+    };
+
+    render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
+
+    expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
+
+    // Click "Skip for now"
+    const skipBtn = screen.getByRole('button', { name: /Skip for now/i });
+    fireEvent.click(skipBtn);
+
+    // Should transition cleanly to Step 3
+    expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
+  });
+
+  it('allows skipping directly to Step 6 (Review & Launch), calculates completeness score, and CTA navigates to target step', () => {
+    const verifiedUser = {
+      id: 'candidate_skip_step6',
+      name: 'Robin Wood',
+      email: 'robin@example.com',
+      email_verified: true
+    };
+
+    render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
+
+    expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
+
+    // Click "Skip directly to Review & Launch (Step 6)"
+    const skipToLaunchBtn = screen.getByRole('button', { name: /Skip directly to Review & Launch \(Step 6\)/i });
+    fireEvent.click(skipToLaunchBtn);
+
+    // Verifies Step 6 is shown
+    expect(screen.getByText(/STEP 6 OF 6 \/\/ BESPOKE BLUEPRINT READY/i)).toBeInTheDocument();
+    expect(screen.getByText(/PROFILE COMPLETENESS & CALIBRATION SCORE/i)).toBeInTheDocument();
+
+    // With default profile and API key, score is 75%
+    expect(screen.getAllByText(/75% COMPLETE/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/WHAT MORE CAN BE DONE TO REACH 100%:/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+25% Potential Boost Available/i)).toBeInTheDocument();
+
+    // CTAs should be available to improve profile
+    const addSkillsCta = screen.getByRole('button', { name: /Add Skills \(\+10%\)/i });
+    expect(addSkillsCta).toBeInTheDocument();
+
+    // Clicking CTA jumps straight to Step 4 (Skills & Experience)
+    fireEvent.click(addSkillsCta);
+    expect(screen.getByText(/STEP 4 OF 6 \/\/ TARGET ROLES & CORE SKILLS/i)).toBeInTheDocument();
+  });
+
+  it('shows 100% complete state when all profile criteria are met', () => {
+    const verifiedUser = {
+      id: 'candidate_100',
+      name: 'Full Profile Candidate',
+      email: 'full@example.com',
+      email_verified: true
+    };
+
+    render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
+
+    // Step 2 -> 3
+    fireEvent.click(screen.getByRole('button', { name: /Save & Continue to Industry/i }));
+
+    // Step 3 -> 4
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Roles & Skills/i }));
+
+    // In Step 4: add skills to have 6+ skills (default has 4 skills)
+    const newSkillInput = screen.getByPlaceholderText('+ Add skill...');
+    fireEvent.change(newSkillInput, { target: { value: 'Kubernetes' } });
+    fireEvent.keyDown(newSkillInput, { key: 'Enter', code: 'Enter' });
+    fireEvent.change(newSkillInput, { target: { value: 'Docker' } });
+    fireEvent.keyDown(newSkillInput, { key: 'Enter', code: 'Enter' });
+
+    // Add resume work experience (>40 chars)
+    const resumeTextarea = screen.getByPlaceholderText(/Paste work experience/i);
+    fireEvent.change(resumeTextarea, {
+      target: {
+        value: 'Senior Lead Software Architect with over 10 years experience building scalable cloud distributed systems and microservices.'
+      }
+    });
+
+    // Continue to Step 5
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Location & Preferences/i }));
+
+    // Location is already set by default ("Melbourne VIC, Australia")
+    // Continue to Step 6
+    fireEvent.click(screen.getByRole('button', { name: /Review Bespoke Blueprint/i }));
+
+    // Step 6 should now be 100% Complete
+    expect(screen.getByText(/STEP 6 OF 6 \/\/ BESPOKE BLUEPRINT READY/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/100% COMPLETE/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Full 100% Candidate Profile Power Reached!/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /⚡ LAUNCH BESPOKE MATRIX \(100% READY\)/i })).toBeInTheDocument();
   });
 });
 

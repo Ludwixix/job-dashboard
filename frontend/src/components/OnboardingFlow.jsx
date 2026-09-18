@@ -301,38 +301,142 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     applyIndustryTheme(profileData.industry);
   }, [profileData.industry]);
 
-  // Bespoke Setup Readiness Score (0 to 100%) & AI Career Coach Insights
+  // Bespoke Setup Readiness & Profile Completeness Score (0 to 100%)
   const readinessAnalysis = useMemo(() => {
     let score = 0;
-    const missingItems = [];
+    const improvements = [];
+
+    // 1. Candidate Identity & Name (15 pts)
     if (profileData.name && profileData.name.trim().length >= 2) {
       score += 15;
     } else {
-      missingItems.push('Enter your name');
+      improvements.push({
+        id: 'name',
+        category: 'Identity',
+        title: 'Add your candidate name',
+        description: 'Personalizes your portal, tailored applications, and ATS document headers.',
+        points: 15,
+        stepTarget: 1,
+        actionLabel: 'Add Full Name (+15%)'
+      });
     }
-    if (profileData.email) score += 10;
-    if (profileData.industry) score += 15;
-    if (profileData.seniorityLevel) score += 10;
-    if (profileData.targetTitles?.length >= 2) {
-      score += 20;
+
+    // 2. Industry Sector & Career Stage (15 pts)
+    if (profileData.industry && profileData.seniorityLevel) {
+      score += 15;
     } else {
-      missingItems.push('Add at least 2 target titles');
+      improvements.push({
+        id: 'industry',
+        category: 'Sector & Seniority',
+        title: 'Choose your industry & seniority stage',
+        description: 'Calibrates scraper gateway filters and contextual dashboard theme.',
+        points: 15,
+        stepTarget: 3,
+        actionLabel: 'Select Industry (+15%)'
+      });
     }
+
+    // 3. Target Job Titles (15 pts)
+    if (profileData.targetTitles?.length >= 2) {
+      score += 15;
+    } else {
+      const missing = Math.max(1, 2 - (profileData.targetTitles?.length || 0));
+      improvements.push({
+        id: 'targetTitles',
+        category: 'Search Queries',
+        title: `Configure ${missing} more target role title${missing > 1 ? 's' : ''}`,
+        description: 'Directly drives automated job gateway queries across Seek, Indeed & Adzuna.',
+        points: 15,
+        stepTarget: 4,
+        actionLabel: 'Add Target Roles (+15%)'
+      });
+    }
+
+    // 4. Core Skills & ATS Keywords (20 pts)
     if (profileData.coreSkills?.length >= 6) {
       score += 20;
     } else if (profileData.coreSkills?.length >= 3) {
       score += 10;
-      missingItems.push('Add 3 more domain skills for ATS optimization');
+      improvements.push({
+        id: 'coreSkills',
+        category: 'ATS Optimization',
+        title: 'Add 3+ domain skills or tools',
+        description: 'Expands semantic match coverage to unlock 85%+ high-fit candidate tiers.',
+        points: 10,
+        stepTarget: 4,
+        actionLabel: 'Add Skills (+10%)'
+      });
     } else {
-      missingItems.push('Add skills to reach ATS threshold');
+      improvements.push({
+        id: 'coreSkills',
+        category: 'ATS Optimization',
+        title: 'Add 4+ core domain skills',
+        description: 'Required by recruiter ATS algorithmic filters to rank your profile.',
+        points: 20,
+        stepTarget: 4,
+        actionLabel: 'Add Core Skills (+20%)'
+      });
     }
-    if (profileData.location) score += 10;
+
+    // 5. Commute Location & Base (10 pts)
+    if (profileData.location && profileData.location.trim().length >= 3) {
+      score += 10;
+    } else {
+      improvements.push({
+        id: 'location',
+        category: 'Commute & Pay',
+        title: 'Set your primary commute suburb',
+        description: 'Enables transit time filtering and proximity scoring from your home base.',
+        points: 10,
+        stepTarget: 5,
+        actionLabel: 'Set Commute Suburb (+10%)'
+      });
+    }
+
+    // 6. Resume Text or Work History (15 pts)
+    const hasWorkExperience = Boolean(
+      (profileData.fullWorkExperienceText && profileData.fullWorkExperienceText.trim().length >= 40) ||
+      (profileData.workHistorySummary && profileData.workHistorySummary.trim().length >= 30) ||
+      (resumeText && resumeText.trim().length >= 40)
+    );
+    if (hasWorkExperience) {
+      score += 15;
+    } else {
+      improvements.push({
+        id: 'resume',
+        category: 'Experience & History',
+        title: 'Upload resume or paste work experience',
+        description: 'Unlocks automated STAR achievement extraction and tailored application synthesis.',
+        points: 15,
+        stepTarget: 4,
+        actionLabel: 'Upload Resume / History (+15%)'
+      });
+    }
+
+    // 7. AI Reasoning Engine Configured (10 pts)
+    const hasApiKey = Boolean(llmApiKey && llmApiKey.trim().length > 3);
+    if (hasApiKey) {
+      score += 10;
+    } else {
+      improvements.push({
+        id: 'aiEngine',
+        category: 'AI Synthesis',
+        title: 'Connect AI Reasoning Engine (API Key)',
+        description: 'Powers 1-click tailored cover letters, document tuning, and interactive voice interview practice.',
+        points: 10,
+        stepTarget: 2,
+        actionLabel: 'Configure AI Key (+10%)'
+      });
+    }
+
     return {
       score: Math.min(100, score),
-      missingItems,
-      atsDensity: (profileData.coreSkills?.length || 0) >= 8 ? 'Optimal' : (profileData.coreSkills?.length || 0) >= 4 ? 'Good' : 'Low'
+      missingItems: improvements.map((i) => i.title),
+      improvements,
+      atsDensity: (profileData.coreSkills?.length || 0) >= 8 ? 'Optimal' : (profileData.coreSkills?.length || 0) >= 4 ? 'Good' : 'Low',
+      isComplete: score >= 100
     };
-  }, [profileData]);
+  }, [profileData, llmApiKey, resumeText]);
 
   const readinessScore = readinessAnalysis.score;
 
@@ -449,15 +553,21 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
   const handleSaveLlmAndContinue = () => {
     const cleanKey = llmApiKey.trim();
-    const meta = PROVIDERS[llmProvider] || PROVIDERS.openrouter;
-    if (meta.requiresKey && !cleanKey) {
-      setLlmError(`An API key is required for ${meta.name} to generate tailored applications and unlock the site.`);
-      return;
-    }
     saveLlmConfig({
       provider: llmProvider,
       model: llmModel,
       apiKey: cleanKey,
+      endpoint: llmEndpoint
+    });
+    setLlmError('');
+    setStep(3); // Advance to Step 3: Industry
+  };
+
+  const handleSkipLlm = () => {
+    saveLlmConfig({
+      provider: llmProvider,
+      model: llmModel,
+      apiKey: llmApiKey.trim(),
       endpoint: llmEndpoint
     });
     setLlmError('');
@@ -581,29 +691,33 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  };
 
  // FINAL COMPLETION & PIPELINE HAND-OFF
- const handleFinalSubmit = async () => {
- setIsLaunching(true);
- setLaunchMessage('Saving candidate profile to secure database...');
- try {
- const { session, profile } = completeOnboarding(profileData);
- setLaunchMessage('Pushing personalized search criteria to scrapers...');
- await saveProfileToBackend(profile);
- setLaunchMessage('Seeding recommendation weights & active theme...');
- await runProfileOnboardingPipeline(profile);
- sessionStorage.setItem('trigger_initial_scrape', 'true');
- setLaunchMessage('Ready! Welcome to your personalized dashboard.');
- setTimeout(() => {
- if (onComplete) onComplete(session, profile);
- }, 350);
- } catch (err) {
- console.error('Error during final onboarding handoff:', err);
- sessionStorage.setItem('trigger_initial_scrape', 'true');
- const { session, profile } = completeOnboarding(profileData);
- if (onComplete) onComplete(session, profile);
- } finally {
- setIsLaunching(false);
- }
- };
+  const handleFinalSubmit = async () => {
+    setIsLaunching(true);
+    setLaunchMessage('Saving candidate profile to secure database...');
+    const finalProfileData = {
+      ...profileData,
+      fullWorkExperienceText: profileData.fullWorkExperienceText || resumeText
+    };
+    try {
+      const { session, profile } = completeOnboarding(finalProfileData);
+      setLaunchMessage('Pushing personalized search criteria to scrapers...');
+      await saveProfileToBackend(profile);
+      setLaunchMessage('Seeding recommendation weights & active theme...');
+      await runProfileOnboardingPipeline(profile);
+      sessionStorage.setItem('trigger_initial_scrape', 'true');
+      setLaunchMessage('Ready! Welcome to your personalized dashboard.');
+      setTimeout(() => {
+        if (onComplete) onComplete(session, profile);
+      }, 350);
+    } catch (err) {
+      console.error('Error during final onboarding handoff:', err);
+      sessionStorage.setItem('trigger_initial_scrape', 'true');
+      const { session, profile } = completeOnboarding(finalProfileData);
+      if (onComplete) onComplete(session, profile);
+    } finally {
+      setIsLaunching(false);
+    }
+  };
 
  const currentIndustryObj = useMemo(() => {
  return INDUSTRY_OPTIONS.find(i => i.id === profileData.industry) || INDUSTRY_OPTIONS[0];
@@ -620,53 +734,58 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  <div>
  <div className="text-sm font-black tracking-widest text-white uppercase flex items-center gap-2">
  JOB SEEKER MATRIX // SETUP
- <span className="text-[10px] px-2 py-0.5 rounded-sm bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
- {readinessScore}% BESPOKE
- </span>
- </div>
- <div className="text-[10px] text-slate-400">HAND-IN-HAND BESPOKE MATCHING & APPLICATION ONBOARDING</div>
- </div>
- </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-sm font-mono font-bold border transition-colors ${
+                readinessScore === 100
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
+                  : readinessScore >= 70
+                  ? 'bg-amber-950 text-amber-300 border-emerald-500/40'
+                  : 'bg-slate-900 text-slate-400 border-slate-700'
+              }`}>
+                {readinessScore}% COMPLETE
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400">HAND-IN-HAND BESPOKE MATCHING & APPLICATION ONBOARDING</div>
+          </div>
+        </div>
 
-  {/* Step Indicators with labels */}
-  <div className="flex items-center gap-1.5 text-xs font-bold w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-  {[
-    { num: 1, label: isVerifyingEmail ? 'Verify Email' : 'Identity' },
-    { num: 2, label: 'AI Engine' },
-    { num: 3, label: 'Industry' },
-    { num: 4, label: 'Skills & Experience' },
-    { num: 5, label: 'Location & Work' },
-    { num: 6, label: 'Launch' }
-  ].map((s) => (
-    <div
-      key={s.num}
-      onClick={() => {
-        if (s.num === 1 && isVerifyingEmail) return;
-        if (s.num > 2 && !llmApiKey.trim()) {
-          setLlmError('Please configure your AI API key first.');
-          setStep(2);
-          return;
-        }
-        if (step > s.num) {
-          setStep(s.num);
-        }
-      }}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-mono transition-all ${
-        step > s.num ? 'cursor-pointer hover:bg-slate-800' : ''
-      } ${
-        step === s.num
-          ? 'bg-amber-600 text-white font-black border border-amber-400'
-          : step > s.num
-          ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
-          : 'bg-slate-900 text-slate-500 border border-slate-800'
-      }`}
-    >
-      <span>{step > s.num ? '✓' : s.num}</span>
-      <span className="hidden md:inline">{s.label}</span>
-    </div>
-  ))}
-  </div>
-  </header>
+        {/* Step Indicators with labels */}
+        <div className="flex items-center gap-1.5 text-xs font-bold w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          {[
+            { num: 1, label: isVerifyingEmail ? 'Verify Email' : 'Identity' },
+            { num: 2, label: 'AI Engine' },
+            { num: 3, label: 'Industry' },
+            { num: 4, label: 'Skills & Experience' },
+            { num: 5, label: 'Location & Work' },
+            { num: 6, label: 'Launch' }
+          ].map((s) => {
+            const isClickable = !isVerifyingEmail || s.num === 1;
+            return (
+              <div
+                key={s.num}
+                onClick={() => {
+                  if (s.num === 1 && isVerifyingEmail) return;
+                  if (isClickable) {
+                    setStep(s.num);
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-mono transition-all ${
+                  isClickable ? 'cursor-pointer hover:bg-slate-800' : 'cursor-not-allowed opacity-60'
+                } ${
+                  step === s.num
+                    ? 'bg-amber-600 text-white font-black border border-amber-400'
+                    : step > s.num
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+                title={`Go to Step ${s.num}: ${s.label}`}
+              >
+                <span>{step > s.num ? '✓' : s.num}</span>
+                <span className="hidden md:inline">{s.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </header>
 
   {/* Main Wizard Container */}
   <main className="max-w-3xl mx-auto w-full my-auto py-6">
@@ -1147,23 +1266,43 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
         </div>
       </div>
 
-      {/* Navigation Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
-        <button
-          type="button"
-          onClick={() => setStep(1)}
-          className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <ArrowLeft size={14} /> Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveLlmAndContinue}
-          disabled={!llmApiKey.trim()}
-          className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shadow-lg shadow-amber-600/20"
-        >
-          Save & Continue to Industry <ArrowRight size={14} />
-        </button>
+      {/* Navigation Footer with Skip Options */}
+      <div className="space-y-2 pt-4 border-t border-slate-800 font-mono text-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={handleSkipLlm}
+              className="px-4 py-2.5 rounded-sm bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              Skip for now <ChevronRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveLlmAndContinue}
+              className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-amber-600/20"
+            >
+              Save & Continue to Industry <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-1 text-[10px] text-slate-500">
+          <span>💡 You can skip AI setup now and configure it later in Settings.</span>
+          <button
+            type="button"
+            onClick={() => setStep(6)}
+            className="text-slate-400 hover:text-amber-400 font-bold transition-colors cursor-pointer underline"
+          >
+            Skip directly to Review & Launch (Step 6) →
+          </button>
+        </div>
       </div>
     </div>
   )}
@@ -1274,19 +1413,42 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  </div>
 
- <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
+ <div className="space-y-2 pt-4 border-t border-slate-800 font-mono text-xs">
+ <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
  <button
+ type="button"
  onClick={() => setStep(2)}
- className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+ className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back
  </button>
+ <div className="flex items-center gap-2 flex-wrap justify-end">
  <button
+ type="button"
  onClick={() => setStep(4)}
- className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5"
+ className="px-4 py-2.5 rounded-sm bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+ >
+ Skip this step <ChevronRight size={14} />
+ </button>
+ <button
+ type="button"
+ onClick={() => setStep(4)}
+ className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  Continue to Roles & Skills <ArrowRight size={14} />
  </button>
+ </div>
+ </div>
+ <div className="flex items-center justify-between pt-1 text-[10px] text-slate-500">
+ <span>💡 Default industry ({profileData.industry}) will be applied.</span>
+ <button
+ type="button"
+ onClick={() => setStep(6)}
+ className="text-slate-400 hover:text-amber-400 font-bold transition-colors cursor-pointer underline"
+ >
+ Skip directly to Review & Launch (Step 6) →
+ </button>
+ </div>
  </div>
  </div>
  )}
@@ -1507,19 +1669,42 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  />
  </div>
 
- <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
+ <div className="space-y-2 pt-4 border-t border-slate-800 font-mono text-xs">
+ <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
  <button
+ type="button"
  onClick={() => setStep(3)}
- className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+ className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back
  </button>
+ <div className="flex items-center gap-2 flex-wrap justify-end">
  <button
+ type="button"
  onClick={() => setStep(5)}
- className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5"
+ className="px-4 py-2.5 rounded-sm bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+ >
+ Skip this step <ChevronRight size={14} />
+ </button>
+ <button
+ type="button"
+ onClick={() => setStep(5)}
+ className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  Continue to Location & Preferences <ArrowRight size={14} />
  </button>
+ </div>
+ </div>
+ <div className="flex items-center justify-between pt-1 text-[10px] text-slate-500">
+ <span>💡 You can upload a resume and tune skills anytime later in your Profile settings.</span>
+ <button
+ type="button"
+ onClick={() => setStep(6)}
+ className="text-slate-400 hover:text-amber-400 font-bold transition-colors cursor-pointer underline"
+ >
+ Skip directly to Review & Launch (Step 6) →
+ </button>
+ </div>
  </div>
  </div>
  )}
@@ -1669,19 +1854,35 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  </div>
 
- <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-mono text-xs">
+ <div className="space-y-2 pt-4 border-t border-slate-800 font-mono text-xs">
+ <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
  <button
+ type="button"
  onClick={() => setStep(4)}
- className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+ className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back
  </button>
+ <div className="flex items-center gap-2 flex-wrap justify-end">
  <button
+ type="button"
  onClick={() => setStep(6)}
- className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center gap-1.5"
+ className="px-4 py-2.5 rounded-sm bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+ >
+ Skip this step <ChevronRight size={14} />
+ </button>
+ <button
+ type="button"
+ onClick={() => setStep(6)}
+ className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  Review Bespoke Blueprint <ArrowRight size={14} />
  </button>
+ </div>
+ </div>
+ <div className="pt-1 text-[10px] text-slate-500">
+ <span>💡 Default commute location ({profileData.location}) will be used.</span>
+ </div>
  </div>
  </div>
  )}
@@ -1771,46 +1972,139 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  </div>
 
- {/* Readiness Optimization Tips if not 100% */}
- {readinessAnalysis.missingItems.length > 0 && (
- <div className="p-3.5 rounded-sm bg-amber-950/30 border border-amber-500/40 text-xs font-mono space-y-2">
- <div className="text-amber-300 font-bold flex items-center gap-1.5 text-[11px]">
- <Sparkles size={13} className="text-amber-400" /> RECOMMENDED ACTIONS TO REACH 100% CANDIDATE POWER:
- </div>
- <ul className="text-slate-300 text-[11px] space-y-1 pl-4 list-disc">
- {readinessAnalysis.missingItems.map((tip, idx) => (
- <li key={idx}>{tip}</li>
- ))}
- </ul>
- </div>
- )}
+      {/* Profile Completeness & Optimization Hub */}
+      <div className="p-5 rounded-sm bg-slate-900/90 border border-slate-800 space-y-4 font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div>
+            <div className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <Sliders size={14} className="text-amber-400" />
+              PROFILE COMPLETENESS & CALIBRATION SCORE
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Quantified match quality based on ATS keywords, commute preferences, and AI engine status.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-1 rounded text-xs font-black border ${
+              readinessScore === 100 
+                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50' 
+                : readinessScore >= 75
+                ? 'bg-indigo-950 text-indigo-300 border-indigo-500/50'
+                : 'bg-amber-950 text-amber-300 border-amber-500/50'
+            }`}>
+              {readinessScore}% COMPLETE
+            </span>
+          </div>
+        </div>
 
- {/* Launch & Back Action Buttons */}
- <div className="space-y-3">
- <button
- onClick={handleFinalSubmit}
- disabled={isLaunching}
- className="w-full py-4 px-6 rounded-sm bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-mono font-black text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75"
- >
- {isLaunching ? (
- <RefreshCw size={18} className="animate-spin text-white" />
- ) : (
- <Zap size={20} className="animate-bounce text-amber-300" />
- )}
- <span>{isLaunching ? (launchMessage || 'CALIBRATING PROFILE & SCRAPERS...') : '⚡ LAUNCH MY BESPOKE JOB MATRIX'}</span>
- </button>
+        {/* Visual Progress Bar */}
+        <div className="space-y-1.5">
+          <div className="w-full bg-slate-950 rounded-full h-3 p-0.5 border border-slate-800 overflow-hidden">
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ${
+                readinessScore === 100
+                  ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500'
+                  : readinessScore >= 75
+                  ? 'bg-gradient-to-r from-indigo-500 to-emerald-400'
+                  : 'bg-gradient-to-r from-amber-500 to-indigo-500'
+              }`}
+              style={{ width: `${readinessScore}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <span>0% (Bare Minimum)</span>
+            <span>75% (Strong Match Power)</span>
+            <span>100% (Maximum Optimization)</span>
+          </div>
+        </div>
 
- <div className="text-center">
- <button
- type="button"
- onClick={() => setStep(5)}
- disabled={isLaunching}
- className="text-slate-400 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
- >
- ← Back to edit preferences
- </button>
- </div>
- </div>
+        {/* What more can be done to reach 100% */}
+        {readinessAnalysis.improvements.length > 0 ? (
+          <div className="space-y-3 pt-2">
+            <div className="text-amber-300 font-bold flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5">
+                <Sparkles size={13} className="text-amber-400" /> WHAT MORE CAN BE DONE TO REACH 100%:
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                +{100 - readinessScore}% Potential Boost Available
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {readinessAnalysis.improvements.map((item) => (
+                <div 
+                  key={item.id}
+                  className="p-3 rounded-sm bg-slate-950/90 border border-amber-500/30 hover:border-amber-500/60 transition-colors flex flex-col justify-between gap-2.5"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30">
+                        {item.category}
+                      </span>
+                      <span className="text-[10px] font-black text-emerald-400">
+                        +{item.points}%
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold text-white leading-snug">
+                      {item.title}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setStep(item.stepTarget)}
+                    className="w-full py-1.5 px-2.5 rounded-sm bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer group"
+                  >
+                    <span>{item.actionLabel}</span>
+                    <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-sm bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-200 flex items-center gap-2.5">
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <div>
+              <span className="font-bold">Full 100% Candidate Profile Power Reached!</span> All ATS keywords, commute preferences, and AI engine calibrations are fully optimized.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Launch & Back Action Buttons */}
+      <div className="space-y-3">
+        <button
+          onClick={handleFinalSubmit}
+          disabled={isLaunching}
+          className="w-full py-4 px-6 rounded-sm bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-mono font-black text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 shadow-lg shadow-emerald-950/50"
+        >
+          {isLaunching ? (
+            <RefreshCw size={18} className="animate-spin text-white" />
+          ) : (
+            <Zap size={20} className="animate-bounce text-amber-300" />
+          )}
+          <span>{isLaunching ? (launchMessage || 'CALIBRATING PROFILE & SCRAPERS...') : `⚡ LAUNCH BESPOKE MATRIX (${readinessScore}% READY)`}</span>
+        </button>
+
+        <p className="text-center font-mono text-[11px] text-slate-400">
+          Any skipped steps or settings can be updated anytime in Settings after launch.
+        </p>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setStep(5)}
+            disabled={isLaunching}
+            className="text-slate-400 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+          >
+            ← Back to edit preferences
+          </button>
+        </div>
+      </div>
  </div>
  )}
 

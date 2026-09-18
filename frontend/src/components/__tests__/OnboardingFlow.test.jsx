@@ -17,6 +17,36 @@ vi.mock('../../services/authService', async (importOriginal) => {
   };
 });
 
+vi.mock('../../services/profileService', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    saveProfileToBackend: vi.fn().mockResolvedValue({ success: true }),
+    parseResumeWithAI: vi.fn(),
+    parseResumeTextClientSide: vi.fn()
+  };
+});
+
+vi.mock('../../services/profileOnboardingPipeline', () => ({
+  runProfileOnboardingPipeline: vi.fn().mockResolvedValue({ success: true }),
+  syncProfileQueriesToBackend: vi.fn().mockResolvedValue({ success: true })
+}));
+
+vi.mock('../../services/llmConfig', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getLlmConfig: vi.fn(() => ({
+      provider: 'openrouter',
+      model: 'anthropic/claude-3.7-sonnet',
+      apiKey: 'sk-or-v1-testkey12345',
+      endpoint: 'https://openrouter.ai/api/v1'
+    })),
+    saveLlmConfig: vi.fn(),
+    testLlmConnection: vi.fn().mockResolvedValue({ success: true, latencyMs: 120 })
+  };
+});
+
 describe('OnboardingFlow Component & Email Verification Step', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,7 +64,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={unverifiedUser} onComplete={vi.fn()} />);
 
-    expect(screen.getByText(/STEP 1 OF 5 \/\/ EMAIL VERIFICATION/i)).toBeInTheDocument();
+    expect(screen.getByText(/STEP 1 OF 6 \/\/ EMAIL VERIFICATION/i)).toBeInTheDocument();
     expect(screen.getByText(/Verify Your Email Address/i)).toBeInTheDocument();
     expect(screen.getByText(/jordan@example.com/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
@@ -105,4 +135,97 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
   });
+
+  it('allows user to progress from Step 2 to Step 3 (Industry Selection) and select an industry and seniority', async () => {
+    const verifiedUser = {
+      id: 'candidate_3',
+      name: 'Morgan Blake',
+      email: 'morgan@example.com',
+      email_verified: true
+    };
+
+    render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
+
+    // In Step 2 (AI Engine), click "Save & Continue to Industry"
+    const continueToIndustryBtn = screen.getByRole('button', { name: /Save & Continue to Industry/i });
+    fireEvent.click(continueToIndustryBtn);
+
+    // Verify Step 3 is rendered
+    expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
+    expect(screen.getByText(/What Industry Do You Specialize In\?/i)).toBeInTheDocument();
+
+    // Verify industry options are present
+    expect(screen.getByText(/Healthcare, Nursing & Medical/i)).toBeInTheDocument();
+    expect(screen.getByText(/Finance, Banking & Accounting/i)).toBeInTheDocument();
+
+    // Click on "Healthcare, Nursing & Medical"
+    const healthcareCard = screen.getByText(/Healthcare, Nursing & Medical/i).closest('button');
+    fireEvent.click(healthcareCard);
+
+    // Verify card is now selected (remains on Step 3)
+    expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
+
+    // Change Career Seniority Stage to Lead & Staff
+    const leadSeniorityBtn = screen.getByText(/Lead & Staff/i).closest('button');
+    fireEvent.click(leadSeniorityBtn);
+
+    expect(screen.getByText(/Active: Lead & Staff/i)).toBeInTheDocument();
+
+    // Now click Continue to Roles & Skills
+    const continueToRolesBtn = screen.getByRole('button', { name: /Continue to Roles & Skills/i });
+    fireEvent.click(continueToRolesBtn);
+
+    // Verify Step 4 is rendered
+    expect(screen.getByText(/STEP 4 OF 6 \/\/ TARGET ROLES & CORE SKILLS/i)).toBeInTheDocument();
+  });
+
+  it('completes the entire onboarding journey from Step 2 through Step 6 and triggers auto-scrape', async () => {
+    const onCompleteMock = vi.fn();
+    const verifiedUser = {
+      id: 'candidate_4',
+      name: 'Alex Rivera',
+      email: 'alex@example.com',
+      email_verified: true
+    };
+
+    render(<OnboardingFlow initialUser={verifiedUser} onComplete={onCompleteMock} />);
+
+    // Step 2 -> Step 3
+    fireEvent.click(screen.getByRole('button', { name: /Save & Continue to Industry/i }));
+    expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
+
+    // Select Technology & IT
+    const techCard = screen.getByText(/Technology, Cloud & Software/i).closest('button');
+    fireEvent.click(techCard);
+
+    // Continue to Step 4 (Roles & Skills)
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Roles & Skills/i }));
+    expect(screen.getByText(/STEP 4 OF 6 \/\/ TARGET ROLES & CORE SKILLS/i)).toBeInTheDocument();
+
+    // Continue to Step 5 (Location & Preferences)
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Location & Preferences/i }));
+    expect(screen.getByText(/STEP 5 OF 6 \/\/ LOCATION, WORK STYLE & COMPENSATION/i)).toBeInTheDocument();
+
+    // Fill in location and salary
+    const locationInput = screen.getByPlaceholderText(/e\.g\. Balaclava VIC 3183/i);
+    fireEvent.change(locationInput, { target: { value: 'Richmond VIC 3121' } });
+
+    // Continue to Step 6 (Review & Launch)
+    fireEvent.click(screen.getByRole('button', { name: /Review Bespoke Blueprint/i }));
+    expect(screen.getByText(/STEP 6 OF 6 \/\/ BESPOKE BLUEPRINT READY/i)).toBeInTheDocument();
+
+    // Verify Review summary shows the candidate's chosen industry & location
+    expect(screen.getByText('Richmond VIC 3121')).toBeInTheDocument();
+
+    // Click Launch
+    const launchBtn = screen.getByRole('button', { name: /LAUNCH MY BESPOKE JOB MATRIX/i });
+    fireEvent.click(launchBtn);
+
+    // Verify sessionStorage has 'trigger_initial_scrape' set to 'true'
+    await waitFor(() => {
+      expect(sessionStorage.getItem('trigger_initial_scrape')).toBe('true');
+      expect(onCompleteMock).toHaveBeenCalled();
+    });
+  });
 });
+

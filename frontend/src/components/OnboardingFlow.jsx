@@ -473,7 +473,6 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       coreSkills: [...new Set([...prev.coreSkills, ...ind.defaultSkills.slice(0, 5)])],
       title: ind.defaultTitles[0] || prev.title
     }));
-    setStep(4);
   };
 
   // STEP 4: RESUME UPLOAD & PARSING
@@ -678,7 +677,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
-          <ShieldCheck size={14} /> STEP 1 OF 5 // EMAIL VERIFICATION
+          <ShieldCheck size={14} /> STEP 1 OF 6 // EMAIL VERIFICATION
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-white">
           Verify Your Email Address
@@ -794,7 +793,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   <div className="space-y-6">
   <div className="text-center space-y-2">
   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
-  <ShieldCheck size={14} /> STEP 1 OF 5 // YOUR CANDIDATE IDENTITY
+  <ShieldCheck size={14} /> STEP 1 OF 6 // YOUR CANDIDATE IDENTITY
   </div>
   <h1 className="text-2xl sm:text-3xl font-black text-white">
   Welcome to Your Bespoke Job Agent
@@ -1170,7 +1169,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   )}
 
   {/* STEP 3: CHOOSE INDUSTRY */}
-  {step === 6 && (
+  {step === 3 && (
 <div className="space-y-6">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
@@ -1293,7 +1292,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  )}
 
  {/* STEP 4: ROLES, SKILLS & RESUME */}
- {step === 3 && (
+ {step === 4 && (
  <div className="space-y-6">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black industry-accent-badge">
@@ -1526,7 +1525,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  )}
 
  {/* STEP 5: LOCATION, WORK STYLE & COMPENSATION */}
- {step === 4 && (
+ {step === 5 && (
  <div className="space-y-6 font-mono text-xs">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black industry-accent-badge">
@@ -1688,7 +1687,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  )}
 
  {/* STEP 6: REVIEW & LAUNCH */}
- {step === 5 && (
+ {step === 6 && (
  <div className="space-y-6">
  <div className="text-center space-y-2">
  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">

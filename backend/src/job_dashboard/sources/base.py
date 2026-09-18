@@ -34,20 +34,36 @@ class SearchQuery:
 def detect_query_stream(term: str) -> str:
     """Classifies a search query term into its primary industry stream."""
     lower = str(term or "").lower()
-    if re.search(r"nurs|health|medic|clinic|patient|aged care|doctor|pharmac|hospital|allied health|physio|dental|midwife", lower):
+    if re.search(
+        r"nurs|health|medic|clinic|patient|aged care|doctor|pharmac|hospital|allied health|physio|dental|midwife",
+        lower,
+    ):
         return "healthcare"
-    if re.search(r"account|audit|cpa|\bca\b|tax|financ|bookkeep|payroll|banking|treasury|actuar", lower):
+    if re.search(
+        r"account|audit|cpa|\bca\b|tax|financ|bookkeep|payroll|banking|treasury|actuar",
+        lower,
+    ):
         return "finance"
-    if re.search(r"construct|builder|site supervisor|site manager|carpenter|electrician|plumber|trade|whs|foreman|estimator|civil", lower):
+    if re.search(
+        r"construct|builder|site supervisor|site manager|carpenter|electrician|plumber|trade|whs|foreman|estimator|civil",
+        lower,
+    ):
         return "trades"
-    if re.search(r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend", lower):
+    if re.search(
+        r"software|engineer|developer|cloud|azure|aws|devops|systems|infra|cyber|network|data|python|react|frontend|backend",
+        lower,
+    ):
         return "technology"
-    if re.search(r"legal|lawyer|counsel|paralegal|solicitor|barrister|litigat|compliance", lower):
+    if re.search(
+        r"legal|lawyer|counsel|paralegal|solicitor|barrister|litigat|compliance", lower
+    ):
         return "legal"
     return "general"
 
 
-def resolve_search_location(query: SearchQuery, default_country: str = "Australia") -> str:
+def resolve_search_location(
+    query: SearchQuery, default_country: str = "Australia"
+) -> str:
     """Resolve the effective search location for a query.
     If the query term or location indicates a remote / WFH position, or if the
     location is generic/nationwide, return nationwide 'Australia' so searches are
@@ -58,8 +74,28 @@ def resolve_search_location(query: SearchQuery, default_country: str = "Australi
     loc_lower = loc_clean.lower()
     is_remote = (
         str(getattr(query, "stream", "")).lower() == "remote"
-        or any(k in term_lower for k in ("remote", "wfh", "work from home", "anywhere in australia", "telecommute"))
-        or any(k in loc_lower for k in ("remote", "wfh", "anywhere in australia", "anywhere", "all australia", "australia", "nationwide"))
+        or any(
+            k in term_lower
+            for k in (
+                "remote",
+                "wfh",
+                "work from home",
+                "anywhere in australia",
+                "telecommute",
+            )
+        )
+        or any(
+            k in loc_lower
+            for k in (
+                "remote",
+                "wfh",
+                "anywhere in australia",
+                "anywhere",
+                "all australia",
+                "australia",
+                "nationwide",
+            )
+        )
     )
     if is_remote:
         return "Australia"
@@ -69,8 +105,7 @@ def resolve_search_location(query: SearchQuery, default_country: str = "Australi
 class JobSource(Protocol):
     name: str
 
-    def search(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
-        ...
+    def search(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]: ...
 
 
 class SeekUnavailableError(RuntimeError):
@@ -93,25 +128,47 @@ def clean_description(value: Any, limit: int = 12000) -> str:
         return ""
 
     # Remove script and style tags completely
-    html = re.sub(r"<\s*style\b[^>]*>[\s\S]*?<\s*/\s*style\s*>", "", raw, flags=re.IGNORECASE)
-    html = re.sub(r"<\s*script\b[^>]*>[\s\S]*?<\s*/\s*script\s*>", "", html, flags=re.IGNORECASE)
-    html = re.sub(r"<\s*head\b[^>]*>[\s\S]*?<\s*/\s*head\s*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(
+        r"<\s*style\b[^>]*>[\s\S]*?<\s*/\s*style\s*>", "", raw, flags=re.IGNORECASE
+    )
+    html = re.sub(
+        r"<\s*script\b[^>]*>[\s\S]*?<\s*/\s*script\s*>", "", html, flags=re.IGNORECASE
+    )
+    html = re.sub(
+        r"<\s*head\b[^>]*>[\s\S]*?<\s*/\s*head\s*>", "", html, flags=re.IGNORECASE
+    )
     html = re.sub(r"<!--[\s\S]*?-->", "", html)
 
     # Strip email MIME/header artifacts
-    html = re.sub(r"(?i)^.*?Content-Type:\s*text/html.*?\n\n", "", html, flags=re.DOTALL)
+    html = re.sub(
+        r"(?i)^.*?Content-Type:\s*text/html.*?\n\n", "", html, flags=re.DOTALL
+    )
     html = re.sub(r"(?i)^.*?boundary=.*?\n\n", "", html, flags=re.DOTALL)
-    html = re.sub(r"(?i)(?:unsubscribe|view this job on seek|manage alerts|email preference|terms of service)[\s\S]*?$", "", html)
+    html = re.sub(
+        r"(?i)(?:unsubscribe|view this job on seek|manage alerts|email preference|terms of service)[\s\S]*?$",
+        "",
+        html,
+    )
 
     # Format paragraph, heading, and list tags
-    html = re.sub(r"<\s*(?:br\s*/?|p|div|section|article|h[1-6]|ul|ol|tr)\b[^>]*>", "\n\n", html, flags=re.IGNORECASE)
+    html = re.sub(
+        r"<\s*(?:br\s*/?|p|div|section|article|h[1-6]|ul|ol|tr)\b[^>]*>",
+        "\n\n",
+        html,
+        flags=re.IGNORECASE,
+    )
     html = re.sub(r"<\s*li\b[^>]*>", "\n• ", html, flags=re.IGNORECASE)
-    html = re.sub(r"<\s*/\s*(?:p|div|section|article|h[1-6]|ul|ol|li|tr|table)\s*>", "\n", html, flags=re.IGNORECASE)
+    html = re.sub(
+        r"<\s*/\s*(?:p|div|section|article|h[1-6]|ul|ol|li|tr|table)\s*>",
+        "\n",
+        html,
+        flags=re.IGNORECASE,
+    )
 
     parser = _TextExtractor()
     parser.feed(html)
     text = unescape("".join(parser.parts)).replace("\u00a0", " ")
-    
+
     # Clean decoded text lines
     lines = []
     for raw_line in text.splitlines():
@@ -123,7 +180,7 @@ def clean_description(value: Any, limit: int = 12000) -> str:
             lines.append(line)
         elif lines and lines[-1] != "":
             lines.append("")
-            
+
     text = "\n".join(lines).strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text[:limit].rstrip() + ("..." if len(text) > limit else "")
@@ -146,13 +203,27 @@ def estimate_salary_bracket(title: str = "", location: str = "") -> SalaryBracke
     title_lower = str(title or "").lower()
 
     # Executive / Lead / Principal / Architect
-    if any(k in title_lower for k in ("principal", "architect", "lead", "head of", "director", "manager", "staff")):
+    if any(
+        k in title_lower
+        for k in (
+            "principal",
+            "architect",
+            "lead",
+            "head of",
+            "director",
+            "manager",
+            "staff",
+        )
+    ):
         min_amt, max_amt = 160000.0, 210000.0
     # Senior / Specialist
     elif any(k in title_lower for k in ("senior", "sr", "specialist", "expert")):
         min_amt, max_amt = 130000.0, 165000.0
     # Junior / Graduate / Entry
-    elif any(k in title_lower for k in ("junior", "jr", "graduate", "entry", "intern", "associate")):
+    elif any(
+        k in title_lower
+        for k in ("junior", "jr", "graduate", "entry", "intern", "associate")
+    ):
         min_amt, max_amt = 70000.0, 95000.0
     # Standard Mid-Level
     else:
@@ -198,12 +269,22 @@ def parse_salary_bracket(
             if max_amount is None:
                 max_amount = extracted[-1] if len(extracted) > 1 else extracted[0]
 
-    if min_amount is None and max_amount is None and (not raw or raw.lower() in ("not stated", "competitive", "none", "null")):
+    if (
+        min_amount is None
+        and max_amount is None
+        and (not raw or raw.lower() in ("not stated", "competitive", "none", "null"))
+    ):
         if estimate_if_missing and title:
             return estimate_salary_bracket(title)
 
     return SalaryBracket(
-        raw_text=raw if raw else (f"${min_amount:,.0f} - ${max_amount:,.0f}" if min_amount and max_amount else None),
+        raw_text=raw
+        if raw
+        else (
+            f"${min_amount:,.0f} - ${max_amount:,.0f}"
+            if min_amount and max_amount
+            else None
+        ),
         min_amount=min_amount,
         max_amount=max_amount,
         currency=currency,
@@ -212,7 +293,9 @@ def parse_salary_bracket(
     )
 
 
-def is_recent(job: Mapping[str, Any], days: int = 14, now: datetime | None = None) -> bool:
+def is_recent(
+    job: Mapping[str, Any], days: int = 14, now: datetime | None = None
+) -> bool:
     """A job with no verifiable posted date cannot be vouched for as recent."""
     value = normalize_posted_date(job.get("posted", ""), now)
     if not value:
@@ -221,7 +304,9 @@ def is_recent(job: Mapping[str, Any], days: int = 14, now: datetime | None = Non
         posted = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         try:
-            posted = datetime.strptime(value[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            posted = datetime.strptime(value[:10], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
         except ValueError:
             return False
     if posted.tzinfo is None:
@@ -268,7 +353,9 @@ def posted_age(value: Any, now: datetime | None = None) -> str:
         posted = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         try:
-            posted = datetime.strptime(text[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            posted = datetime.strptime(text[:10], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
         except ValueError:
             return "Posting date unavailable"
     if posted.tzinfo is None:
@@ -297,7 +384,7 @@ def _page_description(url: str, timeout: float = 4.0) -> str:
         for pattern in patterns:
             match = re.search(pattern, html, re.IGNORECASE)
             if match:
-                value = unescape(match.group(1)).replace("\\n", " ").replace("\\\"", '"')
+                value = unescape(match.group(1)).replace("\\n", " ").replace('\\"', '"')
                 value = re.sub(r"\s+", " ", value).strip()
                 if value:
                     return value[:1000]
@@ -313,7 +400,9 @@ def ensure_descriptions(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any
         job = dict(raw)
         description = clean_description(job.get("description", ""))
         if not description:
-            description = _page_description(str(job.get("url") or job.get("application_route") or ""))
+            description = _page_description(
+                str(job.get("url") or job.get("application_route") or "")
+            )
         if not description:
             description = f"{job.get('title', 'Role')} at {job.get('company', 'the listed employer')} in {job.get('location', 'the advertised location')}."
         job["description"] = description
@@ -334,12 +423,16 @@ class ScrapePipeline:
         self.pause_seconds = pause_seconds
         self.health_check = health_check
         self.source_health: dict[str, dict[str, Any]] = {}
+        self.errors: list[str] = []
 
     def _load_mock_fixture(self) -> list[dict[str, Any]]:
         import json
         from pathlib import Path
+
         candidate_paths = [
-            Path(__file__).resolve().parent.parent.parent.parent / "data" / "mock_jobs_fixture.json",
+            Path(__file__).resolve().parent.parent.parent.parent
+            / "data"
+            / "mock_jobs_fixture.json",
             Path(__file__).resolve().parent.parent / "data" / "mock_jobs_fixture.json",
             Path("/app/data/mock_jobs_fixture.json"),
             Path("data/mock_jobs_fixture.json"),
@@ -371,15 +464,24 @@ class ScrapePipeline:
             }
         ]
 
-    def run(self, queries: Iterable[SearchQuery], on_progress=None) -> list[dict[str, Any]]:
+    def run(
+        self, queries: Iterable[SearchQuery], on_progress=None
+    ) -> list[dict[str, Any]]:
         import os
         from .dedup import deduplicate_jobs
 
         active_queries = [query for query in queries if query.enabled]
-        is_mock = os.environ.get("MOCK_SCRAPERS", "").strip().lower() in ("true", "1", "yes")
+        is_mock = os.environ.get("MOCK_SCRAPERS", "").strip().lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         if is_mock:
             if on_progress:
-                on_progress("Mock scrapers active (MOCK_SCRAPERS=true): loading static fixture...", 50)
+                on_progress(
+                    "Mock scrapers active (MOCK_SCRAPERS=true): loading static fixture...",
+                    50,
+                )
             mock_jobs = self._load_mock_fixture()
             for source in self.sources:
                 self.source_health[source.name] = {
@@ -391,7 +493,9 @@ class ScrapePipeline:
                 }
             if on_progress:
                 on_progress("Mock scrapers complete", 100)
-            return ensure_descriptions(deduplicate_jobs(job for job in mock_jobs if is_recent(job, self.days)))
+            return ensure_descriptions(
+                deduplicate_jobs(job for job in mock_jobs if is_recent(job, self.days))
+            )
 
         collected: list[Mapping[str, Any]] = []
         self.errors: list[str] = []
@@ -401,8 +505,13 @@ class ScrapePipeline:
         for idx, source in enumerate(self.sources):
             started_at = time.monotonic()
             if on_progress:
-                on_progress(f'Scraping {source.name}...', int((idx / total_sources) * 100))
-            health = self.source_health.setdefault(source.name, {"jobs": 0, "queries": 0, "success": False, "last_error": ""})
+                on_progress(
+                    f"Scraping {source.name}...", int((idx / total_sources) * 100)
+                )
+            health = self.source_health.setdefault(
+                source.name,
+                {"jobs": 0, "queries": 0, "success": False, "last_error": ""},
+            )
             for query in active_queries:
                 if on_progress:
                     on_progress(
@@ -415,8 +524,13 @@ class ScrapePipeline:
                     health["success"] = True
                     health["last_success"] = datetime.now(timezone.utc).isoformat()
                     for job in results:
-                        text = " ".join(str(job.get(field, "")) for field in ("title", "company", "description", "tags")).lower()
-                        if not any(term.lower() in text for term in query.exclude_terms):
+                        text = " ".join(
+                            str(job.get(field, ""))
+                            for field in ("title", "company", "description", "tags")
+                        ).lower()
+                        if not any(
+                            term.lower() in text for term in query.exclude_terms
+                        ):
                             collected.append(job)
                             health["jobs"] += 1
                 except Exception as error:
@@ -427,11 +541,19 @@ class ScrapePipeline:
                 if self.pause_seconds:
                     time.sleep(self.pause_seconds)
             if self.health_check:
-                status = "healthy" if health["success"] and not health["last_error"] else "degraded" if health["success"] else "unhealthy"
+                status = (
+                    "healthy"
+                    if health["success"] and not health["last_error"]
+                    else "degraded"
+                    if health["success"]
+                    else "unhealthy"
+                )
                 self.health_check.record_check(
                     component=f"scraper:{source.name}",
                     status=status,
                     duration=time.monotonic() - started_at,
                     details=dict(health),
                 )
-        return ensure_descriptions(deduplicate_jobs(job for job in collected if is_recent(job, self.days)))
+        return ensure_descriptions(
+            deduplicate_jobs(job for job in collected if is_recent(job, self.days))
+        )

@@ -427,7 +427,7 @@ export const triggerProfileScrape = async (profile, options = {}) => {
       body: JSON.stringify({ 
         queries, 
         force: Boolean(options.force),
-        ttl_hours: options.ttl_hours || 12.0
+        ttl_hours: options.ttl_hours !== undefined ? options.ttl_hours : 12.0
       }),
       signal: AbortSignal.timeout(120_000),
     });

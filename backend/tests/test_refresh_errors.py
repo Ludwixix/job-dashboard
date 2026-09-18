@@ -20,8 +20,22 @@ def test_public_jobs_hides_non_new_jobs_by_default(tmp_path):
     app = DashboardApp({}, [], tmp_path)
     app.sync_tracker = lambda: None
     app.jobs = [
-        {"id": "new", "title": "New Role", "company": "Acme", "description": "Cloud", "posted": "2026-08-25", "url": "https://example.test/new"},
-        {"id": "applied", "title": "Applied Role", "company": "Acme", "description": "Cloud", "posted": "2026-08-25", "url": "https://example.test/applied"},
+        {
+            "id": "new",
+            "title": "New Role",
+            "company": "Acme",
+            "description": "Cloud",
+            "posted": "2026-08-25",
+            "url": "https://example.test/new",
+        },
+        {
+            "id": "applied",
+            "title": "Applied Role",
+            "company": "Acme",
+            "description": "Cloud",
+            "posted": "2026-08-25",
+            "url": "https://example.test/applied",
+        },
     ]
     app.jobs = app.materialize_jobs(app.jobs)
     app.repository.replace_jobs(app.jobs)
@@ -38,17 +52,19 @@ def test_refresh_handles_empty_body_cleanly(tmp_path):
     app = DashboardApp({}, [], tmp_path)
     app.sync_tracker = lambda: None
     handler_class = make_handler(app)
-    
+
     # Mock request handler
     handler = handler_class.__new__(handler_class)
     handler.path = "/api/refresh"
     handler.headers = {"Content-Length": "0"}
     handler.rfile = BytesIO(b"")
-    
+
     sent_response = {}
+
     def mock_send_json(status, data):
         sent_response["status"] = status
         sent_response["data"] = data
+
     handler.send_json = mock_send_json
 
     # Should not raise JSONDecodeError
@@ -77,3 +93,48 @@ def test_head_request_health_and_root(tmp_path):
     assert responses == [200]
     assert headers.get("Content-Type") == "application/json"
 
+
+def test_refresh_with_profile_queries_and_force(tmp_path, monkeypatch):
+    import json
+    from io import BytesIO
+    from job_dashboard.web import DashboardApp, make_handler
+
+    monkeypatch.setenv("MOCK_SCRAPERS", "true")
+
+    app = DashboardApp({}, [], tmp_path)
+    app.sync_tracker = lambda: None
+    handler_class = make_handler(app)
+
+    handler = handler_class.__new__(handler_class)
+    handler.path = "/api/refresh"
+
+    payload = {
+        "queries": [
+            {
+                "term": "Cloud Systems Engineer",
+                "location": "Balaclava, VIC",
+                "stream": "core",
+                "weight": 1.5,
+            }
+        ],
+        "force": True,
+        "ttl_hours": 0.0,
+    }
+    raw_body = json.dumps(payload).encode("utf-8")
+    handler.headers = {"Content-Length": str(len(raw_body))}
+    handler.rfile = BytesIO(raw_body)
+
+    sent_response = {}
+
+    def mock_send_json(status, data):
+        sent_response["status"] = status
+        sent_response["data"] = data
+
+    handler.send_json = mock_send_json
+
+    handler.do_POST()
+    assert sent_response["status"] == 200
+    assert "jobs" in sent_response["data"]
+    assert "cache_stats" in sent_response["data"]
+    assert sent_response["data"]["cache_stats"]["cache_hit"] is False
+    assert len(sent_response["data"]["jobs"]) > 0

@@ -482,7 +482,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
  try {
  const ttlHours = options.force ? 0.0 : 12.0;
- const result = await triggerProfileScrape(targetProfile, { ttl_hours: ttlHours });
+ const result = await triggerProfileScrape(targetProfile, { ttl_hours: ttlHours, force: Boolean(options.force) });
  if (!result.success) throw new Error(result.error || 'Refresh failed');
  clearInterval(timer);
  applyIndustryTheme(industry);
@@ -527,14 +527,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  }
  }, [currentUser?.id, currentUser?.email, currentUser?.name]);
 
- // When a new user logs in or completes onboarding, auto-scrape personalized roles immediately
- useEffect(() => {
- const shouldScrape = currentUser?.isNewUser || sessionStorage.getItem('trigger_initial_scrape') === 'true';
- if (shouldScrape && activeProfile) {
- sessionStorage.removeItem('trigger_initial_scrape');
- triggerDiscoveryScrape(activeProfile, { force: true });
- }
- }, [currentUser?.isNewUser, activeProfile?.id, triggerDiscoveryScrape]);
+  // When a new user logs in or completes onboarding, auto-scrape personalized roles immediately
+  const initialScrapeTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (initialScrapeTriggeredRef.current) return;
+    const shouldScrape = currentUser?.isNewUser || sessionStorage.getItem('trigger_initial_scrape') === 'true';
+    if (shouldScrape && activeProfile) {
+      initialScrapeTriggeredRef.current = true;
+      sessionStorage.removeItem('trigger_initial_scrape');
+      triggerDiscoveryScrape(activeProfile, { force: true });
+    }
+  }, [currentUser?.isNewUser, activeProfile, triggerDiscoveryScrape]);
 
  // Load the persisted index immediately. Profile queries are kept in sync,
  // but only a deliberate user refresh/profile completion starts live work.

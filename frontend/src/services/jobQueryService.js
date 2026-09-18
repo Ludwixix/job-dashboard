@@ -323,6 +323,7 @@ export const buildQueriesFromProfile = (profile) => {
   const queries = [];
 
   const add = (term, stream = 'core', weight = 1.0) => {
+    if (queries.length >= maxQueries) return;
     const key = term.toLowerCase().trim();
     if (!key || seen.has(key)) return;
     seen.add(key);

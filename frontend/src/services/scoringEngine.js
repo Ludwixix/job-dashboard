@@ -39,6 +39,7 @@ const MELBOURNE_SUBURB_COORDINATES = {
   'collingwood': { lat: -37.8010, lon: 144.9880 },
   'hawthorn': { lat: -37.8220, lon: 145.0350 },
   'camberwell': { lat: -37.8280, lon: 145.0580 },
+  'parkville': { lat: -37.7870, lon: 144.9510 },
   'geelong': { lat: -38.1499, lon: 144.3617 }
 };
 

@@ -1563,6 +1563,7 @@ class DashboardApp:
                 )
                 fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
                 pipeline_errors = pipeline.errors
+                self.source_health = getattr(pipeline, "source_health", {})
 
                 if fresh:
                     if on_progress:
@@ -3487,6 +3488,15 @@ def make_handler(app: DashboardApp):
                 )
                 return
 
+            if path == "/api/sources/health":
+                from .sources.self_healing import get_all_sources_health_summary
+
+                self.send_json(
+                    200,
+                    {"success": True, "sources": get_all_sources_health_summary(app)},
+                )
+                return
+
             if path == "/api/settings/cookies":
                 provider = query_params.get("provider", [""])[0]
                 if not provider:
@@ -3804,6 +3814,71 @@ def make_handler(app: DashboardApp):
                             "message": f"Successfully stored session cookies for {provider}",
                         },
                     )
+                    return
+
+                if path == "/api/sources/diagnose":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    source_name = body.get("source", "Seek")
+                    query = body.get("query", "Software Engineer")
+                    from .sources.self_healing import diagnose_source
+
+                    diag = diagnose_source(source_name, app, probe_query=query)
+                    self.send_json(200, diag)
+                    return
+
+                if path == "/api/sources/remediate":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    source_name = body.get("source", "Seek")
+                    diag = body.get("diagnosis", {})
+                    from .sources.self_healing import remediate_runtime
+
+                    res = remediate_runtime(source_name, app, diag)
+                    self.send_json(200, res)
+                    return
+
+                if path == "/api/sources/llm-repair-context":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    source_name = body.get("source", "Seek")
+                    err = body.get("error", "")
+                    from .sources.self_healing import get_source_code_context
+
+                    res = get_source_code_context(source_name, err)
+                    self.send_json(200, res)
+                    return
+
+                if path == "/api/sources/apply-patch":
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    body = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    source_name = body.get("source", "Seek")
+                    patch_code = body.get("patch", "")
+                    if not patch_code:
+                        self.send_json(
+                            400, {"success": False, "error": "Missing patch code"}
+                        )
+                        return
+                    from .sources.self_healing import apply_and_verify_patch
+
+                    res = apply_and_verify_patch(source_name, patch_code)
+                    self.send_json(200, res)
                     return
 
                 if path == "/api/digest/dispatch":

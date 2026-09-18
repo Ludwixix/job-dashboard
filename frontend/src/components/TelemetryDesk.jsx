@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Radio, ChevronDown, CheckCircle2, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 
-export const TelemetryDesk = () => {
+export const TelemetryDesk = ({ onOpenSelfHeal }) => {
  const [telemetry, setTelemetry] = useState({
  providers: {
  seek: { name: 'SEEK', status: 'active', detail: 'API / Browser fallback ready', dot: '🟢' },
@@ -112,7 +112,17 @@ export const TelemetryDesk = () => {
 
  <div className="space-y-2.5">
  {providersList.map((p) => (
- <div key={p.name} className="p-2 rounded-sm bg-[#151821] border border-slate-800/80 hover:border-amber-500/30 flex items-start justify-between gap-2 transition-colors">
+ <div
+ key={p.name}
+ onClick={() => {
+ if (onOpenSelfHeal) {
+ setIsOpen(false);
+ onOpenSelfHeal(p.name);
+ }
+ }}
+ className="p-2 rounded-sm bg-[#151821] border border-slate-800/80 hover:border-amber-500/30 flex items-start justify-between gap-2 transition-colors cursor-pointer"
+ title="Click to inspect & self-heal source"
+ >
  <div className="flex items-center gap-2">
  <span className="text-xs">{p.dot}</span>
  <div>
@@ -127,6 +137,19 @@ export const TelemetryDesk = () => {
  ))}
  </div>
 
+ {onOpenSelfHeal && (
+ <button
+ type="button"
+ onClick={() => {
+ setIsOpen(false);
+ onOpenSelfHeal(null);
+ }}
+ className="w-full mt-3 px-2.5 py-1.5 rounded-sm bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-amber-300 hover:text-white font-bold text-[10px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+ >
+ <span>Scraper Health & Autonomous Self-Healing</span>
+ </button>
+ )}
+
  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[9px] text-slate-500 uppercase tracking-widest font-mono font-bold">
  <span>SQLite WAL Concurrent</span>
  <span>Autonomous Resilience</span>
@@ -137,4 +160,3 @@ export const TelemetryDesk = () => {
  </div>
  );
 };
-

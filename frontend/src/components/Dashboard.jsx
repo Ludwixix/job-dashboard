@@ -50,6 +50,7 @@ const JobCompareModal = lazy(() => import('./JobCompareModal').then(m => ({ defa
 const PdfPreviewModal = lazy(() => import('./PdfPreviewModal').then(m => ({ default: m.PdfPreviewModal || m.default })));
 const ScoringTunerModal = lazy(() => import('./ScoringTunerModal').then(m => ({ default: m.ScoringTunerModal || m.default })));
 const VoiceMockInterviewModal = lazy(() => import('./VoiceMockInterviewModal').then(m => ({ default: m.VoiceMockInterviewModal || m.default })));
+const SourceSelfHealModal = lazy(() => import('./SourceSelfHealModal').then(m => ({ default: m.SourceSelfHealModal })));
 
 // Client routing path mappings
 const SECTION_ROUTES = {
@@ -148,7 +149,7 @@ import {
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu
+  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu, ShieldAlert
 } from 'lucide-react';
 
 
@@ -242,6 +243,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
  const [compareJobs, setCompareJobs] = useState([]);
  const [editingProfile, setEditingProfile] = useState(null);
+ const [isSourceSelfHealOpen, setIsSourceSelfHealOpen] = useState(false);
+ const [selfHealSource, setSelfHealSource] = useState(null);
  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
  const toolsMenuRef = useRef(null);
@@ -1158,7 +1161,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <span>Compare Top Opportunities</span>
  </button>
 
- <div className="pt-1 border-t border-slate-800">
+ <div className="pt-1 border-t border-slate-800 space-y-0.5">
+ <button
+ type="button"
+ onClick={() => { setIsToolsMenuOpen(false); setSelfHealSource(null); setIsSourceSelfHealOpen(true); }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-amber-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <ShieldAlert size={13} className="text-amber-400" />
+ <span>Scraper Health & Self-Healing</span>
+ </button>
  <button
  type="button"
  onClick={() => { setIsToolsMenuOpen(false); setIsSettingsOpen(true); }}
@@ -1195,7 +1206,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  </button>
 
  {/* Provider Mesh Telemetry Desk */}
- <TelemetryDesk />
+ <TelemetryDesk onOpenSelfHeal={(src) => { setSelfHealSource(src); setIsSourceSelfHealOpen(true); }} />
 
  {/* Sync Database Feed */}
  <button 
@@ -1686,6 +1697,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 className="w-full px-3 py-2 rounded-sm text-xs text-purple-300 hover:bg-purple-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
               >
                 <Mic size={14} className="text-purple-400" /> Voice Mock Interview
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setSelfHealSource(null); setIsSourceSelfHealOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-amber-300 hover:bg-amber-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <ShieldAlert size={14} className="text-amber-400" /> Scraper Health & Self-Healing
               </button>
               <button
                 type="button"
@@ -2369,6 +2387,22 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   <VoiceMockInterviewModal
   isOpen={isVoiceInterviewOpen}
   onClose={() => setIsVoiceInterviewOpen(false)}
+  />
+  </Suspense>
+  </SafeErrorBoundary>
+  )}
+
+  {/* Scraper Health & Autonomous Self-Healing Modal */}
+  {isSourceSelfHealOpen && (
+  <SafeErrorBoundary sectionName="Scraper Health & Self-Healing" onClose={() => setIsSourceSelfHealOpen(false)}>
+  <Suspense fallback={<ModalSkeleton />}>
+  <SourceSelfHealModal
+  isOpen={isSourceSelfHealOpen}
+  initialSource={selfHealSource}
+  onClose={() => {
+    setIsSourceSelfHealOpen(false);
+    setSelfHealSource(null);
+  }}
   />
   </Suspense>
   </SafeErrorBoundary>

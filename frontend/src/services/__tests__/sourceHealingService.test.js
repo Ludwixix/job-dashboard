@@ -175,3 +175,4 @@ describe('sourceHealingService', () => {
     expect(report.diagnosis.status).toBe('healthy');
   });
 });
+

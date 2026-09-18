@@ -185,9 +185,7 @@ def test_web_api_source_health_endpoints(tmp_path):
 
     mock_source = MagicMock()
     mock_source.name = "Seek"
-    mock_source.search.return_value = [
-        {"title": "Cloud Engineer", "company": "Atlassian"}
-    ]
+    mock_source.search.return_value = [{"title": "Cloud Engineer", "company": "Atlassian"}]
 
     app = DashboardApp({}, [mock_source], tmp_path)
     app.sync_tracker = lambda: None
@@ -234,3 +232,4 @@ def test_web_api_source_health_endpoints(tmp_path):
     assert sent_data["status"] == 200
     assert sent_data["payload"]["success"] is True
     assert "LLM Repair Prompt" in sent_data["payload"]["llm_prompt"]
+

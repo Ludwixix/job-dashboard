@@ -4,6 +4,8 @@ import {
  closestCorners, 
  KeyboardSensor, 
  PointerSensor, 
+ MouseSensor,
+ TouchSensor,
  useSensor, 
  useSensors 
 } from '@dnd-kit/core';
@@ -77,10 +79,11 @@ export const ApplicationPipeline = ({
  }
  }, []);
 
- const sensors = useSensors(
- useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
- useSensor(KeyboardSensor)
- );
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
 
  // Derived state: Only display active pipeline stages and starred wishlist items (deduplicated)
  const activeJobs = useMemo(() => {
@@ -181,7 +184,7 @@ export const ApplicationPipeline = ({
  placeholder="SEARCH APPLICATIONS..." 
  value={searchQuery}
  onChange={(e) => setSearchQuery(e.target.value)}
- className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-sm pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-500 transition-colors placeholder-slate-600"
+ className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-sm pl-9 pr-4 py-2 text-base sm:text-xs focus:outline-none focus:border-amber-500 transition-colors placeholder-slate-600"
  />
  </div>
  <div className="relative hidden sm:block">
@@ -260,27 +263,30 @@ export const ApplicationPipeline = ({
  ) : (
  viewMode === 'kanban' ? (
  <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
- {/* Mobile Stage Selector */}
- <div className="md:hidden flex overflow-x-auto gap-1.5 pb-2 mb-2 scrollbar-none font-mono text-xs">
- {PIPELINE_STAGES.map(stage => {
- const count = activeJobs.filter(j => getJobStage(j, starredSet) === stage.id).length;
- const isActive = mobileActiveStage === stage.id;
- return (
- <button
- key={stage.id}
- type="button"
- onClick={() => setMobileActiveStage(stage.id)}
- className={`px-3 py-1.5 rounded-sm font-bold shrink-0 transition-all cursor-pointer ${
- isActive
- ? 'bg-amber-600 text-white -xs'
- : 'bg-slate-900 text-slate-400 border border-slate-800'
- }`}
- >
- {stage.title} ({count})
- </button>
- );
- })}
- </div>
+            {/* Mobile Stage Selector */}
+            <div className="md:hidden flex overflow-x-auto gap-2 pb-2 mb-3 scrollbar-none font-mono text-xs touch-scroll-x">
+              {PIPELINE_STAGES.map(stage => {
+                const count = activeJobs.filter(j => getJobStage(j, starredSet) === stage.id).length;
+                const isActive = mobileActiveStage === stage.id;
+                return (
+                  <button
+                    key={stage.id}
+                    type="button"
+                    onClick={() => setMobileActiveStage(stage.id)}
+                    className={`px-3.5 py-2.5 rounded-sm font-bold shrink-0 transition-all cursor-pointer touch-target-44 flex items-center gap-2 active:scale-95 ${
+                      isActive
+                        ? 'bg-amber-600 text-white shadow-xs font-black ring-1 ring-amber-400'
+                        : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>{stage.title}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-slate-400'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
  <div className="flex gap-3.5 overflow-x-auto xl:overflow-x-visible h-full pb-4 items-start snap-x xl:snap-none snap-mandatory">
  {PIPELINE_STAGES.map(stage => (

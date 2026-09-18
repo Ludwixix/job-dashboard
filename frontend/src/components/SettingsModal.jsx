@@ -378,46 +378,46 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  </button>
  </div>
 
- {/* Navigation Tabs */}
- <div className="flex items-center gap-2 px-6 border-b border-slate-800 bg-slate-900/90 text-xs font-mono shrink-0">
- <button
- onClick={() => setActiveTab('llm')}
- className={`py-3 px-1 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
- activeTab === 'llm' 
- ? 'border-amber-400 text-amber-300' 
- : 'border-transparent text-slate-400 hover:text-slate-200'
- }`}
- >
- <Cpu size={14} className="text-amber-400" />
- 1. LLM PROVIDER & MODEL
- </button>
- <button
- onClick={() => setActiveTab('preferences')}
- className={`py-3 px-1 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
- activeTab === 'preferences' 
- ? 'border-teal-400 text-teal-300' 
- : 'border-transparent text-slate-400 hover:text-slate-200'
- }`}
- >
- <Sliders size={14} className="text-teal-400" />
- 2. ATS & PLATFORM PREFERENCES
- </button>
- <button
- onClick={() => setActiveTab('queries')}
- className={`py-3 px-1 flex items-center gap-2 border-b-2 font-bold transition-colors cursor-pointer ${
- activeTab === 'queries' 
- ? 'border-amber-400 text-amber-300' 
- : 'border-transparent text-slate-400 hover:text-slate-200'
- }`}
- >
- <Search size={14} className="text-amber-400" />
- 3. SEARCH QUERIES
- </button>
- </div>
+  {/* Navigation Tabs */}
+  <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 border-b border-slate-800 bg-slate-900/90 text-xs font-mono shrink-0 overflow-x-auto touch-scroll-x scrollbar-none">
+  <button
+  onClick={() => setActiveTab('llm')}
+  className={`py-2.5 sm:py-3 px-2 sm:px-1 flex items-center gap-1.5 sm:gap-2 border-b-2 font-bold transition-colors cursor-pointer min-h-[44px] shrink-0 touch-target-44 ${
+  activeTab === 'llm' 
+  ? 'border-amber-400 text-amber-300' 
+  : 'border-transparent text-slate-400 hover:text-slate-200'
+  }`}
+  >
+  <Cpu size={14} className="text-amber-400" />
+  <span className="hidden sm:inline">1. LLM </span>PROVIDER &amp; MODEL
+  </button>
+  <button
+  onClick={() => setActiveTab('preferences')}
+  className={`py-2.5 sm:py-3 px-2 sm:px-1 flex items-center gap-1.5 sm:gap-2 border-b-2 font-bold transition-colors cursor-pointer min-h-[44px] shrink-0 touch-target-44 ${
+  activeTab === 'preferences' 
+  ? 'border-teal-400 text-teal-300' 
+  : 'border-transparent text-slate-400 hover:text-slate-200'
+  }`}
+  >
+  <Sliders size={14} className="text-teal-400" />
+  <span className="hidden sm:inline">2. ATS &amp; </span>PREFERENCES
+  </button>
+  <button
+  onClick={() => setActiveTab('queries')}
+  className={`py-2.5 sm:py-3 px-2 sm:px-1 flex items-center gap-1.5 sm:gap-2 border-b-2 font-bold transition-colors cursor-pointer min-h-[44px] shrink-0 touch-target-44 ${
+  activeTab === 'queries' 
+  ? 'border-amber-400 text-amber-300' 
+  : 'border-transparent text-slate-400 hover:text-slate-200'
+  }`}
+  >
+  <Search size={14} className="text-amber-400" />
+  <span className="hidden sm:inline">3. </span>SEARCH QUERIES
+  </button>
+  </div>
 
- {/* Modal Body */}
- <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-900/50 font-sans">
- {activeTab === 'llm' && (
+  {/* Modal Body */}
+  <div className="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 bg-slate-900/50 font-sans">
+  {activeTab === 'llm' && (
  <div className="space-y-6">
  
  {/* Provider Selector Grid */}
@@ -508,7 +508,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  value={apiKeyInput}
  onChange={(e) => setApiKeyInput(e.target.value)}
  placeholder={currentMeta.keyPlaceholder}
- className="w-full bg-slate-900 border border-slate-700/80 rounded-sm px-3.5 py-2.5 pr-10 text-xs text-white font-mono focus:outline-none focus:border-amber-500 transition-colors"
+ className="w-full bg-slate-900 border border-slate-700/80 rounded-sm px-3.5 py-2.5 pr-10 text-base sm:text-xs text-white font-mono focus:outline-none focus:border-amber-500 transition-colors"
  />
  <button
  type="button"
@@ -611,7 +611,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
                     value={modelSearchQuery}
                     onChange={(e) => setModelSearchQuery(e.target.value)}
                     placeholder="Search 440+ OpenRouter models (e.g. claude-3.7, deepseek, gemini, llama-3.3, free)..."
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-sm pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-sm pl-9 pr-8 py-2 text-base sm:text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500"
                   />
                   {modelSearchQuery && (
                     <button
@@ -640,7 +640,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
                     id="openrouter-model-dropdown"
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-sm px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-sm px-3 py-2.5 text-base sm:text-xs text-white font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     {filteredOpenRouterModels.map((m) => (
                       <option key={m.id} value={m.id} className="bg-slate-900 text-white py-1">
@@ -719,7 +719,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  setSelectedModel(e.target.value);
  }}
  placeholder="e.g. mistralai/mistral-large-2411, qwen2.5:32b, etc."
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-base sm:text-xs text-white font-mono focus:outline-none focus:border-amber-500"
  />
  </div>
  )}
@@ -744,7 +744,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  value={endpointInput}
  onChange={(e) => setEndpointInput(e.target.value)}
  placeholder={currentMeta.defaultEndpoint}
- className="w-full bg-slate-950 border border-slate-800 rounded-sm px-3.5 py-2.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-950 border border-slate-800 rounded-sm px-3.5 py-2.5 text-base sm:text-xs text-slate-300 font-mono focus:outline-none focus:border-amber-500"
  />
  <p className="text-[10px] text-slate-500">
  Target HTTPS/HTTP URL handling completions. For Ollama default is <code className="text-slate-400">http://localhost:11434/v1/chat/completions</code>.
@@ -763,7 +763,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  type="button"
  onClick={handleTestConnection}
  disabled={isTesting || (currentMeta.requiresKey && !apiKeyInput)}
- className={`px-4 py-2 rounded-sm text-xs font-mono font-bold flex items-center gap-2 transition-all cursor-pointer ${
+ className={`px-4 py-2 rounded-sm text-xs font-mono font-bold flex items-center gap-2 transition-all cursor-pointer min-h-[44px] touch-target-44 ${
  isTesting || (currentMeta.requiresKey && !apiKeyInput)
  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
  : 'bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 hover:text-white -xs'
@@ -849,7 +849,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  value={defaultLocation}
  onChange={(e) => setDefaultLocation(e.target.value)}
  placeholder="Melbourne, VIC"
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-teal-500"
  />
  </div>
 
@@ -916,7 +916,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  step="5"
  value={workforceTarget}
  onChange={(e) => setWorkforceTarget(Math.max(10, parseInt(e.target.value || '100', 10)))}
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-amber-500"
  />
  <span className="text-[10px] text-slate-500 mt-0.5 block">Default: 100 points/month</span>
  </div>
@@ -931,7 +931,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  max="28"
  value={workforceCycleDay}
  onChange={(e) => setWorkforceCycleDay(Math.max(1, Math.min(28, parseInt(e.target.value || '1', 10))))}
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-amber-500"
  />
  <span className="text-[10px] text-slate-500 mt-0.5 block">1 = Calendar month; or provider cut-off day</span>
  </div>
@@ -945,7 +945,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  value={workforceJsid}
  onChange={(e) => setWorkforceJsid(e.target.value)}
  placeholder="e.g. JS123456789"
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-amber-500"
  />
  </div>
 
@@ -958,7 +958,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  value={workforceProvider}
  onChange={(e) => setWorkforceProvider(e.target.value)}
  placeholder="e.g. APM, matchworks, Max"
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-1.5 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-amber-500"
  />
  </div>
  </div>
@@ -1041,10 +1041,10 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  <button
  type="button"
  onClick={() => handleRemoveQuery(idx)}
- className="shrink-0 w-7 h-7 rounded-sm bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+ className="shrink-0 w-8 h-8 sm:w-7 sm:h-7 rounded-sm bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-400 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer min-h-[36px] min-w-[36px] touch-target-44"
  title="Remove query"
  >
- <Trash2 size={12} />
+ <Trash2 size={13} />
  </button>
  </div>
  ))
@@ -1056,27 +1056,27 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
  <Plus size={13} className="text-amber-400" /> Add a Search Term
  </label>
- <div className="flex gap-2">
+ <div className="flex flex-col sm:flex-row gap-2">
  <input
  type="text"
  value={newQueryTerm}
  onChange={(e) => setNewQueryTerm(e.target.value)}
  onKeyDown={(e) => e.key === 'Enter' && handleAddQuery()}
  placeholder="e.g. registered nurse, accountant, legal counsel…"
- className="flex-1 bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+ className="flex-1 bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-amber-500"
  />
  <input
  type="text"
  value={newQueryLocation}
  onChange={(e) => setNewQueryLocation(e.target.value)}
  placeholder={defaultLocation || 'Melbourne, VIC'}
- className="w-36 bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+ className="w-full sm:w-36 bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 text-white font-mono text-base sm:text-xs focus:outline-none focus:border-amber-500"
  />
  <button
  type="button"
  onClick={handleAddQuery}
  disabled={!newQueryTerm.trim()}
- className="px-4 py-2 rounded-sm bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all cursor-pointer disabled:opacity-40"
+ className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-sm bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all cursor-pointer disabled:opacity-40 min-h-[44px] sm:min-h-0 touch-target-44 flex items-center justify-center"
  >
  <Plus size={14} />
  </button>
@@ -1091,7 +1091,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  </div>
 
  {/* Footer Actions */}
- <div className="p-5 sm:p-6 border-t border-slate-800 bg-slate-950 flex items-center justify-between shrink-0 font-mono text-xs">
+ <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex items-center justify-between shrink-0 font-mono text-xs pb-safe">
  <div>
  {saveSuccess && (
  <span className="text-emerald-400 font-bold flex items-center gap-1.5 animate-pulse">
@@ -1104,7 +1104,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  <button
  type="button"
  onClick={onClose}
- className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer transition-colors"
+ className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer transition-colors min-h-[44px] touch-target-44 flex items-center justify-center"
  >
  Cancel
  </button>
@@ -1112,7 +1112,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  <button
  type="button"
  onClick={handleSave}
- className="px-6 py-2.5 rounded-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black cursor-pointer transition-all flex items-center gap-2"
+ className="px-6 py-2.5 rounded-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black cursor-pointer transition-all flex items-center gap-2 min-h-[44px] touch-target-44"
  >
  <CheckCircle2 size={15} />
  <span>SAVE SETTINGS</span>

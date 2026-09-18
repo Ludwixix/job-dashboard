@@ -17,6 +17,7 @@ import {
  */
 export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
   const [templateId, setTemplateId] = useState(ATS_TEMPLATES.MODERN_EXECUTIVE);
+  const [mobileTab, setMobileTab] = useState('editor'); // 'editor' | 'preview'
   const [name, setName] = useState(initialProfile.name || 'Candidate Name');
   const [title, setTitle] = useState(initialProfile.title || 'Principal Systems Architect');
   const [email, setEmail] = useState(initialProfile.email || 'candidate@example.com.au');
@@ -74,47 +75,73 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4">
       <div 
-        className="bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden text-slate-100 font-sans"
+        className="bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-2xl w-full max-w-6xl max-h-[96vh] sm:max-h-[92vh] flex flex-col overflow-hidden text-slate-100 font-sans"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <FileText size={20} />
+        <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-slate-800 bg-slate-950/50">
+          <div className="flex items-center gap-2.5 sm:gap-3 truncate">
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+              <FileText size={18} />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-white tracking-wide">Real-Time Visual ATS PDF Studio</h2>
-              <p className="text-xs text-slate-400 font-mono">Australian ATS Compliant Vector Layout Engine</p>
+            <div className="truncate">
+              <h2 className="text-sm sm:text-base font-bold text-white tracking-wide truncate">Real-Time Visual ATS PDF Studio</h2>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-mono truncate">Australian ATS Compliant Vector Layout Engine</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={handleExport}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer touch-target-44 active:scale-95"
             >
-              <Download size={14} /> Export Vector PDF
+              <Download size={14} /> <span>Export PDF</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close Studio"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer touch-target-44 flex items-center justify-center"
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
+        {/* Mobile Segmented Pane Switcher (< lg) */}
+        <div className="lg:hidden flex border-b border-slate-800 bg-slate-950 px-2 sm:px-3 py-1.5 gap-1.5 sm:gap-2 font-mono text-xs shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileTab('editor')}
+            className={`flex-1 py-2 px-2 rounded-sm font-bold flex items-center justify-center gap-1.5 touch-target-44 transition-all cursor-pointer ${
+              mobileTab === 'editor'
+                ? 'bg-amber-600 text-white shadow-xs font-black ring-1 ring-amber-400'
+                : 'text-slate-400 bg-slate-900/60 hover:text-white'
+            }`}
+          >
+            <Sliders size={14} /> <span>1. CONTENT EDITOR</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('preview')}
+            className={`flex-1 py-2 px-2 rounded-sm font-bold flex items-center justify-center gap-1.5 touch-target-44 transition-all cursor-pointer ${
+              mobileTab === 'preview'
+                ? 'bg-amber-600 text-white shadow-xs font-black ring-1 ring-amber-400'
+                : 'text-slate-400 bg-slate-900/60 hover:text-white'
+            }`}
+          >
+            <FileText size={14} /> <span>2. LIVE ATS PREVIEW ({atsAnalysis.score}%)</span>
+          </button>
+        </div>
+
         {/* Studio Body: Split-Pane Editor & Live Preview */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* Left Pane: Content Editor */}
-          <div className="lg:col-span-5 p-5 border-r border-slate-800 overflow-y-auto space-y-4 bg-slate-900/50 text-xs">
+          <div className={`lg:col-span-5 p-3.5 sm:p-5 border-r border-slate-800 overflow-y-auto space-y-4 bg-slate-900/50 text-xs ${mobileTab === 'editor' ? 'block' : 'hidden lg:block'}`}>
             {/* Template Selector */}
             <div>
               <label className="block text-slate-400 uppercase font-mono font-semibold text-[11px] mb-1.5">
@@ -123,7 +150,7 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 text-xs focus:border-amber-400 outline-none"
+                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 text-base sm:text-xs focus:border-amber-400 outline-none"
               >
                 <option value={ATS_TEMPLATES.MODERN_EXECUTIVE}>Modern Executive (Corporate & Scale-Up)</option>
                 <option value={ATS_TEMPLATES.TECHNICAL_SPECIALIST}>Technical Specialist (Skills Matrix & STAR Metrics)</option>
@@ -132,14 +159,14 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
             </div>
 
             {/* Candidate Identity */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               <div>
                 <label className="block text-slate-400 font-mono text-[10px] uppercase mb-1">Full Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 focus:border-amber-400 outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-2 text-slate-200 text-base sm:text-xs focus:border-amber-400 outline-none"
                 />
               </div>
               <div>
@@ -148,20 +175,20 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-200 focus:border-amber-400 outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-2 text-slate-200 text-base sm:text-xs focus:border-amber-400 outline-none"
                 />
               </div>
             </div>
 
             {/* Contact Details */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <label className="block text-slate-400 font-mono text-[10px] uppercase mb-1">Email</label>
                 <input
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:border-amber-400 outline-none text-[11px]"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 text-base sm:text-[11px] focus:border-amber-400 outline-none"
                 />
               </div>
               <div>
@@ -170,7 +197,7 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:border-amber-400 outline-none text-[11px]"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 text-base sm:text-[11px] focus:border-amber-400 outline-none"
                 />
               </div>
               <div>
@@ -179,7 +206,7 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:border-amber-400 outline-none text-[11px]"
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 text-base sm:text-[11px] focus:border-amber-400 outline-none"
                 />
               </div>
             </div>
@@ -194,7 +221,7 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
                 rows={3}
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 focus:border-amber-400 outline-none resize-none leading-relaxed"
+                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 text-base sm:text-xs focus:border-amber-400 outline-none resize-none leading-relaxed"
               />
             </div>
 
@@ -207,7 +234,7 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
                 rows={2}
                 value={skillsText}
                 onChange={(e) => setSkillsText(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 focus:border-amber-400 outline-none resize-none"
+                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 text-base sm:text-xs focus:border-amber-400 outline-none resize-none"
               />
             </div>
 
@@ -223,13 +250,13 @@ export const PdfPreviewModal = ({ isOpen, onClose, initialProfile = {} }) => {
                 rows={4}
                 value={experienceBullets}
                 onChange={(e) => setExperienceBullets(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 focus:border-amber-400 outline-none resize-none font-mono text-[11px] leading-relaxed"
+                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 text-base sm:text-[11px] focus:border-amber-400 outline-none resize-none font-mono leading-relaxed"
               />
             </div>
           </div>
 
           {/* Right Pane: Visual ATS Preview & Readiness Analysis */}
-          <div className="lg:col-span-7 p-6 overflow-y-auto flex flex-col bg-slate-950/60">
+          <div className={`lg:col-span-7 p-3.5 sm:p-6 overflow-y-auto flex flex-col bg-slate-950/60 ${mobileTab === 'preview' ? 'flex' : 'hidden lg:flex'}`}>
             {/* ATS Readiness Banner */}
             <div className="mb-4 p-3.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
               <div>

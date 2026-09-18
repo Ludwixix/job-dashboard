@@ -234,44 +234,44 @@ ${job.coverLetterText || job.coverLetter || ''}`;
 
  <button 
  onClick={onClose}
- className="p-2 rounded-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+ className="p-2.5 rounded-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44"
  >
  <X size={20} />
  </button>
  </div>
 
  {/* Navigation Tabs */}
- <div className="flex border-b border-slate-800 bg-slate-950/50 px-6 pt-2 font-mono text-xs font-bold gap-2">
+ <div className="flex border-b border-slate-800 bg-slate-950/50 px-3 sm:px-6 pt-2 font-mono text-xs font-bold gap-2 overflow-x-auto touch-scroll-x scrollbar-none">
  <button
  onClick={() => setMode('bot')}
- className={`px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-t-2 ${
+ className={`px-3 sm:px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-t-2 min-h-[44px] shrink-0 touch-target-44 ${
  mode === 'bot' 
  ? 'bg-slate-900 text-white border-amber-500 font-black' 
  : 'text-slate-400 hover:text-slate-200 border-transparent'
  }`}
  >
  <Bot size={15} className={mode === 'bot' ? 'text-amber-400' : ''} />
- LIVE BOT CONSOLE
+ <span className="hidden sm:inline">LIVE </span>BOT CONSOLE
  </button>
  
  <button
  onClick={() => setMode('answers')}
- className={`px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-t-2 ${
+ className={`px-3 sm:px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-t-2 min-h-[44px] shrink-0 touch-target-44 ${
  mode === 'answers' 
  ? 'bg-slate-900 text-white border-amber-500 font-black' 
  : 'text-slate-400 hover:text-slate-200 border-transparent'
  }`}
  >
  <ShieldCheck size={15} className={mode === 'answers' ? 'text-emerald-400' : ''} />
- AUTO-FILLED SCREENING ANSWERS ({screeningQuestions.length})
+ <span className="hidden sm:inline">AUTO-FILLED </span>SCREENING ANSWERS ({screeningQuestions.length})
  </button>
  </div>
 
  {/* Content Body */}
- <div className="p-6 flex-1 overflow-y-auto space-y-6">
+ <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-4 sm:space-y-6">
  
  {mode === 'bot' && (
- <div className="space-y-5">
+ <div className="space-y-4 sm:space-y-5">
  {/* Progress Card */}
  <div className="p-4 rounded-sm bg-slate-950 border border-slate-800 space-y-3">
  <div className="flex items-center justify-between text-xs font-mono">
@@ -293,7 +293,7 @@ ${job.coverLetterText || job.coverLetter || ''}`;
  </div>
 
  {/* Live Terminal Log */}
- <div className="p-4 rounded-sm bg-black/90 border border-slate-800 font-mono text-xs space-y-2 h-56 overflow-y-auto">
+ <div className="p-4 rounded-sm bg-black/90 border border-slate-800 font-mono text-xs space-y-2 h-44 sm:h-56 overflow-y-auto">
  <div className="text-[11px] text-slate-500 font-bold border-b border-slate-800 pb-1.5 flex items-center justify-between">
  <span>PLAYWRIGHT EXECUTION LOGS</span>
  <span className="flex items-center gap-1.5 text-emerald-400">
@@ -341,11 +341,11 @@ ${job.coverLetterText || job.coverLetter || ''}`;
  </div>
 
  {/* Modal Footer Controls */}
- <div className="p-6 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
+ <div className="p-4 sm:p-6 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 font-mono pb-safe">
  <div className="flex items-center gap-2 w-full sm:w-auto">
  <button
  onClick={handleCopyClipboard}
- className="flex-1 sm:flex-none px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+ className="w-full sm:w-auto flex-1 sm:flex-none px-4 py-3 sm:py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer min-h-[44px] touch-target-44"
  >
  {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
  {copied ? "COPIED TO CLIPBOARD!" : "COPY AUTO-FILL PAYLOAD"}
@@ -355,7 +355,7 @@ ${job.coverLetterText || job.coverLetter || ''}`;
  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
  <button
  onClick={handleFastTrackLaunch}
- className="flex-1 sm:flex-none px-5 py-3 rounded-sm bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+ className="w-full sm:w-auto flex-1 sm:flex-none px-5 py-3 rounded-sm bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] touch-target-44"
  >
  <ExternalLink size={15} />
  LAUNCH {platformName.toUpperCase()} & AUTO-FILL

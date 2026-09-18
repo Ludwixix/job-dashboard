@@ -84,43 +84,64 @@ const KanbanCard = ({ job, stage, onSelectJob, onOpenCheatSheet, onMoveStage }) 
         </div>
       </div>
 
- {/* 1-Click Master Interview Cheat Sheet Cockpit */}
- {(stage?.id === 'Interviewing' || s.includes('interview')) && onOpenCheatSheet && (
- <div className="mt-2.5 pt-2 border-t border-slate-700/60">
- <button
- type="button"
- aria-label={`Open Interview Cheat Sheet for ${job.title}`}
- onClick={(e) => {
- e.stopPropagation();
- onOpenCheatSheet(job);
- }}
- className="w-full py-1.5 px-2.5 rounded-sm bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition-all -xs cursor-pointer active:scale-95 group/btn"
- title="Open Master Interview Cheat Sheet Cockpit"
- >
- <Compass size={12} className="text-amber-400 group-hover/btn:rotate-45 transition-transform" />
- <span>🎯 CHEAT SHEET</span>
- </button>
- </div>
- )}
+      {/* 1-Click Master Interview Cheat Sheet Cockpit */}
+      {(stage?.id === 'Interviewing' || s.includes('interview')) && onOpenCheatSheet && (
+        <div className="mt-2.5 pt-2 border-t border-slate-700/60">
+          <button
+            type="button"
+            aria-label={`Open Interview Cheat Sheet for ${job.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenCheatSheet(job);
+            }}
+            className="w-full py-2 px-3 rounded-sm bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 touch-target-44 group/btn"
+            title="Open Master Interview Cheat Sheet Cockpit"
+          >
+            <Compass size={14} className="text-amber-400 group-hover/btn:rotate-45 transition-transform" />
+            <span>🎯 CHEAT SHEET</span>
+          </button>
+        </div>
+      )}
 
- {/* Quick 1-Click Stage Advancement */}
- {nextStageConfig && onMoveStage && (
- <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center justify-between">
- <span className="text-[9px] font-mono uppercase text-slate-400">STAGE</span>
- <button
- type="button"
- onClick={(e) => {
- e.stopPropagation();
- onMoveStage(job.id, nextStageConfig.target);
- }}
- className="px-2 py-1 rounded-sm bg-slate-700/70 hover:bg-amber-600 text-slate-200 hover:text-white text-[10px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer"
- title={`Advance to ${nextStageConfig.label}`}
- >
- <span>{nextStageConfig.label}</span>
- <ArrowRight size={10} />
- </button>
- </div>
- )}
+      {/* Stage Selector & 1-Click Advancement */}
+      {onMoveStage && (
+        <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">MOVE:</span>
+            <select
+              value={stage?.id || ''}
+              onChange={(e) => {
+                e.stopPropagation();
+                onMoveStage(job.id, e.target.value);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-slate-700 text-slate-200 text-base sm:text-xs font-mono font-bold rounded-sm px-2 py-1 focus:border-amber-400 outline-none cursor-pointer"
+              aria-label={`Move stage for ${job.title}`}
+            >
+              <option value="Wishlist">Wishlist</option>
+              <option value="Applied">Applied</option>
+              <option value="Interviewing">Interviewing</option>
+              <option value="Offer">Offer</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+
+          {nextStageConfig && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveStage(job.id, nextStageConfig.target);
+              }}
+              className="px-2.5 py-1.5 rounded-sm bg-slate-700/80 hover:bg-amber-600 text-slate-200 hover:text-white text-[11px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer touch-target-44 active:scale-95 ml-auto"
+              title={`Advance to ${nextStageConfig.label}`}
+            >
+              <span>{nextStageConfig.label}</span>
+              <ArrowRight size={12} />
+            </button>
+          )}
+        </div>
+      )}
  </div>
  );
 };

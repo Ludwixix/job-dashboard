@@ -281,3 +281,38 @@
   border-color: var(--industry-border-hover);
   color: #fbf9f4;
 }
+
+/* Mobile Ergonomics & Safe Area Insets */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+.mb-safe {
+  margin-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Ensure minimum touch target dimensions for mobile accessibility */
+.touch-target-44 {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Prevent iOS tap highlight flicker */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile smooth scrolling for horizontal pill bars */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.touch-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+

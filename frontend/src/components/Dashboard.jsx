@@ -148,7 +148,7 @@ import {
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, ChevronUp, Layers, Award, FileText, Mic
+  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu
 } from 'lucide-react';
 
 
@@ -243,6 +243,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [compareJobs, setCompareJobs] = useState([]);
  const [editingProfile, setEditingProfile] = useState(null);
  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+ const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
  const toolsMenuRef = useRef(null);
 
  useEffect(() => {
@@ -868,7 +869,64 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  </div>
  )}
 
- <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 text-slate-300 py-2 px-3 sm:px-5 lg:px-6 font-mono text-[11px] flex flex-wrap items-center justify-between gap-3 font-semibold ">
+      {/* Mobile Compact App Header */}
+      <header className="md:hidden sticky top-0 z-40 bg-[#0c0e14]/95 backdrop-blur-xl border-b border-amber-500/20 px-3 py-2 font-mono">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-sm bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 border border-amber-300/50">
+              <Terminal size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-humanist font-black tracking-wider uppercase text-[#fbf9f4]">
+                  CAREER.AGENT
+                </span>
+                <span className="text-[9px] font-mono font-bold text-amber-400 px-1 py-0.2 rounded-sm bg-amber-950/80 border border-amber-500/30">
+                  {activeSection.toUpperCase()}
+                </span>
+              </div>
+              <div className="text-[9px] text-slate-400 font-mono">
+                {jobs.length} POSITIONS INDEXED
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {/* Quick Location Badge */}
+            <button
+              type="button"
+              onClick={() => { setTempLocationInput(baseLocation); setIsEditingLocation(true); }}
+              className="flex items-center gap-1 text-[10px] text-emerald-300 bg-slate-900/90 border border-slate-700/80 px-2 py-1.5 rounded-sm touch-target-44 cursor-pointer"
+              title="Change location"
+            >
+              <MapPin size={11} className="text-amber-400" />
+              <span className="truncate max-w-[65px]">{baseLocation}</span>
+            </button>
+
+            {/* Command Palette Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="p-2 text-amber-300 bg-amber-950/80 border border-amber-500/40 rounded-sm touch-target-44 flex items-center justify-center cursor-pointer"
+              aria-label="Open Command Palette"
+            >
+              <Command size={14} />
+            </button>
+
+            {/* Mobile Drawer Trigger (Hamburger) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+              className="p-2 text-slate-300 hover:text-white bg-slate-900 border border-slate-700 rounded-sm touch-target-44 flex items-center justify-center cursor-pointer"
+              aria-label="Open Mobile Menu"
+            >
+              {isMobileDrawerOpen ? <XIcon size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="hidden md:flex sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 text-slate-300 py-2 px-3 sm:px-5 lg:px-6 font-mono text-[11px] flex-wrap items-center justify-between gap-3 font-semibold ">
  <div className="flex items-center gap-3 truncate">
  <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0 bg-emerald-950/60 px-2 py-0.5 rounded-sm border border-emerald-500/30">
  <Activity size={12} className="animate-pulse text-emerald-400" /> V2.0 ENGINE ACTIVE
@@ -1183,7 +1241,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  )}
 
  {/* Humanist Atelier Header & Top Navigation */}
- <header className="bg-[#12141c]/95 backdrop-blur-xl border-b border-amber-500/15 sticky top-[33px] z-30 font-mono">
+ <header className="hidden md:block bg-[#12141c]/95 backdrop-blur-xl border-b border-amber-500/15 sticky top-[33px] z-30 font-mono">
  <div className="w-full px-3 sm:px-5 lg:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
  <div className="flex items-center gap-3">
  <div className="p-2.5 rounded-sm bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 border border-amber-300/50">
@@ -1373,7 +1431,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
  {/* Main Workspace Dashboard Container */}
 
- <main className="w-full px-2 sm:px-4 lg:px-6 py-2.5 space-y-3.5 flex-1">
+ <main className="w-full px-2 sm:px-4 lg:px-6 py-2.5 pb-24 md:pb-6 space-y-3.5 flex-1">
  {/* Proactive Agent Copilot Intelligence Bar */}
  <CopilotBar 
  jobs={jobs} 
@@ -1491,11 +1549,252 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  )}
  </>
  )}
- </main>
+  </main>
 
- {/* Floating Background Application Notifications */}
- {backgroundNotifications.length > 0 && (
- <div className="fixed bottom-10 right-6 z-50 space-y-2 max-w-sm w-full font-mono">
+      {/* Mobile Slide-Out Drawer */}
+      {isMobileDrawerOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsMobileDrawerOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Drawer Panel */}
+          <div className="relative ml-auto w-4/5 max-w-sm h-full bg-[#101217] border-l border-amber-500/30 flex flex-col z-50 overflow-y-auto pb-safe font-mono">
+            {/* Drawer Header */}
+            <div className="p-4 border-b border-slate-800 bg-slate-950/90 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Terminal size={16} className="text-amber-400" />
+                <span className="text-xs font-black uppercase tracking-wider text-white">OPERATIVE MENU</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-2 text-slate-400 hover:text-white rounded-sm touch-target-44 flex items-center justify-center cursor-pointer"
+                aria-label="Close menu"
+              >
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            {/* Candidate Profile Quick Info */}
+            <div className="p-4 border-b border-slate-800/80 bg-amber-950/20">
+              <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1">CANDIDATE DOSSIER</div>
+              <div className="text-sm font-black text-white">{activeProfile?.name || 'Candidate'}</div>
+              <div className="text-[11px] text-slate-300 truncate">{activeProfile?.title || 'Principal Systems Architect'}</div>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setEditingProfile(activeProfile); setIsProfileModalOpen(true); }}
+                className="mt-2 w-full py-2 px-2.5 rounded-sm bg-amber-600/30 border border-amber-500/50 text-amber-300 text-[11px] font-bold uppercase flex items-center justify-center gap-1 cursor-pointer touch-target-44"
+              >
+                Edit Profile
+              </button>
+            </div>
+
+            {/* Secondary Views Navigation */}
+            <div className="p-3 border-b border-slate-800/80 space-y-1">
+              <div className="text-[9px] text-slate-500 uppercase font-black px-2 py-1">NAVIGATION PORTALS</div>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('seeker'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'seeker' ? 'bg-amber-600 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <LayoutGrid size={15} /> DISCOVERY STREAM
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('highlights'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'highlights' ? 'bg-amber-600 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <Zap size={15} /> ACTION QUEUE
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('kanban'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'kanban' ? 'bg-amber-600 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <Sliders size={15} /> APPLICATION KANBAN
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('remote'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'remote' ? 'bg-emerald-600 text-white font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <Globe size={15} /> REMOTE ROLES {remoteJobsCount > 0 ? `(${remoteJobsCount})` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('market'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'market' ? 'bg-amber-600 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <TrendingUp size={15} /> MARKET INTEL
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('analytics'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'analytics' ? 'bg-amber-600 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <Target size={15} /> ANALYTICS
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSection('operations'); setIsMobileDrawerOpen(false); }}
+                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'operations' ? 'bg-amber-600 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-900'}`}
+              >
+                <CalendarClock size={15} /> OPERATIONS
+              </button>
+            </div>
+
+            {/* Intelligence & Studio Tools */}
+            <div className="p-3 border-b border-slate-800/80 space-y-1">
+              <div className="text-[9px] text-slate-500 uppercase font-black px-2 py-1">SUITE TOOLS</div>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsCustomJobModalOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-purple-300 hover:bg-purple-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <Sparkles size={14} className="text-purple-400" /> + Custom Job
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsBatchApplyOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-emerald-300 hover:bg-emerald-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <Zap size={14} className="text-emerald-400" /> 1-Click Batch Apply
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsPdfStudioOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-amber-300 hover:bg-amber-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <FileText size={14} className="text-amber-400" /> Visual ATS PDF Studio
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsScoringTunerOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-blue-300 hover:bg-blue-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <Sliders size={14} className="text-blue-400" /> Scoring Matrix Tuner
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsVoiceInterviewOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-purple-300 hover:bg-purple-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <Mic size={14} className="text-purple-400" /> Voice Mock Interview
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsSettingsOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <Settings size={14} className="text-slate-400" /> Settings & LLM Models
+              </button>
+            </div>
+
+            {/* Footer Controls */}
+            <div className="mt-auto p-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); refetch(); }}
+                className="px-3 py-2 rounded-sm bg-slate-900 border border-slate-700 text-xs text-slate-300 flex items-center gap-1.5 touch-target-44 cursor-pointer"
+              >
+                <RefreshCw size={12} /> Sync Feed
+              </button>
+              {onSignOut && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileDrawerOpen(false);
+                    logoutUser();
+                    onSignOut();
+                  }}
+                  className="px-3 py-2 rounded-sm bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-1.5 touch-target-44 cursor-pointer"
+                >
+                  <LogOut size={12} /> Sign Out
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav aria-label="Mobile Navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c0e14]/95 backdrop-blur-2xl border-t border-amber-500/20 pb-safe font-mono shadow-[0_-8px_24px_rgba(0,0,0,0.6)]">
+        <div className="flex items-center justify-around px-1 py-1">
+          <button
+            type="button"
+            onClick={() => setActiveSection('seeker')}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-sm transition-all touch-target-44 cursor-pointer active:scale-95 ${
+              activeSection === 'seeker' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            aria-label="Discovery Stream"
+          >
+            <LayoutGrid size={18} className={activeSection === 'seeker' ? 'text-amber-400 stroke-[2.5]' : ''} />
+            <span className="text-[10px] mt-0.5 tracking-tight uppercase">Discover</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSection('highlights')}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-sm transition-all touch-target-44 cursor-pointer active:scale-95 ${
+              activeSection === 'highlights' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            aria-label="Action Queue"
+          >
+            <Zap size={18} className={activeSection === 'highlights' ? 'text-amber-400 stroke-[2.5]' : ''} />
+            <span className="text-[10px] mt-0.5 tracking-tight uppercase">Queue</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSection('kanban')}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-sm transition-all touch-target-44 cursor-pointer active:scale-95 ${
+              activeSection === 'kanban' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            aria-label="Application Kanban"
+          >
+            <Sliders size={18} className={activeSection === 'kanban' ? 'text-amber-400 stroke-[2.5]' : ''} />
+            <span className="text-[10px] mt-0.5 tracking-tight uppercase">Kanban</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSection('remote')}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-sm transition-all touch-target-44 cursor-pointer active:scale-95 ${
+              activeSection === 'remote' ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            aria-label="Remote Roles"
+          >
+            <div className="relative">
+              <Globe size={18} className={activeSection === 'remote' ? 'text-emerald-400 stroke-[2.5]' : ''} />
+              {remoteJobsCount > 0 && (
+                <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full text-[8px] bg-emerald-500 text-slate-950 font-black">
+                  {remoteJobsCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight uppercase">Remote</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-sm transition-all touch-target-44 cursor-pointer active:scale-95 ${
+              isMobileDrawerOpen ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            aria-label="More Menu"
+          >
+            <Menu size={18} className={isMobileDrawerOpen ? 'text-amber-400 stroke-[2.5]' : ''} />
+            <span className="text-[10px] mt-0.5 tracking-tight uppercase">Menu</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Floating Background Application Notifications */}
+      {backgroundNotifications.length > 0 && (
+        <div className="fixed bottom-20 md:bottom-10 right-4 sm:right-6 z-50 space-y-2 max-w-sm w-full font-mono px-3 sm:px-0">
  {backgroundNotifications.map(n => (
  <div key={n.id} className="bg-slate-900 border-2 border-emerald-500 text-white p-3.5 rounded-sm flex items-start gap-3 animate-in slide-in-from-bottom duration-300">
  <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-sm shrink-0">

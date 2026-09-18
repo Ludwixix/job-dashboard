@@ -419,7 +419,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  value={inputKey}
  onChange={(e) => setInputKey(e.target.value)}
  placeholder={PROVIDERS[activeProvider]?.keyPlaceholder || 'Enter API key...'}
- className="w-full bg-slate-900 border border-slate-700 rounded-sm px-4 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-4 py-2.5 text-base sm:text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
  />
  <p className="text-[11px] text-slate-500">
  Direct HTTPS browser calls. Key is saved locally in private localStorage.
@@ -537,88 +537,88 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  </button>
  </div>
 
- {/* ── Tab bar ── */}
- <div className="bg-slate-900 border-b border-slate-800 px-5 py-2 flex items-center justify-between gap-1 shrink-0 overflow-x-auto">
- <div className="flex items-center gap-1">
- {[
- { id: 'overview', label: 'STUDIO GENERATOR', icon: <Zap size={13} /> },
- hasDocuments && { 
- id: 'quality', 
- label: 'DOUBLE-CHECK GATE', 
- icon: <ShieldCheck size={13} className={qualityAudit.isReadyToSubmit ? 'text-emerald-400' : 'text-amber-400'} /> 
- },
- resumeText && { id: 'resume', label: 'RESUME', icon: <FileUser size={13} className="text-emerald-400" /> },
- coverLetterText && { id: 'cover_letter', label: 'COVER LETTER', icon: <FileText size={13} className="text-amber-400" /> },
- linkedInText && { id: 'linkedin', label: 'LINKEDIN INBOUND', icon: <Cpu size={13} className="text-sky-400" /> },
- matchedKeywords.length && { id: 'ats', label: 'ATS SPECS', icon: <BarChart3 size={13} className="text-amber-400" /> },
- ].filter(Boolean).map(tab => (
- <button
- key={tab.id}
- onClick={() => setActiveTab(tab.id)}
- className={`px-3 py-1.5 rounded-sm text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
- activeTab === tab.id ? 'bg-slate-700 text-white -xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
- }`}
- >
- {tab.icon} {tab.label}
- </button>
- ))}
- </div>
+  {/* ── Tab bar ── */}
+  <div className="bg-slate-900 border-b border-slate-800 px-3 sm:px-5 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shrink-0">
+  <div className="flex items-center gap-1 overflow-x-auto touch-scroll-x pb-1 sm:pb-0 scrollbar-none">
+  {[
+  { id: 'overview', label: 'STUDIO GENERATOR', icon: <Zap size={13} /> },
+  hasDocuments && { 
+  id: 'quality', 
+  label: 'DOUBLE-CHECK GATE', 
+  icon: <ShieldCheck size={13} className={qualityAudit.isReadyToSubmit ? 'text-emerald-400' : 'text-amber-400'} /> 
+  },
+  resumeText && { id: 'resume', label: 'RESUME', icon: <FileUser size={13} className="text-emerald-400" /> },
+  coverLetterText && { id: 'cover_letter', label: 'COVER LETTER', icon: <FileText size={13} className="text-amber-400" /> },
+  linkedInText && { id: 'linkedin', label: 'LINKEDIN INBOUND', icon: <Cpu size={13} className="text-sky-400" /> },
+  matchedKeywords.length && { id: 'ats', label: 'ATS SPECS', icon: <BarChart3 size={13} className="text-amber-400" /> },
+  ].filter(Boolean).map(tab => (
+  <button
+  key={tab.id}
+  onClick={() => setActiveTab(tab.id)}
+  className={`px-3 py-2 sm:py-1.5 rounded-sm text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 min-h-[44px] sm:min-h-0 touch-target-44 ${
+  activeTab === tab.id ? 'bg-slate-700 text-white -xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+  }`}
+  >
+  {tab.icon} {tab.label}
+  </button>
+  ))}
+  </div>
 
- <div className="flex items-center gap-1.5 shrink-0">
- {activeTab === 'resume' && (
- <>
- <button
- onClick={handleCopy}
- className="px-2.5 py-1 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
- >
- {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
- {copiedText ? 'COPIED' : 'COPY'}
- </button>
- <button
- onClick={handleDownloadResume}
- className="px-3 py-1 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer "
- >
- <Download size={12} /> DOWNLOAD RESUME (PDF)
- </button>
- <button
- onClick={handleDownloadAtsDocx}
- className="px-3 py-1 rounded-sm bg-teal-600 hover:bg-teal-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer "
- title="Download ATS OpenXML (.docx) for Workday/Taleo"
- >
- <FileText size={12} /> ATS RESUME (.DOCX)
- </button>
- </>
- )}
+  <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto touch-scroll-x pt-1 sm:pt-0 scrollbar-none">
+  {activeTab === 'resume' && (
+  <>
+  <button
+  onClick={handleCopy}
+  className="px-2.5 py-2 sm:py-1 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700 min-h-[44px] sm:min-h-0 touch-target-44 shrink-0"
+  >
+  {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+  {copiedText ? 'COPIED' : 'COPY'}
+  </button>
+  <button
+  onClick={handleDownloadResume}
+  className="px-3 py-2 sm:py-1 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer min-h-[44px] sm:min-h-0 touch-target-44 shrink-0"
+  >
+  <Download size={12} /> DOWNLOAD RESUME (PDF)
+  </button>
+  <button
+  onClick={handleDownloadAtsDocx}
+  className="px-3 py-2 sm:py-1 rounded-sm bg-teal-600 hover:bg-teal-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer min-h-[44px] sm:min-h-0 touch-target-44 shrink-0"
+  title="Download ATS OpenXML (.docx) for Workday/Taleo"
+  >
+  <FileText size={12} /> ATS RESUME (.DOCX)
+  </button>
+  </>
+  )}
 
- {activeTab === 'cover_letter' && (
- <>
- <button
- onClick={handleCopy}
- className="px-2.5 py-1 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
- >
- {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
- {copiedText ? 'COPIED' : 'COPY'}
- </button>
- <button
- onClick={handleDownloadCoverLetter}
- className="px-3 py-1 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer "
- >
- <Download size={12} /> DOWNLOAD COVER LETTER (PDF)
- </button>
- </>
- )}
+  {activeTab === 'cover_letter' && (
+  <>
+  <button
+  onClick={handleCopy}
+  className="px-2.5 py-2 sm:py-1 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-slate-700 min-h-[44px] sm:min-h-0 touch-target-44 shrink-0"
+  >
+  {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+  {copiedText ? 'COPIED' : 'COPY'}
+  </button>
+  <button
+  onClick={handleDownloadCoverLetter}
+  className="px-3 py-2 sm:py-1 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer min-h-[44px] sm:min-h-0 touch-target-44 shrink-0"
+  >
+  <Download size={12} /> DOWNLOAD COVER LETTER (PDF)
+  </button>
+  </>
+  )}
 
- {activeTab === 'linkedin' && (
- <button
- onClick={handleCopy}
- className="px-2.5 py-1 rounded-sm bg-sky-950 border border-sky-600 hover:bg-sky-900 text-sky-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
- >
- {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
- {copiedText ? 'COPIED' : 'COPY LINKEDIN ASSETS'}
- </button>
- )}
- </div>
- </div>
+  {activeTab === 'linkedin' && (
+  <button
+  onClick={handleCopy}
+  className="px-2.5 py-2 sm:py-1 rounded-sm bg-sky-950 border border-sky-600 hover:bg-sky-900 text-sky-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer min-h-[44px] sm:min-h-0 touch-target-44 shrink-0"
+  >
+  {copiedText ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+  {copiedText ? 'COPIED' : 'COPY LINKEDIN ASSETS'}
+  </button>
+  )}
+  </div>
+  </div>
 
  {/* ── Content ── */}
  <div className="flex-1 overflow-y-auto p-4 sm:p-5">
@@ -660,13 +660,13 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  <p className="text-xs text-slate-300">
  Enter your OpenRouter key to activate live role tailoring with <strong className="text-white">z-ai/glm-5.3-flash</strong> (stored unencrypted in your local browser storage):
  </p>
- <div className="flex items-center gap-2 pt-1">
+ <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
  <input
  type="password"
  placeholder="sk-or-v1-..."
  value={quickApiKey}
  onChange={(e) => setQuickApiKey(e.target.value)}
- className="flex-1 bg-slate-900 border border-slate-700 rounded-sm px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-400"
+ className="flex-1 bg-slate-900 border border-slate-700 rounded-sm px-3.5 py-2 text-base sm:text-xs font-mono text-white focus:outline-none focus:border-amber-400"
  />
  <button
  onClick={() => {
@@ -677,7 +677,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  setTimeout(() => setSavedSettingsSuccess(false), 2000);
  }
  }}
- className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-sm cursor-pointer shrink-0 transition-colors "
+ className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-sm cursor-pointer shrink-0 transition-colors min-h-[44px] sm:min-h-0 touch-target-44"
  >
  Activate Key
  </button>
@@ -686,7 +686,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  )}
 
  {/* Main 1-Click Action Card */}
- <div className="p-6 rounded-sm bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-700/60 flex flex-col justify-between gap-5 ">
+ <div className="p-4 sm:p-6 rounded-sm bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-700/60 flex flex-col justify-between gap-4 sm:gap-5 ">
  <div className="space-y-2">
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs uppercase tracking-wider">
@@ -706,7 +706,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  <button
  onClick={handleGenerate}
  disabled={isGenerating}
- className="w-full sm:w-auto flex-1 py-3 px-5 rounded-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer hover:-emerald-500/20 tracking-wider uppercase"
+ className="w-full sm:w-auto flex-1 py-3 px-5 rounded-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer hover:-emerald-500/20 tracking-wider uppercase min-h-[44px] touch-target-44"
  >
  <Zap size={14} className="animate-pulse" />
  {isGenerating ? 'SYNTHESIZING APPLICATION PACKAGE…' : 'GENERATE FULL APPLICATION PACKAGE'}
@@ -715,7 +715,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  {hasDocuments && (
  <button
  onClick={() => setActiveTab('quality')}
- className="w-full sm:w-auto py-3 px-4 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-colors cursor-pointer"
+ className="w-full sm:w-auto py-3 px-4 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-colors cursor-pointer min-h-[44px] touch-target-44"
  >
  <ShieldCheck size={14} className="text-emerald-400" /> View Quality Gate
  </button>
@@ -824,7 +824,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
  <button
  onClick={handleDownloadResume}
- className={`px-3.5 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+ className={`px-3.5 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] touch-target-44 ${
  qualityAudit.isReadyToSubmit
  ? 'bg-emerald-600 hover:bg-emerald-500 text-white -emerald-500/25 ring-2 ring-emerald-400/50'
  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -835,7 +835,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
  <button
  onClick={handleDownloadAtsDocx}
- className={`px-3.5 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+ className={`px-3.5 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] touch-target-44 ${
  qualityAudit.isReadyToSubmit
  ? 'bg-teal-600 hover:bg-teal-500 text-white -teal-500/25 ring-2 ring-teal-400/50'
  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -847,7 +847,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
  <button
  onClick={handleDownloadCoverLetter}
- className={`px-3.5 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+ className={`px-3.5 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] touch-target-44 ${
  qualityAudit.isReadyToSubmit
  ? 'bg-amber-600 hover:bg-amber-500 text-white -indigo-500/25 ring-2 ring-amber-400/50'
  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -859,7 +859,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  <button
  onClick={handleAutoSubmit}
  disabled={isSubmittedSuccess}
- className={`px-4 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+ className={`px-4 py-2.5 rounded-sm font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] touch-target-44 ${
  qualityAudit.isReadyToSubmit
  ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white -purple-500/30'
  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -972,7 +972,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  onChange={(e) => setResumeText(e.target.value)}
  rows={22}
  placeholder="Paste or write your tailored resume markdown here..."
- className="w-full bg-slate-950/80 border border-slate-800 rounded-sm p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-amber-500 leading-relaxed resize-y"
+ className="w-full bg-slate-950/80 border border-slate-800 rounded-sm p-4 font-mono text-base sm:text-xs text-slate-200 focus:outline-none focus:border-amber-500 leading-relaxed resize-y"
  />
  </div>
  )}
@@ -992,22 +992,22 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  )}
  </span>
  </div>
- <div className="flex items-center gap-2">
+ <div className="flex flex-wrap items-center gap-2">
  <button
  onClick={handleManualSave}
- className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-sm text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+ className="px-2.5 py-1.5 sm:py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-sm text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors min-h-[40px] sm:min-h-0 touch-target-44"
  >
  💾 Save Changes
  </button>
  <button
  onClick={handleDownloadCoverLetter}
- className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-sm text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+ className="px-3 py-1.5 sm:py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-sm text-xs font-bold flex items-center gap-1 cursor-pointer transition-all min-h-[40px] sm:min-h-0 touch-target-44"
  >
  <Download size={12} /> Download Updated PDF
  </button>
  <button
  onClick={() => setActiveTab('quality')}
- className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
+ className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer min-h-[40px] sm:min-h-0 touch-target-44"
  >
  <ShieldCheck size={13} /> {qualityAudit.overallScore}% Quality Pass
  </button>
@@ -1019,7 +1019,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  onChange={(e) => setCoverLetterText(e.target.value)}
  rows={18}
  placeholder="Paste or write your tailored cover letter here..."
- className="w-full bg-slate-950/80 border border-slate-800 rounded-sm p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-amber-500 leading-relaxed resize-y"
+ className="w-full bg-slate-950/80 border border-slate-800 rounded-sm p-4 font-mono text-base sm:text-xs text-slate-200 focus:outline-none focus:border-amber-500 leading-relaxed resize-y"
  />
  </div>
  )}
@@ -1037,16 +1037,16 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  Engineered to trigger recruiter Boolean searches (AND, OR, exact title matching) in LinkedIn Recruiter & Sales Navigator.
  </p>
  </div>
- <div className="flex items-center gap-2">
+ <div className="flex flex-wrap items-center gap-2">
  <button
  onClick={handleManualSave}
- className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-sm text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+ className="px-2.5 py-1.5 sm:py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-sm text-xs font-bold flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors min-h-[40px] sm:min-h-0 touch-target-44"
  >
  💾 Save Changes
  </button>
  <button
  onClick={handleCopy}
- className="px-3 py-1.5 rounded-sm bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+ className="px-3 py-1.5 rounded-sm bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto min-h-[40px] sm:min-h-0 touch-target-44"
  >
  {copiedText ? <Check size={12} className="text-emerald-300" /> : <Copy size={12} />}
  {copiedText ? 'COPIED TO CLIPBOARD' : 'COPY ALL LINKEDIN ASSETS'}
@@ -1058,7 +1058,7 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  onChange={(e) => setLinkedInText(e.target.value)}
  rows={18}
  placeholder="LinkedIn Boolean Headlines & About Section Recruiter Index..."
- className="w-full bg-slate-950/80 border border-slate-800 rounded-sm p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-sky-500 leading-relaxed resize-y"
+ className="w-full bg-slate-950/80 border border-slate-800 rounded-sm p-4 font-mono text-base sm:text-xs text-slate-200 focus:outline-none focus:border-sky-500 leading-relaxed resize-y"
  />
  </div>
  )}
@@ -1083,15 +1083,15 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  </div>
 
  {/* ── Footer ── */}
- <div className="bg-slate-950 px-6 py-3 border-t border-slate-800 flex items-center justify-between shrink-0">
- <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
- <span className="w-2 h-2 rounded-sm bg-emerald-400" />
- <span>Direct Online Engine: {selectedModel}</span>
+ <div className="bg-slate-950 px-4 sm:px-6 py-3 border-t border-slate-800 flex items-center justify-between shrink-0 pb-safe">
+ <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2 truncate pr-2">
+ <span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />
+ <span className="truncate">Direct Online Engine: {selectedModel}</span>
  </div>
- <div className="flex items-center gap-2">
+ <div className="flex items-center gap-2 shrink-0">
  <button
  onClick={onClose}
- className="px-4 py-2 rounded-sm bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer"
+ className="px-4 py-2 rounded-sm bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer min-h-[44px] touch-target-44 flex items-center justify-center"
  >
  CLOSE
  </button>

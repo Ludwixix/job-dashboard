@@ -1072,7 +1072,7 @@ export const JobSeeker = ({
                 <input
                   type="text"
                   placeholder="SEARCH BY ROLE, COMPANY, LOCATION, OR KEYWORDS..."
-                  className="w-full pl-10 pr-9 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                  className="w-full pl-10 pr-9 py-2.5 border border-slate-700/80 rounded-sm bg-slate-950/80 text-base sm:text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -1094,7 +1094,7 @@ export const JobSeeker = ({
  setDocsReadyFilter(!docsReadyFilter);
  setCurrentPage(1);
  }}
- className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
+ className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 min-h-[44px] sm:min-h-0 touch-target-44 ${
  docsReadyFilter
  ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-500/40'
  : 'bg-slate-900/90 text-emerald-400 border-emerald-500/40 hover:bg-emerald-950/40'
@@ -1116,7 +1116,7 @@ export const JobSeeker = ({
  setActiveStreamTab(activeStreamTab === 'Custom' ? 'All' : 'Custom');
  setCurrentPage(1);
  }}
- className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 ${
+ className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-black transition-all cursor-pointer border shrink-0 active:scale-95 min-h-[44px] sm:min-h-0 touch-target-44 ${
  activeStreamTab === 'Custom'
  ? 'bg-purple-600 text-white border-purple-400 ring-2 ring-purple-500/40'
  : 'bg-slate-900/90 text-purple-300 border-purple-500/40 hover:bg-purple-950/40'
@@ -1137,7 +1137,7 @@ export const JobSeeker = ({
  <ArrowUpDown size={14} className="text-amber-400 shrink-0" />
  <span className="text-slate-400 uppercase text-[10px]">SORT:</span>
  <select
- className="bg-transparent focus:outline-none text-xs font-mono font-bold text-slate-100 cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-xs font-mono font-bold text-slate-100 cursor-pointer"
  value={sortBy}
  onChange={(e) => setSortBy(e.target.value)}
  >
@@ -1150,7 +1150,7 @@ export const JobSeeker = ({
  <button
  type="button"
  onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')}
- className="inline-flex items-center gap-1 rounded-sm border border-amber-500/40 bg-amber-950/60 px-2 py-1 text-[10px] font-black text-amber-300 hover:bg-amber-900/60 cursor-pointer transition-colors"
+ className="inline-flex items-center justify-center gap-1 rounded-sm border border-amber-500/40 bg-amber-950/60 px-2 py-1 text-[10px] font-black text-amber-300 hover:bg-amber-900/60 cursor-pointer transition-colors min-h-[36px] touch-target-44"
  title={`Reverse sort order: currently ${sortDirection === 'desc' ? 'descending' : 'ascending'}`}
  >
  {sortBy === 'score' 
@@ -1167,7 +1167,7 @@ export const JobSeeker = ({
  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
  <Navigation size={13} className="text-emerald-400 shrink-0" />
  <select
- className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={maxDistanceFilter}
  onChange={(e) => setMaxDistanceFilter(e.target.value)}
  >
@@ -1182,7 +1182,7 @@ export const JobSeeker = ({
  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-amber-500/50 transition-colors">
  <Clock size={13} className="text-amber-400 shrink-0" />
  <select
- className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={maxAgeFilter}
  onChange={(e) => setMaxAgeFilter(e.target.value)}
  >
@@ -1197,7 +1197,7 @@ export const JobSeeker = ({
  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-amber-500/50 transition-colors">
  <Filter size={13} className="text-slate-400 shrink-0" />
  <select
- className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={sourceFilter}
  onChange={(e) => setSourceFilter(e.target.value)}
  >
@@ -1209,7 +1209,7 @@ export const JobSeeker = ({
  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
  <Award size={13} className="text-emerald-400 shrink-0" />
  <select
- className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={minScoreFilter}
  onChange={(e) => setMinScoreFilter(e.target.value)}
  >
@@ -1223,7 +1223,7 @@ export const JobSeeker = ({
  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-emerald-500/50 transition-colors">
  <DollarSign size={13} className="text-emerald-400 shrink-0" />
  <select
- className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={minSalaryFilter}
  onChange={(e) => setMinSalaryFilter(e.target.value)}
  >
@@ -1237,7 +1237,7 @@ export const JobSeeker = ({
  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-700/80 rounded-sm px-2.5 py-2 text-xs font-bold hover:border-purple-500/50 transition-colors">
  <MapPin size={13} className="text-purple-400 shrink-0" />
  <select
- className="bg-transparent focus:outline-none text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
+ className="bg-transparent focus:outline-none text-base sm:text-[11px] font-mono font-bold text-slate-200 w-full truncate cursor-pointer"
  value={workModeFilter}
  onChange={(e) => setWorkModeFilter(e.target.value)}
  >
@@ -1261,7 +1261,7 @@ export const JobSeeker = ({
  <select
  value={pageSize}
  onChange={(e) => { setPageSize(e.target.value); setCurrentPage(1); }}
- className="bg-slate-900 border border-slate-700/80 rounded-sm px-2 py-0.5 font-extrabold text-slate-200 focus:outline-none cursor-pointer"
+ className="bg-slate-900 border border-slate-700/80 rounded-sm px-2 py-1 font-extrabold text-slate-200 focus:outline-none cursor-pointer text-base sm:text-xs min-h-[36px] sm:min-h-0"
  >
  <option className="bg-slate-900 text-slate-200" value="24">24 / PAGE</option>
  <option className="bg-slate-900 text-slate-200" value="48">48 / PAGE (DEFAULT)</option>
@@ -1772,7 +1772,7 @@ export const JobSeeker = ({
  e.stopPropagation(); 
  dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
  }}
- className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 -emerald-500/20 active:scale-95"
+ className="flex-1 py-2.5 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 -emerald-500/20 active:scale-95 min-h-[44px] touch-target-44"
  title="Download PDFs, Open Job Portal & Mark Applied in 1-Click"
  >
  <CheckCircle2 size={13} className="text-emerald-200" /> 
@@ -1781,7 +1781,7 @@ export const JobSeeker = ({
  <button
  type="button"
  onClick={(e) => { e.stopPropagation(); setSelectedForGenerator(job); }}
- className="py-2 px-2.5 rounded-sm font-bold text-xs bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
+ className="py-2.5 px-3 rounded-sm font-bold text-xs bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44"
  title="Open in AI Studio to customize"
  >
  <Sparkles size={13} className="text-emerald-400" />
@@ -1790,7 +1790,7 @@ export const JobSeeker = ({
  ) : isGeneratingThisJob ? (
  <button
  disabled
- className="flex-1 py-2 px-3 rounded-sm font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 cursor-not-allowed font-mono animate-pulse"
+ className="flex-1 py-2.5 px-3 rounded-sm font-extrabold text-xs bg-amber-500 text-slate-950 border border-amber-600 flex items-center justify-center gap-1.5 cursor-not-allowed font-mono animate-pulse min-h-[44px]"
  >
  <RefreshCw size={12} className="animate-spin text-slate-950" />
  <span>SYNTHESIZING…</span>
@@ -1806,7 +1806,7 @@ export const JobSeeker = ({
  setSelectedForGenerator(job);
  }
  }}
- className="flex-1 py-2 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 -amber-950/40 tracking-wide uppercase active:scale-95"
+ className="flex-1 py-2.5 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 border-amber-400/60 -amber-950/40 tracking-wide uppercase active:scale-95 min-h-[44px] touch-target-44"
  title="Generate Tailored Resume & Cover Letter"
  >
  <Sparkles size={12} className="text-slate-950" />
@@ -1817,7 +1817,7 @@ export const JobSeeker = ({
  <button
  type="button"
  onClick={(e) => { e.stopPropagation(); onSelectJob(job); }}
- className="py-2 px-3.5 rounded-sm bg-stone-900/80 hover:bg-stone-800 text-stone-200 font-extrabold text-xs transition-colors border border-amber-500/20 hover:border-amber-500/40 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+ className="py-2.5 px-3.5 rounded-sm bg-stone-900/80 hover:bg-stone-800 text-stone-200 font-extrabold text-xs transition-colors border border-amber-500/20 hover:border-amber-500/40 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 min-h-[44px] touch-target-44"
  title="View Full Details"
  >
  <Eye size={13} className="text-stone-400" />
@@ -1838,11 +1838,11 @@ export const JobSeeker = ({
  <span>PAGE <strong className="text-white">{currentPage}</strong> OF <strong className="text-white">{totalPages}</strong></span>
  <span className="text-slate-500">({seekerJobs.length} TOTAL POSITIONS)</span>
  </div>
- <div className="flex items-center gap-1.5">
+ <div className="flex items-center gap-1.5 flex-wrap justify-center">
  <button
  onClick={() => handlePageChange(1)}
  disabled={currentPage === 1}
- className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44"
  title="First Page"
  >
  <ChevronFirst size={15} />
@@ -1851,7 +1851,7 @@ export const JobSeeker = ({
  <button
  onClick={() => handlePageChange(currentPage - 1)}
  disabled={currentPage === 1}
- className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44"
  >
  <ChevronLeft size={15} />
  </button>
@@ -1868,7 +1868,7 @@ export const JobSeeker = ({
  {showEllipsis && <span className="px-1 text-slate-500">...</span>}
  <button
  onClick={() => handlePageChange(pageNum)}
- className={`px-3 py-1.5 rounded-sm font-extrabold transition-all cursor-pointer ${
+ className={`px-3 py-1.5 rounded-sm font-extrabold transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44 ${
  currentPage === pageNum
  ? 'bg-amber-600 text-white -indigo-600/30 border border-amber-400/50'
  : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/80'
@@ -1883,7 +1883,7 @@ export const JobSeeker = ({
  <button
  onClick={() => handlePageChange(currentPage + 1)}
  disabled={currentPage === totalPages}
- className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44"
  title="Next Page"
  >
  <ChevronRight size={15} />
@@ -1892,7 +1892,7 @@ export const JobSeeker = ({
  <button
  onClick={() => handlePageChange(totalPages)}
  disabled={currentPage === totalPages}
- className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer"
+ className="p-2 rounded-sm bg-slate-800/90 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-200 border border-slate-700/80 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target-44"
  title="Last Page"
  >
  <ChevronLast size={15} />
@@ -1903,7 +1903,7 @@ export const JobSeeker = ({
  {currentPage < totalPages && (
  <button
  onClick={() => handlePageChange(currentPage + 1)}
- className="px-4 py-2 rounded-sm bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-extrabold border border-amber-500/40 transition-colors flex items-center gap-1.5 cursor-pointer -xs active:scale-95"
+ className="w-full sm:w-auto px-4 py-2.5 rounded-sm bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-extrabold border border-amber-500/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer -xs active:scale-95 min-h-[44px] touch-target-44"
  >
  <ArrowDown size={14} className="text-amber-400" />
  LOAD NEXT {Math.min(effectivePageSize, seekerJobs.length - endJobNum)} POSITIONS

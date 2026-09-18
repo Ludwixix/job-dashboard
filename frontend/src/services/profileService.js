@@ -394,25 +394,25 @@ export const loadSectorTemplate = (sectorKey = 'technology') => {
 
 export const CLEAN_CANDIDATE_PROFILE = {
   id: '',
-  name: 'Candidate',
+  name: '',
   title: '',
-  industry: 'Technology & IT',
-  seniorityLevel: 'Mid / Senior',
-  yearsOfExperience: 3,
+  industry: '',
+  seniorityLevel: '',
+  yearsOfExperience: 0,
   marketArchetype: '',
   email: '',
   phone: '',
-  location: 'Melbourne, VIC',
-  suburb: 'Melbourne',
-  state: 'VIC',
+  location: '',
+  suburb: '',
+  state: '',
   country: 'Australia',
-  workRights: 'Australian Citizen (Unrestricted)',
+  workRights: '',
   clearance: '',
-  targetSalary: '$100,000 - $130,000 + Super',
+  targetSalary: '',
   salaryExpectations: {
-    min: 100000,
-    max: 130000,
-    preferred: 115000,
+    min: 0,
+    max: 0,
+    preferred: 0,
     currency: 'AUD',
     period: 'annual'
   },
@@ -464,9 +464,9 @@ export const getActiveProfile = () => {
           const userProfile = {
             ...CLEAN_CANDIDATE_PROFILE,
             id: sessionUser.id || sessionUser.profileId || 'user_' + Date.now(),
-            name: sessionUser.name || 'Candidate',
+            name: sessionUser.name || '',
             email: sessionUser.email || '',
-            industry: sessionUser.industry || 'Technology & IT',
+            industry: sessionUser.industry || '',
             updatedAt: new Date().toISOString()
           };
           localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));
@@ -486,9 +486,9 @@ export const getActiveProfile = () => {
       const userProfile = {
         ...CLEAN_CANDIDATE_PROFILE,
         id: sessionUser.id || sessionUser.profileId || 'user_' + Date.now(),
-        name: sessionUser.name || 'Candidate',
+        name: sessionUser.name || '',
         email: sessionUser.email || '',
-        industry: sessionUser.industry || 'Technology & IT',
+        industry: sessionUser.industry || '',
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));
@@ -532,7 +532,7 @@ export const saveProfile = (updatedProfile, options = {}) => {
   } catch {}
 
   const email = (updatedProfile.email || sessionUser?.email || '').toLowerCase();
-  const isSam = email.includes('sam.ludwig') || updatedProfile.id === 'sam_ludwig' || (!sessionUser && !email);
+  const isSam = email.includes('sam.ludwig') || updatedProfile.id === 'sam_ludwig';
   const baseProfile = isSam ? DEFAULT_USER_PROFILE : CLEAN_CANDIDATE_PROFILE;
 
   const profile = {
@@ -717,9 +717,9 @@ export const parseResumeTextClientSide = (text = '') => {
   const phoneMatch = text.match(/(?:\+?61|0)[2-478](?:[ -]?[0-9]){8}/);
   const phone = phoneMatch ? phoneMatch[0] : '';
 
-  // Suburb & Location
-  let suburb = 'Balaclava';
-  let location = 'Balaclava VIC 3183';
+  // Suburb & Location — only populate when explicitly found in resume text
+  let suburb = '';
+  let location = '';
   if (lower.includes('richmond')) { suburb = 'Richmond'; location = 'Richmond VIC 3121'; }
   else if (lower.includes('south yarra')) { suburb = 'South Yarra'; location = 'South Yarra VIC 3141'; }
   else if (lower.includes('st kilda')) { suburb = 'St Kilda'; location = 'St Kilda VIC 3182'; }
@@ -781,24 +781,16 @@ export const parseResumeTextClientSide = (text = '') => {
     phone: phone,
     location: location,
     suburb: suburb,
-    workRights: 'Australian Citizen (Unrestricted)',
-    clearance: 'Australian Citizen (Baseline / NV1 Eligible)',
-    targetSalary: '$135,000 - $160,000 + Super',
+    workRights: '',
+    clearance: '',
+    targetSalary: '',
     targetTitles: targetTitles,
-    coreSkills: extractedSkills.length > 0 ? extractedSkills : ['Microsoft 365', 'Azure', 'PowerShell', 'Active Directory'],
-    certifications: ['Microsoft Certified Associate', 'ITIL Foundation'],
-    keyStrengths: [
-      'Zero-downtime cloud and endpoint migrations',
-      'PowerShell scripting and workflow automation',
-      'Reliable systems engineering and incident resolution'
-    ],
-    managementStyle: 'Collaborative / Hands-On Technical Mentor',
-    interviewTalkingPoints: [
-      'Executed large-scale tenant migrations with zero disruption to core operations.',
-      'Streamlined endpoint provisioning via Intune Autopilot, cutting setup times by 80%.',
-      'Authored automated PowerShell health-check scripts to proactively monitor enterprise servers.'
-    ],
-    workHistorySummary: text.slice(0, 500) || 'Experienced Infrastructure & Systems Engineer with strong background across enterprise hybrid environments.',
+    coreSkills: extractedSkills.length > 0 ? extractedSkills : [],
+    certifications: [],
+    keyStrengths: [],
+    managementStyle: '',
+    interviewTalkingPoints: [],
+    workHistorySummary: text.slice(0, 500) || '',
     fullWorkExperienceText: text
   };
 };

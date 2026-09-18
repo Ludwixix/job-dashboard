@@ -211,8 +211,8 @@ export const synthesizeUserProfile = ({
   const targetTitles = deriveTargetTitles(gmailApplications, title);
   const coreSkills = extractCoreSkills(gmailApplications, industry);
 
-  let suburb = 'Balaclava';
-  let location = 'Melbourne, VIC (Balaclava 3183)';
+  let suburb = '';
+  let location = '';
   if (baseLocation) {
     const parts = baseLocation.split(' ');
     if (parts.length > 0) suburb = parts[0];

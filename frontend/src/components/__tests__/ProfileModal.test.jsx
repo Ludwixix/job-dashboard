@@ -38,7 +38,8 @@ describe('Profile Intelligence & Deduction Engine', () => {
     expect(parsed.phone).toBe('0411 222 333');
     expect(parsed.seniorityLevel).toBe('Principal / Architect');
     expect(parsed.industry).toBe('Technology & IT');
-    expect(parsed.clearance).toContain('Baseline / NV1');
+    // Clearance is not fabricated — user enters it during onboarding; parser returns empty string
+    expect(parsed.clearance).toBe('');
     expect(parsed.coreSkills).toContain('AWS');
     expect(parsed.coreSkills).toContain('Terraform');
     expect(parsed.coreSkills).toContain('Kubernetes');

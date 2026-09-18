@@ -275,15 +275,15 @@ export const registerWithEmail = async (name, email, password) => {
     localStorage.setItem('career_agent_site_unlocked', 'true');
   } catch {}
 
-  // Initialize clean candidate profile with user's name & email
+  // Initialize identity-only profile — no industry/location/workRights; user fills these during onboarding
   const initialProfile = {
     id: data.user.id,
     name: cleanName,
     email: cleanEmail,
     title: '',
-    industry: 'Technology & IT',
-    location: 'Melbourne, VIC',
-    workRights: 'Australian Citizen (Unrestricted)',
+    industry: '',
+    location: '',
+    workRights: '',
     targetTitles: [],
     coreSkills: [],
     keyStrengths: [],
@@ -375,7 +375,7 @@ export const completeOnboarding = (profileData) => {
     name: finalProfile.name,
     email: finalProfile.email,
     profileId: finalProfile.id,
-    industry: finalProfile.industry || 'Technology & IT',
+    industry: finalProfile.industry || '',
     onboardingCompleted: true,
     lastActiveAt: new Date().toISOString()
   };

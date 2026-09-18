@@ -200,23 +200,23 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   const [llmTestResult, setLlmTestResult] = useState(null);
   const [llmError, setLlmError] = useState('');
 
-  // Step 3-5 Profile Builder state
+  // Step 3-5 Profile Builder state — blank canvas for every new user
   const [profileData, setProfileData] = useState(() => ({
     id: initialUser?.id || initialUser?.profileId || `profile_${Date.now()}`,
     name: initialUser?.name || '',
     email: initialUser?.email || '',
-    phone: initialUser?.phone || '0400 000 000',
+    phone: initialUser?.phone || '',
     title: initialUser?.title || '',
-    industry: initialUser?.industry || 'Technology & IT',
-    seniorityLevel: initialUser?.seniorityLevel || 'Senior',
-    location: initialUser?.location || 'Balaclava VIC 3183',
-    suburb: initialUser?.suburb || 'Balaclava',
+    industry: initialUser?.industry || '',
+    seniorityLevel: initialUser?.seniorityLevel || '',
+    location: initialUser?.location || '',
+    suburb: initialUser?.suburb || '',
     workMode: initialUser?.workMode || 'Any / Flexible',
-    targetSalary: initialUser?.targetSalary || '$130,000 + Super',
-    workRights: initialUser?.workRights || 'Australian Citizen (Unrestricted)',
-    clearance: initialUser?.clearance || 'Citizen / Standard Police Check',
-    targetTitles: initialUser?.targetTitles || ['Senior Systems Engineer', 'Cloud Infrastructure Engineer', 'M365 Engineer'],
-    coreSkills: initialUser?.coreSkills || ['Microsoft 365', 'Azure', 'PowerShell', 'Active Directory'],
+    targetSalary: initialUser?.targetSalary || '',
+    workRights: initialUser?.workRights || '',
+    clearance: initialUser?.clearance || '',
+    targetTitles: initialUser?.targetTitles || [],
+    coreSkills: initialUser?.coreSkills || [],
     certifications: initialUser?.certifications || [],
     workHistorySummary: initialUser?.workHistorySummary || '',
     fullWorkExperienceText: initialUser?.fullWorkExperienceText || '',

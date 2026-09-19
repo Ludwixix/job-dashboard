@@ -51,6 +51,7 @@ const PdfPreviewModal = lazy(() => import('./PdfPreviewModal').then(m => ({ defa
 const ScoringTunerModal = lazy(() => import('./ScoringTunerModal').then(m => ({ default: m.ScoringTunerModal || m.default })));
 const VoiceMockInterviewModal = lazy(() => import('./VoiceMockInterviewModal').then(m => ({ default: m.VoiceMockInterviewModal || m.default })));
 const SourceSelfHealModal = lazy(() => import('./SourceSelfHealModal').then(m => ({ default: m.SourceSelfHealModal })));
+const PricingModal = lazy(() => import('./PricingModal').then(m => ({ default: m.PricingModal })));
 
 // Client routing path mappings
 const SECTION_ROUTES = {
@@ -145,11 +146,12 @@ import { suggestRelatedTitles, buildQueriesFromProfile, triggerProfileScrape } f
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../services/profileOnboardingPipeline';
 import { getSpendSummary, subscribeToSpendUpdates } from '../services/llmCostService';
+import { fetchBillingStatus, getCachedBillingStatus } from '../services/billingService';
 import { 
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu, ShieldAlert, ArrowRight
+  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu, ShieldAlert, ArrowRight, Crown
 } from 'lucide-react';
 
 
@@ -250,6 +252,49 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
  const toolsMenuRef = useRef(null);
+
+ // Platform Subscription & Billing State
+ const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+ const [pricingModalReason, setPricingModalReason] = useState('upgrade');
+ const [billingStatus, setBillingStatus] = useState(() => getCachedBillingStatus());
+
+ useEffect(() => {
+   fetchBillingStatus().then(status => {
+     if (status) setBillingStatus(status);
+   }).catch(() => {});
+
+   const handleOpenPricingModal = (e) => {
+     setPricingModalReason(e?.detail?.reason || 'upgrade');
+     setIsPricingModalOpen(true);
+   };
+
+   const handleBillingStatusUpdate = (e) => {
+     if (e?.detail) setBillingStatus(e.detail);
+   };
+
+   window.addEventListener('open-pricing-modal', handleOpenPricingModal);
+   window.addEventListener('billing-status-updated', handleBillingStatusUpdate);
+
+   // Check URL parameters for Stripe return redirects
+   if (typeof window !== 'undefined') {
+     const urlParams = new URLSearchParams(window.location.search);
+     if (urlParams.get('payment') === 'success') {
+       addToast('Pro subscription activated! Built-in AI models are ready.', 'success');
+       fetchBillingStatus({ force: true }).then(status => {
+         if (status) setBillingStatus(status);
+       }).catch(() => {});
+       window.history.replaceState({}, '', window.location.pathname);
+     } else if (urlParams.get('payment') === 'cancelled') {
+       addToast('Checkout cancelled. You can upgrade anytime to access built-in AI.', 'info');
+       window.history.replaceState({}, '', window.location.pathname);
+     }
+   }
+
+   return () => {
+     window.removeEventListener('open-pricing-modal', handleOpenPricingModal);
+     window.removeEventListener('billing-status-updated', handleBillingStatusUpdate);
+   };
+ }, [addToast]);
 
  useEffect(() => {
  const handleOutsideClick = (e) => {
@@ -1174,6 +1219,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  </button>
  <button
  type="button"
+ onClick={() => { setIsToolsMenuOpen(false); setIsPricingModalOpen(true); }}
+ className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-amber-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+ >
+ <Crown size={13} className="text-amber-400" />
+ <span>Subscription & Plans</span>
+ </button>
+ <button
+ type="button"
  onClick={() => { setIsToolsMenuOpen(false); setIsSettingsOpen(true); }}
  className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
  >
@@ -1204,6 +1257,31 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <Zap size={11} className="text-amber-400 animate-pulse" />
  <span>
  SPEND: <strong className="text-emerald-400 font-black">${(spendSummary.totalSpendUsd || 0) > 0 ? (spendSummary.totalSpendUsd).toFixed(4) : '0.00'}</strong>
+ </span>
+ </button>
+
+ {/* Subscription Tier HUD */}
+ <button
+ type="button"
+ onClick={() => setIsPricingModalOpen(true)}
+ className={`flex items-center gap-1.5 transition-all cursor-pointer text-[10px] uppercase font-mono font-bold px-2.5 py-1 rounded-sm border shadow-xs ${
+ billingStatus?.is_active
+ ? 'text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border-emerald-500/40'
+ : 'text-amber-300 bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/40'
+ }`}
+ title={
+ billingStatus?.is_active
+ ? `Pro Active (${billingStatus.plan_name || 'Active'}) · Click to manage subscription`
+ : `Free Tier (${billingStatus?.trial_generations_remaining ?? 3} trials remaining) · Click to view Pro plans`
+ }
+ >
+ <Crown size={11} className={billingStatus?.is_active ? "text-emerald-400" : "text-amber-400"} />
+ <span>
+ {billingStatus?.is_active ? (
+ <>PRO <span className="text-emerald-400 font-black">ACTIVE</span></>
+ ) : (
+ <>PRO TIER <span className="text-amber-400 font-black">· UPGRADE</span></>
+ )}
  </span>
  </button>
 
@@ -1759,6 +1837,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                 className="w-full px-3 py-2 rounded-sm text-xs text-amber-300 hover:bg-amber-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
               >
                 <ShieldAlert size={14} className="text-amber-400" /> Scraper Health & Self-Healing
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setIsPricingModalOpen(true); }}
+                className="w-full px-3 py-2 rounded-sm text-xs text-amber-300 hover:bg-amber-950/40 flex items-center gap-2.5 touch-target-44 cursor-pointer"
+              >
+                <Crown size={14} className="text-amber-400" /> Subscription & Plans
               </button>
               <button
                 type="button"
@@ -2461,6 +2546,23 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   />
   </Suspense>
   </SafeErrorBoundary>
+  )}
+
+  {/* Platform Built-In AI & Subscription Pricing Modal */}
+  {isPricingModalOpen && (
+    <SafeErrorBoundary sectionName="Subscription and Plans" onClose={() => setIsPricingModalOpen(false)}>
+      <Suspense fallback={<ModalSkeleton />}>
+        <PricingModal
+          isOpen={isPricingModalOpen}
+          onClose={() => setIsPricingModalOpen(false)}
+          onOpenKeyModal={() => {
+            setIsPricingModalOpen(false);
+            setIsSettingsOpen(true);
+          }}
+          reason={pricingModalReason}
+        />
+      </Suspense>
+    </SafeErrorBoundary>
   )}
 
 

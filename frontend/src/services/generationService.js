@@ -5,6 +5,7 @@
  */
 import { getActiveProfile } from './profileService';
 import { getBackendApiBase } from './apiConfig';
+import { callAIProxy } from './billingService';
 
 const MASTER_RESUME_HIGHLIGHTS = `
 SAM LUDWIG — Senior IT Infrastructure & M365 Engineer
@@ -228,65 +229,63 @@ Core Competencies & Boolean Recruiter Keywords:
 };
 
 /**
- * Main Direct Online Generation Function
- * Calls OpenRouter directly via HTTPS CORS with GLM 5.3 Flash.
- * Falls back seamlessly to grounded client-side generation if offline.
+ * Parses raw generated document package into its discrete structural parts.
+ *
+ * @param {string} content - Raw AI output text with standard delimiters.
+ * @returns {Object} Structured components: { diagnostic, resume, coverLetter, linkedInOptimization }.
  */
-export const generateApplicationDocs = async (job, onProgress, onLog, candidateProfile) => {
-  const llmConfig = getLlmConfig();
-  const provider = llmConfig.provider || 'openrouter';
-  const providerMeta = llmConfig.providerMeta || PROVIDERS[provider] || PROVIDERS.openrouter;
-  const apiKey = llmConfig.apiKey;
-  const model = llmConfig.model || providerMeta.defaultModel;
-  const endpoint = llmConfig.endpoint || providerMeta.defaultEndpoint;
-  const startTime = Date.now();
-  const profile = candidateProfile || getActiveProfile();
+export const parseGeneratedPackageContent = (content = '') => {
+  const finalContent = content || '';
+  const diagIdx = finalContent.indexOf('===DIAGNOSTIC===');
+  const resIdx = finalContent.indexOf('===RESUME===');
+  const clIdx = finalContent.indexOf('===COVER_LETTER===');
+  const liIdx = finalContent.indexOf('===LINKEDIN_OPTIMIZATION===');
 
-  const log = (msg, type = 'info') => {
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
-    onLog?.({ time: elapsed, msg, type });
-    onProgress?.(msg);
-  };
+  let diagnostic = '';
+  let resume = '';
+  let coverLetter = '';
+  let linkedInOptimization = '';
 
-  if (!apiKey && providerMeta.requiresKey) {
-    log('Dispatching application synthesis to sovereign background pipeline...', 'info');
-    try {
-      const backendBase = getBackendApiBase();
-      const jobId = job.id || `${job.company}_${job.title}`;
-      const backendRes = await fetch(`${backendBase}/api/jobs/${encodeURIComponent(jobId)}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (backendRes.ok) {
-        log('Application synthesized via backend sovereign engine.', 'success');
-        const data = await backendRes.json();
-        if (data && (data.resume || data.resume_text)) {
-          return {
-            success: true,
-            resume: data.resume || data.resume_text,
-            coverLetter: data.cover_letter || data.cover_text,
-            linkedInOptimization: data.linkedin_optimization || data.screening_answers || '',
-            diagnostic: data.diagnostic || 'Candidate alignment verified by sovereign LLM engine.',
-            model: data.model || 'OpenRouter Server Engine',
-            elapsedMs: Date.now() - startTime
-          };
-        }
-      }
-    } catch (e) {
-      log(`Backend generation attempt note: ${e.message}`, 'info');
-    }
-
-    log('Applying grounded high-conviction candidate tailoring (Zero API Key friction)...', 'success');
-    const grounded = generateClientSideTailoredDocs(job, candidateProfile);
-    return {
-      ...grounded,
-      elapsedMs: Date.now() - startTime
-    };
+  if (diagIdx !== -1) {
+    const diagEnd = resIdx !== -1 ? resIdx : (clIdx !== -1 ? clIdx : finalContent.length);
+    diagnostic = finalContent.slice(diagIdx + '===DIAGNOSTIC==='.length, diagEnd).trim();
   }
 
-  log(`Initializing ${providerMeta.name} API stream for ${profile.name} [Model: ${model}]`, 'init');
-  log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
+  if (resIdx !== -1) {
+    const resEnd = clIdx !== -1 ? clIdx : (liIdx !== -1 ? liIdx : finalContent.length);
+    resume = finalContent.slice(resIdx + '===RESUME==='.length, resEnd).trim();
+  } else if (clIdx !== -1) {
+    const startOffset = diagIdx !== -1 && diagnostic ? diagIdx + '===DIAGNOSTIC==='.length + diagnostic.length : 0;
+    resume = finalContent.slice(startOffset, clIdx).trim();
+  } else {
+    resume = finalContent.trim();
+  }
 
+  if (clIdx !== -1) {
+    const clEnd = liIdx !== -1 ? liIdx : finalContent.length;
+    coverLetter = finalContent.slice(clIdx + '===COVER_LETTER==='.length, clEnd).trim();
+  }
+
+  if (liIdx !== -1) {
+    linkedInOptimization = finalContent.slice(liIdx + '===LINKEDIN_OPTIMIZATION==='.length).trim();
+  }
+
+  return {
+    diagnostic,
+    resume,
+    coverLetter,
+    linkedInOptimization
+  };
+};
+
+/**
+ * Builds system and user prompts for ATS application synthesis.
+ *
+ * @param {Object} job - Target job entity.
+ * @param {Object} profile - Candidate profile record.
+ * @returns {{systemPrompt: string, userPrompt: string, candidateSummary: string}}
+ */
+export const buildGenerationPrompts = (job, profile) => {
   const candidateSummary = [profile.fullWorkExperienceText, profile.workHistorySummary]
     .filter(value => typeof value === 'string' && value.trim())
     .join('\n\n') || MASTER_RESUME_HIGHLIGHTS;
@@ -363,7 +362,7 @@ Company: ${job.company}
 Location: ${job.location || 'Melbourne, VIC'}
 ${job.salary ? `Salary: ${job.salary}` : ''}
 Job Details & Requirements:
-${job.notes || job.description || 'Enterprise IT infrastructure, systems engineering, and workplace support.'}
+${job.notes || job.description || 'Enterprise professional responsibilities and core deliverable execution.'}
 
 Generate in strict sequence:
 ===DIAGNOSTIC===
@@ -374,6 +373,113 @@ Generate in strict sequence:
 [Cover Letter]
 ===LINKEDIN_OPTIMIZATION===
 [LinkedIn Headlines & About Index]`;
+
+  return { systemPrompt, userPrompt, candidateSummary };
+};
+
+/**
+ * Main Direct Online Generation Function
+ * Calls OpenRouter directly via HTTPS CORS with configured provider,
+ * or routes through authenticated server-side AI proxy for Pro / Trial users with zero keys.
+ */
+export const generateApplicationDocs = async (job, onProgress, onLog, candidateProfile) => {
+  const llmConfig = getLlmConfig();
+  const provider = llmConfig.provider || 'openrouter';
+  const providerMeta = llmConfig.providerMeta || PROVIDERS[provider] || PROVIDERS.openrouter;
+  const apiKey = llmConfig.apiKey;
+  const model = llmConfig.model || providerMeta.defaultModel;
+  const endpoint = llmConfig.endpoint || providerMeta.defaultEndpoint;
+  const startTime = Date.now();
+  const profile = candidateProfile || getActiveProfile();
+
+  const log = (msg, type = 'info') => {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+    onLog?.({ time: elapsed, msg, type });
+    onProgress?.(msg);
+  };
+
+  const { systemPrompt, userPrompt } = buildGenerationPrompts(job, profile);
+
+  if (!apiKey && providerMeta.requiresKey) {
+    log('Dispatching application synthesis to platform built-in AI gateway (Zero API Key friction)...', 'info');
+    try {
+      const proxyResult = await callAIProxy({
+        model: model || 'google/gemini-2.0-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 16000
+      });
+
+      const raw = proxyResult?.choices?.[0]?.message?.content || '';
+      if (raw) {
+        log('Application synthesized via platform built-in AI engine.', 'success');
+        const parsed = parseGeneratedPackageContent(raw);
+        const jobId = job.id || `${job.company}_${job.title}`;
+        if (parsed.resume) {
+          saveDocumentToBackend(jobId, 'resume', parsed.resume, model, { title: job.title, company: job.company }).catch(() => {});
+        }
+        if (parsed.coverLetter) {
+          saveDocumentToBackend(jobId, 'cover_letter', parsed.coverLetter, model, { title: job.title, company: job.company }).catch(() => {});
+        }
+        if (parsed.linkedInOptimization) {
+          saveDocumentToBackend(jobId, 'linkedin_optimization', parsed.linkedInOptimization, model, { title: job.title, company: job.company }).catch(() => {});
+        }
+        return {
+          success: true,
+          ...parsed,
+          model: proxyResult.model || model,
+          elapsedMs: Date.now() - startTime
+        };
+      }
+    } catch (proxyErr) {
+      log(`Platform built-in gateway note: ${proxyErr.message}`, 'info');
+      if (proxyErr.trialExhausted || proxyErr.code === 'PAYMENT_REQUIRED') {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('open-pricing-modal', { detail: { reason: 'trial_exhausted' } }));
+        }
+      }
+    }
+
+    // Secondary sovereign background engine attempt
+    try {
+      const backendBase = getBackendApiBase();
+      const jobId = job.id || `${job.company}_${job.title}`;
+      const backendRes = await fetch(`${backendBase}/api/jobs/${encodeURIComponent(jobId)}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (backendRes.ok) {
+        log('Application synthesized via backend sovereign engine.', 'success');
+        const data = await backendRes.json();
+        if (data && (data.resume || data.resume_text)) {
+          return {
+            success: true,
+            resume: data.resume || data.resume_text,
+            coverLetter: data.cover_letter || data.cover_text,
+            linkedInOptimization: data.linkedin_optimization || data.screening_answers || '',
+            diagnostic: data.diagnostic || 'Candidate alignment verified by sovereign LLM engine.',
+            model: data.model || 'OpenRouter Server Engine',
+            elapsedMs: Date.now() - startTime
+          };
+        }
+      }
+    } catch (e) {
+      log(`Backend generation attempt note: ${e.message}`, 'info');
+    }
+
+    log('Applying grounded high-conviction candidate tailoring (Zero API Key friction)...', 'success');
+    const grounded = generateClientSideTailoredDocs(job, candidateProfile);
+    return {
+      ...grounded,
+      elapsedMs: Date.now() - startTime
+    };
+  }
+
+  log(`Initializing ${providerMeta.name} API stream for ${profile.name} [Model: ${model}]`, 'init');
+  log(`Target: ${job.title} | ${job.company} (${job.location || 'Melbourne, VIC'})`, 'info');
 
   log('Extracting high-priority ATS keywords and requirements…', 'info');
   log(`Dispatching request to ${providerMeta.name} endpoint…`, 'network');

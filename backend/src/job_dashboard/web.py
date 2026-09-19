@@ -2186,6 +2186,14 @@ def resolve_user_id(handler, query_params=None) -> str | None:
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
         try:
+            from .security import decode_token
+
+            decoded = decode_token(token)
+            if decoded and decoded.get("sub"):
+                return str(decoded["sub"])
+        except Exception:
+            pass
+        try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             sub = payload.get("sub")
             if sub:
@@ -3750,6 +3758,21 @@ def make_handler(app: DashboardApp):
                     self.end_headers()
                     self.wfile.write(data)
                     return
+
+            if path in ("/api/billing/status", "/api/billing/status/"):
+                user_id = resolve_user_id(self, query_params)
+                if not user_id:
+                    self.send_json(
+                        401,
+                        {"error": "Authentication required", "code": "UNAUTHORIZED"},
+                    )
+                    return
+                from .billing import get_billing_status_response
+
+                res = get_billing_status_response(user_id, app.repository)
+                self.send_json(200, res)
+                return
+
             static_dir = Path(__file__).parent / "static"
             target_asset = (static_dir / path.removeprefix("/")).resolve()
             if target_asset.is_file() and str(target_asset).startswith(
@@ -6477,6 +6500,121 @@ def make_handler(app: DashboardApp):
                         )
                         return
                     self.send_json(200, app.generated_documents[job_id])
+                    return
+
+                # Phase 26: AI Gateway Proxy & Billing POST Endpoints
+                if path in ("/api/ai/proxy", "/api/ai/proxy/"):
+                    user_id = resolve_user_id(self, query_params)
+                    if not user_id:
+                        self.send_json(
+                            401,
+                            {
+                                "error": "Authentication required for AI gateway proxy",
+                                "code": "UNAUTHORIZED",
+                            },
+                        )
+                        return
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    from .billing import process_ai_proxy_request
+
+                    status_code, result = process_ai_proxy_request(
+                        payload, user_id, app.repository
+                    )
+                    self.send_json(status_code, result)
+                    return
+
+                if path in (
+                    "/api/billing/create-checkout-session",
+                    "/api/billing/create-checkout-session/",
+                ):
+                    user_id = resolve_user_id(self, query_params)
+                    if not user_id:
+                        self.send_json(
+                            401,
+                            {
+                                "error": "Authentication required",
+                                "code": "UNAUTHORIZED",
+                            },
+                        )
+                        return
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    plan_tier = (
+                        payload.get("plan_id")
+                        or payload.get("plan_tier")
+                        or "pro_monthly"
+                    )
+                    origin = self.headers.get("Origin") or "http://localhost:5173"
+                    success_url = (
+                        payload.get("success_url")
+                        or f"{origin}/dashboard?payment=success"
+                    )
+                    cancel_url = (
+                        payload.get("cancel_url")
+                        or f"{origin}/dashboard?payment=cancelled"
+                    )
+                    user = app.repository.get_user_by_id(user_id) or {}
+                    from .billing import create_checkout_session
+
+                    res = create_checkout_session(
+                        user_id=user_id,
+                        email=user.get("email", ""),
+                        name=user.get("name", ""),
+                        plan_tier=plan_tier,
+                        success_url=success_url,
+                        cancel_url=cancel_url,
+                        repository=app.repository,
+                    )
+                    self.send_json(200 if res.get("success") else 400, res)
+                    return
+
+                if path in ("/api/billing/webhook", "/api/billing/webhook/"):
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    raw_body = self.rfile.read(content_len) if content_len > 0 else b""
+                    sig_header = self.headers.get("Stripe-Signature", "")
+                    from .billing import process_stripe_webhook
+
+                    res = process_stripe_webhook(raw_body, sig_header, app.repository)
+                    self.send_json(200 if res.get("success") else 400, res)
+                    return
+
+                if path in (
+                    "/api/billing/customer-portal",
+                    "/api/billing/customer-portal/",
+                ):
+                    user_id = resolve_user_id(self, query_params)
+                    if not user_id:
+                        self.send_json(
+                            401,
+                            {
+                                "error": "Authentication required",
+                                "code": "UNAUTHORIZED",
+                            },
+                        )
+                        return
+                    origin = self.headers.get("Origin") or "http://localhost:5173"
+                    content_len = int(self.headers.get("Content-Length", "0"))
+                    payload = (
+                        json.loads(self.rfile.read(content_len))
+                        if content_len > 0
+                        else {}
+                    )
+                    return_url = payload.get("return_url") or f"{origin}/dashboard"
+                    from .billing import create_customer_portal_session
+
+                    res = create_customer_portal_session(
+                        user_id, return_url, app.repository
+                    )
+                    self.send_json(200 if res.get("success") else 400, res)
                     return
 
                 self.send_json(404, {"error": f"Endpoint not found: {path}"})

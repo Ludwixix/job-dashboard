@@ -281,6 +281,38 @@ class JobRepository:
                     cookies_json TEXT NOT NULL DEFAULT '{}',
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS user_subscriptions (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    stripe_customer_id TEXT DEFAULT '',
+                    stripe_subscription_id TEXT DEFAULT '',
+                    plan_tier TEXT NOT NULL DEFAULT 'free',
+                    status TEXT NOT NULL DEFAULT 'inactive',
+                    current_period_start TEXT NOT NULL,
+                    current_period_end TEXT NOT NULL,
+                    cancel_at_period_end INTEGER DEFAULT 0,
+                    monthly_token_allowance INTEGER DEFAULT 500000,
+                    trial_generations_remaining INTEGER DEFAULT 3,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_subs_user ON user_subscriptions(user_id);
+                CREATE INDEX IF NOT EXISTS idx_user_subs_stripe_cust ON user_subscriptions(stripe_customer_id);
+                CREATE TABLE IF NOT EXISTS user_token_ledger (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    billing_period_month TEXT NOT NULL,
+                    prompt_tokens INTEGER DEFAULT 0,
+                    completion_tokens INTEGER DEFAULT 0,
+                    total_tokens INTEGER DEFAULT 0,
+                    cost_usd REAL DEFAULT 0.0,
+                    call_count INTEGER DEFAULT 0,
+                    last_call_at TEXT NOT NULL,
+                    UNIQUE(user_id, billing_period_month),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_token_ledger_user ON user_token_ledger(user_id);
             """)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
@@ -1999,3 +2031,227 @@ class JobRepository:
                     "updated_at": row[2],
                 }
         return {"provider": provider, "headers": {}, "cookies": {}, "updated_at": None}
+
+    def get_subscription(self, user_id: str) -> dict[str, Any]:
+        """Retrieve subscription details for a user, returning default free tier if unconfigured."""
+        with self.pool.connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, user_id, stripe_customer_id, stripe_subscription_id,
+                       plan_tier, status, current_period_start, current_period_end,
+                       cancel_at_period_end, monthly_token_allowance, trial_generations_remaining,
+                       created_at, updated_at
+                FROM user_subscriptions
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "id": row[0],
+                    "user_id": row[1],
+                    "stripe_customer_id": row[2] or "",
+                    "stripe_subscription_id": row[3] or "",
+                    "plan_tier": row[4],
+                    "status": row[5],
+                    "current_period_start": row[6],
+                    "current_period_end": row[7],
+                    "cancel_at_period_end": bool(row[8]),
+                    "monthly_token_allowance": int(row[9]),
+                    "trial_generations_remaining": int(row[10]),
+                    "created_at": row[11],
+                    "updated_at": row[12],
+                }
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return {
+            "id": f"sub_{user_id}",
+            "user_id": user_id,
+            "stripe_customer_id": "",
+            "stripe_subscription_id": "",
+            "plan_tier": "free",
+            "status": "inactive",
+            "current_period_start": now_iso,
+            "current_period_end": now_iso,
+            "cancel_at_period_end": False,
+            "monthly_token_allowance": 0,
+            "trial_generations_remaining": 3,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
+
+    def save_subscription(
+        self,
+        user_id: str,
+        plan_tier: str = "pro_monthly",
+        status: str = "active",
+        stripe_customer_id: str = "",
+        stripe_subscription_id: str = "",
+        current_period_start: str = "",
+        current_period_end: str = "",
+        cancel_at_period_end: bool = False,
+        monthly_token_allowance: int = 500000,
+        trial_generations_remaining: int = 3,
+    ) -> dict[str, Any]:
+        """Upsert a user subscription."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        start = current_period_start or now_iso
+        end = current_period_end or now_iso
+        sub_id = f"sub_{user_id}"
+        with self.pool.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_subscriptions (
+                    id, user_id, stripe_customer_id, stripe_subscription_id,
+                    plan_tier, status, current_period_start, current_period_end,
+                    cancel_at_period_end, monthly_token_allowance, trial_generations_remaining,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    plan_tier = excluded.plan_tier,
+                    status = excluded.status,
+                    stripe_customer_id = CASE WHEN excluded.stripe_customer_id != '' THEN excluded.stripe_customer_id ELSE user_subscriptions.stripe_customer_id END,
+                    stripe_subscription_id = CASE WHEN excluded.stripe_subscription_id != '' THEN excluded.stripe_subscription_id ELSE user_subscriptions.stripe_subscription_id END,
+                    current_period_start = excluded.current_period_start,
+                    current_period_end = excluded.current_period_end,
+                    cancel_at_period_end = excluded.cancel_at_period_end,
+                    monthly_token_allowance = excluded.monthly_token_allowance,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    sub_id,
+                    user_id,
+                    stripe_customer_id,
+                    stripe_subscription_id,
+                    plan_tier,
+                    status,
+                    start,
+                    end,
+                    1 if cancel_at_period_end else 0,
+                    monthly_token_allowance,
+                    trial_generations_remaining,
+                    now_iso,
+                    now_iso,
+                ),
+            )
+            conn.commit()
+        return self.get_subscription(user_id)
+
+    def record_token_usage(
+        self,
+        user_id: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cost_usd: float = 0.0,
+        model: str = "",
+    ) -> dict[str, Any]:
+        """Record token consumption in user_token_ledger."""
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        month_key = now.strftime("%Y-%m")
+        ledger_id = f"tok_{user_id}_{month_key}"
+        total = prompt_tokens + completion_tokens
+
+        with self.pool.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_token_ledger (
+                    id, user_id, billing_period_month, prompt_tokens,
+                    completion_tokens, total_tokens, cost_usd, call_count, last_call_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+                ON CONFLICT(user_id, billing_period_month) DO UPDATE SET
+                    prompt_tokens = user_token_ledger.prompt_tokens + excluded.prompt_tokens,
+                    completion_tokens = user_token_ledger.completion_tokens + excluded.completion_tokens,
+                    total_tokens = user_token_ledger.total_tokens + excluded.total_tokens,
+                    cost_usd = user_token_ledger.cost_usd + excluded.cost_usd,
+                    call_count = user_token_ledger.call_count + 1,
+                    last_call_at = excluded.last_call_at
+                """,
+                (
+                    ledger_id,
+                    user_id,
+                    month_key,
+                    prompt_tokens,
+                    completion_tokens,
+                    total,
+                    cost_usd,
+                    now_iso,
+                ),
+            )
+            conn.commit()
+        return self.get_token_usage(user_id, month_key)
+
+    def get_token_usage(self, user_id: str, month: str | None = None) -> dict[str, Any]:
+        """Retrieve token usage and allowance for a user for the given or current month."""
+        month_key = month or datetime.now(timezone.utc).strftime("%Y-%m")
+        sub = self.get_subscription(user_id)
+        allowance = sub.get("monthly_token_allowance", 0)
+
+        with self.pool.connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT prompt_tokens, completion_tokens, total_tokens, cost_usd, call_count, last_call_at
+                FROM user_token_ledger
+                WHERE user_id = ? AND billing_period_month = ?
+                """,
+                (user_id, month_key),
+            )
+            row = cursor.fetchone()
+            if row:
+                prompt_tokens = int(row[0])
+                completion_tokens = int(row[1])
+                total_tokens = int(row[2])
+                cost_usd = float(row[3])
+                call_count = int(row[4])
+                last_call_at = row[5]
+            else:
+                prompt_tokens = 0
+                completion_tokens = 0
+                total_tokens = 0
+                cost_usd = 0.0
+                call_count = 0
+                last_call_at = None
+
+        remaining = max(0, allowance - total_tokens) if allowance > 0 else 0
+        return {
+            "user_id": user_id,
+            "billing_period_month": month_key,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "cost_usd": cost_usd,
+            "call_count": call_count,
+            "last_call_at": last_call_at,
+            "allowance": allowance,
+            "remaining_tokens": remaining,
+        }
+
+    def decrement_trial_generations(self, user_id: str) -> int:
+        """Decrement the trial generations remaining for a user (min 0)."""
+        with self.pool.connection() as conn:
+            self.save_subscription(
+                user_id=user_id,
+                plan_tier="free",
+                status="inactive",
+                monthly_token_allowance=0,
+            )
+            conn.execute(
+                """
+                UPDATE user_subscriptions
+                SET trial_generations_remaining = MAX(0, trial_generations_remaining - 1),
+                    updated_at = ?
+                WHERE user_id = ?
+                """,
+                (datetime.now(timezone.utc).isoformat(), user_id),
+            )
+            conn.commit()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT trial_generations_remaining FROM user_subscriptions WHERE user_id = ?",
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row else 0

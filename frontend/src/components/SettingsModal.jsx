@@ -419,6 +419,35 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   <div className="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 bg-slate-900/50 font-sans">
   {activeTab === 'llm' && (
  <div className="space-y-6">
+
+ {/* Built-in AI & Subscription Callout */}
+ <div className="p-3.5 rounded-sm bg-gradient-to-r from-amber-950/40 via-slate-900 to-emerald-950/30 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+   <div className="flex items-center gap-3">
+     <div className="p-2 rounded-sm bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+       <Sparkles size={18} />
+     </div>
+     <div>
+       <div className="text-xs font-bold text-white flex items-center gap-2">
+         Platform Built-In AI Available
+         <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase">Zero Setup</span>
+       </div>
+       <p className="text-[11px] text-slate-300 mt-0.5">
+         Don't want to configure API keys? Pro members get built-in access to Claude 3.7 Sonnet & GPT-4o with zero developer setup.
+       </p>
+     </div>
+   </div>
+   <button
+     type="button"
+     onClick={() => {
+       if (typeof window !== 'undefined') {
+         window.dispatchEvent(new CustomEvent('open-pricing-modal', { detail: { reason: 'settings' } }));
+       }
+     }}
+     className="px-3.5 py-1.5 rounded-sm bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider shrink-0 transition-colors cursor-pointer self-start sm:self-center shadow-xs"
+   >
+     View Plans
+   </button>
+ </div>
  
  {/* Provider Selector Grid */}
  <div className="space-y-2.5">

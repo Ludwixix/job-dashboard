@@ -8,6 +8,7 @@ import { getLlmConfig } from './llmConfig';
 import { recordLlmUsage, estimateActionCost } from './llmCostService';
 import { getActiveProfile } from './profileService';
 import { getBackendApiBase } from './apiConfig';
+import { callAIProxy } from './billingService';
 
 export const ACTION_TOOLS = {
   RECRUITER_CRM: {
@@ -676,26 +677,35 @@ export const generateIntelligenceArtifact = async (toolKey, job, candidateProfil
   const toolMeta = ACTION_TOOLS[toolKey.toUpperCase()] || { label: toolKey };
   const prompts = buildToolPrompt(toolKey, job, candidateProfile);
 
-  // If no API key and model is not free, auto-route to free tier model
+  // Target model selection
   let targetModel = model;
-  if (!apiKey && !targetModel.includes(':free') && provider !== 'free') {
-    targetModel = 'meta-llama/llama-3.3-70b-instruct:free';
-  }
-
-  const headers = { 'Content-Type': 'application/json' };
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
-  }
-  if (provider === 'openrouter' || provider === 'free') {
-    headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
-    headers['X-Title'] = `Career.Agent Intelligence - ${toolMeta.label}`;
-  }
-
   let rawContent = '';
   let promptTokens = 0;
   let completionTokens = 0;
 
-  if (provider === 'anthropic' && apiKey) {
+  if (!apiKey) {
+    // Platform Built-In AI Route: Uses server proxy with platform master keys & subscription/trial
+    try {
+      const proxyRes = await callAIProxy({
+        messages: [
+          { role: 'system', content: prompts.system },
+          { role: 'user', content: prompts.user }
+        ],
+        model: model && !model.includes(':free') ? model : 'anthropic/claude-3.7-sonnet',
+        temperature: 0.2,
+        json_mode: true
+      });
+      rawContent = proxyRes?.content || '{}';
+      promptTokens = proxyRes?.usage?.prompt_tokens || 1200;
+      completionTokens = proxyRes?.usage?.completion_tokens || 600;
+      targetModel = proxyRes?.model || model || 'anthropic/claude-3.7-sonnet';
+    } catch (proxyErr) {
+      if (proxyErr.code === 'PAYMENT_REQUIRED') {
+        throw new Error('Platform Built-In AI trial completed. Please upgrade to Pro or configure your own OpenRouter/OpenAI API key in Settings.');
+      }
+      throw proxyErr;
+    }
+  } else if (provider === 'anthropic') {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -724,6 +734,13 @@ export const generateIntelligenceArtifact = async (toolKey, job, candidateProfil
     completionTokens = data?.usage?.output_tokens || 500;
   } else {
     // OpenAI-compatible format (OpenRouter, OpenAI, Gemini, DeepSeek, Free Tier)
+    const headers = { 'Content-Type': 'application/json' };
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    if (provider === 'openrouter' || provider === 'free') {
+      headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
+      headers['X-Title'] = `Career.Agent Intelligence - ${toolMeta.label}`;
+    }
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers,

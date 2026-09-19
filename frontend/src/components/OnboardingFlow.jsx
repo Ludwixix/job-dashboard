@@ -2106,7 +2106,15 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-[11px] text-slate-300">
  <div className="p-2.5 rounded-sm bg-slate-900/80 border border-slate-800">
  <div className="text-[9px] text-slate-500 uppercase font-bold">AI ENGINE</div>
- <div className="font-bold text-amber-400 truncate mt-0.5">{PROVIDERS[llmProvider]?.name || 'Configured'} ({llmModel.split('/').pop()})</div>
+ <div className="font-bold truncate mt-0.5">
+ {aiEngineMode === 'builtin' ? (
+ <span className="text-emerald-400 font-bold flex items-center gap-1">
+ <Sparkles size={11} className="inline shrink-0" /> Built-In (Claude 3.7)
+ </span>
+ ) : (
+ <span className="text-amber-400">{PROVIDERS[llmProvider]?.name || 'Configured'} ({llmModel.split('/').pop()})</span>
+ )}
+ </div>
  </div>
  <div className="p-2.5 rounded-sm bg-slate-900/80 border border-slate-800">
  <div className="text-[9px] text-slate-500 uppercase font-bold">INDUSTRY</div>

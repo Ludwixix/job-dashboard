@@ -434,6 +434,86 @@ class JobRepository:
                     ),
                 )
 
+    def find_fresh_matching_jobs(
+        self,
+        term: str,
+        location: str = "",
+        max_age_days: int = 21,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Find fresh relevant jobs in SQLite matching search term/keywords and location."""
+        if not term:
+            return []
+
+        cleaned_term = term.strip().lower()
+        search_pattern = f"%{cleaned_term}%"
+
+        clauses = ["lower(source) != 'gmail'"]
+        params: list[Any] = []
+
+        # Match across title, stream, and description
+        clauses.append(
+            "(lower(title) LIKE ? OR lower(stream) LIKE ? OR lower(description) LIKE ?)"
+        )
+        params.extend([search_pattern, search_pattern, search_pattern])
+
+        loc_clean = (location or "").strip().lower()
+        if loc_clean and loc_clean not in ("australia", "all", "remote"):
+            city_match = loc_clean.split(",")[0].strip()
+            if city_match:
+                clauses.append("(lower(location) LIKE ? OR remote = 1)")
+                params.append(f"%{city_match}%")
+
+        where_sql = " AND ".join(clauses)
+
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                f"SELECT data_json, status, posted FROM jobs WHERE {where_sql} ORDER BY score DESC, posted DESC",
+                params,
+            ).fetchall()
+
+        now_utc = datetime.now(timezone.utc)
+        results = []
+        for row in rows:
+            try:
+                data = json.loads(row["data_json"])
+                if str(data.get("source") or "").strip().lower() == "gmail":
+                    continue
+                posted_dt = self._parse_posted_timestamp(
+                    data.get("posted") or data.get("date")
+                )
+                if posted_dt is not None:
+                    posted_dt_utc = datetime.fromtimestamp(posted_dt, tz=timezone.utc)
+                    age_days = (now_utc - posted_dt_utc).total_seconds() / 86400.0
+                    if age_days > max_age_days:
+                        continue
+                data["status"] = row["status"]
+                results.append(data)
+                if len(results) >= limit:
+                    break
+            except Exception:
+                continue
+
+        return results
+
+    def has_sufficient_matching_jobs(
+        self,
+        term: str,
+        location: str = "",
+        threshold: int = 10,
+        max_age_days: int = 21,
+    ) -> tuple[bool, int]:
+        """Check if the SQLite database already contains sufficient fresh jobs for a term."""
+        matches = self.find_fresh_matching_jobs(
+            term=term,
+            location=location,
+            max_age_days=max_age_days,
+            limit=max(threshold + 5, 20),
+        )
+        count = len(matches)
+        return count >= threshold, count
+
     def replace_jobs(self, jobs: list[dict[str, Any]]) -> None:
         now = datetime.now(timezone.utc).isoformat()
         start_time = datetime.now()

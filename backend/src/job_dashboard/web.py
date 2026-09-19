@@ -260,6 +260,9 @@ class DashboardApp:
         self.application_tracker = get_smart_application_tracker(self.data_dir)
         # Phase 16: Recruiter & Talent Network CRM
         self.network_crm = NetworkCRMManager(self.data_dir / "jobs.sqlite3")
+        from .scrape_coordinator import ScrapeCoordinator
+
+        self.scrape_coordinator = ScrapeCoordinator(repo=self.repository)
         self.lock = threading.Lock()
         self.db_ready_event = threading.Event()
         if self.jobs:
@@ -1539,11 +1542,25 @@ class DashboardApp:
 
             queries_to_scrape = []
             cached_query_terms = []
+            db_satisfied_terms = []
 
             for q in normalized_queries:
                 term = q.term
                 loc = q.location
 
+                # 1. Database-First: Check if SQLite already has sufficient fresh matching jobs (>= 10)
+                if not force:
+                    has_cov, match_count = self.repository.has_sufficient_matching_jobs(
+                        term, loc, threshold=10, max_age_days=21
+                    )
+                    if has_cov:
+                        db_satisfied_terms.append(term)
+                        cached_query_terms.append(term)
+                        # Record cache entry with actual matching count
+                        self.repository.record_query_scrape(term, loc, match_count)
+                        continue
+
+                # 2. Query Scrape Cache: Check if scraped within TTL
                 if not force and self.repository.is_query_cached(
                     term, loc, ttl_hours=ttl_hours
                 ):
@@ -1629,6 +1646,7 @@ class DashboardApp:
                 "total_jobs": len(self.jobs),
                 "queries_scraped": len(queries_to_scrape),
                 "queries_cached": len(cached_query_terms),
+                "satisfied_from_db": db_satisfied_terms,
                 "cache_hit": len(queries_to_scrape) == 0,
                 "cached_terms": cached_query_terms,
                 "skipped_jobs_count": len(getattr(self, "last_skipped_jobs", [])),
@@ -3545,6 +3563,16 @@ def make_handler(app: DashboardApp):
                 filters["match_score_min"] = int(query.get("match_score_min", [0])[0])
                 jobs = app.public_jobs(filters)
                 self.send_json(200, {"success": True, "jobs": jobs})
+                return
+
+            if path == "/api/scrape/status":
+                if hasattr(app, "scrape_coordinator") and app.scrape_coordinator:
+                    self.send_json(200, app.scrape_coordinator.get_status())
+                else:
+                    self.send_json(
+                        200,
+                        {"success": True, "is_scraping": False, "queue_depth": 0},
+                    )
                 return
 
             if path in ("/api/metrics/summary", "/api/stats"):

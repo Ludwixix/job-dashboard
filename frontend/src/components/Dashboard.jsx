@@ -537,16 +537,17 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  clearInterval(timer);
  applyIndustryTheme(industry);
  refetch();
- const stats = result.cacheStats || {};
- setScrapeProgress({
- isActive: false,
- percent: 100,
- stage: stats.cache_hit ? 'Index already fresh' : 'Discovery Complete!',
- elapsedSec: Math.round((Date.now() - startTime) / 1000),
- totalDiscovered: stats.total_jobs || result.jobs.length
- });
- setProfileScrapeStatus('done');
- setProfileScrapeMsg(`✅ ${stats.cache_hit ? 'Using the fresh indexed roles' : `Updated index with ${industry} opportunities`}`);
+    const stats = result.cacheStats || {};
+    const fromDb = Boolean(stats.satisfied_from_db && stats.satisfied_from_db.length > 0);
+    setScrapeProgress({
+      isActive: false,
+      percent: 100,
+      stage: fromDb ? 'Database Index Match' : stats.cache_hit ? 'Index already fresh' : 'Discovery Complete!',
+      elapsedSec: Math.round((Date.now() - startTime) / 1000),
+      totalDiscovered: stats.total_jobs || result.jobs.length
+    });
+    setProfileScrapeStatus('done');
+    setProfileScrapeMsg(`✅ ${fromDb ? `Instant match: Loaded ${industry} opportunities from database` : stats.cache_hit ? 'Using the fresh indexed roles' : `Updated index with ${industry} opportunities`}`);
  setTimeout(() => {
  setScrapeProgress(prev => ({ ...prev, percent: 0, stage: '' }));
  setProfileScrapeStatus(null);
@@ -585,7 +586,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     if (shouldScrape && activeProfile) {
       initialScrapeTriggeredRef.current = true;
       sessionStorage.removeItem('trigger_initial_scrape');
-      triggerDiscoveryScrape(activeProfile, { force: true });
+      triggerDiscoveryScrape(activeProfile, { force: false });
     }
   }, [currentUser?.isNewUser, activeProfile, triggerDiscoveryScrape]);
 

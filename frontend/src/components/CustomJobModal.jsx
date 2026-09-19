@@ -110,25 +110,41 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
  docsGeneratedAt: new Date().toISOString(),
  };
 
- // Persist to custom jobs storage so it appears in the JobSeeker list
- try {
- const existingCustom = JSON.parse(localStorage.getItem('job_dashboard_custom_jobs') || '[]');
- const filteredCustom = existingCustom.filter(j => j.id !== jobId);
- filteredCustom.unshift(updatedJob);
- localStorage.setItem('job_dashboard_custom_jobs', JSON.stringify(filteredCustom));
- } catch (err) {
- console.warn('Failed to save to job_dashboard_custom_jobs:', err);
- }
+  // Persist to custom jobs storage so it appears in the JobSeeker list
+  try {
+    const existingCustom = JSON.parse(localStorage.getItem('job_dashboard_custom_jobs') || '[]');
+    const filteredCustom = existingCustom.filter(j => j.id !== jobId);
+    filteredCustom.unshift(updatedJob);
+    try {
+      localStorage.setItem('job_dashboard_custom_jobs', JSON.stringify(filteredCustom));
+    } catch {
+      // Self-healing: Evict non-essential cached models & psychology blobs, then retry
+      try {
+        localStorage.removeItem('openrouter_cached_models');
+        localStorage.removeItem('job_dashboard_psychology_cache');
+        localStorage.setItem('job_dashboard_custom_jobs', JSON.stringify(filteredCustom));
+      } catch (retryErr) {
+        console.warn('Quota exceeded even after cache eviction:', retryErr);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to save to job_dashboard_custom_jobs:', err);
+  }
 
- try {
- const localApps = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
- localApps[jobId] = { ...updatedJob, applied_at: new Date().toISOString(), notes: 'Custom job posting' };
- localStorage.setItem('job_dashboard_local_applications', JSON.stringify(localApps));
- } catch {}
+  try {
+    const localApps = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+    localApps[jobId] = { ...updatedJob, applied_at: new Date().toISOString(), notes: 'Custom job posting' };
+    try {
+      localStorage.setItem('job_dashboard_local_applications', JSON.stringify(localApps));
+    } catch {
+      localStorage.removeItem('openrouter_cached_models');
+      localStorage.setItem('job_dashboard_local_applications', JSON.stringify(localApps));
+    }
+  } catch {}
 
- try {
- await saveUserApplicationToBackend(updatedJob, profile?.id);
- } catch {}
+  try {
+    await saveUserApplicationToBackend(updatedJob, profile?.id);
+  } catch {}
 
  setStatusMsg('Downloading tailored PDFs...');
  if (docs.resume) {

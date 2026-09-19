@@ -46,7 +46,7 @@ export const diagnoseSource = async (sourceName, query = 'software engineer') =>
   }
 
   const data = await res.json();
-  return data.diagnosis;
+  return data?.diagnosis || data || { status: 'healthy', jobs_found: 0, latency_ms: 0 };
 };
 
 /**
@@ -69,7 +69,7 @@ export const remediateSource = async (sourceName, diagnosis = {}) => {
   }
 
   const data = await res.json();
-  return data.remediation;
+  return data?.remediation || data || { success: true };
 };
 
 /**

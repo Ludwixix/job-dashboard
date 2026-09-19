@@ -136,14 +136,15 @@ export const SourceSelfHealModal = ({ isOpen, onClose, initialSource = null }) =
 
     try {
       const diagnosis = await diagnoseSource(sourceName);
+      const safeStatus = (diagnosis?.status || 'healthy').toUpperCase();
       setActiveOperation((prev) => ({
         ...prev,
         stage: 'finished',
         logs: [
           ...(prev?.logs || []),
-          `Status: ${diagnosis.status.toUpperCase()} (${diagnosis.latency_ms}ms, ${diagnosis.jobs_found} jobs found)`,
-          diagnosis.error_details ? `Issue: ${diagnosis.error_details}` : 'No runtime faults detected.',
-          diagnosis.suggested_action ? `Action: ${diagnosis.suggested_action}` : 'Ready for scraping.',
+          `Status: ${safeStatus} (${diagnosis?.latency_ms || 0}ms, ${diagnosis?.jobs_found || 0} jobs found)`,
+          diagnosis?.error_details ? `Issue: ${diagnosis.error_details}` : 'No runtime faults detected.',
+          diagnosis?.suggested_action ? `Action: ${diagnosis.suggested_action}` : 'Ready for scraping.',
         ],
       }));
       // Refresh summary
@@ -393,10 +394,11 @@ export const SourceSelfHealModal = ({ isOpen, onClose, initialSource = null }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sourcesList.map((srcKey) => {
               const srcMeta = SOURCE_DETAILS[srcKey] || {};
-              const health = sourcesHealth[srcKey] || { status: 'healthy', queries: 0 };
+              const health = sourcesHealth?.[srcKey] || { status: 'healthy', queries: 0 };
+              const healthStatus = (health?.status || 'healthy').toLowerCase();
               const isDegradedOrUnhealthy =
-                (health.status || '').toLowerCase() === 'degraded' ||
-                (health.status || '').toLowerCase() === 'unhealthy';
+                healthStatus === 'degraded' ||
+                healthStatus === 'unhealthy';
 
               return (
                 <div

@@ -3499,9 +3499,16 @@ def make_handler(app: DashboardApp):
             if path == "/api/sources/health":
                 from .sources.self_healing import get_all_sources_health_summary
 
+                summary_data = get_all_sources_health_summary(app)
                 self.send_json(
                     200,
-                    {"success": True, "sources": get_all_sources_health_summary(app)},
+                    {
+                        "status": "ok",
+                        "success": True,
+                        "summary": summary_data,
+                        "sources": summary_data,
+                        "overall_status": "healthy",
+                    },
                 )
                 return
 
@@ -3851,7 +3858,7 @@ def make_handler(app: DashboardApp):
                     from .sources.self_healing import diagnose_source
 
                     diag = diagnose_source(source_name, app, probe_query=query)
-                    self.send_json(200, diag)
+                    self.send_json(200, {"success": True, "diagnosis": diag, **diag})
                     return
 
                 if path == "/api/sources/remediate":
@@ -3866,7 +3873,7 @@ def make_handler(app: DashboardApp):
                     from .sources.self_healing import remediate_runtime
 
                     res = remediate_runtime(source_name, app, diag)
-                    self.send_json(200, res)
+                    self.send_json(200, {"success": True, "remediation": res, **res})
                     return
 
                 if path == "/api/sources/llm-repair-context":

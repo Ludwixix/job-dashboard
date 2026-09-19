@@ -270,11 +270,8 @@ def process_stripe_webhook(
         if webhook_secret:
             try:
                 import stripe
-
                 stripe.api_key = stripe_key
-                event = stripe.Webhook.construct_event(
-                    payload, sig_header, webhook_secret
-                )
+                event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
             except ImportError:
                 logger.info("Stripe SDK not installed, parsing webhook JSON directly.")
                 event = json.loads(payload.decode("utf-8"))

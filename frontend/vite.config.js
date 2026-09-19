@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: '/',
   
   define: {
     __API_BASE_URL__: JSON.stringify(process.env.VITE_API_BASE_URL || ''),

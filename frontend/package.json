@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && rm -rf ../backend/src/job_dashboard/static/assets && cp -r dist/* ../backend/src/job_dashboard/static/",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",

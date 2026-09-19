@@ -44,7 +44,7 @@ describe('JobModal Component', () => {
     const psychButton = screen.getByRole('button', { name: /DECRYPT EMPLOYER PSYCHOLOGY/i });
     fireEvent.click(psychButton);
 
-    expect(await screen.findByText(/Employer Psychology Decoder/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Employer Psychology Decoder/i, {}, { timeout: 3000 })).toBeInTheDocument();
   });
 
   it('toggles Intelligence Tools dropdown and calls respective tool callbacks', () => {

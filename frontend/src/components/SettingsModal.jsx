@@ -68,42 +68,48 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  const [newQueryLocation, setNewQueryLocation] = useState('');
  const [isRegenerating, setIsRegenerating] = useState(false);
 
- // Synchronize state from storage whenever modal opens
- useEffect(() => {
- if (isOpen) {
- const config = getLlmConfig();
- setActiveProvider(config.provider || 'openrouter');
- setSelectedModel(config.model || PROVIDERS[config.provider || 'openrouter']?.defaultModel || '');
- setApiKeyInput(config.apiKey || '');
- setEndpointInput(config.endpoint || PROVIDERS[config.provider || 'openrouter']?.defaultEndpoint || '');
- setCustomModelInput(config.customModel || '');
+  // Synchronize state from storage whenever modal opens
+  useEffect(() => {
+    let isMounted = true;
+    if (isOpen) {
+      const config = getLlmConfig();
+      setActiveProvider(config.provider || 'openrouter');
+      setSelectedModel(config.model || PROVIDERS[config.provider || 'openrouter']?.defaultModel || '');
+      setApiKeyInput(config.apiKey || '');
+      setEndpointInput(config.endpoint || PROVIDERS[config.provider || 'openrouter']?.defaultEndpoint || '');
+      setCustomModelInput(config.customModel || '');
 
- const currentProviderMeta = PROVIDERS[config.provider || 'openrouter'];
- const isPreset = (config.provider === 'openrouter' ? openRouterModels : currentProviderMeta?.models)?.some(m => m.id === config.model);
- setIsCustomModel(!isPreset && Boolean(config.customModel));
+      const currentProviderMeta = PROVIDERS[config.provider || 'openrouter'];
+      const isPreset = (config.provider === 'openrouter' ? openRouterModels : currentProviderMeta?.models)?.some(m => m.id === config.model);
+      setIsCustomModel(!isPreset && Boolean(config.customModel));
 
- if ((config.provider || 'openrouter') === 'openrouter') {
- fetchOpenRouterModels().then((models) => {
- if (models && models.length > 0) {
- setOpenRouterModels(models);
- }
- });
- }
+      if ((config.provider || 'openrouter') === 'openrouter') {
+        fetchOpenRouterModels()
+          .then((models) => {
+            if (isMounted && typeof window !== 'undefined' && models && models.length > 0) {
+              setOpenRouterModels(models);
+            }
+          })
+          .catch(() => {});
+      }
 
- setAuEnglish(localStorage.getItem('pref_au_english') !== 'false');
- setDefaultLocation(localStorage.getItem('job_dashboard_base_location') || 'Melbourne, VIC');
- setMatchThreshold(parseInt(localStorage.getItem('pref_match_threshold') || '75', 10));
- const wf = getWorkforceSettings();
- setWorkforceEnabled(wf.enabled);
- setWorkforceTarget(wf.pointsTarget);
- setWorkforceCycleDay(wf.cycleStartDay);
- setWorkforceJsid(wf.jobseekerId);
- setWorkforceProvider(wf.providerName);
+      setAuEnglish(localStorage.getItem('pref_au_english') !== 'false');
+      setDefaultLocation(localStorage.getItem('job_dashboard_base_location') || 'Melbourne, VIC');
+      setMatchThreshold(parseInt(localStorage.getItem('pref_match_threshold') || '75', 10));
+      const wf = getWorkforceSettings();
+      setWorkforceEnabled(wf.enabled);
+      setWorkforceTarget(wf.pointsTarget);
+      setWorkforceCycleDay(wf.cycleStartDay);
+      setWorkforceJsid(wf.jobseekerId);
+      setWorkforceProvider(wf.providerName);
 
- setTestResult(null);
- setSaveSuccess(false);
- }
- }, [isOpen]);
+      setTestResult(null);
+      setSaveSuccess(false);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
 
  // When user switches provider tab
  const handleSelectProvider = (providerId) => {

@@ -34,6 +34,18 @@ export const normalizeOpenRouterModel = (m = {}) => {
   };
 };
 
+// Self-heal: If localStorage has bloated legacy models (> 50KB), prune immediately
+if (typeof window !== 'undefined') {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_OR_MODELS);
+    if (raw && raw.length > 50000) {
+      localStorage.removeItem(STORAGE_KEY_OR_MODELS);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Synchronously returns cached OpenRouter models or fallback presets.
  *
@@ -48,6 +60,10 @@ export const getOpenRouterModels = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_OR_MODELS);
       if (raw) {
+        if (raw.length > 50000) {
+          localStorage.removeItem(STORAGE_KEY_OR_MODELS);
+          return PROVIDERS.openrouter.models;
+        }
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           inMemoryOpenRouterModels = parsed;
@@ -104,10 +120,21 @@ export const fetchOpenRouterModels = async ({ force = false } = {}) => {
 
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEY_OR_MODELS, JSON.stringify(normalized));
+          // Store only a lightweight subset (top 50 models without long descriptions, ~4KB)
+          const leanForCache = normalized.slice(0, 50).map(m => ({
+            id: m.id,
+            name: m.name,
+            isFree: m.isFree,
+            pricing: m.pricing
+          }));
+          localStorage.setItem(STORAGE_KEY_OR_MODELS, JSON.stringify(leanForCache));
           localStorage.setItem(STORAGE_KEY_OR_TIMESTAMP, String(Date.now()));
-        } catch (storageErr) {
-          console.warn('Could not cache OpenRouter models in localStorage:', storageErr);
+        } catch {
+          // If storage quota is still tight, silently purge the models cache to free space
+          try {
+            localStorage.removeItem(STORAGE_KEY_OR_MODELS);
+          } catch {}
+          console.warn('OpenRouter models cached in memory only (localStorage quota protected)');
         }
       }
 

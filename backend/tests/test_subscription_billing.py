@@ -208,24 +208,14 @@ def test_ai_proxy_free_trial_and_exhaustion(tmp_path):
         "usage": {"prompt_tokens": 100, "completion_tokens": 50},
     }
 
-    with (
-        patch(
-            "job_dashboard.billing.get_server_openrouter_key", return_value="test_key"
-        ),
-        patch("job_dashboard.billing.forward_to_openrouter", return_value=mock_res),
-    ):
+    with patch("job_dashboard.billing.get_server_openrouter_key", return_value="test_key"), \
+         patch("job_dashboard.billing.forward_to_openrouter", return_value=mock_res):
         # 1st call: should succeed under trial
-        payload = {
-            "model": "google/gemini-2.0-flash",
-            "messages": [{"role": "user", "content": "test"}],
-        }
+        payload = {"model": "google/gemini-2.0-flash", "messages": [{"role": "user", "content": "test"}]}
         body = json.dumps(payload).encode("utf-8")
         handler = handler_cls.__new__(handler_cls)
         handler.path = "/api/ai/proxy"
-        handler.headers = {
-            "Content-Length": str(len(body)),
-            "Authorization": f"Bearer {token}",
-        }
+        handler.headers = {"Content-Length": str(len(body)), "Authorization": f"Bearer {token}"}
         handler.rfile = io.BytesIO(body)
         handler.wfile = io.BytesIO()
         handler.client_address = ("127.0.0.1", 12345)
@@ -244,10 +234,7 @@ def test_ai_proxy_free_trial_and_exhaustion(tmp_path):
         # 2nd call: trial exhausted, should return 402 Payment Required
         handler2 = handler_cls.__new__(handler_cls)
         handler2.path = "/api/ai/proxy"
-        handler2.headers = {
-            "Content-Length": str(len(body)),
-            "Authorization": f"Bearer {token}",
-        }
+        handler2.headers = {"Content-Length": str(len(body)), "Authorization": f"Bearer {token}"}
         handler2.rfile = io.BytesIO(body)
         handler2.wfile = io.BytesIO()
         handler2.client_address = ("127.0.0.1", 12345)
@@ -308,3 +295,4 @@ def test_stripe_webhook_activates_subscription(tmp_path):
         assert sub["plan_tier"] == "pro_monthly"
         assert sub["stripe_customer_id"] == "cus_stripe_real_123"
         assert sub["monthly_token_allowance"] == 500000
+

@@ -5,8 +5,10 @@
  */
 
 import { getBackendApiBase } from './apiConfig';
+import { getActiveProfile } from './profileService';
 
-const MELBOURNE_SUBURB_COORDINATES = {
+const AU_LOCATION_COORDINATES = {
+  // Victoria
   'melbourne': { lat: -37.8136, lon: 144.9631 },
   'cbd': { lat: -37.8136, lon: 144.9631 },
   'richmond': { lat: -37.8230, lon: 144.9980 },
@@ -40,7 +42,36 @@ const MELBOURNE_SUBURB_COORDINATES = {
   'hawthorn': { lat: -37.8220, lon: 145.0350 },
   'camberwell': { lat: -37.8280, lon: 145.0580 },
   'parkville': { lat: -37.7870, lon: 144.9510 },
-  'geelong': { lat: -38.1499, lon: 144.3617 }
+  'geelong': { lat: -38.1499, lon: 144.3617 },
+  'ballarat': { lat: -37.5622, lon: 143.8503 },
+  'bendigo': { lat: -36.7570, lon: 144.2794 },
+  // New South Wales
+  'sydney': { lat: -33.8688, lon: 151.2093 },
+  'north sydney': { lat: -33.8358, lon: 151.2071 },
+  'parramatta': { lat: -33.8150, lon: 151.0011 },
+  'chatswood': { lat: -33.7961, lon: 151.1831 },
+  'macquarie park': { lat: -33.7745, lon: 151.1219 },
+  'surry hills': { lat: -33.8860, lon: 151.2110 },
+  'newcastle': { lat: -32.9283, lon: 151.7817 },
+  'wollongong': { lat: -34.4278, lon: 150.8931 },
+  // Queensland
+  'brisbane': { lat: -27.4698, lon: 153.0251 },
+  'fortitude valley': { lat: -27.4578, lon: 153.0367 },
+  'south brisbane': { lat: -27.4795, lon: 153.0188 },
+  'gold coast': { lat: -28.0167, lon: 153.4000 },
+  'sunshine coast': { lat: -26.6500, lon: 153.0667 },
+  // Western Australia
+  'perth': { lat: -31.9505, lon: 115.8605 },
+  'fremantle': { lat: -32.0569, lon: 115.7439 },
+  // South Australia
+  'adelaide': { lat: -34.9285, lon: 138.6007 },
+  'norwood': { lat: -34.9217, lon: 138.6342 },
+  // ACT
+  'canberra': { lat: -35.2809, lon: 149.1300 },
+  // Tasmania
+  'hobart': { lat: -42.8821, lon: 147.3272 },
+  // Northern Territory
+  'darwin': { lat: -12.4634, lon: 130.8456 }
 };
 
 /**
@@ -50,8 +81,13 @@ export const calculateCandidateDistanceKm = (jobLocationStr = '', candidateLocat
   const jobLoc = (jobLocationStr || '').toLowerCase();
   const candLoc = (candidateLocationStr || '').toLowerCase();
 
+  // If either location is remote, commute distance is zero
+  if (jobLoc.includes('remote') || candLoc.includes('remote') || jobLoc.includes('wfh')) {
+    return 0;
+  }
+
   let jobCoords = null;
-  for (const [suburb, coords] of Object.entries(MELBOURNE_SUBURB_COORDINATES)) {
+  for (const [suburb, coords] of Object.entries(AU_LOCATION_COORDINATES)) {
     if (jobLoc.includes(suburb)) {
       jobCoords = coords;
       break;
@@ -59,24 +95,22 @@ export const calculateCandidateDistanceKm = (jobLocationStr = '', candidateLocat
   }
 
   let candCoords = null;
-  for (const [suburb, coords] of Object.entries(MELBOURNE_SUBURB_COORDINATES)) {
+  for (const [suburb, coords] of Object.entries(AU_LOCATION_COORDINATES)) {
     if (candLoc.includes(suburb)) {
       candCoords = coords;
       break;
     }
   }
 
-  if (!candCoords) {
-    candCoords = MELBOURNE_SUBURB_COORDINATES['melbourne'];
-  }
-
-  if (!jobCoords) {
-    // If job is CBD or general Melbourne
-    if (jobLoc.includes('melbourne') || jobLoc.includes('vic')) {
-      jobCoords = MELBOURNE_SUBURB_COORDINATES['cbd'];
-    } else {
-      return 15; // default fallback km
+  if (!candCoords || !jobCoords) {
+    // If state matches (e.g. both VIC, both NSW), return realistic regional distance
+    const states = ['nsw', 'vic', 'qld', 'wa', 'sa', 'act', 'tas', 'nt'];
+    for (const st of states) {
+      if (jobLoc.includes(st) && candLoc.includes(st)) {
+        return 12;
+      }
     }
+    return 15; // neutral fallback distance without forcing Melbourne CBD
   }
 
   const R = 6371; // Earth radius in km
@@ -275,12 +309,30 @@ export const resetUserPreferences = () => {
  */
 export const calculateCandidateJobMatch = (job, profile, customPrefs = null) => {
   const prefs = customPrefs || getUserPreferences();
-  if (!job || !profile) {
+  if (!job) {
     return {
-      score: job?.score || 85,
-      matchedSkills: job?.tags || [],
+      score: 50,
+      matchedSkills: [],
       missingSkills: [],
-      matchTier: 'High Fit'
+      matchTier: 'Unscored'
+    };
+  }
+
+  // If candidate has no profile, no titles, and no skills, return neutral baseline
+  const hasProfileData = Boolean(
+    profile && (
+      profile.title ||
+      (Array.isArray(profile.targetTitles) && profile.targetTitles.length > 0) ||
+      (Array.isArray(profile.coreSkills) && profile.coreSkills.length > 0)
+    )
+  );
+
+  if (!hasProfileData) {
+    return {
+      score: job.score || 50,
+      matchedSkills: [],
+      missingSkills: [],
+      matchTier: 'Unscored'
     };
   }
 
@@ -375,7 +427,7 @@ export const calculateCandidateJobMatch = (job, profile, customPrefs = null) => 
 
   return {
     score: calculatedScore,
-    matchedSkills: matchedSkills.length > 0 ? matchedSkills : (job.tags || []).slice(0, 3),
+    matchedSkills: matchedSkills,
     distanceKm: distanceKm,
     matchTier: matchTier,
     feedbackBonus: feedbackBonus

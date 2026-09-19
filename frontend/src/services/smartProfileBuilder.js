@@ -35,7 +35,7 @@ const INDUSTRY_SKILL_MAP = {
 /**
  * Extracts and synthesizes a high-accuracy job title and seniority level from a list of applied roles
  */
-export const inferCandidateTitle = (applications = [], defaultTitle = 'Senior IT Systems & Infrastructure Engineer') => {
+export const inferCandidateTitle = (applications = [], defaultTitle = '') => {
   if (!applications || applications.length === 0) return defaultTitle;
 
   const titleCounts = {};
@@ -49,7 +49,7 @@ export const inferCandidateTitle = (applications = [], defaultTitle = 'Senior IT
   if (sortedTitles.length > 0) {
     const topRole = sortedTitles[0][0];
     if (!topRole.toLowerCase().includes('senior') && !topRole.toLowerCase().includes('lead') && !topRole.toLowerCase().includes('specialist')) {
-      return `Senior ${topRole} & Systems Specialist`;
+      return `Senior ${topRole}`;
     }
     return topRole;
   }
@@ -72,19 +72,6 @@ export const deriveTargetTitles = (applications = [], candidateTitle = '') => {
         titles.add(clean);
       }
     }
-  });
-
-  const fallbackTitles = [
-    'Senior Systems Engineer',
-    'M365 & Cloud Infrastructure Specialist',
-    'Cloud Endpoint Engineer',
-    'SharePoint & Collaboration Administrator',
-    'IT Operations Lead',
-    'Platform Support Engineer'
-  ];
-
-  fallbackTitles.forEach(fb => {
-    if (titles.size < 6) titles.add(fb);
   });
 
   return Array.from(titles).slice(0, 6);
@@ -128,7 +115,7 @@ export const extractCoreSkills = (applications = [], industry = 'Technology & IT
  * Determines primary candidate industry from applications
  */
 export const inferPrimaryIndustry = (applications = []) => {
-  if (!applications || applications.length === 0) return 'Technology & IT';
+  if (!applications || applications.length === 0) return 'General';
 
   const industryScores = {
     'Technology & IT': 0,
@@ -146,7 +133,7 @@ export const inferPrimaryIndustry = (applications = []) => {
     if (text.includes('system') || text.includes('it support') || text.includes('engineer') || text.includes('m365') || text.includes('azure')) {
       industryScores['Technology & IT'] += 3;
     }
-    if (text.includes('nurse') || text.includes('clinical') || text.includes('doctor') || text.includes('patient')) {
+    if (text.includes('nurse') || text.includes('clinical') || text.includes('doctor') || text.includes('patient') || text.includes('hospital')) {
       industryScores['Healthcare & Clinical'] += 3;
     }
     if (text.includes('accountant') || text.includes('finance') || text.includes('payroll') || text.includes('tax')) {
@@ -158,7 +145,7 @@ export const inferPrimaryIndustry = (applications = []) => {
   });
 
   const sorted = Object.entries(industryScores).sort((a, b) => b[1] - a[1]);
-  return sorted[0][1] > 0 ? sorted[0][0] : 'Technology & IT';
+  return sorted[0][1] > 0 ? sorted[0][0] : 'General';
 };
 
 /**
@@ -168,11 +155,11 @@ export const synthesizeUserProfile = ({
   googleUser = {},
   gmailApplications = [],
   existingProfile = null,
-  baseLocation = 'BALACLAVA VIC 3183'
+  baseLocation = ''
 }) => {
-  const name = googleUser.name || existingProfile?.name || 'Candidate';
-  const email = googleUser.email || existingProfile?.email || 'candidate@gmail.com';
-  const profileId = email ? `prof_${email.replace(/[^a-zA-Z0-9]/g, '_')}` : (existingProfile?.id || 'default_candidate');
+  const name = googleUser.name || existingProfile?.name || '';
+  const email = googleUser.email || existingProfile?.email || '';
+  const profileId = email ? `prof_${email.replace(/[^a-zA-Z0-9]/g, '_')}` : (existingProfile?.id || `cand_${Date.now()}`);
 
   const isSamLudwig = (email && email.toLowerCase() === 'sam.ludwig@gmail.com') ||
                       (name && name.toLowerCase().includes('sam') && name.toLowerCase().includes('ludwig'));
@@ -206,8 +193,8 @@ export const synthesizeUserProfile = ({
     };
   }
 
-  const industry = inferPrimaryIndustry(gmailApplications);
-  const title = inferCandidateTitle(gmailApplications, existingProfile?.title || 'Senior IT Systems & Infrastructure Engineer');
+  const industry = existingProfile?.industry || inferPrimaryIndustry(gmailApplications);
+  const title = inferCandidateTitle(gmailApplications, existingProfile?.title || '');
   const targetTitles = deriveTargetTitles(gmailApplications, title);
   const coreSkills = extractCoreSkills(gmailApplications, industry);
 
@@ -216,29 +203,24 @@ export const synthesizeUserProfile = ({
   if (baseLocation) {
     const parts = baseLocation.split(' ');
     if (parts.length > 0) suburb = parts[0];
-    location = `Melbourne, VIC (${baseLocation})`;
+    location = baseLocation;
   }
 
   const summaryBullets = [
-    `Demonstrated enterprise track record delivering high-availability infrastructure, identity security, and endpoint engineering.`,
-    `Extensive expertise across ${coreSkills.slice(0, 5).join(', ')} with proven SLA first-contact resolution.`,
-    `Automated complex multi-step batch operations, driving significant operational efficiency and reducing recurring incidents.`,
-    `Strong cross-functional stakeholder communication, Root Cause Analysis (RCA), and adherence to compliance frameworks.`
+    title ? `Demonstrated track record as ${title} with proven outcome-driven delivery.` : 'Demonstrated professional track record with proven outcome-driven delivery.',
+    coreSkills.length > 0 ? `Core domain expertise across ${coreSkills.slice(0, 5).join(', ')}.` : 'Broad domain expertise and collaborative execution.',
+    'Strong cross-functional stakeholder communication, structured problem-solving, and adherence to quality standards.'
   ];
 
   const fullExperience = `
-${name.toUpperCase()} — ${title}
-Location: ${location} | Email: ${email}
-Australian Citizen | Baseline / NV1 Ready | LinkedIn: linkedin.com/in/${name.toLowerCase().replace(/\s+/g, '-')}
+${name ? name.toUpperCase() : 'CANDIDATE'}${title ? ` — ${title}` : ''}
+${location ? `Location: ${location} | ` : ''}${email ? `Email: ${email}` : ''}
 
 PROFESSIONAL PROFILE:
-Senior infrastructure specialist and technology consultant with extensive expertise managing mission-critical enterprise environments, automation frameworks, and cloud endpoints.
+${summaryBullets.join('\n')}
 
-CORE COMPETENCIES:
-${coreSkills.join(' • ')}
-
-TARGET CAREER PATHWAYS:
-${targetTitles.join(' • ')}
+${coreSkills.length > 0 ? `CORE COMPETENCIES:\n${coreSkills.join(' • ')}\n` : ''}
+${targetTitles.length > 0 ? `TARGET ROLES:\n${targetTitles.join(' • ')}` : ''}
   `.trim();
 
   const synthesized = {

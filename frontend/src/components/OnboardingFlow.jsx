@@ -11,7 +11,7 @@ import {
   loginWithEmail, registerWithEmail, completeOnboarding, loginWithDemoPersona,
   verifyEmail, resendVerificationCode, validatePasswordStrength 
 } from '../services/authService';
-import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES, saveProfileToBackend } from '../services/profileService';
+import { parseResumeWithAI, parseResumeTextClientSide, DEFAULT_PROFILES, saveProfile, saveProfileToBackend } from '../services/profileService';
 import { loginWithBrowserPasskey, isPasskeySupported, storeBrowserCredentials } from '../services/passkeyService';
 import { loginWithGoogle } from '../services/googleAuthService';
 import { GooglePromptModal } from './GooglePromptModal';
@@ -158,20 +158,44 @@ const CLEARANCE_OPTIONS = [
  'White Card / Industry Specific Cleared'
 ];
 
+const ONBOARDING_DRAFT_KEY = 'job_dashboard_onboarding_draft';
+
 export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = null }) => {
   const [currentUser, setCurrentUser] = useState(initialUser);
+
+  // Restore draft if saved previously for seamless continuation across page reloads/browser restarts
+  const savedDraft = useMemo(() => {
+    try {
+      if (typeof localStorage === 'undefined') return null;
+      const raw = localStorage.getItem(ONBOARDING_DRAFT_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (initialUser?.email && parsed?.profileData?.email && parsed.profileData.email.toLowerCase() !== initialUser.email.toLowerCase()) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, [initialUser?.email]);
+
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(() => {
     if (initialUser) {
       return !initialUser.email_verified;
     }
     return false;
   });
+
   const [step, setStep] = useState(() => {
+    if (savedDraft?.step && (!initialUser || initialUser.email_verified || savedDraft.step > 1)) {
+      return savedDraft.step;
+    }
     if (initialUser) {
       return initialUser.email_verified ? 2 : 1;
     }
     return 1;
   });
+
   const [authMode, setAuthMode] = useState('login'); // 'login', 'signup'
   
   // Step 1 Auth state
@@ -191,36 +215,36 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
   // Step 2 AI Intelligence Engine state
   const initialLlmConfig = useMemo(() => getLlmConfig(), []);
-  const [llmProvider, setLlmProvider] = useState(() => initialLlmConfig.provider || 'openrouter');
-  const [llmModel, setLlmModel] = useState(() => initialLlmConfig.model || 'anthropic/claude-3.7-sonnet');
-  const [llmApiKey, setLlmApiKey] = useState(() => initialLlmConfig.apiKey || '');
+  const [llmProvider, setLlmProvider] = useState(() => savedDraft?.llmProvider || initialLlmConfig.provider || 'openrouter');
+  const [llmModel, setLlmModel] = useState(() => savedDraft?.llmModel || initialLlmConfig.model || 'anthropic/claude-3.7-sonnet');
+  const [llmApiKey, setLlmApiKey] = useState(() => savedDraft?.llmApiKey || initialLlmConfig.apiKey || '');
   const [llmEndpoint, setLlmEndpoint] = useState(() => initialLlmConfig.endpoint || '');
   const [showApiKey, setShowApiKey] = useState(false);
   const [llmTesting, setLlmTesting] = useState(false);
   const [llmTestResult, setLlmTestResult] = useState(null);
   const [llmError, setLlmError] = useState('');
 
-  // Step 3-5 Profile Builder state — blank canvas for every new user
+  // Step 3-5 Profile Builder state — blank canvas by default, or restored from draft
   const [profileData, setProfileData] = useState(() => ({
-    id: initialUser?.id || initialUser?.profileId || `profile_${Date.now()}`,
-    name: initialUser?.name || '',
-    email: initialUser?.email || '',
-    phone: initialUser?.phone || '',
-    title: initialUser?.title || '',
-    industry: initialUser?.industry || '',
-    seniorityLevel: initialUser?.seniorityLevel || '',
-    location: initialUser?.location || '',
-    suburb: initialUser?.suburb || '',
-    workMode: initialUser?.workMode || 'Any / Flexible',
-    targetSalary: initialUser?.targetSalary || '',
-    workRights: initialUser?.workRights || '',
-    clearance: initialUser?.clearance || '',
-    targetTitles: initialUser?.targetTitles || [],
-    coreSkills: initialUser?.coreSkills || [],
-    certifications: initialUser?.certifications || [],
-    workHistorySummary: initialUser?.workHistorySummary || '',
-    fullWorkExperienceText: initialUser?.fullWorkExperienceText || '',
-    email_verified: Boolean(initialUser?.email_verified)
+    id: savedDraft?.profileData?.id || initialUser?.id || initialUser?.profileId || `profile_${Date.now()}`,
+    name: savedDraft?.profileData?.name || initialUser?.name || '',
+    email: savedDraft?.profileData?.email || initialUser?.email || '',
+    phone: savedDraft?.profileData?.phone || initialUser?.phone || '',
+    title: savedDraft?.profileData?.title || initialUser?.title || '',
+    industry: savedDraft?.profileData?.industry || initialUser?.industry || '',
+    seniorityLevel: savedDraft?.profileData?.seniorityLevel || initialUser?.seniorityLevel || '',
+    location: savedDraft?.profileData?.location || initialUser?.location || '',
+    suburb: savedDraft?.profileData?.suburb || initialUser?.suburb || '',
+    workMode: savedDraft?.profileData?.workMode || initialUser?.workMode || 'Any / Flexible',
+    targetSalary: savedDraft?.profileData?.targetSalary || initialUser?.targetSalary || '',
+    workRights: savedDraft?.profileData?.workRights || initialUser?.workRights || '',
+    clearance: savedDraft?.profileData?.clearance || initialUser?.clearance || '',
+    targetTitles: savedDraft?.profileData?.targetTitles || initialUser?.targetTitles || [],
+    coreSkills: savedDraft?.profileData?.coreSkills || initialUser?.coreSkills || [],
+    certifications: savedDraft?.profileData?.certifications || initialUser?.certifications || [],
+    workHistorySummary: savedDraft?.profileData?.workHistorySummary || initialUser?.workHistorySummary || '',
+    fullWorkExperienceText: savedDraft?.profileData?.fullWorkExperienceText || initialUser?.fullWorkExperienceText || '',
+    email_verified: Boolean(savedDraft?.profileData?.email_verified || initialUser?.email_verified)
   }));
 
   // Countdown timer for resend code
@@ -284,7 +308,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   };
 
   // Step 3 Resume Parsing state
-  const [resumeText, setResumeText] = useState('');
+  const [resumeText, setResumeText] = useState(() => savedDraft?.resumeText || '');
   const [isParsing, setIsParsing] = useState(false);
   const [parseSuccessMsg, setParseSuccessMsg] = useState('');
   const [newTitleInput, setNewTitleInput] = useState('');
@@ -300,6 +324,39 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   useEffect(() => {
     applyIndustryTheme(profileData.industry);
   }, [profileData.industry]);
+
+  // Auto-save onboarding draft to localStorage to ensure complete persistence across tab closures/reloads
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify({
+            profileData,
+            step,
+            resumeText,
+            llmProvider,
+            llmModel,
+            llmApiKey,
+            updatedAt: Date.now()
+          }));
+        }
+      } catch (err) {
+        console.warn('Failed to auto-save onboarding draft:', err);
+      }
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [profileData, step, resumeText, llmProvider, llmModel, llmApiKey]);
+
+  // Incrementally persist partial profile to candidate profile storage on step progression
+  useEffect(() => {
+    if (step >= 2 && profileData && typeof saveProfile === 'function') {
+      try {
+        saveProfile(profileData, { syncToBackend: true });
+      } catch (err) {
+        console.warn('Non-blocking incremental profile save error:', err);
+      }
+    }
+  }, [step]);
 
   // Bespoke Setup Readiness & Profile Completeness Score (0 to 100%)
   const readinessAnalysis = useMemo(() => {
@@ -699,6 +756,9 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       fullWorkExperienceText: profileData.fullWorkExperienceText || resumeText
     };
     try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(ONBOARDING_DRAFT_KEY);
+      }
       const { session, profile } = completeOnboarding(finalProfileData);
       setLaunchMessage('Pushing personalized search criteria to scrapers...');
       await saveProfileToBackend(profile);
@@ -711,6 +771,9 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       }, 350);
     } catch (err) {
       console.error('Error during final onboarding handoff:', err);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('profile_needs_backend_sync', 'true');
+      }
       sessionStorage.setItem('trigger_initial_scrape', 'true');
       const { session, profile } = completeOnboarding(finalProfileData);
       if (onComplete) onComplete(session, profile);
@@ -903,6 +966,20 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
             </button>
           )}
         </div>
+
+        <div className="pt-3 border-t border-slate-800/80 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              setIsVerifyingEmail(false);
+              setStep(2);
+            }}
+            className="text-xs text-slate-400 hover:text-amber-300 transition-colors underline cursor-pointer inline-flex items-center gap-1"
+          >
+            <span>Verify later &amp; continue profile setup</span>
+            <ChevronRight size={13} />
+          </button>
+        </div>
       </form>
     </div>
   )}
@@ -949,23 +1026,42 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   required
   value={authEmail}
   onChange={(e) => setAuthEmail(e.target.value)}
-  placeholder="e.g. user@gmail.com"
+  placeholder="your.name@example.com"
   className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
   />
   </div>
 
   <div className="space-y-1.5">
+  <div className="flex items-center justify-between">
   <label className="text-slate-300 font-bold flex items-center gap-1.5">
   <Lock size={13} className="text-amber-400" /> PASSWORD
   </label>
+  {authMode === 'signup' && signupPwdStrength && (
+  <span className={`text-[10px] font-bold ${
+  signupPwdStrength.level === 'strong' ? 'text-emerald-400' :
+  signupPwdStrength.level === 'medium' ? 'text-amber-400' : 'text-rose-400'
+  }`}>
+  {signupPwdStrength.level.toUpperCase()}
+  </span>
+  )}
+  </div>
+  <div className="relative">
   <input
-  type="password"
+  type={showApiKey ? 'text' : 'password'}
   required
   value={authPassword}
   onChange={(e) => setAuthPassword(e.target.value)}
-  placeholder="Min. 8 chars, 1 upper, 1 special"
-  className="w-full p-3 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
+  placeholder="••••••••••••"
+  className="w-full p-3 pr-10 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-amber-500 focus:outline-none placeholder-slate-600 font-sans text-sm"
   />
+  <button
+  type="button"
+  onClick={() => setShowApiKey(!showApiKey)}
+  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+  >
+  {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+  </button>
+  </div>
   </div>
 
   {/* Real-time Password Complexity Meter & Checklist for Signup */}
@@ -1031,22 +1127,21 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  )}
 
- {/* 1-Click Google Sign In with Auto Gmail Scan */}
- <button
- type="button"
- onClick={handleGoogleLogin}
- disabled={authLoading}
- className="w-full py-3.5 px-4 rounded-sm bg-white hover:bg-slate-100 text-slate-900 font-black text-xs border border-slate-200 transition-all cursor-pointer flex items-center justify-center gap-3 disabled:opacity-50 relative overflow-hidden group"
- title="1-Click Google Login: Auto-provisions account and scans Gmail for application history"
- >
- <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
- <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
- <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.29 21.36 7.37 24 12 24z"/>
- <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.98 0 12s.46 3.84 1.26 5.42l4.02-3.15z"/>
- <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.29 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
- </svg>
- <span className="tracking-wide">SIGN IN WITH GOOGLE (AUTO-SETUP & GMAIL SYNC)</span>
- </button>
+ {/* Quick 1-Click Google Login Button */}
+  <button
+  type="button"
+  onClick={handleGoogleLogin}
+  disabled={authLoading}
+  className="w-full py-3 px-4 rounded-sm bg-slate-950 hover:bg-slate-800 border border-slate-700 text-white font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+  >
+  <svg className="w-4 h-4" viewBox="0 0 24 24">
+  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+  </svg>
+  <span>CONTINUE WITH GOOGLE</span>
+  </button>
 
  <div className="flex items-center gap-3 my-2">
  <div className="flex-1 h-px bg-slate-800" />
@@ -1109,13 +1204,13 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  <div className="w-10 h-10 rounded-sm bg-amber-600/30 text-amber-300 font-black text-sm flex items-center justify-center shrink-0 border border-amber-400/50 group-hover:bg-amber-600 group-hover:text-white transition-colors">
  SL
  </div>
- <div className="min-w-0 flex-1">
- <div className="font-black text-white text-sm group-hover:text-amber-300 flex items-center gap-1.5">
- {preset.name}
- <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-500/40 font-mono">ORIGINAL PROFILE</span>
- </div>
- <div className="text-[11px] text-slate-400 truncate">{preset.title}</div>
- </div>
+  <div className="flex-1 min-w-0">
+  <div className="font-bold text-white text-xs group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+  <span>{preset.name}</span>
+  <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 border border-amber-500/30">DEMO</span>
+  </div>
+  <div className="text-[11px] text-slate-400 truncate">{preset.title}</div>
+  </div>
  <ArrowRight size={16} className="text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
  </button>
  ))}
@@ -1124,18 +1219,18 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
  </div>
  )}
 
-  {/* STEP 2: AI INTELLIGENCE ENGINE & CREDENTIALS */}
+  {/* STEP 2: AI-POWERED FEATURES (OPTIONAL) */}
   {step === 2 && (
     <div className="space-y-6 animate-in fade-in duration-200 font-mono text-xs">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
-          <Cpu size={14} /> STEP 2 OF 6 // AI INTELLIGENCE ENGINE & CREDENTIALS
+          <Cpu size={14} /> STEP 2 OF 6 // AI INTELLIGENCE ENGINE (OPTIONAL)
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-white font-sans">
-          Configure Your Career AI Engine
+          Configure Your Career AI Engine (Optional)
         </h1>
         <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto font-sans">
-          An API key is required to power ATS match scoring, custom executive cover letters, and live interview simulation.
+          Connect your preferred AI provider to unlock automated resume parsing, tailored cover letters, and smart interview prep. You can skip this step anytime.
         </p>
       </div>
 

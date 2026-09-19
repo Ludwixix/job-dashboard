@@ -40,7 +40,7 @@ def test_nurse_profile_with_it_job_title_is_neutral():
     assert result.dimensions["title_category_match"] == 55
 
 
-def test_empty_profile_uses_it_fallback():
+def test_empty_profile_uses_neutral_fallback():
     empty_profile = {}
     it_job = Job(
         id="job-it-2",
@@ -57,15 +57,14 @@ def test_empty_profile_uses_it_fallback():
         description="Ward nurse duties.",
     )
 
-    # IT job matches fallback IT heuristic -> 1.0
-    assert _title_category(it_job, empty_profile) == 1.0
+    # Both IT and Non-IT jobs receive a neutral 0.70 score for unconfigured profiles without favoring IT
+    assert _title_category(it_job, empty_profile) == 0.70
     it_result = score_job(it_job, empty_profile)
-    assert it_result.dimensions["title_category_match"] == 100
+    assert it_result.dimensions["title_category_match"] == 70
 
-    # Non-IT job does not match fallback IT heuristic -> 0.45
-    assert _title_category(non_it_job, empty_profile) == 0.45
+    assert _title_category(non_it_job, empty_profile) == 0.70
     non_it_result = score_job(non_it_job, empty_profile)
-    assert non_it_result.dimensions["title_category_match"] == 45
+    assert non_it_result.dimensions["title_category_match"] == 70
 
 
 def test_profile_experience_title_overlap_matches():
@@ -220,7 +219,7 @@ def test_nested_profile_extracts_target_titles_and_skills():
             "targetTitles": ["Lead Cloud Architect"],
             "coreSkills": ["Terraform", "Kubernetes", "GCP"],
             "seniorityLevel": "senior",
-        }
+        },
     }
     job = Job(
         id="job-arch-1",
@@ -234,4 +233,3 @@ def test_nested_profile_extracts_target_titles_and_skills():
     result = score_job(job, nested_profile)
     assert result.dimensions["title_category_match"] == 100
     assert "terraform" in result.matched_skills
-

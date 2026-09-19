@@ -547,7 +547,7 @@ export function generateInterviewCheatSheetHtml(job = {}, profileOverride = null
     opts = profileOverride;
     profile = profileOverride.candidateProfile || null;
   }
-  profile = profile || getActiveProfile() || DEFAULT_USER_PROFILE;
+  profile = profile || (getActiveProfile()?.name ? getActiveProfile() : null) || DEFAULT_USER_PROFILE;
 
   const meetingInfo = {
     ...extractInterviewMeetingInfo(job),

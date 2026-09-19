@@ -131,7 +131,7 @@ import { getWorkforceSettings } from '../services/workforceAustraliaService';
 
 
 import { generateApplicationDocs } from '../services/generationService';
-import { getActiveProfile, saveProfile, fetchProfileFromBackend } from '../services/profileService';
+import { getActiveProfile, saveProfile, fetchProfileFromBackend, calculateProfileCompleteness } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
 import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
@@ -149,7 +149,7 @@ import {
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu, ShieldAlert
+  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu, ShieldAlert, ArrowRight
 } from 'lucide-react';
 
 
@@ -238,6 +238,8 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  // Candidate Personalization Profile State
  const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+ const [isCompletenessDismissed, setIsCompletenessDismissed] = useState(false);
+ const profileCompleteness = useMemo(() => calculateProfileCompleteness(activeProfile), [activeProfile]);
  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
  const [isSkillGapModalOpen, setIsSkillGapModalOpen] = useState(false);
  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
@@ -1454,6 +1456,59 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  onNavigateView={(view) => setActiveSection(view)}
  />
 
+ {/* Profile Completeness Hub & Calibration CTA */}
+ {profileCompleteness && profileCompleteness.score < 100 && !isCompletenessDismissed && (
+ <div className="bg-slate-900/95 border border-amber-500/30 rounded-sm p-3.5 text-xs space-y-2.5 relative animate-in fade-in duration-200">
+ <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+ <div className="flex items-center gap-3">
+ <div className="p-2 rounded-sm bg-amber-500/20 text-amber-400 border border-amber-400/30 shrink-0">
+ <Sparkles size={16} />
+ </div>
+ <div>
+ <div className="flex items-center gap-2 font-mono font-bold text-white uppercase text-xs">
+ <span>PROFILE COMPLETENESS: {profileCompleteness.score}%</span>
+ <span className="text-[10px] px-2 py-0.5 rounded-sm bg-amber-950 text-amber-300 border border-amber-500/30">
+ +{100 - profileCompleteness.score}% MATCH BOOST AVAILABLE
+ </span>
+ </div>
+ <p className="text-[11px] text-slate-300 font-sans mt-0.5">
+ {profileCompleteness.improvements[0]?.description || 'Complete remaining profile details to calibrate discovery and unlock precision match scoring.'}
+ </p>
+ </div>
+ </div>
+ <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+ <button
+ type="button"
+ onClick={() => {
+ setEditingProfile(activeProfile);
+ setIsProfileModalOpen(true);
+ }}
+ className="px-3 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-black font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+ >
+ <span>{profileCompleteness.improvements[0]?.actionLabel || 'Improve Profile'}</span>
+ <ArrowRight size={12} className="stroke-[3]" />
+ </button>
+ <button
+ type="button"
+ onClick={() => setIsCompletenessDismissed(true)}
+ className="p-1.5 text-slate-400 hover:text-white rounded-sm hover:bg-slate-800 transition-colors cursor-pointer"
+ title="Dismiss for this session"
+ >
+ <XIcon size={14} />
+ </button>
+ </div>
+ </div>
+
+ {/* Progress Track */}
+ <div className="w-full h-1.5 bg-slate-800 rounded-sm overflow-hidden">
+ <div
+ className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-sm transition-all duration-500"
+ style={{ width: `${profileCompleteness.score}%` }}
+ />
+ </div>
+ </div>
+ )}
+
  {/* Dynamic View Component */}
  {loading ? (
  <DashboardGridSkeleton />
@@ -1596,7 +1651,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             <div className="p-4 border-b border-slate-800/80 bg-amber-950/20">
               <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1">CANDIDATE DOSSIER</div>
               <div className="text-sm font-black text-white">{activeProfile?.name || 'Candidate'}</div>
-              <div className="text-[11px] text-slate-300 truncate">{activeProfile?.title || 'Principal Systems Architect'}</div>
+              <div className="text-[11px] text-slate-300 truncate">{activeProfile?.title || 'Candidate Profile'}</div>
               <button
                 type="button"
                 onClick={() => { setIsMobileDrawerOpen(false); setEditingProfile(activeProfile); setIsProfileModalOpen(true); }}
@@ -2144,7 +2199,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  isOpen={isFunnelModalOpen}
  onClose={() => setIsFunnelModalOpen(false)}
  jobs={jobs}
- currentSector={activeProfile?.industry || 'technology'}
+ currentSector={activeProfile?.industry || 'all'}
  onSelectJob={(j) => {
  setIsFunnelModalOpen(false);
  setSelectedJob(j);
@@ -2166,7 +2221,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  isOpen={isCareerModalOpen}
  onClose={() => setIsCareerModalOpen(false)}
  profile={activeProfile}
- currentSector={activeProfile?.industry || 'technology'}
+ currentSector={activeProfile?.industry || 'all'}
  />
  </Suspense>
  </SafeErrorBoundary>

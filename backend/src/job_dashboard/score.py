@@ -7,6 +7,7 @@ from .models import Job, ScoreResult
 from .types import ScoringError
 
 SKILL_ALIASES = {
+    # Technology & IT
     "azure": ("azure", "microsoft azure", "azure ad", "entra"),
     "microsoft 365": ("m365", "microsoft 365", "office 365", "modern workplace"),
     "sharepoint": ("sharepoint", "sharepoint online"),
@@ -21,28 +22,160 @@ SKILL_ALIASES = {
     "itil": ("itil", "incident management", "change management"),
     "cybersecurity": ("cybersecurity", "security", "infosec", "iso 27001"),
     "data centre": ("data centre", "data center", "server room", "rack"),
-    "customer service": ("customer service", "customer support", "user support", "help desk"),
-    "documentation": ("documentation", "technical writing", "runbooks"),
+    "customer service": (
+        "customer service",
+        "customer support",
+        "user support",
+        "help desk",
+    ),
+    "documentation": (
+        "documentation",
+        "technical writing",
+        "runbooks",
+        "clinical documentation",
+    ),
+    # Healthcare & Clinical
+    "patient care": (
+        "patient care",
+        "patient assessment",
+        "clinical care",
+        "nursing care",
+        "bedside care",
+    ),
+    "medication administration": (
+        "medication administration",
+        "medication",
+        "drug administration",
+        "pharmacology",
+        "dosage",
+    ),
+    "triage": ("triage", "emergency triage", "clinical triage", "patient triage"),
+    "infection control": (
+        "infection control",
+        "sterilisation",
+        "aseptic technique",
+        "hygiene protocols",
+    ),
+    "wound management": (
+        "wound management",
+        "wound care",
+        "dressings",
+        "tissue viability",
+    ),
+    "cannulation": ("cannulation", "venepuncture", "iv therapy", "phlebotomy"),
+    "clinical governance": (
+        "clinical governance",
+        "clinical audit",
+        "quality assurance",
+        "healthcare standards",
+    ),
+    "aged care": ("aged care", "geriatric care", "dementia care", "palliative care"),
+    "ahpra": ("ahpra", "registered nurse", "enrolled nurse", "nurse practitioner"),
+    # Finance & Accounting
+    "financial reporting": (
+        "financial reporting",
+        "statutory reporting",
+        "financial statements",
+        "management reporting",
+    ),
+    "reconciliation": (
+        "reconciliation",
+        "bank reconciliation",
+        "balance sheet reconciliation",
+    ),
+    "budgeting": ("budgeting", "budget preparation", "forecasting", "fp&a"),
+    "payroll": ("payroll", "payroll processing", "stp", "superannuation"),
+    "accounts payable": ("accounts payable", "ap", "invoice processing"),
+    "accounts receivable": (
+        "accounts receivable",
+        "ar",
+        "debt collection",
+        "credit control",
+    ),
+    "cpa": ("cpa", "ca qualified", "chartered accountant"),
+    # Trades & Construction
+    "site supervision": (
+        "site supervision",
+        "site management",
+        "foreman",
+        "site coordinator",
+    ),
+    "whs": ("whs", "oh&s", "workplace health and safety", "safety compliance"),
+    "white card": ("white card", "general construction induction", "cpccwhs1001"),
+    "electrical": ("electrical", "electrician", "wiring", "switchboard", "a-grade"),
+    "plumbing": ("plumbing", "pipefitting", "drainage", "gasfitting"),
+    # Legal & Compliance
+    "compliance": ("compliance", "regulatory compliance", "aml/ctf", "governance"),
+    "contract management": (
+        "contract management",
+        "contract negotiation",
+        "procurement contracts",
+    ),
 }
 
 _LEVEL_WEIGHT = {"expert": 1.0, "advanced": 0.8, "intermediate": 0.6, "basic": 0.4}
 _CLUSTER_WEIGHT = {"primary": 1.0, "secondary": 0.45}
-_PRIMARY_SKILLS = {"sharepoint", "microsoft 365", "exchange", "intune", "azure", "powershell", "windows", "networking", "servicenow", "itil", "customer service"}
-_SECONDARY_SKILLS = {"linux", "cybersecurity", "data centre", "documentation", "python"}
-_DATA_ROLE_TERMS = ("data engineer", "data warehouse", "data warehousing", "etl", "extract transform load", "data model", "dimensional model", "sql developer")
-_DATA_SPECIFIC_TERMS = ("data warehouse", "data warehousing", "etl", "extract transform load", "dimensional model", "data pipeline", "sql modeling", "data modelling")
-# Fallback IT title terms used only when the profile has no targetTitles/experience configured.
-_IT_TITLE_TERMS = (
-    "sharepoint", "microsoft 365", "m365", "infrastructure",
-    "systems administrator", "powershell", "azure", "cloud",
+_PRIMARY_SKILLS = {
+    "sharepoint",
+    "microsoft 365",
+    "exchange",
+    "intune",
+    "azure",
+    "powershell",
+    "windows",
+    "networking",
+    "servicenow",
+    "itil",
+    "customer service",
+    "patient care",
+    "medication administration",
+    "triage",
+    "financial reporting",
+    "reconciliation",
+    "budgeting",
+    "site supervision",
+    "compliance",
+}
+_SECONDARY_SKILLS = {
+    "linux",
+    "cybersecurity",
+    "data centre",
+    "documentation",
+    "python",
+    "infection control",
+    "wound management",
+    "cannulation",
+    "payroll",
+    "whs",
+    "white card",
+}
+_DATA_ROLE_TERMS = (
+    "data engineer",
+    "data warehouse",
+    "data warehousing",
+    "etl",
+    "extract transform load",
+    "data model",
+    "dimensional model",
+    "sql developer",
 )
-
+_DATA_SPECIFIC_TERMS = (
+    "data warehouse",
+    "data warehousing",
+    "etl",
+    "extract transform load",
+    "dimensional model",
+    "data pipeline",
+    "sql modeling",
+    "data modelling",
+)
 
 
 @lru_cache(maxsize=128)
 def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, str]:
     """Cached version of profile skills extraction supporting both flat and nested profiles."""
     import json
+
     data = json.loads(profile_data)
     if not isinstance(data, Mapping):
         return {}
@@ -52,14 +185,18 @@ def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, st
     for source in (data, nested):
         raw = source.get("skills", {})
         if isinstance(raw, Mapping):
-            values.update({str(name).lower(): str(value).lower() for name, value in raw.items()})
+            values.update(
+                {str(name).lower(): str(value).lower() for name, value in raw.items()}
+            )
         elif raw and isinstance(raw, (list, tuple)):
             values.update({str(skill).lower(): "intermediate" for skill in raw})
         tech_exp = source.get("technical_expertise", {})
         if isinstance(tech_exp, Mapping):
             for group in tech_exp.values():
                 if isinstance(group, (list, tuple)):
-                    values.update({str(skill).lower(): "intermediate" for skill in group})
+                    values.update(
+                        {str(skill).lower(): "intermediate" for skill in group}
+                    )
         for skill in source.get("coreSkills", []) or []:
             key = str(skill).strip().lower()
             if key and key not in values:
@@ -68,7 +205,10 @@ def _profile_skills_cached(profile_hash: str, profile_data: str) -> dict[str, st
     canonical: dict[str, str] = {}
     for skill, aliases in SKILL_ALIASES.items():
         for profile_skill, level in values.items():
-            if any(re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", profile_skill) for alias in aliases):
+            if any(
+                re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", profile_skill)
+                for alias in aliases
+            ):
                 canonical[skill] = level
                 break
     # Retain every other candidate skill term verbatim (any industry) so it can
@@ -84,11 +224,14 @@ def _profile_skills(profile: Mapping[str, Any]) -> dict[str, str]:
     try:
         import hashlib
         import json
+
         profile_json = json.dumps(profile, sort_keys=True, default=str)
         profile_hash = hashlib.md5(profile_json.encode()).hexdigest()[:16]
         return _profile_skills_cached(profile_hash, profile_json)
     except Exception as e:
-        raise ScoringError(f"Failed to extract profile skills: {e!s}", {"error": str(e)}) from e
+        raise ScoringError(
+            f"Failed to extract profile skills: {e!s}", {"error": str(e)}
+        ) from e
 
 
 def _job_skills(job: Job, extra_terms: tuple[str, ...] = ()) -> dict[str, float]:
@@ -96,7 +239,12 @@ def _job_skills(job: Job, extra_terms: tuple[str, ...] = ()) -> dict[str, float]
     terms (any industry) directly against the job text, so scoring isn't
     limited to a fixed Microsoft/IT vocabulary.
     """
-    fields = {"title": job.title, "tags": " ".join(job.tags), "why": job.why, "description": job.description}
+    fields = {
+        "title": job.title,
+        "tags": " ".join(job.tags),
+        "why": job.why,
+        "description": job.description,
+    }
     text = job.text().lower()
     found: dict[str, float] = {}
 
@@ -104,7 +252,9 @@ def _job_skills(job: Job, extra_terms: tuple[str, ...] = ()) -> dict[str, float]
         for alias in aliases:
             if re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", text):
                 confidence = 0.6
-                if re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", fields["title"].lower()):
+                if re.search(
+                    r"(?<!\w)" + re.escape(alias) + r"(?!\w)", fields["title"].lower()
+                ):
                     confidence = 1.0
                 elif alias in fields["tags"].lower():
                     confidence = 0.9
@@ -141,7 +291,9 @@ def _extract_profile_target_titles(profile: Mapping[str, Any]) -> list[str]:
     if not isinstance(profile, Mapping):
         return []
     titles: list[str] = []
-    nested = profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    nested = (
+        profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    )
     for source in (profile, nested):
         raw = source.get("targetTitles") or []
         if isinstance(raw, (list, tuple)):
@@ -158,11 +310,17 @@ def _candidate_seniority(profile: Mapping[str, Any]) -> str:
     """
     if not isinstance(profile, Mapping):
         return "mid"
-    nested = profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    nested = (
+        profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    )
 
     # 1. Explicit seniority level field
     for source in (nested, profile):
-        raw_level = str(source.get("seniorityLevel") or source.get("seniority") or "").lower().strip()
+        raw_level = (
+            str(source.get("seniorityLevel") or source.get("seniority") or "")
+            .lower()
+            .strip()
+        )
         if raw_level in {"senior", "lead", "principal", "staff", "architect"}:
             return "senior"
         if raw_level in {"executive", "director", "vp", "head of", "c-level"}:
@@ -241,11 +399,25 @@ def _seniority_penalty(job: Job, candidate_level: str = "mid") -> float:
     return 0.0
 
 
-def _role_domain(job: Job) -> str:
+def _role_domain(job: Job, profile_industry: str = "") -> str:
     text = job.text().lower()
+    if profile_industry:
+        clean_ind = profile_industry.lower()
+        if any(w in clean_ind for w in ("health", "medic", "nurs", "clinic")):
+            return "healthcare"
+        if any(w in clean_ind for w in ("finance", "account", "bank")):
+            return "finance"
+        if any(w in clean_ind for w in ("trade", "construct", "build")):
+            return "trades"
+        if "legal" in clean_ind:
+            return "legal"
+        if any(w in clean_ind for w in ("educat", "teach", "school")):
+            return "education"
+        if any(w in clean_ind for w in ("tech", "cloud", "software", "it")):
+            return "it"
     if any(term in text for term in _DATA_ROLE_TERMS):
         return "data"
-    return "it"
+    return "general"
 
 
 def _skill_cluster(skill: str, profile_skills: Mapping[str, Any] | None = None) -> str:
@@ -261,11 +433,13 @@ def _title_category(job: Job, profile: Mapping[str, Any]) -> float:
     1. If the profile has ``targetTitles`` or ``experience[].title`` entries, match
        against those using word-level overlap — industry-agnostic and correct for any
        profession (nurse, lawyer, engineer, …).
-    2. If the profile provides no title hints, fall back to the original IT-specific
-       heuristic so existing IT users are unaffected.
+    2. If the profile provides no title hints, evaluate neutrally (0.70) rather than
+       penalising non-IT professions.
     """
     target_titles = _extract_profile_target_titles(profile)
-    nested = profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    nested = (
+        profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
+    )
     exp_list = profile.get("experience") or nested.get("experience") or []
     exp_titles = [
         str(e.get("title", "")).lower().strip()
@@ -285,9 +459,8 @@ def _title_category(job: Job, profile: Mapping[str, Any]) -> float:
         # Profile is set up but this job's title doesn't match — neutral penalty, not punished
         return 0.55
 
-    # Fallback: original IT-specific heuristic (backward compatible for IT profiles)
-    return 1.0 if any(term in job_title_lower for term in _IT_TITLE_TERMS) else 0.45
-
+    # Neutral fallback for unconfigured profiles without explicit target titles
+    return 0.70
 
 
 def explain_score(result: ScoreResult) -> dict[str, Any]:
@@ -321,18 +494,30 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
     try:
         profile_skills = _profile_skills(profile)
         skills = _job_skills(job, extra_terms=tuple(profile_skills.keys()))
-        domain = _role_domain(job)
+        nested_prof = (
+            profile.get("profile")
+            if isinstance(profile.get("profile"), Mapping)
+            else {}
+        )
+        cand_industry = str(
+            profile.get("industry") or nested_prof.get("industry") or ""
+        )
+        domain = _role_domain(job, profile_industry=cand_industry)
         matched = tuple(
-            skill for skill, confidence in skills.items()
+            skill
+            for skill, confidence in skills.items()
             if confidence >= 0.6 and skill in profile_skills
         )
         missing = tuple(skill for skill in skills if skill not in profile_skills)
         total_weight = sum(
-            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill, profile_skills)]
+            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5)
+            * _CLUSTER_WEIGHT[_skill_cluster(skill, profile_skills)]
             for skill in skills
         )
         matched_weight = sum(
-            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5) * _CLUSTER_WEIGHT[_skill_cluster(skill, profile_skills)] * skills[skill]
+            _LEVEL_WEIGHT.get(profile_skills.get(skill, "basic"), 0.5)
+            * _CLUSTER_WEIGHT[_skill_cluster(skill, profile_skills)]
+            * skills[skill]
             for skill in matched
         )
         skill_match = matched_weight / total_weight if total_weight else 0.0
@@ -349,35 +534,138 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
             exp_table = {"mid": 1.0, "senior": 0.9, "junior": 0.7, "executive": 0.3}
         experience = exp_table.get(job_level, 0.8)
 
-        location = 1.0 if job.remote or re.search(r"remote|australia|melbourne|vic", job.location, re.IGNORECASE) else 0.5
-        company = 0.9 if re.search(r"government|council|bank|university|health|technology|cloud", job.company, re.IGNORECASE) else 0.7
-        growth = 0.9 if re.search(r"trainee|graduate|junior|entry[- ]level", job.text(), re.IGNORECASE) else 0.8 if re.search(r"training|mentorship|development|progression|leadership|upskill|cloud|azure|devops", job.text(), re.IGNORECASE) else 0.5
+        cand_loc = (
+            str(
+                profile.get("location")
+                or profile.get("suburb")
+                or nested_prof.get("location")
+                or ""
+            )
+            .lower()
+            .strip()
+        )
+        loc_words = [re.escape(w) for w in re.split(r"[\s,]+", cand_loc) if len(w) > 2]
+        loc_regex = (
+            r"remote|australia|" + "|".join(loc_words)
+            if loc_words
+            else r"remote|australia|melbourne|vic|sydney|nsw|brisbane|qld|perth|wa|adelaide|sa|hobart|tas|canberra|act"
+        )
+        location = (
+            1.0
+            if job.remote or re.search(loc_regex, job.location, re.IGNORECASE)
+            else 0.5
+        )
+        company = (
+            0.9
+            if re.search(
+                r"government|council|bank|university|health|hospital|clinic|education|school|agency|corporate|technology",
+                job.company,
+                re.IGNORECASE,
+            )
+            else 0.7
+        )
+        growth = (
+            0.9
+            if re.search(
+                r"trainee|graduate|junior|entry[- ]level", job.text(), re.IGNORECASE
+            )
+            else 0.8
+            if re.search(
+                r"training|mentorship|development|progression|leadership|upskill|certification|cpd|specialisation",
+                job.text(),
+                re.IGNORECASE,
+            )
+            else 0.5
+        )
         seniority_penalty = _seniority_penalty(job, cand_level)
         title_category = _title_category(job, profile)
         recency = 1.0 if getattr(job, "posted", "") else 0.5
-        dimensions = {"skill_match": round(skill_match * 100), "title_category_match": round(title_category * 100), "location_fit": round(location * 100), "recency_weight": round(recency * 100), "experience_fit": round(experience * 100), "company_fit": round(company * 100), "growth_potential": round(growth * 100)}
-        total = skill_match * 0.6 + title_category * 0.12 + location * 0.08 + experience * 0.08 + company * 0.04 + growth * 0.03 + recency * 0.05 - seniority_penalty
-        is_data_candidate = any("data" in t or "analytics" in t or "sql" in t for t in profile_skills.keys())
-        if domain == "data" and not is_data_candidate and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS):
+        dimensions = {
+            "skill_match": round(skill_match * 100),
+            "title_category_match": round(title_category * 100),
+            "location_fit": round(location * 100),
+            "recency_weight": round(recency * 100),
+            "experience_fit": round(experience * 100),
+            "company_fit": round(company * 100),
+            "growth_potential": round(growth * 100),
+        }
+        total = (
+            skill_match * 0.6
+            + title_category * 0.12
+            + location * 0.08
+            + experience * 0.08
+            + company * 0.04
+            + growth * 0.03
+            + recency * 0.05
+            - seniority_penalty
+        )
+        is_data_candidate = any(
+            "data" in t or "analytics" in t or "sql" in t for t in profile_skills.keys()
+        )
+        if (
+            domain == "data"
+            and not is_data_candidate
+            and not any(term in job.text().lower() for term in _DATA_SPECIFIC_TERMS)
+        ):
             total = min(total, 0.5)
         total = max(0.0, min(1.0, total))
-        fit = "No skill match" if not matched else "Excellent fit" if total >= 0.85 else "Strong fit" if total >= 0.7 else "Good fit" if total >= 0.55 else "Partial fit"
-        confidence = min(1.0, 0.5 + (0.2 if job.description else 0) + (0.1 if job.tags else 0) + (0.1 if job.why else 0) + (0.1 if len(skills) > 3 else 0))
-        strengths = ("Strong skill alignment", "Experience level matches role requirements", "Ideal location match")[:1 + (experience >= 0.8) + (location >= 0.9)]
-        risks = ((f"Missing skills: {', '.join(missing[:3])}",) if missing else ()) + ("Verify exact requirements before applying",)
-        relevance = "No match" if domain == "trade" else "Strong"
-        return ScoreResult(round(total * 100), fit, dimensions, matched, missing, strengths, risks[:3], round(confidence, 2), _experience_level(job), relevance, dimensions)
+        fit = (
+            "No skill match"
+            if not matched
+            else "Excellent fit"
+            if total >= 0.85
+            else "Strong fit"
+            if total >= 0.7
+            else "Good fit"
+            if total >= 0.55
+            else "Partial fit"
+        )
+        confidence = min(
+            1.0,
+            0.5
+            + (0.2 if job.description else 0)
+            + (0.1 if job.tags else 0)
+            + (0.1 if job.why else 0)
+            + (0.1 if len(skills) > 3 else 0),
+        )
+        strengths = (
+            "Strong skill alignment",
+            "Experience level matches role requirements",
+            "Ideal location match",
+        )[: 1 + (experience >= 0.8) + (location >= 0.9)]
+        risks = ((f"Missing skills: {', '.join(missing[:3])}",) if missing else ()) + (
+            "Verify exact requirements before applying",
+        )
+        relevance = "Strong"
+        return ScoreResult(
+            round(total * 100),
+            fit,
+            dimensions,
+            matched,
+            missing,
+            strengths,
+            risks[:3],
+            round(confidence, 2),
+            _experience_level(job),
+            relevance,
+            dimensions,
+        )
     except Exception as e:
-        raise ScoringError(f"Failed to score job: {e!s}", {
-            "job_id": job.id,
-            "title": job.title,
-            "company": job.company,
-            "error": str(e)
-        }) from e
+        raise ScoringError(
+            f"Failed to score job: {e!s}",
+            {
+                "job_id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "error": str(e),
+            },
+        ) from e
 
 
-def score_job_hybrid(job: Job, profile: Mapping[str, Any], semantic_weight: float = 0.25) -> ScoreResult:
+def score_job_hybrid(
+    job: Job, profile: Mapping[str, Any], semantic_weight: float = 0.25
+) -> ScoreResult:
     """Calculate a hybrid score blending deterministic rules with semantic vector similarity."""
     from .semantic_scoring import score_job_hybrid as _score_hybrid
-    return _score_hybrid(job, profile, semantic_weight=semantic_weight)
 
+    return _score_hybrid(job, profile, semantic_weight=semantic_weight)

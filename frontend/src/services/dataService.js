@@ -68,26 +68,6 @@ export const cleanDescriptionText = (raw = '') => {
   return cleanLines.join('\n\n').trim();
 };
 
-const CANDIDATE_SKILLS = [
-  { term: 'system administrator', weight: 15 },
-  { term: 'it support', weight: 15 },
-  { term: 'azure', weight: 12 },
-  { term: 'm365', weight: 12 },
-  { term: 'microsoft 365', weight: 12 },
-  { term: 'intune', weight: 12 },
-  { term: 'network', weight: 10 },
-  { term: 'help desk', weight: 10 },
-  { term: 'desktop support', weight: 10 },
-  { term: 'cloud', weight: 10 },
-  { term: 'devops', weight: 10 },
-  { term: 'cyber', weight: 10 },
-  { term: 'infrastructure', weight: 8 },
-  { term: 'windows server', weight: 8 },
-  { term: 'linux', weight: 8 },
-  { term: 'powershell', weight: 8 },
-  { term: 'active directory', weight: 8 }
-];
-
 export const calculateCandidateMatchScore = (row, profile = null) => {
   if (row['score'] !== undefined && row['score'] !== null && row['score'] !== '') {
     const val = Number(row['score']);
@@ -125,39 +105,43 @@ export const calculateCandidateMatchScore = (row, profile = null) => {
     }
   }
 
-  const activeSkills = skillsToMatch.length > 0 ? skillsToMatch : CANDIDATE_SKILLS;
-
-  let matchScore = 65;
-  activeSkills.forEach(skill => {
-    if (text.includes(skill.term)) {
-      matchScore += (skill.weight || 8);
-    }
-  });
-
   // Target title alignment bonus
-  if (activeProfile) {
-    const targetTitles = activeProfile.targetTitles || (activeProfile.profile && activeProfile.profile.targetTitles) || [];
-    if (Array.isArray(targetTitles)) {
-      const matchesTitle = targetTitles.some(t => {
-        const words = String(t).toLowerCase().split(/\W+/).filter(w => w.length > 3);
-        return words.some(w => jobTitle.includes(w));
-      });
-      if (matchesTitle) matchScore += 10;
-    }
+  const targetTitles = (activeProfile?.targetTitles || (activeProfile?.profile && activeProfile.profile.targetTitles) || []);
+  let titleBonus = 0;
+  if (Array.isArray(targetTitles) && targetTitles.length > 0) {
+    const hasTitleMatch = targetTitles.some(tt => {
+      const words = String(tt).toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      return words.some(w => jobTitle.includes(w));
+    });
+    if (hasTitleMatch) titleBonus = 12;
+  }
 
-    // Seniority alignment
+  // Seniority alignment
+  let seniorityMod = 0;
+  if (activeProfile) {
     const seniority = String(activeProfile.seniorityLevel || (activeProfile.profile && activeProfile.profile.seniorityLevel) || '').toLowerCase();
     const isSeniorCandidate = seniority.includes('senior') || seniority.includes('lead') || Number(activeProfile.yearsOfExperience || (activeProfile.profile && activeProfile.profile.yearsOfExperience) || 0) >= 7;
     const isSeniorJob = /\b(senior|lead|principal|architect)\b/i.test(jobTitle);
     const isJuniorJob = /\b(junior|graduate|trainee|apprentice)\b/i.test(jobTitle);
 
     if (isSeniorCandidate) {
-      if (isSeniorJob) matchScore += 6;
-      else if (isJuniorJob) matchScore -= 12;
+      if (isSeniorJob) seniorityMod += 5;
+      else if (isJuniorJob) seniorityMod -= 10;
     }
   }
 
-  return Math.min(98, Math.max(55, matchScore));
+  if (skillsToMatch.length === 0) {
+    return Math.min(98, Math.max(50, 65 + titleBonus + seniorityMod));
+  }
+
+  let matchScore = 60 + titleBonus + seniorityMod;
+  skillsToMatch.forEach(skill => {
+    if (text.includes(skill.term)) {
+      matchScore += (skill.weight || 8);
+    }
+  });
+
+  return Math.min(98, Math.max(40, matchScore));
 };
 
 /**
@@ -218,7 +202,7 @@ export const resolveJobAdLink = (rawLink, notesStr = '', company = '', title = '
   const comp = String(company || '').trim();
   const tit = String(title || '').trim();
   if (tit || comp) {
-    const query = encodeURIComponent(`${tit} ${comp} Melbourne`.trim());
+    const query = encodeURIComponent(`${tit} ${comp}`.trim());
     return `https://www.seek.com.au/jobs?keywords=${query}`;
   }
 
@@ -360,8 +344,8 @@ export const parseMetadata = (row, index) => {
 
   // Parse rich audit & score
   const matchScore = calculateCandidateMatchScore(row);
-  const location = String(row['location'] || row['Location'] || 'Melbourne, VIC').trim();
-  const stream = row['stream'] || row['industry'] || 'Core IT & Systems';
+  const location = String(row['location'] || row['Location'] || 'Australia').trim();
+  const stream = row['stream'] || row['industry'] || 'General';
   const tags = Array.isArray(row['tags']) ? row['tags'] : [];
   const audit = row['audit'] || null;
   const remote = Boolean(row['remote']);

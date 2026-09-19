@@ -298,11 +298,11 @@ const SKILL_INFERENCE_MAP = {
  */
 export const extractLocationForQuery = (profile) => {
   const raw = (profile?.location || profile?.suburb || '').trim();
-  if (!raw) return 'Melbourne, VIC';
+  if (!raw) return 'Australia';
   if (/remote|wfh|anywhere|australia/i.test(raw)) return 'Australia';
   const stateMatch = raw.match(/([A-Za-z\s]+),?\s*(VIC|NSW|QLD|WA|SA|TAS|ACT|NT)/i);
   if (stateMatch) return `${stateMatch[1].trim()}, ${stateMatch[2].toUpperCase()}`;
-  return raw.split('(')[0].trim() || 'Melbourne, VIC';
+  return raw.split('(')[0].trim() || 'Australia';
 };
 
 /**
@@ -317,10 +317,14 @@ export const buildQueriesFromProfile = (profile) => {
   if (!profile) return [];
 
   const location = extractLocationForQuery(profile);
-  const industry = profile.industry || 'Technology & IT';
-  const industryData = INDUSTRY_QUERY_MAP[industry] || INDUSTRY_QUERY_MAP['Technology & IT'];
+  const industry = profile.industry || '';
+  const industryData = industry ? (INDUSTRY_QUERY_MAP[industry] || null) : null;
   const seen = new Set();
   const queries = [];
+
+  // Keep one refresh bounded: sources are queried serially and a broad,
+  // 30-term profile made an interactive scrape take many minutes.
+  const maxQueries = 12;
 
   const add = (term, stream = 'core', weight = 1.0) => {
     if (queries.length >= maxQueries) return;
@@ -332,10 +336,6 @@ export const buildQueriesFromProfile = (profile) => {
     queries.push({ term: term.trim(), location: queryLoc, stream: isRemote ? 'remote' : stream, weight });
   };
 
-  // Keep one refresh bounded: sources are queried serially and a broad,
-  // 30-term profile made an interactive scrape take many minutes.
-  const maxQueries = 12;
-
   // 1. Explicit target titles — highest priority
   for (const title of (profile.targetTitles || [])) {
     add(title, 'core', 1.5);
@@ -345,10 +345,12 @@ export const buildQueriesFromProfile = (profile) => {
     if (queries.length >= maxQueries) break;
   }
 
-  // 2. Industry-mapped core titles
-  for (const title of (industryData.titles || [])) {
-    add(title, 'core', 1.0);
-    if (queries.length >= maxQueries) break;
+  // 2. Industry-mapped core titles (only if industry was explicitly specified)
+  if (industryData) {
+    for (const title of (industryData.titles || [])) {
+      add(title, 'core', 1.0);
+      if (queries.length >= maxQueries) break;
+    }
   }
 
   // 3. Skills-inferred additions
@@ -360,10 +362,12 @@ export const buildQueriesFromProfile = (profile) => {
     if (queries.length >= maxQueries) break;
   }
 
-  // 4. Bridge / adjacent titles
-  for (const title of (industryData.bridgeTitles || [])) {
-    add(title, 'bridge', 0.6);
-    if (queries.length >= maxQueries) break;
+  // 4. Bridge / adjacent titles (only if industry was explicitly specified)
+  if (industryData) {
+    for (const title of (industryData.bridgeTitles || [])) {
+      add(title, 'bridge', 0.6);
+      if (queries.length >= maxQueries) break;
+    }
   }
 
   return queries;

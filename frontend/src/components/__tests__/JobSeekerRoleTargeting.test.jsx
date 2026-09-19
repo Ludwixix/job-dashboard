@@ -15,13 +15,14 @@ describe('JobSeeker Default Role Targeting', () => {
     vi.restoreAllMocks();
   });
 
+  const todayDate = new Date().toISOString().split('T')[0];
   const mockJobs = [
     {
       id: 'job_it_1',
       title: 'Senior Cloud Systems Engineer',
       company: 'Tech Corp',
       location: 'Sydney NSW',
-      date: '2026-09-05',
+      date: todayDate,
       salary: '$140,000 - $160,000',
       description: 'AWS Azure Infrastructure',
       isComplete: true,
@@ -33,7 +34,7 @@ describe('JobSeeker Default Role Targeting', () => {
       title: 'Registered Nurse - Acute Care',
       company: 'Health Care Inc',
       location: 'Sydney NSW',
-      date: '2026-09-05',
+      date: todayDate,
       salary: '$95,000',
       description: 'Clinical nursing care in hospital',
       isComplete: true,
@@ -44,7 +45,7 @@ describe('JobSeeker Default Role Targeting', () => {
       title: 'Corporate Tax Accountant CPA',
       company: 'Finance Ltd',
       location: 'Sydney NSW',
-      date: '2026-09-05',
+      date: todayDate,
       salary: '$110,000',
       description: 'Tax and financial reporting',
       isComplete: true,
@@ -89,7 +90,7 @@ describe('JobSeeker Default Role Targeting', () => {
     );
 
     // Find and click SHOW ALL button
-    const showAllBtn = screen.getByRole('button', { name: /SHOW ALL/i });
+    const showAllBtn = screen.getByRole('button', { name: /^SHOW ALL \(/i });
     fireEvent.click(showAllBtn);
 
     // Now all jobs should be visible
@@ -143,7 +144,7 @@ describe('JobSeeker Default Role Targeting', () => {
         location: null,
         notes: null,
         tags: ['Kubernetes', 'Go'],
-        date: '2026-09-10',
+        date: todayDate,
         isComplete: true,
         score: 88
       }
@@ -158,7 +159,7 @@ describe('JobSeeker Default Role Targeting', () => {
       />
     );
 
-    const showAllBtn = screen.getByRole('button', { name: /SHOW ALL/i });
+    const showAllBtn = screen.getByRole('button', { name: /^SHOW ALL \(/i });
     fireEvent.click(showAllBtn);
 
     const searchInput = screen.getByPlaceholderText(/SEARCH BY ROLE/i);

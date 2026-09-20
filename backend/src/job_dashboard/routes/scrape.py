@@ -247,21 +247,25 @@ def handle_scrape_stream(handler):
 def handle_get_search_criteria(handler):
     """List configured search discovery criteria queries."""
     app = handler.app
+    queries_data = [
+        {
+            "term": q.term,
+            "location": q.location,
+            "stream": q.stream,
+            "group": q.group,
+            "weight": q.weight,
+            "exclude_terms": list(q.exclude_terms),
+            "enabled": q.enabled,
+        }
+        for q in app.search_queries
+    ]
     handler.send_json(
         200,
         {
-            "queries": [
-                {
-                    "term": q.term,
-                    "location": q.location,
-                    "stream": q.stream,
-                    "group": q.group,
-                    "weight": q.weight,
-                    "exclude_terms": list(q.exclude_terms),
-                    "enabled": q.enabled,
-                }
-                for q in app.search_queries
-            ]
+            "success": True,
+            "queries": queries_data,
+            "searchCriteria": queries_data,
+            "criteria": queries_data,
         },
     )
 
@@ -272,7 +276,7 @@ def handle_post_search_criteria(handler):
     app = handler.app
     payload = get_json_body(handler)
     if isinstance(payload, dict):
-        raw_queries = payload.get("queries", payload.get("items", []))
+        raw_queries = payload.get("queries", payload.get("items", payload.get("searchCriteria", [])))
     elif isinstance(payload, list):
         raw_queries = payload
     else:
@@ -284,6 +288,8 @@ def handle_post_search_criteria(handler):
         {
             "success": True,
             "queries": res_queries,
+            "searchCriteria": res_queries,
+            "criteria": res_queries,
         },
     )
 

@@ -295,7 +295,13 @@ def _extract_profile_target_titles(profile: Mapping[str, Any]) -> list[str]:
         profile.get("profile") if isinstance(profile.get("profile"), Mapping) else {}
     )
     for source in (profile, nested):
-        raw = source.get("targetTitles") or []
+        raw = (
+            source.get("targetTitles")
+            or source.get("targetRoles")
+            or source.get("target_titles")
+            or source.get("target_roles")
+            or []
+        )
         if isinstance(raw, (list, tuple)):
             for t in raw:
                 cleaned = str(t).lower().strip()
@@ -537,8 +543,11 @@ def score_job(job: Job, profile: Mapping[str, Any]) -> ScoreResult:
         cand_loc = (
             str(
                 profile.get("location")
+                or profile.get("locationPreference")
+                or profile.get("location_preference")
                 or profile.get("suburb")
                 or nested_prof.get("location")
+                or nested_prof.get("locationPreference")
                 or ""
             )
             .lower()

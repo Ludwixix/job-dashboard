@@ -176,6 +176,25 @@ export const saveProfile = (updatedProfile, options = {}) => {
     updatedAt: updatedProfile.updatedAt || new Date().toISOString()
   };
 
+  // Cross-populate aliases so both frontend and backend conventions are always complete
+  if (profile.targetTitles && !profile.targetRoles) {
+    profile.targetRoles = [...profile.targetTitles];
+  } else if (profile.targetRoles && !profile.targetTitles) {
+    profile.targetTitles = [...profile.targetRoles];
+  }
+
+  if (profile.seniorityLevel && !profile.seniority) {
+    profile.seniority = profile.seniorityLevel;
+  } else if (profile.seniority && !profile.seniorityLevel) {
+    profile.seniorityLevel = profile.seniority;
+  }
+
+  if (profile.location && !profile.locationPreference) {
+    profile.locationPreference = profile.location;
+  } else if (profile.locationPreference && !profile.location) {
+    profile.location = profile.locationPreference;
+  }
+
   try {
     // Single profile persistence
     localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(profile));
@@ -198,6 +217,9 @@ export const saveProfile = (updatedProfile, options = {}) => {
     // Persist to backend database asynchronously unless explicitly bypassed
     if (options.syncToBackend !== false) {
       saveProfileToBackend(profile).catch(() => {});
+      import('../jobQueryService.js').then(({ pushQueriesToBackend }) => {
+        pushQueriesToBackend(profile).catch(() => {});
+      }).catch(() => {});
     }
   } catch (e) {
     console.error('Error saving profile:', e);

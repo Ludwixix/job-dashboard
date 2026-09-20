@@ -126,6 +126,22 @@ def _persist_profile_to_all_sinks(
     if "updatedAt" not in profile_data and "updated_at" not in profile_data:
         profile_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
+    # Cross-populate naming convention aliases
+    if "targetRoles" in profile_data and "targetTitles" not in profile_data:
+        profile_data["targetTitles"] = list(profile_data["targetRoles"])
+    elif "targetTitles" in profile_data and "targetRoles" not in profile_data:
+        profile_data["targetRoles"] = list(profile_data["targetTitles"])
+
+    if "seniority" in profile_data and "seniorityLevel" not in profile_data:
+        profile_data["seniorityLevel"] = profile_data["seniority"]
+    elif "seniorityLevel" in profile_data and "seniority" not in profile_data:
+        profile_data["seniority"] = profile_data["seniorityLevel"]
+
+    if "locationPreference" in profile_data and "location" not in profile_data:
+        profile_data["location"] = profile_data["locationPreference"]
+    elif "location" in profile_data and "locationPreference" not in profile_data:
+        profile_data["locationPreference"] = profile_data["location"]
+
     res = app.repository.upsert_user_profile(user_id, profile_data)
     email = str(profile_data.get("email") or "").strip().lower()
     if email and email != user_id:
@@ -144,6 +160,15 @@ def _persist_profile_to_all_sinks(
     # 1. Update in-memory dashboard profile so subsequent scoring and tools use the live profile
     if hasattr(app, "dashboard") and app.dashboard:
         app.dashboard.profile = res
+
+    # 1b. Auto-synchronize search discovery queries from the new profile
+    if hasattr(app, "suggested_search_queries") and hasattr(app, "update_search_queries"):
+        try:
+            suggested = app.suggested_search_queries()
+            if suggested:
+                app.update_search_queries(suggested)
+        except Exception as sq_err:
+            logger.debug(f"Could not auto-update search queries on profile persist: {sq_err}")
 
     # 2. Write to data_dir / job_profile.json for persistent state
     if hasattr(app, "data_dir") and app.data_dir:
@@ -621,11 +646,39 @@ class DashboardApp:
         ],
     }
 
+    def _normalize_industry_key(self, ind_raw: str) -> str:
+        s = str(ind_raw or "").lower()
+        if any(k in s for k in ("health", "nurs", "medic", "clinic")):
+            return "Healthcare & Medical"
+        if any(k in s for k in ("tech", "cloud", "software", "it", "developer", "data")):
+            return "Technology & IT"
+        if any(k in s for k in ("finance", "account", "bank", "cpa")):
+            return "Finance & Accounting"
+        if any(k in s for k in ("construct", "trade", "build")):
+            return "Construction & Trades"
+        if any(k in s for k in ("educat", "teach", "school")):
+            return "Education"
+        if any(k in s for k in ("legal", "law", "solicitor")):
+            return "Legal"
+        if any(k in s for k in ("hr", "people", "talent", "recruit")):
+            return "HR & People"
+        if any(k in s for k in ("market", "sales")):
+            return "Marketing & Sales"
+        if any(k in s for k in ("retail", "hospitality")):
+            return "Retail & Hospitality"
+        if any(k in s for k in ("engineer", "mechanical", "electrical")):
+            return "Engineering"
+        if any(k in s for k in ("logistics", "supply chain", "transport")):
+            return "Logistics & Supply Chain"
+        if any(k in s for k in ("creative", "design")):
+            return "Creative & Design"
+        return "Technology & IT"
+
     def suggested_search_queries(self):
         """Return search terms grounded in the candidate's profile and industry.
 
         Priority:
-        1. Explicit target titles from the profile (highest relevance).
+        1. Explicit target titles / target roles from the profile (highest relevance).
         2. Past job titles from experience entries.
         3. Industry-appropriate titles from ``_INDUSTRY_TITLES``.
         All terms are deduplicated and capped at 20 suggestions.
@@ -634,7 +687,14 @@ class DashboardApp:
         terms = []
         seen: set[str] = set()
         location = (
-            str(profile.get("location") or "Melbourne, VIC").split("(")[0].strip()
+            str(
+                profile.get("location")
+                or profile.get("locationPreference")
+                or profile.get("location_preference")
+                or "Melbourne, VIC"
+            )
+            .split("(")[0]
+            .strip()
             or "Melbourne, VIC"
         )
 
@@ -644,8 +704,15 @@ class DashboardApp:
                 seen.add(term.lower())
                 terms.append(SearchQuery(term, location, stream))
 
-        # 1. Explicit target titles — highest priority
-        for title in profile.get("targetTitles") or []:
+        # 1. Explicit target titles / target roles — highest priority
+        titles = (
+            profile.get("targetTitles")
+            or profile.get("targetRoles")
+            or profile.get("target_titles")
+            or profile.get("target_roles")
+            or []
+        )
+        for title in titles:
             add(title)
 
         # 2. Past experience titles
@@ -653,9 +720,13 @@ class DashboardApp:
             add(experience.get("title", ""))
 
         # 3. Industry-appropriate titles
-        industry = str(profile.get("industry") or "Technology & IT")
+        industry_raw = str(profile.get("industry") or "Technology & IT")
+        norm_industry = self._normalize_industry_key(industry_raw)
         for title in self._INDUSTRY_TITLES.get(
-            industry, self._INDUSTRY_TITLES["Technology & IT"]
+            norm_industry,
+            self._INDUSTRY_TITLES.get(
+                industry_raw, self._INDUSTRY_TITLES["Technology & IT"]
+            ),
         ):
             add(title)
 

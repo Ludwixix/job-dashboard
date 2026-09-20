@@ -3,8 +3,8 @@
  * Multi-industry heuristic and AI-assisted resume parsing.
  */
 
-import { MULTI_INDUSTRY_PARSER_CONFIG } from './multiIndustryParserConfig';
-import { getLlmConfig } from '../llmConfig';
+import { MULTI_INDUSTRY_PARSER_CONFIG } from './multiIndustryParserConfig.js';
+import { getLlmConfig } from '../llmConfig.js';
 
 /**
  * Heuristic client-side resume parser with full multi-industry intelligence
@@ -46,11 +46,9 @@ export const parseResumeTextClientSide = (text = '', existingProfile = {}) => {
   else if (lower.includes('melbourne')) { suburb = 'Melbourne'; location = 'Melbourne VIC 3000'; }
 
   // Industry Resolution: Evaluate keyword density across all industries
-  let bestIndustry = existingProfile.industry && existingProfile.industry !== ''
-    ? existingProfile.industry
-    : 'Healthcare & Medical';
+  let bestIndustry = null;
 
-  let highestScore = -1;
+  let highestScore = 0;
   for (const [indName, indConf] of Object.entries(MULTI_INDUSTRY_PARSER_CONFIG)) {
     let score = 0;
     for (const kw of indConf.keywords) {
@@ -65,9 +63,34 @@ export const parseResumeTextClientSide = (text = '', existingProfile = {}) => {
     }
   }
 
-  // If existing profile had an explicit non-IT industry and score didn't massively contradict, honor existing profile
-  if (existingProfile.industry && existingProfile.industry in MULTI_INDUSTRY_PARSER_CONFIG) {
-    bestIndustry = existingProfile.industry;
+  // Canonicalize bestIndustry
+  if (bestIndustry === 'Healthcare') bestIndustry = 'Healthcare & Medical';
+  if (bestIndustry === 'Technology') bestIndustry = 'Technology & IT';
+  if (bestIndustry === 'Finance') bestIndustry = 'Finance & Accounting';
+  if (bestIndustry === 'Trades') bestIndustry = 'Construction & Trades';
+
+  // Only fall back to existing profile preference when the resume has no industry signal at all.
+  // Never let an empty or stale profile override a resume that clearly signals a different industry.
+  if (!bestIndustry || highestScore === 0) {
+    let fallback = existingProfile.industry;
+    if (fallback === 'Healthcare') fallback = 'Healthcare & Medical';
+    if (fallback === 'Technology') fallback = 'Technology & IT';
+    if (fallback === 'Finance') fallback = 'Finance & Accounting';
+    if (fallback === 'Trades') fallback = 'Construction & Trades';
+    bestIndustry =
+      (fallback && fallback in MULTI_INDUSTRY_PARSER_CONFIG
+        ? fallback
+        : null) || 'Healthcare & Medical';
+  }
+
+  // Preserve existing short-form naming if explicitly requested by caller
+  let outputIndustry = bestIndustry;
+  if (existingProfile.industry === 'Healthcare' && bestIndustry === 'Healthcare & Medical') {
+    outputIndustry = 'Healthcare';
+  } else if (existingProfile.industry === 'Technology' && bestIndustry === 'Technology & IT') {
+    outputIndustry = 'Technology';
+  } else if (existingProfile.industry === 'Finance' && bestIndustry === 'Finance & Accounting') {
+    outputIndustry = 'Finance';
   }
 
   const industryConfig = MULTI_INDUSTRY_PARSER_CONFIG[bestIndustry] || MULTI_INDUSTRY_PARSER_CONFIG['Healthcare & Medical'];
@@ -141,18 +164,21 @@ export const parseResumeTextClientSide = (text = '', existingProfile = {}) => {
     id: existingProfile.id || `profile_${Date.now()}`,
     name: name,
     title: matchedTitle,
-    industry: bestIndustry,
+    industry: outputIndustry,
     seniorityLevel: seniorityLevel,
+    seniority: seniorityLevel,
     yearsOfExperience: yearsOfExperience,
     marketArchetype: `${seniorityLevel} ${bestIndustry} Specialist`,
     email: email,
     phone: phone,
     location: location,
+    locationPreference: location,
     suburb: suburb,
     workRights: existingProfile.workRights || 'Australian Citizen (Unrestricted)',
     clearance: existingProfile.clearance || '',
     targetSalary: existingProfile.targetSalary || '',
     targetTitles: targetTitles,
+    targetRoles: [...targetTitles],
     coreSkills: finalSkills,
     certifications: existingProfile.certifications || [],
     keyStrengths: existingProfile.keyStrengths || [],

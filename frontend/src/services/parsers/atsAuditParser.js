@@ -13,6 +13,7 @@ import { CANDIDATE_PROFILE } from '../profiles/profileTemplates';
 export const extractJobKeywords = (jobDescription) => {
   const text = (jobDescription || '').toLowerCase();
   const keywordGroups = {
+    // Technology & Cloud
     'Microsoft 365': ['microsoft 365', 'm365', 'office 365', 'o365'],
     'SharePoint': ['sharepoint'],
     'Azure': ['azure', 'azure ad', 'entra id'],
@@ -34,7 +35,23 @@ export const extractJobKeywords = (jobDescription) => {
     'L3 Support': ['level 3', 'l3', 'tier 3', 'escalation', 'senior support'],
     'Infrastructure': ['infrastructure', 'systems administrator', 'sysadmin', 'cloud engineer'],
     'Government': ['government', 'aps', 'public sector', 'defence', 'federal', 'state government'],
-    'Healthcare': ['healthcare', 'hospital', 'clinical', 'health'],
+
+    // Healthcare & Nursing
+    'Healthcare': ['healthcare', 'hospital', 'clinical', 'health', 'ward', 'aged care', 'medical'],
+    'Nursing & AHPRA': ['nurse', 'nursing', 'ahpra', 'registered nurse', 'enrolled nurse', 'clinical nurse', 'rn'],
+    'Patient Care & Assessment': ['patient care', 'patient assessment', 'acute care', 'bedside care', 'vital signs', 'triage'],
+    'Medication & Clinical': ['medication administration', 'medication', 'cannulation', 'wound care', 'infection control', 'iv therapy'],
+    'Clinical Governance': ['clinical governance', 'clinical audit', 'nsqhs', 'quality assurance', 'care planning'],
+    'Health Systems / EMR': ['emr', 'cerner', 'electronic medical record', 'patient records', 'health documentation'],
+
+    // Finance & Accounting
+    'Finance & Accounting': ['accountant', 'accounting', 'financial', 'cpa', 'ca qualified', 'bookkeeper'],
+    'Financial Reporting': ['financial reporting', 'statutory reporting', 'balance sheet', 'reconciliation', 'general ledger'],
+    'Tax & Compliance': ['tax compliance', 'bas', 'gst', 'audit', 'payroll'],
+
+    // Construction & Trades
+    'Construction & Trades': ['construction', 'site supervisor', 'foreman', 'trades', 'builder'],
+    'WHS & Site Safety': ['white card', 'safework', 'swms', 'whs', 'ohs', 'site safety']
   };
 
   return Object.entries(keywordGroups)
@@ -47,9 +64,11 @@ export const extractJobKeywords = (jobDescription) => {
  */
 export const calculateAtsScore = (jobDescription) => {
   const matched = extractJobKeywords(jobDescription);
-  const total = 22; // total keyword groups
-  const base = 55;
-  return Math.min(98, Math.round(base + (matched.length / total) * 43));
+  if (!matched.length) return 50;
+  // Dynamic scaling based on industry-relevant matched density
+  const base = 58;
+  const score = base + Math.min(40, matched.length * 9);
+  return Math.min(98, score);
 };
 
 /**

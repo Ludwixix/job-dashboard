@@ -17,6 +17,7 @@ import { loginWithGoogle } from '../services/googleAuthService';
 import { GooglePromptModal } from './GooglePromptModal';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
+import { pushQueriesToBackend } from '../services/jobQueryService';
 import { getActiveApiKey, getActiveModel } from '../services/generationService';
 import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
 import { PROVIDERS, getLlmConfig, saveLlmConfig, testLlmConnection } from '../services/llmConfig';
@@ -781,8 +782,17 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   const handleFinalSubmit = async () => {
     setIsLaunching(true);
     setLaunchMessage('Saving candidate profile to secure database...');
+    const titles = profileData.targetTitles?.length ? profileData.targetTitles : (profileData.targetRoles || []);
+    const seniority = profileData.seniorityLevel || profileData.seniority || 'Senior';
+    const loc = profileData.location || profileData.locationPreference || '';
     const finalProfileData = {
       ...profileData,
+      targetTitles: titles,
+      targetRoles: [...titles],
+      seniorityLevel: seniority,
+      seniority: seniority,
+      location: loc,
+      locationPreference: loc,
       fullWorkExperienceText: profileData.fullWorkExperienceText || resumeText
     };
     try {
@@ -792,6 +802,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       const { session, profile } = completeOnboarding(finalProfileData);
       setLaunchMessage('Pushing personalized search criteria to scrapers...');
       await saveProfileToBackend(profile);
+      await pushQueriesToBackend(profile).catch(() => {});
       setLaunchMessage('Seeding recommendation weights & active theme...');
       await runProfileOnboardingPipeline(profile);
       sessionStorage.setItem('trigger_initial_scrape', 'true');

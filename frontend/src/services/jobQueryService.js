@@ -25,6 +25,7 @@ export const INDUSTRY_QUERY_MAP = {
   'Technology & IT': {
     stream: 'core',
     titles: [
+      'software engineer',
       'systems administrator',
       'support engineer',
       'helpdesk',
@@ -32,6 +33,7 @@ export const INDUSTRY_QUERY_MAP = {
       'cloud engineer',
       'devops engineer',
       'service desk analyst',
+      'full stack developer',
       'microsoft 365 administrator',
       'azure administrator',
       'sharepoint administrator',
@@ -262,6 +264,14 @@ export const INDUSTRY_QUERY_MAP = {
   },
 };
 
+// Aliases for short-form industry labels
+INDUSTRY_QUERY_MAP['Healthcare'] = INDUSTRY_QUERY_MAP['Healthcare & Medical'];
+INDUSTRY_QUERY_MAP['Technology'] = INDUSTRY_QUERY_MAP['Technology & IT'];
+INDUSTRY_QUERY_MAP['Finance'] = INDUSTRY_QUERY_MAP['Finance & Accounting'];
+INDUSTRY_QUERY_MAP['Trades'] = INDUSTRY_QUERY_MAP['Construction & Trades'];
+INDUSTRY_QUERY_MAP['Marketing'] = INDUSTRY_QUERY_MAP['Marketing & Sales'];
+INDUSTRY_QUERY_MAP['HR'] = INDUSTRY_QUERY_MAP['HR & People'];
+
 // ---------------------------------------------------------------------------
 // Skills → additional inferred search terms
 // ---------------------------------------------------------------------------
@@ -297,7 +307,7 @@ const SKILL_INFERENCE_MAP = {
  * Extract a clean "City, STATE" location string from the profile's freeform location.
  */
 export const extractLocationForQuery = (profile) => {
-  const raw = (profile?.location || profile?.suburb || '').trim();
+  const raw = (profile?.location || profile?.locationPreference || profile?.location_preference || profile?.suburb || '').trim();
   if (!raw) return 'Australia';
   if (/remote|wfh|anywhere|australia/i.test(raw)) return 'Australia';
   const stateMatch = raw.match(/([A-Za-z\s]+),?\s*(VIC|NSW|QLD|WA|SA|TAS|ACT|NT)/i);
@@ -308,7 +318,7 @@ export const extractLocationForQuery = (profile) => {
 /**
  * Build a de-duplicated list of SearchQuery-compatible objects from a profile.
  * Priority:
- *   1. User's own targetTitles  (weight: 1.5)
+ *   1. User's own targetTitles / targetRoles  (weight: 1.5)
  *   2. Industry-mapped titles   (weight: 1.0)
  *   3. Skills-inferred titles   (weight: 0.8)
  *   4. Industry bridge titles   (weight: 0.6, stream: 'bridge')
@@ -317,7 +327,13 @@ export const buildQueriesFromProfile = (profile) => {
   if (!profile) return [];
 
   const location = extractLocationForQuery(profile);
-  const industry = profile.industry || '';
+  const rawIndustry = profile.industry || '';
+  let industry = rawIndustry;
+  if (/health|medic|nurs|clinic/i.test(rawIndustry)) industry = 'Healthcare & Medical';
+  else if (/tech|cloud|software|it\b|developer/i.test(rawIndustry)) industry = 'Technology & IT';
+  else if (/finance|account|bank/i.test(rawIndustry)) industry = 'Finance & Accounting';
+  else if (/construct|trade|build/i.test(rawIndustry)) industry = 'Construction & Trades';
+
   const industryData = industry ? (INDUSTRY_QUERY_MAP[industry] || null) : null;
   const seen = new Set();
   const queries = [];
@@ -336,8 +352,9 @@ export const buildQueriesFromProfile = (profile) => {
     queries.push({ term: term.trim(), location: queryLoc, stream: isRemote ? 'remote' : stream, weight });
   };
 
-  // 1. Explicit target titles — highest priority
-  for (const title of (profile.targetTitles || [])) {
+  // 1. Explicit target titles / target roles — highest priority
+  const titles = profile.targetTitles || profile.targetRoles || profile.target_titles || profile.target_roles || [];
+  for (const title of titles) {
     add(title, 'core', 1.5);
     if ((profile.openToRemote || profile.includeRemote) && queries.length < maxQueries) {
       add(`${title} Remote`, 'remote', 1.2);

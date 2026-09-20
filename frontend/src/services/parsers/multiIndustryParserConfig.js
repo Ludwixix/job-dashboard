@@ -20,6 +20,22 @@ export const MULTI_INDUSTRY_PARSER_CONFIG = {
     ],
     keywords: ['nurse', 'nursing', 'ahpra', 'triage', 'hospital', 'clinical', 'patient', 'medical', 'ward', 'icu', 'medication', 'allied health', 'physiotherapy', 'aged care', 'healthcare', 'health service', 'epworth', 'emergency triage']
   },
+  'Technology & IT': {
+    titles: [
+      'Senior Systems Engineer', 'Cloud Infrastructure Engineer', 'DevOps Engineer',
+      'Full Stack Developer', 'Software Engineer', 'Senior Software Engineer',
+      'Backend Developer', 'Frontend Developer', 'Lead Software Engineer',
+      'Systems Administrator', 'Solutions Architect',
+      'Platform Engineer', 'Site Reliability Engineer', 'IT Operations Lead'
+    ],
+    skills: [
+      'Microsoft 365', 'Azure', 'AWS', 'Kubernetes', 'Docker',
+      'PowerShell', 'Active Directory', 'Windows Server', 'Linux',
+      'Python', 'CI/CD', 'Terraform', 'PostgreSQL', 'Networking', 'Firewalls', 'Security',
+      'React', 'Node.js', 'TypeScript', 'JavaScript', 'REST APIs', 'Git'
+    ],
+    keywords: ['software', 'cloud', 'developer', 'devops', 'azure', 'aws', 'systems engineer', 'infrastructure', 'm365', 'powershell', 'active directory', 'network', 'linux', 'kubernetes', 'full stack', 'software engineer', 'react', 'node', 'typescript', 'backend', 'frontend']
+  },
   'Finance & Accounting': {
     titles: [
       'Senior Financial Accountant', 'Management Accountant', 'Finance Manager',
@@ -110,3 +126,9 @@ export const MULTI_INDUSTRY_PARSER_CONFIG = {
     keywords: ['software', 'cloud', 'developer', 'devops', 'azure', 'aws', 'systems engineer', 'infrastructure', 'm365', 'powershell', 'active directory', 'network', 'linux', 'kubernetes', 'full stack']
   }
 };
+
+// Aliases for short-form industry labels
+MULTI_INDUSTRY_PARSER_CONFIG['Healthcare'] = MULTI_INDUSTRY_PARSER_CONFIG['Healthcare & Medical'];
+MULTI_INDUSTRY_PARSER_CONFIG['Technology'] = MULTI_INDUSTRY_PARSER_CONFIG['Technology & IT'];
+MULTI_INDUSTRY_PARSER_CONFIG['Finance'] = MULTI_INDUSTRY_PARSER_CONFIG['Finance & Accounting'];
+MULTI_INDUSTRY_PARSER_CONFIG['Trades'] = MULTI_INDUSTRY_PARSER_CONFIG['Construction & Trades'];

@@ -317,3 +317,76 @@ def test_nurse_onboarding_and_job_discovery_lifecycle(nurse_app_environment):
     assert result_1.score > result_3.score, (
         f"Nurse job ({result_1.score}) must score substantially higher than DevOps job ({result_3.score})"
     )
+
+    # =========================================================================
+    # Step 6: Verify Profile Retrieval has all complete required fields
+    # =========================================================================
+    get_prof_handler = create_handler_request(
+        handler_cls, "GET", "/api/profile", headers={"Authorization": f"Bearer {token}"}
+    )
+    get_prof_handler.do_GET()
+    assert get_prof_handler.send_response.call_args[0][0] == 200
+    retrieved_prof = get_response_payload(get_prof_handler).get("profile", {})
+    assert retrieved_prof.get("industry") == "Healthcare & Medical"
+    assert retrieved_prof.get("seniority") in ("Senior", "Senior / Specialist")
+    assert any("nurse" in r.lower() for r in (retrieved_prof.get("targetRoles") or []))
+    assert any("ahpra" in s.lower() for s in (retrieved_prof.get("coreSkills") or []))
+    assert retrieved_prof.get("locationPreference") is not None
+
+    # =========================================================================
+    # Step 7: Verify GET /api/search-criteria has searchCriteria key & nurse terms
+    # =========================================================================
+    crit_get_handler = create_handler_request(
+        handler_cls, "GET", "/api/search-criteria", headers={"Authorization": f"Bearer {token}"}
+    )
+    crit_get_handler.do_GET()
+    assert crit_get_handler.send_response.call_args[0][0] == 200
+    crit_payload = get_response_payload(crit_get_handler)
+    assert "searchCriteria" in crit_payload
+    sc_terms = [q["term"] for q in crit_payload["searchCriteria"]]
+    assert any("nurse" in t.lower() or "rn" in t.lower() for t in sc_terms)
+    assert not any("developer" in t.lower() or "software" in t.lower() for t in sc_terms)
+
+    # =========================================================================
+    # Step 8: Verify GET /api/job-explanation with jobId returns clinical breakdown
+    # =========================================================================
+    exp_handler = create_handler_request(
+        handler_cls, "GET", "/api/job-explanation?jobId=seek-nurse-001", headers={"Authorization": f"Bearer {token}"}
+    )
+    exp_handler.do_GET()
+    assert exp_handler.send_response.call_args[0][0] == 200
+    exp_data = get_response_payload(exp_handler)
+    assert exp_data.get("success") is True
+    explanation = exp_data.get("explanation", {})
+    assert explanation.get("score", 0) >= 70
+    assert any("triage" in s.lower() or "patient" in s.lower() or "nurse" in s.lower() or "medication" in s.lower()
+               for s in explanation.get("matched_skills", []))
+
+    # =========================================================================
+    # Step 9: Verify Developer Onboarding updates search-criteria to tech terms
+    # =========================================================================
+    dev_profile = {
+        "id": "user_dev_001",
+        "name": "David Dev",
+        "title": "Senior Software Engineer",
+        "industry": "Technology",
+        "seniority": "Senior",
+        "targetRoles": ["Senior Software Engineer", "Full Stack Developer"],
+        "coreSkills": ["Python", "React", "AWS", "Docker"],
+        "locationPreference": "Melbourne, VIC"
+    }
+    dev_prof_handler = create_handler_request(
+        handler_cls, "POST", "/api/profile", body=dev_profile, headers={"X-User-Id": "user_dev_001"}
+    )
+    dev_prof_handler.do_POST()
+    assert dev_prof_handler.send_response.call_args[0][0] == 200
+
+    dev_crit_handler = create_handler_request(
+        handler_cls, "GET", "/api/search-criteria", headers={"X-User-Id": "user_dev_001"}
+    )
+    dev_crit_handler.do_GET()
+    assert dev_crit_handler.send_response.call_args[0][0] == 200
+    dev_crit_payload = get_response_payload(dev_crit_handler)
+    dev_terms = [q["term"] for q in dev_crit_payload["searchCriteria"]]
+    assert any("software" in t.lower() or "developer" in t.lower() or "engineer" in t.lower() for t in dev_terms)
+    assert not any("nurse" in t.lower() or "hospital" in t.lower() for t in dev_terms)

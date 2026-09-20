@@ -330,7 +330,27 @@ def handle_job_explanation(handler):
     app = handler.app
     query_params = get_query_params(handler)
     user_id = _resolve_user_id(handler, query_params)
-    if not user_id:
+
+    # Support both snake_case and camelCase parameters
+    job_id = (query_params.get("job_id") or query_params.get("jobId") or [""])[0].strip()
+    if not job_id:
+        handler.send_json(400, {"success": False, "error": "jobId or job_id parameter is required."})
+        return
+
+    job_data = app.repository.get_job(job_id)
+    if not job_data:
+        # Fall back to in-memory jobs collection
+        for raw_j in getattr(app, "jobs", []):
+            if str(raw_j.get("id", "")) == job_id:
+                job_data = raw_j
+                break
+
+    if not job_data:
+        handler.send_json(404, {"error": "Job not found"})
+        return
+
+    profile = (app.repository.get_user_profile(user_id) if user_id else None) or getattr(app.dashboard, "profile", None)
+    if not profile:
         handler.send_json(
             401,
             {
@@ -340,13 +360,6 @@ def handle_job_explanation(handler):
         )
         return
 
-    job_id = query_params.get("job_id", [""])[0]
-    job_data = app.repository.get_job(job_id)
-    if not job_data:
-        handler.send_json(404, {"error": "Job not found"})
-        return
-
-    profile = app.repository.get_user_profile(user_id) or app.dashboard.profile
     fields = {key: job_data.get(key, "") for key in Job.__dataclass_fields__}
     fields["tags"] = tuple(job_data.get("tags") or ())
     handler.send_json(

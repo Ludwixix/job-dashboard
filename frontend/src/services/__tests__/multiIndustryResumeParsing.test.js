@@ -59,13 +59,50 @@ describe('Multi-Industry Resume Parsing Engine', () => {
   it('respects existing profile industry context when parsing', () => {
     const result = parseResumeTextClientSide(nurseResume, {
       name: 'Sarah Whitfield Test',
-      industry: 'Healthcare & Medical'
+      industry: 'Healthcare'
     });
 
     expect(result.name).toBe('Sarah Whitfield Test');
-    expect(result.industry).toBe('Healthcare & Medical');
+    expect(result.industry).toBe('Healthcare');
     expect(result.targetTitles.some(t => /Nurse/i.test(t))).toBe(true);
     expect(result.targetTitles.some(t => /Systems Engineer/i.test(t))).toBe(false);
+  });
+
+  const softwareEngineerResume = `
+    David Chen
+    Senior Software Engineer
+    david.chen@tech.com | 0433 888 777 | Melbourne VIC 3000
+
+    SUMMARY
+    Full Stack Software Engineer with 8 years of experience building distributed systems,
+    cloud microservices, and web applications using React, Node.js, Python, and AWS.
+
+    EXPERIENCE
+    Senior Software Engineer — Atlassian (2021 – Present)
+    - Architected scalable microservices using TypeScript, Node.js, and Docker.
+    - Designed and implemented CI/CD pipelines with GitHub Actions and AWS ECS.
+    - Mentored junior developers and led technical design reviews.
+
+    Software Developer — REA Group (2018 – 2021)
+    - Developed customer-facing React web applications and REST APIs in Python.
+  `;
+
+  it('correctly parses a Software Engineer resume into Technology without healthcare titles', () => {
+    const result = parseResumeTextClientSide(softwareEngineerResume, {
+      industry: 'Technology'
+    });
+
+    expect(result.name).toBe('David Chen');
+    expect(result.industry).toBe('Technology');
+    expect(result.title).toMatch(/Software Engineer|Developer/i);
+    expect(result.title).not.toMatch(/Nurse|Clinical/i);
+
+    expect(result.targetTitles.length).toBeGreaterThan(0);
+    expect(result.targetTitles.some(t => /Software Engineer|Developer/i.test(t))).toBe(true);
+    expect(result.targetTitles.some(t => /Nurse|Triage|Clinical/i.test(t))).toBe(false);
+
+    expect(result.coreSkills.some(s => /Python|React|AWS|Docker|CI\/CD/i.test(s))).toBe(true);
+    expect(result.coreSkills.some(s => /Nurse|AHPRA|Triage|Medication/i.test(s))).toBe(false);
   });
 
   it('correctly parses an Accountant resume into Finance & Accounting', () => {

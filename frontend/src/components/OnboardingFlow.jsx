@@ -195,10 +195,12 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
   const [step, setStep] = useState(() => {
     if (savedDraft?.step && (!initialUser || initialUser.email_verified || savedDraft.step > 1)) {
-      return savedDraft.step;
+      // Step 2 used to be a mandatory AI setup screen. Migrate old drafts to
+      // the first real profile step now that built-in AI is the default.
+      return savedDraft.step === 2 ? 3 : savedDraft.step;
     }
     if (initialUser) {
-      return initialUser.email_verified ? 2 : 1;
+      return initialUser.email_verified ? 3 : 1;
     }
     return 1;
   });
@@ -288,7 +290,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       setProfileData(prev => ({ ...prev, email_verified: true }));
       setTimeout(() => {
         setIsVerifyingEmail(false);
-        setStep(2);
+        setStep(3);
       }, 700);
     } catch (err) {
       setVerifyError(err.message || 'Verification failed. Please check the code.');
@@ -479,9 +481,10 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       });
     }
 
-    // 7. AI Reasoning Engine Configured (10 pts)
+    // 7. AI Reasoning Engine (built-in by default; personal key is optional)
     const hasApiKey = Boolean(llmApiKey && llmApiKey.trim().length > 3);
-    if (hasApiKey) {
+    const hasAiEngine = aiEngineMode === 'builtin' || hasApiKey;
+    if (hasAiEngine) {
       score += 10;
     } else {
       improvements.push({
@@ -552,7 +555,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
         return;
       }
 
-      setStep(2);
+      setStep(3);
     } catch (err) {
       setAuthError(err.message || 'Authentication failed.');
     } finally {
@@ -626,7 +629,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       endpoint: aiEngineMode === 'builtin' ? '' : llmEndpoint
     });
     setLlmError('');
-    setStep(3); // Advance to Step 3: Industry
+    setStep(3); // Advance to profile setup
   };
 
   const handleSkipLlm = () => {
@@ -841,12 +844,11 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
         {/* Step Indicators with labels */}
         <div className="flex items-center gap-1.5 text-xs font-bold w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           {[
-            { num: 1, label: isVerifyingEmail ? 'Verify Email' : 'Identity' },
-            { num: 2, label: 'AI Engine' },
-            { num: 3, label: 'Industry' },
-            { num: 4, label: 'Skills & Experience' },
-            { num: 5, label: 'Location & Work' },
-            { num: 6, label: 'Launch' }
+            { num: 1, displayNum: 1, label: isVerifyingEmail ? 'Verify Email' : 'Identity' },
+            { num: 3, displayNum: 2, label: 'Profile' },
+            { num: 4, displayNum: 3, label: 'Skills & Experience' },
+            { num: 5, displayNum: 4, label: 'Preferences' },
+            { num: 6, displayNum: 5, label: 'Launch' }
           ].map((s) => {
             const isClickable = !isVerifyingEmail || s.num === 1;
             return (
@@ -869,7 +871,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
                 }`}
                 title={`Go to Step ${s.num}: ${s.label}`}
               >
-                <span>{step > s.num ? '✓' : s.num}</span>
+                <span>{step > s.num ? '✓' : s.displayNum}</span>
                 <span className="hidden md:inline">{s.label}</span>
               </div>
             );

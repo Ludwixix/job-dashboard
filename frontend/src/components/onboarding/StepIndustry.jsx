@@ -121,7 +121,7 @@ export function StepIndustry({
  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
  <button
  type="button"
- onClick={() => setStep(2)}
+ onClick={() => setStep(1)}
  className="px-4 py-2.5 rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  <ArrowLeft size={14} /> Back

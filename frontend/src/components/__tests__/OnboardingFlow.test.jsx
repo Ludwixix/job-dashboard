@@ -117,13 +117,13 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
       expect(screen.getByText(/Email verified!/i)).toBeInTheDocument();
     });
 
-    // Advances to Step 2 (AI Intelligence Engine)
+    // Advances directly to profile setup; built-in AI no longer blocks onboarding.
     await waitFor(() => {
-      expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
+      expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
     }, { timeout: 2000 });
   });
 
-  it('starts at Step 2 directly if user email is already verified', () => {
+  it('starts at profile setup directly if user email is already verified', () => {
     const verifiedUser = {
       id: 'candidate_2',
       name: 'Taylor Swift',
@@ -133,10 +133,10 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
 
-    expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
+    expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
   });
 
-  it('allows user to progress from Step 2 to Step 3 (Industry Selection) and select an industry and seniority', async () => {
+  it('allows a verified user to start profile setup without configuring an AI key', async () => {
     const verifiedUser = {
       id: 'candidate_3',
       name: 'Morgan Blake',
@@ -146,11 +146,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
 
-    // In Step 2 (AI Engine), click "Save & Continue to Industry"
-    const continueToIndustryBtn = screen.getByRole('button', { name: /Save & Continue to Industry/i });
-    fireEvent.click(continueToIndustryBtn);
-
-    // Verify Step 3 is rendered
+    // Built-in AI is the default; no provider or API-key step is required.
     expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
     expect(screen.getByText(/What Industry Do You Specialize In\?/i)).toBeInTheDocument();
 
@@ -179,7 +175,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
     expect(screen.getByText(/STEP 4 OF 6 \/\/ TARGET ROLES & CORE SKILLS/i)).toBeInTheDocument();
   });
 
-  it('completes the entire onboarding journey from Step 2 through Step 6 and triggers auto-scrape', async () => {
+  it('completes the entire onboarding journey from profile setup through launch and triggers auto-scrape', async () => {
     const onCompleteMock = vi.fn();
     const verifiedUser = {
       id: 'candidate_4',
@@ -190,8 +186,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={onCompleteMock} />);
 
-    // Step 2 -> Step 3
-    fireEvent.click(screen.getByRole('button', { name: /Save & Continue to Industry/i }));
+    // Verified users start directly at profile setup.
     expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
 
     // Select Technology & IT
@@ -228,23 +223,20 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
     });
   });
 
-  it('allows skipping Step 2 (AI Engine) and advances to Step 3 without an API key', () => {
+  it('migrates an old AI setup draft directly to profile setup', () => {
     const verifiedUser = {
       id: 'candidate_skip_llm',
       name: 'Sam Taylor',
       email: 'sam@example.com',
       email_verified: true
     };
+    localStorage.setItem('job_dashboard_onboarding_draft', JSON.stringify({
+      step: 2,
+      profileData: { email: 'sam@example.com' }
+    }));
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
 
-    expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
-
-    // Click "Skip for now"
-    const skipBtn = screen.getByRole('button', { name: /Skip for now/i });
-    fireEvent.click(skipBtn);
-
-    // Should transition cleanly to Step 3
     expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
   });
 
@@ -262,7 +254,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
 
-    expect(screen.getByText(/STEP 2 OF 6 \/\/ AI INTELLIGENCE ENGINE/i)).toBeInTheDocument();
+    expect(screen.getByText(/STEP 3 OF 6 \/\/ TARGET SECTOR & INDUSTRY/i)).toBeInTheDocument();
 
     // Click "Skip directly to Review & Launch (Step 6)"
     const skipToLaunchBtn = screen.getByRole('button', { name: /Skip directly to Review & Launch \(Step 6\)/i });
@@ -298,8 +290,7 @@ describe('OnboardingFlow Component & Email Verification Step', () => {
 
     render(<OnboardingFlow initialUser={verifiedUser} onComplete={vi.fn()} />);
 
-    // Step 2 -> 3
-    fireEvent.click(screen.getByRole('button', { name: /Save & Continue to Industry/i }));
+    // Verified users start directly at profile setup.
 
     // Step 3 -> 4
     fireEvent.click(screen.getByRole('button', { name: /Continue to Roles & Skills/i }));

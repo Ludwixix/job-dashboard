@@ -141,7 +141,7 @@ export function StepAuthEmail({
             type="button"
             onClick={() => {
               setIsVerifyingEmail(false);
-              setStep(2);
+              setStep(3);
             }}
             className="text-xs text-slate-400 hover:text-amber-300 transition-colors underline cursor-pointer inline-flex items-center gap-1"
           >

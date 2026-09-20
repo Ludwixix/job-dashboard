@@ -4,7 +4,7 @@ Polyglot monorepo consolidating the backend domain service, multi-provider scrap
 
 ## 🏗️ Architecture & Subprojects
 
-- **[Backend (`backend/`)](backend/README.md)**: Python package (`job_dashboard`) containing core domain logic, multi-provider scrapers (SEEK, Indeed, Adzuna, RemoteOK), SQLite/WAL persistence, health monitors, and FastAPI/HTTP endpoints.
+- **[Backend (`backend/`)](backend/README.md)**: Python package (`job_dashboard`) containing core domain logic, multi-provider scrapers (SEEK, Indeed, Adzuna, RemoteOK), SQLite/WAL persistence, health monitors, and a modular HTTP routing layer.
 - **[Frontend (`frontend/`)](frontend/README.md)**: Vite + React Single Page Application featuring interactive Kanban boards, document generator studio, AI psychology profiler, and minimalist Zen Autopilot.
 - **[Documentation & Tasks (`docs/`)](docs/)**: Architectural proposals, task roadmaps, and AI layer evaluations:
   - `docs/tasks/ai-layer-roadmap.md`: Research evaluation on Crawl4AI and embedding-based matching.
@@ -12,19 +12,20 @@ Polyglot monorepo consolidating the backend domain service, multi-provider scrap
   - `docs/tasks/google-integrations-consolidation-proposal.md`: Consolidation design for Google Workspace and passkey identity.
   - `docs/Resume_Optimization.md`: ATS and algorithmic recruitment optimization guidelines.
 
-## ⚡ Recent Architectural Milestones
+## ⚡ Architectural Milestones
 
 - **Phase 1 (Dead Code Eradication)**: Removed obsolete `job-collector/` legacy packages (-1,978 LOC) and cleaned root clutter.
 - **Phase 2 (Component Deduplication)**: Removed orphaned Kanban and Table tracker components in favor of unified `ApplicationPipeline` (-1,381 LOC).
 - **Phase 3 (Dashboard Code-Splitting)**: Converted all 11 heavy modal dialogs to dynamic `React.lazy` imports with `Suspense` and `ModalSkeleton`, shrinking the main JavaScript bundle from 1.84 MB down to 1.19 MB (-34.9% raw, -34.0% gzip).
 - **Phase 4 (Service Consolidation Proposals)**: Produced architectural consolidation proposals for interview intelligence and Google Workspace services.
+- **Phase 5 (Full-Stack De-Monolithification)**: Strangler Fig decomposition of the 6,700-line `web.py` God Object into domain-scoped route modules (`auth`, `billing`, `jobs`, `ai`, `scrape`) via a lightweight custom regex router. Frontend service layers partitioned into `services/prompts/`, `services/parsers/`, `services/profiles/` with 100% backward-compatible facades. `Dashboard.jsx` decoupled into `useDashboardState` / `useScrapeOrchestrator` hooks and `DashboardModals`. `JobModal.jsx` and `OnboardingFlow.jsx` decomposed into dedicated tab/step sub-components. Production bundle reduced by a further ~480 kB.
 
 ## 🚀 Quick Start
 
 ### Backend (Python)
 ```bash
 cd backend
-# Run test suite (108 tests)
+# Run test suite (339 tests, 3 skipped)
 python3 -m pytest tests/ -v
 
 # Run local API server
@@ -40,7 +41,7 @@ npm install
 # Run dev server
 npm run dev
 
-# Run test suite (18 suites, 48 tests)
+# Run test suite (81 test files, 436 tests)
 npm test -- --run
 
 # Production bundle build

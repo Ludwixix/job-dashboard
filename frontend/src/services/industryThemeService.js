@@ -163,6 +163,68 @@ export const INDUSTRY_THEMES = {
   }
 };
 
+export const TIER_THEMES = {
+  free: {
+    tier: 'free',
+    label: 'FREE TIER',
+    isPremium: false,
+    cardBg: 'var(--bg-surface)',
+    cardBackdrop: 'none',
+    cardBorder: 'var(--industry-border)',
+    badgeBg: 'rgba(30, 41, 59, 0.7)',
+    badgeBorder: 'rgba(71, 85, 105, 0.4)',
+    badgeText: '#cbd5e1',
+    crownColor: '#f59e0b',
+    auraOpacity: '0.08',
+    haloGradient: 'radial-gradient(ellipse 90% 55% at 50% -10%, var(--industry-glow), transparent 75%)',
+    tag: 'DEVELOPER & BYO KEY'
+  },
+  pro: {
+    tier: 'pro',
+    label: 'PRO SUBSCRIBER',
+    isPremium: true,
+    cardBg: 'rgba(18, 22, 33, 0.72)',
+    cardBackdrop: 'blur(16px)',
+    cardBorder: 'rgba(16, 185, 129, 0.28)',
+    badgeBg: 'linear-gradient(135deg, rgba(6, 78, 59, 0.85), rgba(15, 23, 42, 0.9))',
+    badgeBorder: 'rgba(52, 211, 153, 0.45)',
+    badgeText: '#6ee7b7',
+    crownColor: '#10b981',
+    auraOpacity: '0.22',
+    haloGradient: 'radial-gradient(ellipse 95% 65% at 50% -8%, rgba(16, 185, 129, 0.20), var(--industry-glow), transparent 75%)',
+    tag: 'PRO JOB HUNTER // BUILT-IN AI'
+  },
+  pass: {
+    tier: 'pass',
+    label: 'CAREER PASS VIP',
+    isPremium: true,
+    cardBg: 'rgba(18, 22, 33, 0.72)',
+    cardBackdrop: 'blur(16px)',
+    cardBorder: 'rgba(6, 182, 212, 0.32)',
+    badgeBg: 'linear-gradient(135deg, rgba(22, 78, 99, 0.85), rgba(15, 23, 42, 0.9))',
+    badgeBorder: 'rgba(34, 211, 238, 0.45)',
+    badgeText: '#a5f3fc',
+    crownColor: '#06b6d4',
+    auraOpacity: '0.24',
+    haloGradient: 'radial-gradient(ellipse 95% 65% at 50% -8%, rgba(6, 182, 212, 0.20), var(--industry-glow), transparent 75%)',
+    tag: 'CAREER PASS VIP // 90-DAY ALL-INCLUSIVE'
+  }
+};
+
+/**
+ * Get the tier theme config from billingStatus
+ */
+export const getTierTheme = (billingStatus) => {
+  if (!billingStatus || !billingStatus.is_active) {
+    return TIER_THEMES.free;
+  }
+  const plan = billingStatus.plan_tier || '';
+  if (plan === 'pass_3mo') {
+    return TIER_THEMES.pass;
+  }
+  return TIER_THEMES.pro;
+};
+
 /**
  * Get the theme config for a given industry name (falls back to Technology & IT)
  */
@@ -172,28 +234,48 @@ export const getIndustryTheme = (industryName) => {
 };
 
 /**
- * Smoothly applies the industry CSS custom variables onto the root document element.
+ * Smoothly applies the industry and subscription tier CSS custom variables onto the root document element.
  */
-export const applyIndustryTheme = (industryName) => {
+export const applyIndustryTheme = (industryName, billingStatus = null) => {
   if (typeof document === 'undefined') return;
-  const theme = getIndustryTheme(industryName);
+  const industryTheme = getIndustryTheme(industryName);
+  const tierTheme = getTierTheme(billingStatus);
   const root = document.documentElement;
 
-  root.style.setProperty('--industry-accent', theme.accent);
-  root.style.setProperty('--industry-accent-rgb', theme.accentRgb);
-  root.style.setProperty('--industry-light', theme.light);
-  root.style.setProperty('--industry-glow', theme.glow);
-  root.style.setProperty('--industry-border', theme.border);
-  root.style.setProperty('--industry-subtle', theme.subtle);
-  root.style.setProperty('--industry-badge-bg', theme.badgeBg);
-  root.style.setProperty('--industry-badge-text', theme.badgeText);
-  root.style.setProperty('--industry-tag', theme.tag);
-  root.style.setProperty('--industry-name', theme.name);
-  root.setAttribute('data-industry', theme.name);
+  // Industry custom properties
+  root.style.setProperty('--industry-accent', industryTheme.accent);
+  root.style.setProperty('--industry-accent-rgb', industryTheme.accentRgb);
+  root.style.setProperty('--industry-light', industryTheme.light);
+  root.style.setProperty('--industry-glow', industryTheme.glow);
+  root.style.setProperty('--industry-border', industryTheme.border);
+  root.style.setProperty('--industry-subtle', industryTheme.subtle);
+  root.style.setProperty('--industry-badge-bg', industryTheme.badgeBg);
+  root.style.setProperty('--industry-badge-text', industryTheme.badgeText);
+  root.style.setProperty('--industry-tag', industryTheme.tag);
+  root.style.setProperty('--industry-name', industryTheme.name);
+  root.setAttribute('data-industry', industryTheme.name);
+
+  // Subscription tier custom properties & attributes
+  root.setAttribute('data-tier', tierTheme.tier);
+  root.setAttribute('data-premium', tierTheme.isPremium ? 'true' : 'false');
+  root.style.setProperty('--tier-is-premium', tierTheme.isPremium ? '1' : '0');
+  root.style.setProperty('--tier-label', tierTheme.label);
+  root.style.setProperty('--tier-tag', tierTheme.tag);
+  root.style.setProperty('--tier-card-bg', tierTheme.cardBg);
+  root.style.setProperty('--tier-card-backdrop', tierTheme.cardBackdrop);
+  root.style.setProperty('--tier-card-border', tierTheme.cardBorder);
+  root.style.setProperty('--tier-crown-color', tierTheme.crownColor);
+  root.style.setProperty('--tier-aura-opacity', tierTheme.auraOpacity);
+  root.style.setProperty('--tier-halo-gradient', tierTheme.haloGradient);
 
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     try {
-      window.dispatchEvent(new CustomEvent('industryThemeChange', { detail: theme }));
+      window.dispatchEvent(new CustomEvent('industryThemeChange', {
+        detail: {
+          industry: industryTheme,
+          tier: tierTheme
+        }
+      }));
     } catch {
       // Ignore if CustomEvent not supported in test environment
     }

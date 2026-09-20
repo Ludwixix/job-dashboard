@@ -52,4 +52,39 @@ describe('industryThemeService', () => {
     expect(root.style.getPropertyValue('--industry-tag')).toBe('CLINICAL EMERALD');
     expect(root.style.getPropertyValue('--industry-name')).toBe('Healthcare & Medical');
   });
+
+  it('defaults to free tier attributes when no billing status is passed', () => {
+    applyIndustryTheme('Technology & IT');
+
+    const root = document.documentElement;
+    expect(root.getAttribute('data-tier')).toBe('free');
+    expect(root.getAttribute('data-premium')).toBe('false');
+    expect(root.style.getPropertyValue('--tier-is-premium')).toBe('0');
+  });
+
+  it('applies pro_monthly premium tier attributes and variables when active', () => {
+    applyIndustryTheme('Healthcare & Medical', {
+      is_active: true,
+      plan_tier: 'pro_monthly'
+    });
+
+    const root = document.documentElement;
+    expect(root.getAttribute('data-tier')).toBe('pro');
+    expect(root.getAttribute('data-premium')).toBe('true');
+    expect(root.style.getPropertyValue('--tier-is-premium')).toBe('1');
+    expect(root.style.getPropertyValue('--tier-label')).toBe('PRO SUBSCRIBER');
+  });
+
+  it('applies pass_3mo premium tier attributes and variables when active', () => {
+    applyIndustryTheme('Legal', {
+      is_active: true,
+      plan_tier: 'pass_3mo'
+    });
+
+    const root = document.documentElement;
+    expect(root.getAttribute('data-tier')).toBe('pass');
+    expect(root.getAttribute('data-premium')).toBe('true');
+    expect(root.style.getPropertyValue('--tier-is-premium')).toBe('1');
+    expect(root.style.getPropertyValue('--tier-label')).toBe('CAREER PASS VIP');
+  });
 });

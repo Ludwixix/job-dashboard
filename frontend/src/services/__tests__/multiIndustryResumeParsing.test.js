@@ -78,3 +78,4 @@ describe('Multi-Industry Resume Parsing Engine', () => {
     expect(result.coreSkills.some(s => /CPA|Financial|Tax|Reporting|SAP/i.test(s))).toBe(true);
   });
 });
+

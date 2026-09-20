@@ -1430,13 +1430,18 @@ export const JobSeeker = ({
  }`}
  >
  {/* Top Gradient Accent Line */}
- <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${
+ <div 
+ className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${
  hasCustomDocs
  ? 'bg-gradient-to-r from-teal-400 via-emerald-400 to-amber-500'
  : isTopFit
  ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400'
- : 'bg-gradient-to-r from-amber-600/70 via-stone-600/50 to-amber-700/70'
- }`} />
+ : 'opacity-80'
+ }`}
+ style={!hasCustomDocs && !isTopFit ? {
+ background: 'linear-gradient(90deg, transparent, var(--industry-accent), transparent)'
+ } : undefined}
+ />
 
  {/* Top Header: Badges + Star + Kebab Action Menu */}
  <div className="flex items-start justify-between gap-2 pt-0.5">

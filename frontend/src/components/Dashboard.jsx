@@ -492,12 +492,10 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  return getIndustryTheme(activeProfile?.industry);
  }, [activeProfile?.industry]);
 
- // Apply subtle industry theme CSS variables smoothly whenever the active profile changes or loads
- useEffect(() => {
- if (activeProfile?.industry) {
- applyIndustryTheme(activeProfile.industry);
- }
- }, [activeProfile?.industry]);
+  // Apply subtle industry theme and subscription tier CSS variables smoothly whenever active profile or billing status changes
+  useEffect(() => {
+    applyIndustryTheme(activeProfile?.industry, billingStatus);
+  }, [activeProfile?.industry, billingStatus]);
 
  // Background Scraper Progress & Discovery State
  const [scrapeProgress, setScrapeProgress] = useState({
@@ -535,7 +533,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  const result = await triggerProfileScrape(targetProfile, { ttl_hours: ttlHours, force: Boolean(options.force) });
  if (!result.success) throw new Error(result.error || 'Refresh failed');
  clearInterval(timer);
- applyIndustryTheme(industry);
+ applyIndustryTheme(industry, billingStatus);
  refetch();
     const stats = result.cacheStats || {};
     const fromDb = Boolean(stats.satisfied_from_db && stats.satisfied_from_db.length > 0);
@@ -558,7 +556,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  setProfileScrapeStatus('error');
  setProfileScrapeMsg(`Refresh unavailable: ${error.message}`);
  }
- }, [refetch]);
+ }, [refetch, billingStatus]);
 
  // Load backend profile when currentUser is authenticated
  useEffect(() => {
@@ -985,6 +983,21 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0 bg-emerald-950/60 px-2 py-0.5 rounded-sm border border-emerald-500/30">
  <Activity size={12} className="animate-pulse text-emerald-400" /> V2.0 ENGINE ACTIVE
  </span>
+  {currentIndustryTheme && (
+    <span 
+      className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[10px] font-black uppercase tracking-wider transition-all"
+      style={{
+        backgroundColor: currentIndustryTheme.badgeBg,
+        borderColor: currentIndustryTheme.border,
+        color: currentIndustryTheme.badgeText,
+        borderWidth: '1px'
+      }}
+      title={`Active Domain: ${currentIndustryTheme.name} // ${currentIndustryTheme.tag}`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0" style={{ backgroundColor: currentIndustryTheme.accent }} />
+      <span>{currentIndustryTheme.tag}</span>
+    </span>
+  )}
  <span className="text-slate-700 hidden sm:inline">|</span>
  <span className="truncate text-slate-300 text-xs">
  <strong className="text-white font-black">{jobs.length}</strong> POSITIONS
@@ -1261,25 +1274,28 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
  </span>
  </button>
 
- {/* Subscription Tier HUD */}
+ {/* Subscription Tier HUD: Google Antigravity VIP Member Capsule */}
  <button
  type="button"
  onClick={() => setIsPricingModalOpen(true)}
- className={`flex items-center gap-1.5 transition-all cursor-pointer text-[10px] uppercase font-mono font-bold px-2.5 py-1 rounded-sm border shadow-xs ${
+ className={`flex items-center gap-1.5 transition-all cursor-pointer text-[10px] uppercase font-mono font-bold px-2.5 py-1 border shadow-xs ${
  billingStatus?.is_active
- ? 'text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border-emerald-500/40'
- : 'text-amber-300 bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/40'
+ ? 'vip-subscriber-capsule rounded-full text-emerald-200 ring-1 ring-emerald-400/40'
+ : 'text-amber-300 bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/40 rounded-sm'
  }`}
  title={
  billingStatus?.is_active
- ? `Pro Active (${billingStatus.plan_name || 'Active'}) · Click to manage subscription`
+ ? `⭐ ${billingStatus?.plan_tier === 'pass_3mo' ? 'Career Pass VIP' : 'Pro Job Hunter'} Active · Click to manage subscription`
  : `Free Tier (${billingStatus?.trial_generations_remaining ?? 3} trials remaining) · Click to view Pro plans`
  }
  >
- <Crown size={11} className={billingStatus?.is_active ? "text-emerald-400" : "text-amber-400"} />
+ <Crown size={12} className={billingStatus?.is_active ? "text-emerald-300 animate-pulse" : "text-amber-400"} />
  <span>
  {billingStatus?.is_active ? (
- <>PRO <span className="text-emerald-400 font-black">ACTIVE</span></>
+ <span className="flex items-center gap-1.5">
+ <span className="text-white font-black">{billingStatus?.plan_tier === 'pass_3mo' ? 'CAREER PASS' : 'PRO'}</span>
+ <span className="text-emerald-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-400/30">VIP</span>
+ </span>
  ) : (
  <>PRO TIER <span className="text-amber-400 font-black">· UPGRADE</span></>
  )}

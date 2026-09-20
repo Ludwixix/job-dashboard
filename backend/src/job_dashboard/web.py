@@ -10,6 +10,8 @@ import random
 import time
 
 login_attempts = {}
+JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-key-fallback")
+JWT_EXPIRY_HOURS = 24
 
 
 import re
@@ -26,6 +28,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from xml.sax.saxutils import escape
+
+from .router import app_router
+from . import routes
 
 
 from reportlab.lib import colors
@@ -2270,6 +2275,10 @@ _ALLOWED_ORIGINS = {
 
 def make_handler(app: DashboardApp):
     class Handler(BaseHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            self.app = app
+            super().__init__(*args, **kwargs)
+
         def _cors_origin(self):
             origin = self.headers.get("Origin", "")
             if origin in _ALLOWED_ORIGINS:
@@ -2375,9 +2384,13 @@ def make_handler(app: DashboardApp):
             return generate_seek_pass_report(job_dict, profile)
 
         def do_GET(self):
+            self.command = "GET"
             parsed = urlparse(self.path)
             path = parsed.path
             query_params = parse_qs(parsed.query)
+
+            if app_router.dispatch(self, "GET", path):
+                return
 
             if path == "/api/session":
                 auth_header = self.headers.get("Authorization")
@@ -3844,10 +3857,13 @@ def make_handler(app: DashboardApp):
             self.send_json(404, {"error": "not found"})
 
         def do_POST(self):
+            self.command = "POST"
             parsed = urlparse(self.path)
             path = parsed.path
             query_params = parse_qs(parsed.query)
             try:
+                if app_router.dispatch(self, "POST", path):
+                    return
                 if path == "/api/settings/cookies":
                     content_len = int(self.headers.get("Content-Length", "0"))
                     body = (
@@ -6658,10 +6674,13 @@ def make_handler(app: DashboardApp):
                 self.send_json(500, {"error": str(error)})
 
         def do_DELETE(self):
+            self.command = "DELETE"
             parsed = urlparse(self.path)
             path = parsed.path
             query_params = parse_qs(parsed.query)
             try:
+                if app_router.dispatch(self, "DELETE", path):
+                    return
                 if path.startswith("/api/network/contacts/"):
                     contact_id = path.removeprefix("/api/network/contacts/").strip("/")
                     user_id = resolve_user_id(self, query_params) or "default_user"
@@ -6678,6 +6697,7 @@ def make_handler(app: DashboardApp):
         def log_message(self, *_args):
             return
 
+    Handler.app = app
     return Handler
 
 

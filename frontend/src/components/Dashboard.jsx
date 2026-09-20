@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
-import { useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useToast } from './ToastContext';
 import { useJobs } from '../hooks/useJobs';
+import { useDashboardState, RouteSync } from '../hooks/useDashboardState';
+import { useScrapeOrchestrator } from '../hooks/useScrapeOrchestrator';
 import { JobSeeker } from './JobSeeker';
 import { MarketIntelligence } from './MarketIntelligence';
 import { ActionHighlights } from './ActionHighlights';
@@ -10,916 +11,369 @@ import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { CopilotBar } from './CopilotBar';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
-import { DashboardGridSkeleton, ModalSkeleton } from './SkeletonLoaders';
+import { DashboardGridSkeleton } from './SkeletonLoaders';
 import PrimeTargetSpotlight from './PrimeTargetSpotlight';
 import CyberpunkAmbientMode from './CyberpunkAmbientMode';
 import { CareerOperations } from './CareerOperations';
-import { startAutopilot } from '../services/autopilotAgent';
-
-// Lazy-loaded modal dialogs to eliminate eager bundle bloat
-const JobModal = lazy(() => import('./JobModal').then(m => ({ default: m.JobModal })));
-const GeneratorModal = lazy(() => import('./GeneratorModal').then(m => ({ default: m.GeneratorModal })));
-const InterviewPrepModal = lazy(() => import('./InterviewPrepModal').then(m => ({ default: m.InterviewPrepModal })));
-const MockInterviewModal = lazy(() => import('./MockInterviewModal').then(m => ({ default: m.MockInterviewModal })));
-const CustomJobModal = lazy(() => import('./CustomJobModal').then(m => ({ default: m.CustomJobModal })));
-const CommandPalette = lazy(() => import('./CommandPalette').then(m => ({ default: m.CommandPalette })));
-const BatchApplyModal = lazy(() => import('./BatchApplyModal').then(m => ({ default: m.BatchApplyModal })));
-const ProfileModal = lazy(() => import('./ProfileModal').then(m => ({ default: m.ProfileModal })));
-const AuthModal = lazy(() => import('./AuthModal').then(m => ({ default: m.AuthModal })));
-const GoogleIntegrationModal = lazy(() => import('./GoogleIntegrationModal').then(m => ({ default: m.GoogleIntegrationModal })));
-const AutoApplyModal = lazy(() => import('./AutoApplyModal').then(m => ({ default: m.AutoApplyModal })));
-const SettingsModal = lazy(() => import('./SettingsModal').then(m => ({ default: m.SettingsModal })));
-const FollowUpEmailModal = lazy(() => import('./FollowUpEmailModal').then(m => ({ default: m.FollowUpEmailModal })));
-const OfferActionHubModal = lazy(() => import('./OfferActionHubModal').then(m => ({ default: m.OfferActionHubModal })));
-const ExecutiveDossierModal = lazy(() => import('./ExecutiveDossierModal').then(m => ({ default: m.ExecutiveDossierModal })));
-const RecruiterRelationshipModal = lazy(() => import('./RecruiterRelationshipModal').then(m => ({ default: m.RecruiterRelationshipModal })));
-const FunnelIntelligenceModal = lazy(() => import('./FunnelIntelligenceModal'));
-const CareerMatrixModal = lazy(() => import('./CareerMatrixModal'));
-const WorkforceAustraliaModal = lazy(() => import('./WorkforceAustraliaModal'));
-const InterviewInfluenceModal = lazy(() => import('./InterviewInfluenceModal'));
-const AtsDiagnosticModal = lazy(() => import('./AtsDiagnosticModal'));
-const LinkedInInboundModal = lazy(() => import('./LinkedInInboundModal'));
-const CoverLetterPolarizerModal = lazy(() => import('./CoverLetterPolarizerModal').then(m => ({ default: m.CoverLetterPolarizerModal })));
-const ScreeningSolverModal = lazy(() => import('./ScreeningSolverModal').then(m => ({ default: m.ScreeningSolverModal })));
-const KscGeneratorModal = lazy(() => import('./KscGeneratorModal').then(m => ({ default: m.KscGeneratorModal })));
-const SeekPassModal = lazy(() => import('./SeekPassModal').then(m => ({ default: m.SeekPassModal })));
-const RemoteRolesSection = lazy(() => import('./RemoteRolesSection').then(m => ({ default: m.RemoteRolesSection })));
-const InterviewCheatSheetModal = lazy(() => import('./InterviewCheatSheetModal'));
-const SkillGapModal = lazy(() => import('./SkillGapModal').then(m => ({ default: m.SkillGapModal || m.default })));
-const JobCompareModal = lazy(() => import('./JobCompareModal').then(m => ({ default: m.JobCompareModal || m.default })));
-const PdfPreviewModal = lazy(() => import('./PdfPreviewModal').then(m => ({ default: m.PdfPreviewModal || m.default })));
-const ScoringTunerModal = lazy(() => import('./ScoringTunerModal').then(m => ({ default: m.ScoringTunerModal || m.default })));
-const VoiceMockInterviewModal = lazy(() => import('./VoiceMockInterviewModal').then(m => ({ default: m.VoiceMockInterviewModal || m.default })));
-const SourceSelfHealModal = lazy(() => import('./SourceSelfHealModal').then(m => ({ default: m.SourceSelfHealModal })));
-const PricingModal = lazy(() => import('./PricingModal').then(m => ({ default: m.PricingModal })));
-
-// Client routing path mappings
-const SECTION_ROUTES = {
-  seeker: '/',
-  highlights: '/highlights',
-  kanban: '/pipeline',
-  remote: '/remote',
-  market: '/market',
-  analytics: '/analytics',
-  operations: '/operations',
-};
-
-const ROUTE_SECTIONS = {
-  '/': 'seeker',
-  '/seeker': 'seeker',
-  '/highlights': 'highlights',
-  '/pipeline': 'kanban',
-  '/kanban': 'kanban',
-  '/remote': 'remote',
-  '/market': 'market',
-  '/analytics': 'analytics',
-  '/operations': 'operations',
-};
-
-// Safe bridge for React Router DOM (no-ops gracefully if rendered without Router context in unit tests)
-function ActiveRouteSync({ activeSection, setActiveSection, jobs, setSelectedJob }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const lastSectionRef = useRef(activeSection);
-
-  // 1. URL Path -> State synchronization (driven strictly when location.pathname changes)
-  useEffect(() => {
-    const path = location.pathname;
-    if (path.startsWith('/job/')) {
-      const jobId = decodeURIComponent(path.replace('/job/', '').trim());
-      if (jobId && jobs && jobs.length > 0) {
-        const found = jobs.find(j => String(j.id) === jobId || `${j.company}_${j.title}` === jobId);
-        if (found) {
-          setSelectedJob(found);
-        }
-      }
-    } else if (ROUTE_SECTIONS[path]) {
-      const targetSection = ROUTE_SECTIONS[path];
-      lastSectionRef.current = targetSection;
-      setActiveSection(prev => (prev === targetSection ? prev : targetSection));
-    }
-  }, [location.pathname, jobs, setActiveSection, setSelectedJob]);
-
-  // 2. ActiveSection -> URL synchronization (driven strictly when activeSection state changes)
-  useEffect(() => {
-    if (activeSection === lastSectionRef.current) return;
-    lastSectionRef.current = activeSection;
-
-    const targetPath = SECTION_ROUTES[activeSection];
-    if (targetPath && !location.pathname.startsWith('/job/') && location.pathname !== targetPath) {
-      navigate(targetPath, { replace: false });
-    }
-  }, [activeSection, location.pathname, navigate]);
-
-  return null;
-}
-
-function RouteSync({ activeSection, setActiveSection, jobs, setSelectedJob }) {
-  const inRouter = useInRouterContext();
-  if (!inRouter) return null;
-  return (
-    <ActiveRouteSync
-      activeSection={activeSection}
-      setActiveSection={setActiveSection}
-      jobs={jobs}
-      setSelectedJob={setSelectedJob}
-    />
-  );
-}
-
 import { TelemetryDesk } from './TelemetryDesk';
-import { getWorkforceSettings } from '../services/workforceAustraliaService';
+import { DashboardModals } from './dashboard/DashboardModals';
 
-
+import { startAutopilot } from '../services/autopilotAgent';
 import { generateApplicationDocs } from '../services/generationService';
-import { getActiveProfile, saveProfile, fetchProfileFromBackend, calculateProfileCompleteness } from '../services/profileService';
 import { getAuthenticatedUser } from '../services/googleAuthService';
 import { upsertApplicationInSheet } from '../services/googleSheetService';
 import { logoutUser } from '../services/authService';
-import { fetchCadenceRadar } from '../services/recruiterCrmService';
 import { recordJobInteraction, evolveProfileFromLearnedContext } from '../services/profileLearningEngine';
 
-
-import { fetchJobsForProfile } from '../services/dataService';
-import { fetchPreferencesFromBackend, savePreferencesToBackend } from '../services/scoringEngine';
-import { suggestRelatedTitles, buildQueriesFromProfile, triggerProfileScrape } from '../services/jobQueryService';
-import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
-import { runProfileOnboardingPipeline, syncProfileQueriesToBackend } from '../services/profileOnboardingPipeline';
-import { getSpendSummary, subscribeToSpendUpdates } from '../services/llmCostService';
-import { fetchBillingStatus, getCachedBillingStatus } from '../services/billingService';
-import { 
- Terminal, Sparkles, Cpu, Activity, RefreshCw, 
- MapPin, Command, Zap, LayoutGrid, CheckCircle2,
-  Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, ChevronUp, Layers, Award, FileText, Mic, Menu, ShieldAlert, ArrowRight, Crown
+import {
+  Terminal, Sparkles, Activity, RefreshCw,
+  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
+  Sliders, TrendingUp, Table, Lock, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
+  ChevronDown, Layers, Award, FileText, Mic, Menu, ShieldAlert, ArrowRight, Crown
 } from 'lucide-react';
 
+// Lazy-load remote roles tab section to eliminate initial bundle bloat
+const RemoteRolesSection = lazy(() => import('./RemoteRolesSection').then(m => ({ default: m.RemoteRolesSection })));
 
-
+/**
+ * Primary Application Dashboard view and operations console.
+ * Coordinates user opportunities, active personalization profile, background scraping telemetry,
+ * and AI application synthesis pipelines.
+ *
+ * @param {Object} props
+ * @param {Object|null} props.currentUser - Authenticated Google or local developer session.
+ * @param {Function|null} props.onSignOut - Sign out handler.
+ * @returns {React.ReactElement}
+ */
 export const Dashboard = ({ currentUser, onSignOut }) => {
- const { jobs, loading, error, refetch, updateJobStatus, rejectJob, unrejectJob } = useJobs();
- const { addToast } = useToast();
- const [liveAnnouncement, setLiveAnnouncement] = useState('');
- const [activeSection, setActiveSection] = useState('seeker'); // 'seeker', 'kanban', 'market', 'tracker'
- const [selectedJob, setSelectedJob] = useState(null);
- const [selectedForGenerator, setSelectedForGenerator] = useState(null);
- const [selectedForInterviewPrep, setSelectedForInterviewPrep] = useState(null);
- const [selectedForMockInterview, setSelectedForMockInterview] = useState(null);
- const [selectedForOutreach, setSelectedForOutreach] = useState(null);
- const [selectedForOfferHub, setSelectedForOfferHub] = useState(null);
- const [selectedForDossier, setSelectedForDossier] = useState(null);
- const [selectedForInfluenceHub, setSelectedForInfluenceHub] = useState(null);
- const [selectedForAtsDiagnostic, setSelectedForAtsDiagnostic] = useState(null);
- const [selectedForLinkedInInbound, setSelectedForLinkedInInbound] = useState(null);
- const [selectedForCoverLetterPolarizer, setSelectedForCoverLetterPolarizer] = useState(null);
- const [selectedForScreeningSolver, setSelectedForScreeningSolver] = useState(null);
- const [selectedForKscGenerator, setSelectedForKscGenerator] = useState(null);
- const [selectedForSeekPass, setSelectedForSeekPass] = useState(null);
- const [selectedForCheatSheet, setSelectedForCheatSheet] = useState(null);
- const [spendSummary, setSpendSummary] = useState(() => getSpendSummary());
+  const { jobs, loading, error, refetch, updateJobStatus, rejectJob, unrejectJob } = useJobs();
+  const { addToast } = useToast();
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
 
- useEffect(() => {
- const unsubscribe = subscribeToSpendUpdates((summary) => {
- setSpendSummary(summary);
- });
- return () => unsubscribe();
- }, []);
+  // Helper: announce dynamic changes to screen readers
+  const announce = useCallback((msg) => {
+    setLiveAnnouncement('');
+    setTimeout(() => setLiveAnnouncement(msg), 50);
+  }, []);
 
- const [isRecruiterCrmOpen, setIsRecruiterCrmOpen] = useState(false);
- const [selectedForRecruiterCrm, setSelectedForRecruiterCrm] = useState(null);
- const [isFunnelModalOpen, setIsFunnelModalOpen] = useState(false);
- const [isCareerModalOpen, setIsCareerModalOpen] = useState(false);
- const [overdueTouchpointCount, setOverdueTouchpointCount] = useState(0);
- const [isWorkforceModalOpen, setIsWorkforceModalOpen] = useState(false);
- const [isWorkforceEnabled, setIsWorkforceEnabled] = useState(() => getWorkforceSettings().enabled);
- const [isPdfStudioOpen, setIsPdfStudioOpen] = useState(false);
- const [isScoringTunerOpen, setIsScoringTunerOpen] = useState(false);
- const [isVoiceInterviewOpen, setIsVoiceInterviewOpen] = useState(false);
- const [activeScoringWeights, setActiveScoringWeights] = useState(null);
+  // Top-level Dashboard State Hook (Navigation, Profile, Billing, Modal State)
+  const dashboardState = useDashboardState({
+    jobs,
+    currentUser,
+    addToast,
+  });
 
- const handleApplyCustomWeights = useCallback((recalculatedJobs, weights) => {
-   setActiveScoringWeights(weights);
-   setJobs(recalculatedJobs);
-   addToast('Custom scoring matrix applied across all opportunities', 'success');
- }, [addToast]);
+  const {
+    activeSection,
+    setActiveSection,
+    activeProfile,
+    setActiveProfile,
+    editingProfile,
+    setEditingProfile,
+    profileCompleteness,
+    isCompletenessDismissed,
+    setIsCompletenessDismissed,
+    handleAddSuggestedTitle,
+    billingStatus,
+    setIsPricingModalOpen,
+    viewMode,
+    setViewMode,
+    spendSummary,
+    overdueTouchpointCount,
+    fallbackBanner,
+    setFallbackBanner,
+    isWorkforceEnabled,
+    setIsWorkforceModalOpen,
+    currentIndustryTheme,
+    isToolsMenuOpen,
+    setIsToolsMenuOpen,
+    isMobileDrawerOpen,
+    setIsMobileDrawerOpen,
+    toolsMenuRef,
+    setSelectedJob,
+    setSelectedForGenerator,
+    setSelectedForInterviewPrep,
+    setSelectedForMockInterview,
+    setSelectedForOutreach,
+    setSelectedForOfferHub,
+    setSelectedForDossier,
+    setSelectedForCheatSheet,
+    setSelectedForRecruiterCrm,
+    setIsRecruiterCrmOpen,
+    setIsFunnelModalOpen,
+    setIsCareerModalOpen,
+    setIsPdfStudioOpen,
+    setIsScoringTunerOpen,
+    setIsVoiceInterviewOpen,
+    setIsCommandPaletteOpen,
+    setIsBatchApplyOpen,
+    setIsCustomJobModalOpen,
+    setIsProfileModalOpen,
+    setIsSettingsOpen,
+    setIsSkillGapModalOpen,
+    setIsCompareModalOpen,
+    setCompareJobs,
+    setIsSourceSelfHealOpen,
+    setSelfHealSource,
+    setIsAuthModalOpen,
+    setIsGoogleIntegrationOpen,
+    modalState,
+  } = dashboardState;
 
- // Helper: announce dynamic changes to screen readers
- const announce = useCallback((msg) => {
- setLiveAnnouncement('');
- setTimeout(() => setLiveAnnouncement(msg), 50);
- }, []);
+  // Scrape Telemetry & Ingestion Orchestrator Hook
+  const {
+    scrapeProgress,
+    profileScrapeStatus,
+    profileScrapeMsg,
+    triggerDiscoveryScrape,
+  } = useScrapeOrchestrator({
+    activeProfile,
+    currentUser,
+    billingStatus,
+    refetch,
+  });
 
- useEffect(() => {
- const handleSettingsUpdate = (e) => {
- if (e?.detail?.enabled !== undefined) {
- setIsWorkforceEnabled(Boolean(e.detail.enabled));
- } else {
- setIsWorkforceEnabled(getWorkforceSettings().enabled);
- }
- };
- if (typeof window !== 'undefined') {
- window.addEventListener('workforce-settings-updated', handleSettingsUpdate);
- return () => window.removeEventListener('workforce-settings-updated', handleSettingsUpdate);
- }
- }, []);
+  // Interactive Scoring Tuner Weights & Handler (BUG 2 FIX: Uses refetch() gracefully)
+  const [activeScoringWeights, setActiveScoringWeights] = useState(null);
 
- const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
- const [isBatchApplyOpen, setIsBatchApplyOpen] = useState(false);
- const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
- const [isCustomJobModalOpen, setIsCustomJobModalOpen] = useState(false);
-
- useEffect(() => {
- fetchCadenceRadar().then((radar) => {
- if (radar && typeof radar.overdue_count === 'number') {
- setOverdueTouchpointCount(radar.overdue_count);
- }
- }).catch(() => {});
- }, []);
-
-
- // Candidate Personalization Profile State
- const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
- const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
- const [isCompletenessDismissed, setIsCompletenessDismissed] = useState(false);
- const profileCompleteness = useMemo(() => calculateProfileCompleteness(activeProfile), [activeProfile]);
- const [isSettingsOpen, setIsSettingsOpen] = useState(false);
- const [isSkillGapModalOpen, setIsSkillGapModalOpen] = useState(false);
- const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
- const [compareJobs, setCompareJobs] = useState([]);
- const [editingProfile, setEditingProfile] = useState(null);
- const [isSourceSelfHealOpen, setIsSourceSelfHealOpen] = useState(false);
- const [selfHealSource, setSelfHealSource] = useState(null);
- const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
- const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
- const toolsMenuRef = useRef(null);
-
- // Platform Subscription & Billing State
- const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
- const [pricingModalReason, setPricingModalReason] = useState('upgrade');
- const [billingStatus, setBillingStatus] = useState(() => getCachedBillingStatus());
-
- useEffect(() => {
-   fetchBillingStatus().then(status => {
-     if (status) setBillingStatus(status);
-   }).catch(() => {});
-
-   const handleOpenPricingModal = (e) => {
-     setPricingModalReason(e?.detail?.reason || 'upgrade');
-     setIsPricingModalOpen(true);
-   };
-
-   const handleBillingStatusUpdate = (e) => {
-     if (e?.detail) setBillingStatus(e.detail);
-   };
-
-   window.addEventListener('open-pricing-modal', handleOpenPricingModal);
-   window.addEventListener('billing-status-updated', handleBillingStatusUpdate);
-
-   // Check URL parameters for Stripe return redirects
-   if (typeof window !== 'undefined') {
-     const urlParams = new URLSearchParams(window.location.search);
-     if (urlParams.get('payment') === 'success') {
-       addToast('Pro subscription activated! Built-in AI models are ready.', 'success');
-       fetchBillingStatus({ force: true }).then(status => {
-         if (status) setBillingStatus(status);
-       }).catch(() => {});
-       window.history.replaceState({}, '', window.location.pathname);
-     } else if (urlParams.get('payment') === 'cancelled') {
-       addToast('Checkout cancelled. You can upgrade anytime to access built-in AI.', 'info');
-       window.history.replaceState({}, '', window.location.pathname);
-     }
-   }
-
-   return () => {
-     window.removeEventListener('open-pricing-modal', handleOpenPricingModal);
-     window.removeEventListener('billing-status-updated', handleBillingStatusUpdate);
-   };
- }, [addToast]);
-
- useEffect(() => {
- const handleOutsideClick = (e) => {
- if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) {
- setIsToolsMenuOpen(false);
- }
- };
- if (isToolsMenuOpen) {
- document.addEventListener('mousedown', handleOutsideClick);
- return () => document.removeEventListener('mousedown', handleOutsideClick);
- }
- }, [isToolsMenuOpen]);
-
- // Synchronize state immediately whenever profile is updated across any component or engine
- useEffect(() => {
- const handleProfileUpdate = (e) => {
- if (e?.detail && typeof e.detail === 'object') {
- setActiveProfile(e.detail);
- }
- };
- window.addEventListener('profile-updated', handleProfileUpdate);
- window.addEventListener('candidate-profile-updated', handleProfileUpdate);
- return () => {
- window.removeEventListener('profile-updated', handleProfileUpdate);
- window.removeEventListener('candidate-profile-updated', handleProfileUpdate);
- };
- }, []);
-
-
- // Single Dashboard Mode vs Minimalist Cyberpunk Ambient Flow Mode
- const [viewMode, setViewMode] = useState(() => {
- const saved = localStorage.getItem('job_dashboard_view_mode');
- return saved === 'ambient' ? 'ambient' : 'dashboard';
- });
-
- // Fallback banner state when static fallback jobs are loaded
- const [fallbackBanner, setFallbackBanner] = useState(null);
-
- useEffect(() => {
- const handleFallbackActive = (e) => {
- const detail = e.detail || {};
- const ts = detail.fallbackTimestamp;
- const formattedAge = ts ? new Date(ts).toLocaleString() : 'Cached Snapshot';
- setFallbackBanner(`Serving static fallback data (Snapshot: ${formattedAge}). Live scraper API offline or unreachable.`);
- };
-
- window.addEventListener('jobs-fallback-active', handleFallbackActive);
- return () => window.removeEventListener('jobs-fallback-active', handleFallbackActive);
- }, []);
-
- useEffect(() => {
- localStorage.setItem('job_dashboard_view_mode', viewMode);
- // Non-blocking backend sync so the mode follows the user across devices.
- fetchPreferencesFromBackend()
- .then((prefs) => savePreferencesToBackend({ ...(prefs || {}), viewMode }))
- .catch(() => {});
- }, [viewMode]);
-
- // First-visit restore: if no local preference yet, adopt the backend's saved mode.
- useEffect(() => {
- if (localStorage.getItem('job_dashboard_view_mode')) return undefined;
- let cancelled = false;
- fetchPreferencesFromBackend()
- .then((prefs) => {
- const saved = prefs?.viewMode;
- if (!cancelled && saved === 'ambient') {
- setViewMode('ambient');
- }
- })
- .catch(() => {});
- return () => {
- cancelled = true;
- };
- }, []);
-
- useEffect(() => {
- if (jobs && jobs.length > 0) {
- const appsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
- startAutopilot({ jobs, profile: activeProfile, applications: appsList });
- }
- }, [jobs, activeProfile]);
-
- // Google Authentication & Integration State
- const [authUser, setAuthUser] = useState(() => getAuthenticatedUser());
- const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
- const [isGoogleIntegrationOpen, setIsGoogleIntegrationOpen] = useState(false);
-
- // Profile-aware scraping state
- const [profileScrapeStatus, setProfileScrapeStatus] = useState(null); // null | 'loading' | 'done' | 'error'
- const [profileScrapeMsg, setProfileScrapeMsg] = useState('');
- const [suggestedTitles, setSuggestedTitles] = useState([]);
- const [showSuggestions, setShowSuggestions] = useState(false);
-
- // Background Async Application Generation Queue
- const [asyncGeneratingIds, setAsyncGeneratingIds] = useState(new Set());
- const [backgroundNotifications, setBackgroundNotifications] = useState([]);
-
-
- const handleDispatchAsyncApplication = useCallback(async (job) => {
- const jobId = job.id || `${job.company}_${job.title}`;
- setAsyncGeneratingIds(prev => {
- const next = new Set(prev);
- if (job.id) next.add(job.id).add(String(job.id));
- next.add(`${job.company}_${job.title}`);
- return next;
- });
-
- try {
- const result = await generateApplicationDocs(job, null, null, activeProfile);
- 
- if (result && result.resume && result.coverLetter) {
- const appPayload = {
- hasCustomDocs: true,
- resumeText: result.resume,
- coverLetterText: result.coverLetter,
- docsModel: result.model,
- docsGeneratedAt: new Date().toISOString(),
- driveFolder: `Job Applications - ${activeProfile.name}`,
- driveStatus: 'Synced to Google Drive / Ready for Submission'
- };
-
- updateJobStatus(jobId, 'Package Prepared / To Submit', appPayload);
- // Train Profile Learning Engine with synthesized application
- try {
- recordJobInteraction(job, 'generated_docs', activeProfile);
- const evolved = evolveProfileFromLearnedContext(activeProfile, { threshold: 3 });
- if (evolved && evolved.coreSkills?.length > (activeProfile.coreSkills?.length || 0)) {
- setActiveProfile(evolved);
- addToast(`Profile evolved! Learned: ${evolved.coreSkills.slice(-1)[0]}`, 'info');
- }
- } catch (e) {
- console.warn('Profile learning note:', e);
- }
-
-
- // Auto append or update to Google Sheet if user has an active spreadsheet
- if (currentUser?.accessToken && currentUser?.spreadsheetId) {
- upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, { ...job, ...appPayload }, activeProfile);
- }
-
- const notif = {
- title: job.title,
- company: job.company,
- time: 'Just now'
- };
- setBackgroundNotifications(prev => [notif, ...prev.slice(0, 4)]);
- setTimeout(() => {
- setBackgroundNotifications(prev => prev.filter(n => n.id !== notif.id));
- }, 6000);
- addToast(`Package ready: ${job.title} @ ${job.company}`, 'success');
- announce(`Application package generated for ${job.title} at ${job.company}`);
- }
- } catch (err) {
- console.error('Async application error:', err);
- addToast(`Synthesis failed: ${err.message}`, 'error');
- } finally {
-
- setAsyncGeneratingIds(prev => {
- const next = new Set(prev);
- if (job.id) {
- next.delete(job.id);
- next.delete(String(job.id));
- }
- next.delete(`${job.company}_${job.title}`);
- return next;
- });
- }
- }, [updateJobStatus]);
-
- // Updatable Location Bound State
- const [baseLocation, setBaseLocation] = useState(() => {
- return localStorage.getItem('userBaseLocation') || 'BALACLAVA VIC 3183';
- });
- const [isEditingLocation, setIsEditingLocation] = useState(false);
- const [tempLocationInput, setTempLocationInput] = useState(baseLocation);
-
- useEffect(() => {
- localStorage.setItem('userBaseLocation', baseLocation);
- }, [baseLocation]);
-
- // Global Ctrl+K / Cmd+K listener
- useEffect(() => {
- const handleKeyDown = (e) => {
- if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
- e.preventDefault();
- setIsCommandPaletteOpen(prev => !prev);
- }
- };
- window.addEventListener('keydown', handleKeyDown);
- return () => window.removeEventListener('keydown', handleKeyDown);
- }, []);
-
- // Derive current industry theme
- const currentIndustryTheme = useMemo(() => {
- return getIndustryTheme(activeProfile?.industry);
- }, [activeProfile?.industry]);
-
-  // Apply subtle industry theme and subscription tier CSS variables smoothly whenever active profile or billing status changes
-  useEffect(() => {
-    applyIndustryTheme(activeProfile?.industry, billingStatus);
-  }, [activeProfile?.industry, billingStatus]);
-
- // Background Scraper Progress & Discovery State
- const [scrapeProgress, setScrapeProgress] = useState({
- isActive: false,
- percent: 0,
- stage: '',
- elapsedSec: 0,
- totalDiscovered: 0
- });
-
- 
- const triggerDiscoveryScrape = useCallback(async (targetProfile, options = {}) => {
- if (!targetProfile) return;
- const industry = targetProfile.industry || 'Technology & IT';
- const queries = buildQueriesFromProfile(targetProfile);
- const primaryQuery = targetProfile.targetTitles?.[0] || queries[0]?.term || industry;
-
- setScrapeProgress({
- isActive: true,
- percent: 5,
- stage: `Connecting to gateways for ${primaryQuery}...`,
- elapsedSec: 0,
- totalDiscovered: 0
- });
- setProfileScrapeStatus('loading');
- setProfileScrapeMsg(`🔄 Ingestion Active: Scanning ${industry} opportunities...`);
-
- const startTime = Date.now();
- const timer = setInterval(() => {
- setScrapeProgress(prev => ({ ...prev, elapsedSec: Math.round((Date.now() - startTime) / 1000) }));
- }, 1000);
-
- try {
- const ttlHours = options.force ? 0.0 : 12.0;
- const result = await triggerProfileScrape(targetProfile, { ttl_hours: ttlHours, force: Boolean(options.force) });
- if (!result.success) throw new Error(result.error || 'Refresh failed');
- clearInterval(timer);
- applyIndustryTheme(industry, billingStatus);
- refetch();
-    const stats = result.cacheStats || {};
-    const fromDb = Boolean(stats.satisfied_from_db && stats.satisfied_from_db.length > 0);
-    setScrapeProgress({
-      isActive: false,
-      percent: 100,
-      stage: fromDb ? 'Database Index Match' : stats.cache_hit ? 'Index already fresh' : 'Discovery Complete!',
-      elapsedSec: Math.round((Date.now() - startTime) / 1000),
-      totalDiscovered: stats.total_jobs || result.jobs.length
-    });
-    setProfileScrapeStatus('done');
-    setProfileScrapeMsg(`✅ ${fromDb ? `Instant match: Loaded ${industry} opportunities from database` : stats.cache_hit ? 'Using the fresh indexed roles' : `Updated index with ${industry} opportunities`}`);
- setTimeout(() => {
- setScrapeProgress(prev => ({ ...prev, percent: 0, stage: '' }));
- setProfileScrapeStatus(null);
- }, 6000);
- } catch (error) {
- clearInterval(timer);
- setScrapeProgress(prev => ({ ...prev, isActive: false, percent: 100, stage: 'Index unchanged' }));
- setProfileScrapeStatus('error');
- setProfileScrapeMsg(`Refresh unavailable: ${error.message}`);
- }
- }, [refetch, billingStatus]);
-
- // Load backend profile when currentUser is authenticated
- useEffect(() => {
- if (currentUser?.id) {
- fetchProfileFromBackend(currentUser.id, currentUser.email)
- .then((remoteProf) => {
- if (remoteProf && Object.keys(remoteProf).length > 0) {
- setActiveProfile((prev) => ({
- ...(prev || {}),
- ...remoteProf,
- email: currentUser.email || remoteProf.email || prev?.email,
- name: currentUser.name || remoteProf.name || prev?.name
- }));
- }
- })
- .catch(() => {});
- }
- }, [currentUser?.id, currentUser?.email, currentUser?.name]);
-
-  // When a new user logs in or completes onboarding, auto-scrape personalized roles immediately
-  const initialScrapeTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (initialScrapeTriggeredRef.current) return;
-    const shouldScrape = currentUser?.isNewUser || sessionStorage.getItem('trigger_initial_scrape') === 'true';
-    if (shouldScrape && activeProfile) {
-      initialScrapeTriggeredRef.current = true;
-      sessionStorage.removeItem('trigger_initial_scrape');
-      triggerDiscoveryScrape(activeProfile, { force: false });
+  const handleApplyCustomWeights = useCallback((_recalculatedJobs, weights) => {
+    setActiveScoringWeights(weights);
+    if (typeof refetch === 'function') {
+      refetch();
     }
-  }, [currentUser?.isNewUser, activeProfile, triggerDiscoveryScrape]);
+    if (addToast) addToast('Custom scoring matrix applied across all opportunities', 'success');
+  }, [addToast, refetch]);
 
- // Load the persisted index immediately. Profile queries are kept in sync,
- // but only a deliberate user refresh/profile completion starts live work.
- useEffect(() => {
- if (activeProfile) {
- syncProfileQueriesToBackend(activeProfile);
- }
- }, [activeProfile?.id, activeProfile?.industry]);
+  // Google Authentication state
+  const [authUser, setAuthUser] = useState(() => getAuthenticatedUser());
 
+  // Suggestions state
+  const [suggestedTitles] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Background Async Application Generation Queue
+  const [asyncGeneratingIds, setAsyncGeneratingIds] = useState(new Set());
+  const [backgroundNotifications, setBackgroundNotifications] = useState([]);
 
- /** Add a suggested title to the active profile's targetTitles */
- const handleAddSuggestedTitle = useCallback((title) => {
- if (!activeProfile) return;
- const updated = {
- ...activeProfile,
- targetTitles: [...new Set([...(activeProfile.targetTitles || []), title])],
- };
- saveProfile(updated);
- setActiveProfile(updated);
- setSuggestedTitles(prev => prev.filter(t => t !== title));
- }, [activeProfile]);
+  const handleDispatchAsyncApplication = useCallback(async (job) => {
+    const jobId = job.id || `${job.company}_${job.title}`;
+    setAsyncGeneratingIds(prev => {
+      const next = new Set(prev);
+      if (job.id) next.add(job.id).add(String(job.id));
+      next.add(`${job.company}_${job.title}`);
+      return next;
+    });
 
+    try {
+      const result = await generateApplicationDocs(job, null, null, activeProfile);
 
+      if (result && result.resume && result.coverLetter) {
+        const appPayload = {
+          hasCustomDocs: true,
+          resumeText: result.resume,
+          coverLetterText: result.coverLetter,
+          docsModel: result.model,
+          docsGeneratedAt: new Date().toISOString(),
+          driveFolder: `Job Applications - ${activeProfile?.name || 'Candidate'}`,
+          driveStatus: 'Synced to Google Drive / Ready for Submission',
+        };
 
- const handleSaveLocation = (e) => {
- if (e) e.preventDefault();
- if (tempLocationInput.trim()) {
- setBaseLocation(tempLocationInput.trim().toUpperCase());
- }
- setIsEditingLocation(false);
- };
+        if (updateJobStatus) updateJobStatus(jobId, 'Package Prepared / To Submit', appPayload);
 
- const PRESET_SUBURBS = [
- 'BALACLAVA VIC 3183',
- 'ST KILDA VIC 3182',
- 'PRAHRAN VIC 3181',
- 'ELSTERNWICK VIC 3185',
- 'MELBOURNE CBD 3000',
- 'RICHMOND VIC 3121',
- 'SOUTH YARRA VIC 3141'
- ];
+        // Train Profile Learning Engine with synthesized application
+        try {
+          recordJobInteraction(job, 'generated_docs', activeProfile);
+          const evolved = evolveProfileFromLearnedContext(activeProfile, { threshold: 3 });
+          if (evolved && evolved.coreSkills?.length > (activeProfile?.coreSkills?.length || 0)) {
+            if (setActiveProfile) setActiveProfile(evolved);
+            if (addToast) addToast(`Profile evolved! Learned: ${evolved.coreSkills.slice(-1)[0]}`, 'info');
+          }
+        } catch (e) {
+          console.warn('Profile learning note:', e);
+        }
 
- // Real-time live derived modal targets
- const liveSelectedJob = useMemo(() => {
- if (!selectedJob) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedJob.id)) ||
- `${j.company}_${j.title}` === `${selectedJob.company}_${selectedJob.title}`
- );
- return match || selectedJob;
- }, [selectedJob, jobs]);
+        // Auto append or update to Google Sheet if user has an active spreadsheet
+        if (currentUser?.accessToken && currentUser?.spreadsheetId) {
+          upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, { ...job, ...appPayload }, activeProfile);
+        }
 
- const liveSelectedForGenerator = useMemo(() => {
- if (!selectedForGenerator) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForGenerator.id)) ||
- `${j.company}_${j.title}` === `${selectedForGenerator.company}_${selectedForGenerator.title}`
- );
- return match || selectedForGenerator;
- }, [selectedForGenerator, jobs]);
+        const notif = {
+          id: `${jobId}_${Date.now()}`,
+          title: job.title,
+          company: job.company,
+          time: 'Just now',
+        };
+        setBackgroundNotifications(prev => [notif, ...prev.slice(0, 4)]);
+        setTimeout(() => {
+          setBackgroundNotifications(prev => prev.filter(n => n.id !== notif.id));
+        }, 6000);
+        if (addToast) addToast(`Package ready: ${job.title} @ ${job.company}`, 'success');
+        if (announce) announce(`Application package generated for ${job.title} at ${job.company}`);
+      }
+    } catch (err) {
+      console.error('Async application error:', err);
+      if (addToast) addToast(`Synthesis failed: ${err.message}`, 'error');
+    } finally {
+      setAsyncGeneratingIds(prev => {
+        const next = new Set(prev);
+        if (job.id) {
+          next.delete(job.id);
+          next.delete(String(job.id));
+        }
+        next.delete(`${job.company}_${job.title}`);
+        return next;
+      });
+    }
+  }, [updateJobStatus, activeProfile, setActiveProfile, addToast, announce, currentUser]);
 
- const liveSelectedForInterviewPrep = useMemo(() => {
- if (!selectedForInterviewPrep) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForInterviewPrep.id)) ||
- `${j.company}_${j.title}` === `${selectedForInterviewPrep.company}_${selectedForInterviewPrep.title}`
- );
- return match || selectedForInterviewPrep;
- }, [selectedForInterviewPrep, jobs]);
+  // Updatable Location Bound State
+  const [baseLocation, setBaseLocation] = useState(() => {
+    if (typeof window === 'undefined') return 'BALACLAVA VIC 3183';
+    return localStorage.getItem('userBaseLocation') || 'BALACLAVA VIC 3183';
+  });
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [tempLocationInput, setTempLocationInput] = useState(baseLocation);
 
- const liveSelectedForMockInterview = useMemo(() => {
- if (!selectedForMockInterview) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForMockInterview.id)) ||
- `${j.company}_${j.title}` === `${selectedForMockInterview.company}_${selectedForMockInterview.title}`
- );
- return match || selectedForMockInterview;
- }, [selectedForMockInterview, jobs]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('userBaseLocation', baseLocation);
+    }
+  }, [baseLocation]);
 
- const liveSelectedForOutreach = useMemo(() => {
- if (!selectedForOutreach) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForOutreach.id)) ||
- `${j.company}_${j.title}` === `${selectedForOutreach.company}_${selectedForOutreach.title}`
- );
- return match || selectedForOutreach;
- }, [selectedForOutreach, jobs]);
+  const handleSaveLocation = (e) => {
+    if (e) e.preventDefault();
+    if (tempLocationInput.trim()) {
+      setBaseLocation(tempLocationInput.trim().toUpperCase());
+    }
+    setIsEditingLocation(false);
+  };
 
- const liveSelectedForOfferHub = useMemo(() => {
- if (!selectedForOfferHub) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForOfferHub.id)) ||
- `${j.company}_${j.title}` === `${selectedForOfferHub.company}_${selectedForOfferHub.title}`
- );
- return match || selectedForOfferHub;
- }, [selectedForOfferHub, jobs]);
+  const PRESET_SUBURBS = [
+    'BALACLAVA VIC 3183',
+    'ST KILDA VIC 3182',
+    'PRAHRAN VIC 3181',
+    'ELSTERNWICK VIC 3185',
+    'MELBOURNE CBD 3000',
+    'RICHMOND VIC 3121',
+    'SOUTH YARRA VIC 3141',
+  ];
 
- const liveSelectedForDossier = useMemo(() => {
- if (!selectedForDossier) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForDossier.id)) ||
- `${j.company}_${j.title}` === `${selectedForDossier.company}_${selectedForDossier.title}`
- );
- return match || selectedForDossier;
- }, [selectedForDossier, jobs]);
+  // Start background Autopilot agent if jobs exist
+  useEffect(() => {
+    if (jobs && jobs.length > 0) {
+      const appsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+      startAutopilot({ jobs, profile: activeProfile, applications: appsList });
+    }
+  }, [jobs, activeProfile]);
 
- const liveSelectedForInfluenceHub = useMemo(() => {
- if (!selectedForInfluenceHub) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForInfluenceHub.id)) ||
- `${j.company}_${j.title}` === `${selectedForInfluenceHub.company}_${selectedForInfluenceHub.title}`
- );
- return match || selectedForInfluenceHub;
- }, [selectedForInfluenceHub, jobs]);
+  // Derived counts
+  const preparedCount = useMemo(() => {
+    return (jobs || []).filter(j =>
+      !j.isRejected && (
+        j.status?.toLowerCase().includes('package prepared') ||
+        j.status?.toLowerCase().includes('to submit') ||
+        j.status?.toLowerCase().includes('discovered')
+      )
+    ).length;
+  }, [jobs]);
 
- const liveSelectedForAtsDiagnostic = useMemo(() => {
- if (!selectedForAtsDiagnostic) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForAtsDiagnostic.id)) ||
- `${j.company}_${j.title}` === `${selectedForAtsDiagnostic.company}_${selectedForAtsDiagnostic.title}`
- );
- return match || selectedForAtsDiagnostic;
- }, [selectedForAtsDiagnostic, jobs]);
+  const remoteJobsCount = useMemo(() => {
+    return (jobs || []).filter(j => {
+      if (j.remote === true || j.remote === 1 || j.remote === 'true') return true;
+      const wm = String(j.work_mode || '').toLowerCase();
+      if (wm === 'remote' || wm === 'hybrid') return true;
+      const combined = `${j.title || ''} ${j.location || ''} ${(j.tags || []).join(' ')}`.toLowerCase();
+      return combined.includes('remote') || combined.includes('wfh') || combined.includes('work from home');
+    }).length;
+  }, [jobs]);
 
- const liveSelectedForLinkedInInbound = useMemo(() => {
- if (!selectedForLinkedInInbound) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForLinkedInInbound.id)) ||
- `${j.company}_${j.title}` === `${selectedForLinkedInInbound.company}_${selectedForLinkedInInbound.title}`
- );
- return match || selectedForLinkedInInbound;
- }, [selectedForLinkedInInbound, jobs]);
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-950 text-rose-200 rounded-sm border border-rose-800 font-mono text-xs ">
+        <h2 className="text-sm font-bold tracking-widest uppercase mb-1">SYSTEM ERROR // FETCH FAILED</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
- const liveSelectedForCoverLetterPolarizer = useMemo(() => {
- if (!selectedForCoverLetterPolarizer) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForCoverLetterPolarizer.id)) ||
- `${j.company}_${j.title}` === `${selectedForCoverLetterPolarizer.company}_${selectedForCoverLetterPolarizer.title}`
- );
- return match || selectedForCoverLetterPolarizer;
- }, [selectedForCoverLetterPolarizer, jobs]);
+  const applicationsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
 
- const liveSelectedForScreeningSolver = useMemo(() => {
- if (!selectedForScreeningSolver) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForScreeningSolver.id)) ||
- `${j.company}_${j.title}` === `${selectedForScreeningSolver.company}_${selectedForScreeningSolver.title}`
- );
- return match || selectedForScreeningSolver;
- }, [selectedForScreeningSolver, jobs]);
+  // Ambient Flow Mode
+  if (viewMode === 'ambient') {
+    return (
+      <SafeErrorBoundary>
+        <CyberpunkAmbientMode
+          jobs={jobs}
+          profile={activeProfile}
+          applications={applicationsList}
+          onReturnToDashboard={() => setViewMode('dashboard')}
+          onOpenJobModal={(job) => setSelectedJob(job)}
+          onOpenGenerator={(job) => setSelectedForGenerator(job)}
+        />
+        <DashboardModals
+          modalState={modalState}
+          jobs={jobs}
+          activeProfile={activeProfile}
+          setActiveProfile={setActiveProfile}
+          editingProfile={editingProfile}
+          setEditingProfile={setEditingProfile}
+          updateJobStatus={updateJobStatus}
+          rejectJob={rejectJob}
+          unrejectJob={unrejectJob}
+          refetch={refetch}
+          addToast={addToast}
+          announce={announce}
+          activeScoringWeights={activeScoringWeights}
+          handleApplyCustomWeights={handleApplyCustomWeights}
+          setActiveSection={setActiveSection}
+          triggerDiscoveryScrape={triggerDiscoveryScrape}
+          setBaseLocation={setBaseLocation}
+          currentUser={currentUser}
+          setAuthUser={setAuthUser}
+        />
+      </SafeErrorBoundary>
+    );
+  }
 
- const liveSelectedForKscGenerator = useMemo(() => {
- if (!selectedForKscGenerator) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForKscGenerator.id)) ||
- `${j.company}_${j.title}` === `${selectedForKscGenerator.company}_${selectedForKscGenerator.title}`
- );
- return match || selectedForKscGenerator;
- }, [selectedForKscGenerator, jobs]);
+  return (
+    <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-amber-600 selection:text-white">
+      {/* React Router Bidirectional Synchronization */}
+      <RouteSync
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        jobs={jobs}
+        setSelectedJob={setSelectedJob}
+      />
 
- const liveSelectedForSeekPass = useMemo(() => {
- if (!selectedForSeekPass) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForSeekPass.id)) ||
- `${j.company}_${j.title}` === `${selectedForSeekPass.company}_${selectedForSeekPass.title}`
- );
- return match || selectedForSeekPass;
- }, [selectedForSeekPass, jobs]);
+      {/* Screen-reader live announcement region */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {liveAnnouncement}
+      </div>
 
- const liveSelectedForCheatSheet = useMemo(() => {
- if (!selectedForCheatSheet) return null;
- const match = jobs.find(j => 
- (j.id && String(j.id) === String(selectedForCheatSheet.id)) ||
- `${j.company}_${j.title}` === `${selectedForCheatSheet.company}_${selectedForCheatSheet.title}`
- );
- return match || selectedForCheatSheet;
- }, [selectedForCheatSheet, jobs]);
-
- const preparedCount = useMemo(() => {
- return jobs.filter(j => 
- !j.isRejected && (
- j.status.toLowerCase().includes('package prepared') || 
- j.status.toLowerCase().includes('to submit') ||
- j.status.toLowerCase().includes('discovered')
- )
- ).length;
- }, [jobs]);
-
- const remoteJobsCount = useMemo(() => {
- return (jobs || []).filter(j => {
- if (j.remote === true || j.remote === 1 || j.remote === 'true') return true;
- const wm = String(j.work_mode || '').toLowerCase();
- if (wm === 'remote' || wm === 'hybrid') return true;
- const combined = `${j.title || ''} ${j.location || ''} ${(j.tags || []).join(' ')}`.toLowerCase();
- return combined.includes('remote') || combined.includes('wfh') || combined.includes('work from home');
- }).length;
- }, [jobs]);
-
- const handleExportCSV = () => {
- if (!jobs || jobs.length === 0) return;
-
- const headers = ['Date', 'Company', 'Job Title', 'Status', 'Location', 'Salary', 'Source', 'Score', 'Portal Link', 'Notes'];
- const rows = jobs.map(j => [
- `"${(j.date || '').replace(/"/g, '""')}"`,
- `"${(j.company || '').replace(/"/g, '""')}"`,
- `"${(j.title || '').replace(/"/g, '""')}"`,
- `"${(j.status || '').replace(/"/g, '""')}"`,
- `"${(j.location || '').replace(/"/g, '""')}"`,
- `"${(j.salary || '').replace(/"/g, '""')}"`,
- `"${(j.source || '').replace(/"/g, '""')}"`,
- `"${j.score || 85}"`,
- `"${(j.portalLink || '').replace(/"/g, '""')}"`,
- `"${(j.notes || '').replace(/"/g, '""')}"`
- ]);
-
- const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
- const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
- const url = URL.createObjectURL(blob);
- const link = document.createElement('a');
- link.setAttribute('href', url);
- link.setAttribute('download', `Job_Tracker_Export_${new Date().toISOString().split('T')[0]}.csv`);
- document.body.appendChild(link);
- link.click();
- document.body.removeChild(link);
- };
-
- // Loading is now handled within the main layout via SkeletonLoaders
-
- if (error) return (
- <div className="max-w-2xl mx-auto my-12 p-6 bg-rose-950 text-rose-200 rounded-sm border border-rose-800 font-mono text-xs ">
- <h2 className="text-sm font-bold tracking-widest uppercase mb-1">SYSTEM ERROR // FETCH FAILED</h2>
- <p>{error}</p>
- </div>
- );
-
- const applicationsList = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
-
- if (viewMode === 'ambient') {
- return (
- <SafeErrorBoundary>
- <CyberpunkAmbientMode
- jobs={jobs}
- profile={activeProfile}
- applications={applicationsList}
- onReturnToDashboard={() => setViewMode('dashboard')}
- onOpenJobModal={(job) => setSelectedJob(job)}
- onOpenGenerator={(job) => setSelectedForGenerator(job)}
- />
-
- {selectedJob && (
- <Suspense fallback={<ModalSkeleton />}>
- <JobModal
- job={selectedJob}
- onClose={() => setSelectedJob(null)}
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
- onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
- onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
- onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
- onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
- onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
- onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
- onOpenAtsDiagnostic={(j) => setSelectedForAtsDiagnostic(j)}
- onOpenLinkedInInbound={(j) => setSelectedForLinkedInInbound(j)}
- onOpenCoverLetterPolarizer={(j) => setSelectedForCoverLetterPolarizer(j)}
- onOpenScreeningSolver={(j) => setSelectedForScreeningSolver(j)}
- onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
- onOpenKscGenerator={(j) => setSelectedForKscGenerator(j)}
- onOpenSeekPass={(j) => setSelectedForSeekPass(j)}
- onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
- profile={activeProfile}
- allJobs={jobs}
- />
- </Suspense>
- )}
-
- {selectedForGenerator && (
- <Suspense fallback={<ModalSkeleton />}>
- <GeneratorModal
- job={selectedForGenerator}
- profile={activeProfile}
- isOpen={Boolean(selectedForGenerator)}
- onClose={() => setSelectedForGenerator(null)}
- onApplicationCreated={(app) => {
- updateJobStatus(selectedForGenerator.id || `${selectedForGenerator.company}_${selectedForGenerator.title}`, 'Package Prepared / To Submit', app);
- }}
- />
- </Suspense>
- )}
- </SafeErrorBoundary>
- );
- }
-
- return (
- <div className="min-h-screen bg-slate-950 industry-ambient-bg font-sans text-slate-100 pb-16 selection:bg-amber-600 selection:text-white">
- {/* React Router Bidirectional Synchronization */}
- <RouteSync
- activeSection={activeSection}
- setActiveSection={setActiveSection}
- jobs={jobs}
- setSelectedJob={setSelectedJob}
- />
-
- {/* Screen-reader live announcement region */}
- <div
- role="status"
- aria-live="polite"
- aria-atomic="true"
- className="sr-only"
- >
- {liveAnnouncement}
- </div>
-
- {/* Top Live Engine Status Bar */}
- {fallbackBanner && (
- <div
- role="alert"
- className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between"
- >
- <span className="flex items-center gap-2">
- <span className="inline-block w-2 h-2 rounded-sm bg-amber-400 animate-pulse" aria-hidden="true" />
- {fallbackBanner}
- </span>
- <button
- onClick={() => setFallbackBanner(null)}
- aria-label="Dismiss status banner"
- className="text-amber-400 hover:text-white ml-4 text-xs font-bold"
- >
- ✕
- </button>
- </div>
- )}
+      {/* Top Live Engine Status Bar */}
+      {fallbackBanner && (
+        <div
+          role="alert"
+          className="bg-amber-500/15 border-b border-amber-500/30 text-amber-300 px-4 py-2 text-xs font-mono flex items-center justify-between"
+        >
+          <span className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-sm bg-amber-400 animate-pulse" aria-hidden="true" />
+            {fallbackBanner}
+          </span>
+          <button
+            onClick={() => setFallbackBanner(null)}
+            aria-label="Dismiss status banner"
+            className="text-amber-400 hover:text-white ml-4 text-xs font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Mobile Compact App Header */}
       <header className="md:hidden sticky top-0 z-40 bg-[#0c0e14]/95 backdrop-blur-xl border-b border-amber-500/20 px-3 py-2 font-mono">
@@ -978,749 +432,748 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
         </div>
       </header>
 
+      {/* Desktop Top Nav / Status Bar */}
       <div className="hidden md:flex sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 text-slate-300 py-2 px-3 sm:px-5 lg:px-6 font-mono text-[11px] flex-wrap items-center justify-between gap-3 font-semibold ">
- <div className="flex items-center gap-3 truncate">
- <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0 bg-emerald-950/60 px-2 py-0.5 rounded-sm border border-emerald-500/30">
- <Activity size={12} className="animate-pulse text-emerald-400" /> V2.0 ENGINE ACTIVE
- </span>
-  {currentIndustryTheme && (
-    <span 
-      className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[10px] font-black uppercase tracking-wider transition-all"
-      style={{
-        backgroundColor: currentIndustryTheme.badgeBg,
-        borderColor: currentIndustryTheme.border,
-        color: currentIndustryTheme.badgeText,
-        borderWidth: '1px'
-      }}
-      title={`Active Domain: ${currentIndustryTheme.name} // ${currentIndustryTheme.tag}`}
-    >
-      <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0" style={{ backgroundColor: currentIndustryTheme.accent }} />
-      <span>{currentIndustryTheme.tag}</span>
-    </span>
-  )}
- <span className="text-slate-700 hidden sm:inline">|</span>
- <span className="truncate text-slate-300 text-xs">
- <strong className="text-white font-black">{jobs.length}</strong> POSITIONS
- </span>
- <span className="text-slate-700 hidden md:inline">|</span>
- 
- {/* Location Bound selector */}
- <div className="flex items-center gap-1.5 truncate">
- <span className="text-slate-500 font-bold hidden lg:inline text-[10px]">BASE:</span>
- {isEditingLocation ? (
- <form onSubmit={handleSaveLocation} className="flex items-center gap-1">
- <input
- type="text"
- value={tempLocationInput}
- onChange={(e) => setTempLocationInput(e.target.value)}
- className="bg-slate-900 border border-amber-500 text-emerald-300 px-2 py-0.5 rounded-sm text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
- placeholder="SUBURB POSTCODE"
- autoFocus
- />
- <button type="submit" className="text-emerald-400 hover:text-emerald-300 font-bold px-1.5 py-0.5 bg-emerald-950/60 rounded border border-emerald-500/40 cursor-pointer">✓</button>
- <button type="button" onClick={() => setIsEditingLocation(false)} className="text-rose-400 hover:text-rose-300 font-bold px-1.5 py-0.5 bg-rose-950/60 rounded border border-rose-500/40 cursor-pointer">✕</button>
- </form>
- ) : (
- <button 
- onClick={() => { setTempLocationInput(baseLocation); setIsEditingLocation(true); }}
- className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer bg-slate-900/90 px-2.5 py-0.5 rounded-sm border border-slate-700/80 transition-colors"
- title="Click to change your primary location radius baseline"
- >
- <MapPin size={11} className="text-amber-400" />
- <span className="truncate max-w-[130px] sm:max-w-[180px]">{baseLocation}</span>
- <span className="text-[9px] text-slate-400 font-normal">✎</span>
- </button>
- )}
- </div>
- </div>
+        <div className="flex items-center gap-3 truncate">
+          <span className="flex items-center gap-1.5 text-emerald-400 font-bold shrink-0 bg-emerald-950/60 px-2 py-0.5 rounded-sm border border-emerald-500/30">
+            <Activity size={12} className="animate-pulse text-emerald-400" /> V2.0 ENGINE ACTIVE
+          </span>
+          {currentIndustryTheme && (
+            <span
+              className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[10px] font-black uppercase tracking-wider transition-all"
+              style={{
+                backgroundColor: currentIndustryTheme.badgeBg,
+                borderColor: currentIndustryTheme.border,
+                color: currentIndustryTheme.badgeText,
+                borderWidth: '1px'
+              }}
+              title={`Active Domain: ${currentIndustryTheme.name} // ${currentIndustryTheme.tag}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0" style={{ backgroundColor: currentIndustryTheme.accent }} />
+              <span>{currentIndustryTheme.tag}</span>
+            </span>
+          )}
+          <span className="text-slate-700 hidden sm:inline">|</span>
+          <span className="truncate text-slate-300 text-xs">
+            <strong className="text-white font-black">{jobs.length}</strong> POSITIONS
+          </span>
+          <span className="text-slate-700 hidden md:inline">|</span>
 
- <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] flex-wrap justify-end">
- {/* Active Candidate Profile Switcher */}
- <ProfileSwitcher 
- activeProfile={activeProfile}
- onProfileChange={(p) => {
- setActiveProfile(p);
- if (p.suburb || p.location) {
- setBaseLocation(p.suburb || p.location);
- }
- }}
- onOpenProfileModal={(p) => {
- setEditingProfile(p);
- setIsProfileModalOpen(true);
- }}
- onOpenSettings={() => setIsSettingsOpen(true)}
- onOpenAuth={() => setIsAuthModalOpen(true)}
- />
+          {/* Location Bound selector */}
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="text-slate-500 font-bold hidden lg:inline text-[10px]">BASE:</span>
+            {isEditingLocation ? (
+              <form onSubmit={handleSaveLocation} className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={tempLocationInput}
+                  onChange={(e) => setTempLocationInput(e.target.value)}
+                  className="bg-slate-900 border border-amber-500 text-emerald-300 px-2 py-0.5 rounded-sm text-[11px] font-mono focus:outline-none w-36 uppercase font-bold"
+                  placeholder="SUBURB POSTCODE"
+                  autoFocus
+                />
+                <button type="submit" className="text-emerald-400 hover:text-emerald-300 font-bold px-1.5 py-0.5 bg-emerald-950/60 rounded border border-emerald-500/40 cursor-pointer">✓</button>
+                <button type="button" onClick={() => setIsEditingLocation(false)} className="text-rose-400 hover:text-rose-300 font-bold px-1.5 py-0.5 bg-rose-950/60 rounded border border-rose-500/40 cursor-pointer">✕</button>
+              </form>
+            ) : (
+              <button
+                onClick={() => { setTempLocationInput(baseLocation); setIsEditingLocation(true); }}
+                className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer bg-slate-900/90 px-2.5 py-0.5 rounded-sm border border-slate-700/80 transition-colors"
+                title="Click to change your primary location radius baseline"
+              >
+                <MapPin size={11} className="text-amber-400" />
+                <span className="truncate max-w-[130px] sm:max-w-[180px]">{baseLocation}</span>
+                <span className="text-[9px] text-slate-400 font-normal">✎</span>
+              </button>
+            )}
+          </div>
+        </div>
 
- {/* Quick Action: + Custom Job */}
- <button
- onClick={() => setIsCustomJobModalOpen(true)}
- className="flex items-center gap-1 text-purple-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 px-2.5 py-1 rounded-sm -xs"
- title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
- >
- <Sparkles size={11} className="text-purple-400" /> + CUSTOM
- </button>
+        <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] flex-wrap justify-end">
+          {/* Active Candidate Profile Switcher */}
+          <ProfileSwitcher
+            activeProfile={activeProfile}
+            onProfileChange={(p) => {
+              setActiveProfile(p);
+              if (p.suburb || p.location) {
+                setBaseLocation(p.suburb || p.location);
+              }
+            }}
+            onOpenProfileModal={(p) => {
+              setEditingProfile(p);
+              setIsProfileModalOpen(true);
+            }}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+          />
 
- {/* Quick Action: Batch Apply */}
- <button
- onClick={() => setIsBatchApplyOpen(true)}
- className="flex items-center gap-1 text-emerald-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 px-2.5 py-1 rounded-sm -xs"
- title="Dispatch 1-Click Batch Automated Applications"
- >
- <Zap size={11} className="text-emerald-400" /> BATCH
- </button>
+          {/* Quick Action: + Custom Job */}
+          <button
+            onClick={() => setIsCustomJobModalOpen(true)}
+            className="flex items-center gap-1 text-purple-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 px-2.5 py-1 rounded-sm -xs"
+            title="Generate Tailored Resume & Cover Letter from any Job Description or Link"
+          >
+            <Sparkles size={11} className="text-purple-400" /> + CUSTOM
+          </button>
 
- {/* Ambient Flow Toggle (Test Compatible) */}
- <button
- onClick={() => setViewMode("ambient")}
- className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-all font-bold text-[10px] rounded-sm cursor-pointer"
- title="Switch to Cyberpunk Ambient Flow Mode"
- >
- <span className="w-1.5 h-1.5 rounded-sm bg-cyan-400 animate-pulse" />
- <span>AMBIENT FLOW</span>
- </button>
+          {/* Quick Action: Batch Apply */}
+          <button
+            onClick={() => setIsBatchApplyOpen(true)}
+            className="flex items-center gap-1 text-emerald-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-bold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 px-2.5 py-1 rounded-sm -xs"
+            title="Dispatch 1-Click Batch Automated Applications"
+          >
+            <Zap size={11} className="text-emerald-400" /> BATCH
+          </button>
 
- {/* Consolidated Intelligence & Tools Dropdown */}
- <div className="relative" ref={toolsMenuRef}>
- <button
- type="button"
- onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
- className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase transition-all cursor-pointer ${
- isToolsMenuOpen 
- ? 'bg-amber-600 text-white border-amber-400 -indigo-600/30' 
- : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700'
- }`}
- title="Intelligence, Analytics & Network Tools"
- >
- <Layers size={11} className={isToolsMenuOpen ? 'text-white' : 'text-amber-400'} />
- <span>TOOLS</span>
- {overdueTouchpointCount > 0 && (
- <span className="px-1.5 py-0.2 rounded-sm bg-rose-500 text-white text-[9px] font-black animate-pulse">
- {overdueTouchpointCount}
- </span>
- )}
- <ChevronDown size={11} className={`transition-transform duration-200 ${isToolsMenuOpen ? 'rotate-180' : ''}`} />
- </button>
+          {/* Ambient Flow Toggle */}
+          <button
+            onClick={() => setViewMode("ambient")}
+            className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 hover:text-white hover:bg-cyan-900 transition-all font-bold text-[10px] rounded-sm cursor-pointer"
+            title="Switch to Cyberpunk Ambient Flow Mode"
+          >
+            <span className="w-1.5 h-1.5 rounded-sm bg-cyan-400 animate-pulse" />
+            <span>AMBIENT FLOW</span>
+          </button>
 
- {isToolsMenuOpen && (
- <div className="absolute right-0 top-full mt-1.5 w-64 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-sm p-2 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200">
- <div className="px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-800">
- CAREER SUITE // TOOLS & INTEL
- </div>
+          {/* Consolidated Intelligence & Tools Dropdown */}
+          <div className="relative" ref={toolsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                isToolsMenuOpen
+                  ? 'bg-amber-600 text-white border-amber-400 -indigo-600/30'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700'
+              }`}
+              title="Intelligence, Analytics & Network Tools"
+            >
+              <Layers size={11} className={isToolsMenuOpen ? 'text-white' : 'text-amber-400'} />
+              <span>TOOLS</span>
+              {overdueTouchpointCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-sm bg-rose-500 text-white text-[9px] font-black animate-pulse">
+                  {overdueTouchpointCount}
+                </span>
+              )}
+              <ChevronDown size={11} className={`transition-transform duration-200 ${isToolsMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsRecruiterCrmOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-purple-950/70 text-slate-200 hover:text-purple-300 flex items-center justify-between transition-colors text-left cursor-pointer"
- >
- <span className="flex items-center gap-2 font-bold text-[11px]">
- <Users size={13} className="text-purple-400" />
- <span>Recruiter CRM</span>
- </span>
- {overdueTouchpointCount > 0 && (
- <span className="px-1.5 py-0.5 rounded-sm bg-rose-500 text-white text-[9px] font-black animate-pulse">
- {overdueTouchpointCount} due
- </span>
- )}
- </button>
+            {isToolsMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-64 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-sm p-2 z-50 space-y-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-150 text-slate-200">
+                <div className="px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                  CAREER SUITE // TOOLS & INTEL
+                </div>
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsFunnelModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-cyan-950/70 text-slate-200 hover:text-cyan-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <TrendingUp size={13} className="text-cyan-400" />
- <span>Funnel Intelligence</span>
- </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsRecruiterCrmOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-purple-950/70 text-slate-200 hover:text-purple-300 flex items-center justify-between transition-colors text-left cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 font-bold text-[11px]">
+                    <Users size={13} className="text-purple-400" />
+                    <span>Recruiter CRM</span>
+                  </span>
+                  {overdueTouchpointCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-sm bg-rose-500 text-white text-[9px] font-black animate-pulse">
+                      {overdueTouchpointCount} due
+                    </span>
+                  )}
+                </button>
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsCareerModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Compass size={13} className="text-amber-400" />
- <span>Career Vector Compass</span>
- </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsFunnelModalOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-cyan-950/70 text-slate-200 hover:text-cyan-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <TrendingUp size={13} className="text-cyan-400" />
+                  <span>Funnel Intelligence</span>
+                </button>
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsPdfStudioOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <FileText size={13} className="text-amber-400" />
- <span>Visual ATS PDF Studio</span>
- </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsCareerModalOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <Compass size={13} className="text-amber-400" />
+                  <span>Career Vector Compass</span>
+                </button>
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsScoringTunerOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-blue-950/70 text-slate-200 hover:text-blue-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Sliders size={13} className="text-blue-400" />
- <span>Scoring Matrix Tuner</span>
- </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsPdfStudioOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <FileText size={13} className="text-amber-400" />
+                  <span>Visual ATS PDF Studio</span>
+                </button>
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsVoiceInterviewOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-purple-950/70 text-slate-200 hover:text-purple-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Mic size={13} className="text-purple-400" />
- <span>Voice Mock Interview Studio</span>
- </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsScoringTunerOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-blue-950/70 text-slate-200 hover:text-blue-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <Sliders size={13} className="text-blue-400" />
+                  <span>Scoring Matrix Tuner</span>
+                </button>
 
- {authUser ? (
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsGoogleIntegrationOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-emerald-950/70 text-slate-200 hover:text-emerald-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Table size={13} className="text-emerald-400" />
- <span>Google Sheets Tracker</span>
- </button>
- ) : (
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsAuthModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Lock size={13} className="text-amber-400" />
- <span>Sign in with Google</span>
- </button>
- )}
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsVoiceInterviewOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-purple-950/70 text-slate-200 hover:text-purple-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <Mic size={13} className="text-purple-400" />
+                  <span>Voice Mock Interview Studio</span>
+                </button>
 
- {isWorkforceEnabled && (
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsWorkforceModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Award size={13} className="text-amber-400" />
- <span>Workforce Australia</span>
- </button>
- )}
+                {authUser ? (
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsGoogleIntegrationOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-sm hover:bg-emerald-950/70 text-slate-200 hover:text-emerald-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Table size={13} className="text-emerald-400" />
+                    <span>Google Sheets Tracker</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsAuthModalOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Lock size={13} className="text-amber-400" />
+                    <span>Sign in with Google</span>
+                  </button>
+                )}
 
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsSkillGapModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <TrendingUp size={13} className="text-emerald-400" />
- <span>Market Skill Gap Intelligence</span>
- </button>
+                {isWorkforceEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsWorkforceModalOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-sm hover:bg-amber-950/70 text-slate-200 hover:text-amber-300 flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Award size={13} className="text-amber-400" />
+                    <span>Workforce Australia</span>
+                  </button>
+                )}
 
- <button
- type="button"
- onClick={() => {
- setIsToolsMenuOpen(false);
- setCompareJobs(jobs.slice(0, 2));
- setIsCompareModalOpen(true);
- }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Sparkles size={13} className="text-amber-400" />
- <span>Compare Top Opportunities</span>
- </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsToolsMenuOpen(false); setIsSkillGapModalOpen(true); }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <TrendingUp size={13} className="text-emerald-400" />
+                  <span>Market Skill Gap Intelligence</span>
+                </button>
 
- <div className="pt-1 border-t border-slate-800 space-y-0.5">
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setSelfHealSource(null); setIsSourceSelfHealOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-amber-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <ShieldAlert size={13} className="text-amber-400" />
- <span>Scraper Health & Self-Healing</span>
- </button>
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsPricingModalOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-amber-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Crown size={13} className="text-amber-400" />
- <span>Subscription & Plans</span>
- </button>
- <button
- type="button"
- onClick={() => { setIsToolsMenuOpen(false); setIsSettingsOpen(true); }}
- className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
- >
- <Settings size={13} className="text-amber-400" />
- <span>Settings & LLM Models</span>
- </button>
- </div>
- </div>
- )}
- </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsToolsMenuOpen(false);
+                    setCompareJobs(jobs.slice(0, 2));
+                    setIsCompareModalOpen(true);
+                  }}
+                  className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                >
+                  <Sparkles size={13} className="text-amber-400" />
+                  <span>Compare Top Opportunities</span>
+                </button>
 
- {/* Command Palette (Ctrl+K) */}
- <button
- onClick={() => setIsCommandPaletteOpen(true)}
- className="flex items-center gap-1 text-amber-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-amber-950/80 border border-amber-500/40 px-2 py-1 rounded-sm"
- title="Open Command Palette (Ctrl+K)"
- >
- <Command size={11} /> ⌘K
- </button>
+                <div className="pt-1 border-t border-slate-800 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setSelfHealSource(null); setIsSourceSelfHealOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-amber-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <ShieldAlert size={13} className="text-amber-400" />
+                    <span>Scraper Health & Self-Healing</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsPricingModalOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-amber-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Crown size={13} className="text-amber-400" />
+                    <span>Subscription & Plans</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsToolsMenuOpen(false); setIsSettingsOpen(true); }}
+                    className="w-full px-2.5 py-2 rounded-sm hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors text-left font-bold text-[11px] cursor-pointer"
+                  >
+                    <Settings size={13} className="text-amber-400" />
+                    <span>Settings & LLM Models</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
- {/* LLM Spend HUD */}
- <button
- type="button"
- onClick={() => setIsSettingsOpen(true)}
- className="flex items-center gap-1.5 text-amber-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-mono font-bold bg-amber-950/70 hover:bg-amber-900/80 border border-amber-500/40 px-2.5 py-1 rounded-sm shadow-xs"
- title={`Total LLM Spend: $${(spendSummary.totalSpendUsd || 0).toFixed(4)} USD (${(spendSummary.totalTokens || 0).toLocaleString()} tokens across ${spendSummary.callCount || 0} calls). Click to open Settings & Model selection.`}
- >
- <Zap size={11} className="text-amber-400 animate-pulse" />
- <span>
- SPEND: <strong className="text-emerald-400 font-black">${(spendSummary.totalSpendUsd || 0) > 0 ? (spendSummary.totalSpendUsd).toFixed(4) : '0.00'}</strong>
- </span>
- </button>
+          {/* Command Palette (Ctrl+K) */}
+          <button
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="flex items-center gap-1 text-amber-300 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold bg-amber-950/80 border border-amber-500/40 px-2 py-1 rounded-sm"
+            title="Open Command Palette (Ctrl+K)"
+          >
+            <Command size={11} /> ⌘K
+          </button>
 
- {/* Subscription Tier HUD: Google Antigravity VIP Member Capsule */}
- <button
- type="button"
- onClick={() => setIsPricingModalOpen(true)}
- className={`flex items-center gap-1.5 transition-all cursor-pointer text-[10px] uppercase font-mono font-bold px-2.5 py-1 border shadow-xs ${
- billingStatus?.is_active
- ? 'vip-subscriber-capsule rounded-full text-emerald-200 ring-1 ring-emerald-400/40'
- : 'text-amber-300 bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/40 rounded-sm'
- }`}
- title={
- billingStatus?.is_active
- ? `⭐ ${billingStatus?.plan_tier === 'pass_3mo' ? 'Career Pass VIP' : 'Pro Job Hunter'} Active · Click to manage subscription`
- : `Free Tier (${billingStatus?.trial_generations_remaining ?? 3} trials remaining) · Click to view Pro plans`
- }
- >
- <Crown size={12} className={billingStatus?.is_active ? "text-emerald-300 animate-pulse" : "text-amber-400"} />
- <span>
- {billingStatus?.is_active ? (
- <span className="flex items-center gap-1.5">
- <span className="text-white font-black">{billingStatus?.plan_tier === 'pass_3mo' ? 'CAREER PASS' : 'PRO'}</span>
- <span className="text-emerald-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-400/30">VIP</span>
- </span>
- ) : (
- <>PRO TIER <span className="text-amber-400 font-black">· UPGRADE</span></>
- )}
- </span>
- </button>
+          {/* LLM Spend HUD */}
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-1.5 text-amber-300 hover:text-white transition-all cursor-pointer text-[10px] uppercase font-mono font-bold bg-amber-950/70 hover:bg-amber-900/80 border border-amber-500/40 px-2.5 py-1 rounded-sm shadow-xs"
+            title={`Total LLM Spend: $${(spendSummary.totalSpendUsd || 0).toFixed(4)} USD (${(spendSummary.totalTokens || 0).toLocaleString()} tokens across ${spendSummary.callCount || 0} calls). Click to open Settings & Model selection.`}
+          >
+            <Zap size={11} className="text-amber-400 animate-pulse" />
+            <span>
+              SPEND: <strong className="text-emerald-400 font-black">${(spendSummary.totalSpendUsd || 0) > 0 ? (spendSummary.totalSpendUsd).toFixed(4) : '0.00'}</strong>
+            </span>
+          </button>
 
- {/* Provider Mesh Telemetry Desk */}
- <TelemetryDesk onOpenSelfHeal={(src) => { setSelfHealSource(src); setIsSourceSelfHealOpen(true); }} />
+          {/* Subscription Tier HUD: Google Antigravity VIP Member Capsule */}
+          <button
+            type="button"
+            onClick={() => setIsPricingModalOpen(true)}
+            className={`flex items-center gap-1.5 transition-all cursor-pointer text-[10px] uppercase font-mono font-bold px-2.5 py-1 border shadow-xs ${
+              billingStatus?.is_active
+                ? 'vip-subscriber-capsule rounded-full text-emerald-200 ring-1 ring-emerald-400/40'
+                : 'text-amber-300 bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/40 rounded-sm'
+            }`}
+            title={
+              billingStatus?.is_active
+                ? `⭐ ${billingStatus?.plan_tier === 'pass_3mo' ? 'Career Pass VIP' : 'Pro Job Hunter'} Active · Click to manage subscription`
+                : `Free Tier (${billingStatus?.trial_generations_remaining ?? 3} trials remaining) · Click to view Pro plans`
+            }
+          >
+            <Crown size={12} className={billingStatus?.is_active ? "text-emerald-300 animate-pulse" : "text-amber-400"} />
+            <span>
+              {billingStatus?.is_active ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="text-white font-black">{billingStatus?.plan_tier === 'pass_3mo' ? 'CAREER PASS' : 'PRO'}</span>
+                  <span className="text-emerald-300 font-extrabold text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-400/30">VIP</span>
+                </span>
+              ) : (
+                <>PRO TIER <span className="text-amber-400 font-black">· UPGRADE</span></>
+              )}
+            </span>
+          </button>
 
- {/* Sync Database Feed */}
- <button 
- onClick={refetch}
- className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-sm bg-slate-900 border border-slate-800"
- title="Sync Database Feed"
- >
- <RefreshCw size={11} />
- </button>
+          {/* Provider Mesh Telemetry Desk */}
+          <TelemetryDesk onOpenSelfHeal={(src) => { setSelfHealSource(src); setIsSourceSelfHealOpen(true); }} />
 
- {/* Sign Out */}
- {onSignOut && (
- <button 
- onClick={() => {
- logoutUser();
- onSignOut();
- }}
- className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-sm bg-rose-950/60 border border-rose-500/40"
- title="Sign Out / Switch User"
- >
- <LogOut size={11} />
- </button>
- )}
- </div>
- </div>
+          {/* Sync Database Feed */}
+          <button
+            onClick={refetch}
+            className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-sm bg-slate-900 border border-slate-800"
+            title="Sync Database Feed"
+          >
+            <RefreshCw size={11} />
+          </button>
 
+          {/* Sign Out */}
+          {onSignOut && (
+            <button
+              onClick={() => {
+                logoutUser();
+                onSignOut();
+              }}
+              className="flex items-center gap-1 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer text-[10px] uppercase font-bold px-2 py-1 rounded-sm bg-rose-950/60 border border-rose-500/40"
+              title="Sign Out / Switch User"
+            >
+              <LogOut size={11} />
+            </button>
+          )}
+        </div>
+      </div>
 
- {/* Location Preset Bar */}
- {isEditingLocation && (
- <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[10px] border-b border-slate-800 flex items-center gap-2 overflow-x-auto">
- <span className="text-slate-500 font-bold uppercase shrink-0">QUICK PRESETS:</span>
- {PRESET_SUBURBS.map(suburb => (
- <button
- key={suburb}
- onClick={() => { setBaseLocation(suburb); setTempLocationInput(suburb); setIsEditingLocation(false); }}
- className={`px-2 py-0.5 rounded border transition-colors shrink-0 cursor-pointer font-bold ${
- baseLocation === suburb 
- ? 'bg-emerald-600 text-white border-emerald-400'
- : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
- }`}
- >
- {suburb}
- </button>
- ))}
- </div>
- )}
+      {/* Location Preset Bar */}
+      {isEditingLocation && (
+        <div className="bg-slate-900 text-slate-300 py-1.5 px-4 font-mono text-[10px] border-b border-slate-800 flex items-center gap-2 overflow-x-auto">
+          <span className="text-slate-500 font-bold uppercase shrink-0">QUICK PRESETS:</span>
+          {PRESET_SUBURBS.map(suburb => (
+            <button
+              key={suburb}
+              onClick={() => { setBaseLocation(suburb); setTempLocationInput(suburb); setIsEditingLocation(false); }}
+              className={`px-2 py-0.5 rounded border transition-colors shrink-0 cursor-pointer font-bold ${
+                baseLocation === suburb
+                  ? 'bg-emerald-600 text-white border-emerald-400'
+                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              {suburb}
+            </button>
+          ))}
+        </div>
+      )}
 
- {/* Humanist Atelier Header & Top Navigation */}
- <header className="hidden md:block bg-[#12141c]/95 backdrop-blur-xl border-b border-amber-500/15 sticky top-[33px] z-30 font-mono">
- <div className="w-full px-3 sm:px-5 lg:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
- <div className="flex items-center gap-3">
- <div className="p-2.5 rounded-sm bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 border border-amber-300/50">
- <Terminal size={20} />
- </div>
- <div>
- <div className="flex items-center gap-2">
- <h1 className="text-base font-humanist font-black tracking-widest uppercase text-[#fbf9f4]">
- CANDIDATE LOGISTICS PORTAL <span className="text-[10px] font-mono font-bold tracking-widest text-amber-400/90 px-1.5 py-0.5 rounded-sm bg-amber-950/80 border border-amber-500/30 ml-1">MENTAT CORE</span>
- </h1>
- <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-400/30">
- <Terminal size={11} className="text-amber-400" /> ACTIVE
- </span>
- {(currentUser?.isDemoUser || currentUser?.authProvider === 'demo') && (
- <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-stone-900 text-amber-300 border border-amber-400/30">
- <Activity size={11} className="text-amber-400" /> DEMO MODE
- </span>
- )}
- </div>
- <p className="text-[11px] text-slate-400 font-humanist font-medium tracking-widest uppercase mt-1">
- HUMAN-CENTRIC DISCOVERY & AUTONOMOUS APPLICATION DISPATCHER
- </p>
- </div>
- </div>
+      {/* Humanist Atelier Header & Top Navigation */}
+      <header className="hidden md:block bg-[#12141c]/95 backdrop-blur-xl border-b border-amber-500/15 sticky top-[33px] z-30 font-mono">
+        <div className="w-full px-3 sm:px-5 lg:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-sm bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 border border-amber-300/50">
+              <Terminal size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-humanist font-black tracking-widest uppercase text-[#fbf9f4]">
+                  CANDIDATE LOGISTICS PORTAL <span className="text-[10px] font-mono font-bold tracking-widest text-amber-400/90 px-1.5 py-0.5 rounded-sm bg-amber-950/80 border border-amber-500/30 ml-1">MENTAT CORE</span>
+                </h1>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-amber-950/60 text-amber-300 border border-amber-400/30">
+                  <Terminal size={11} className="text-amber-400" /> ACTIVE
+                </span>
+                {(currentUser?.isDemoUser || currentUser?.authProvider === 'demo') && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-stone-900 text-amber-300 border border-amber-400/30">
+                    <Activity size={11} className="text-amber-400" /> DEMO MODE
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 font-humanist font-medium tracking-widest uppercase mt-1">
+                HUMAN-CENTRIC DISCOVERY & AUTONOMOUS APPLICATION DISPATCHER
+              </p>
+            </div>
+          </div>
 
- {/* 5-Way Tab View Switcher */}
- <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-[#0a0c10]/90 backdrop-blur-md p-1 rounded-sm border border-amber-500/15 max-w-full overflow-x-auto scrollbar-none shrink-0 ">
- <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1">
- <button
- role="tab"
- aria-selected={activeSection === 'seeker'}
- aria-controls="panel-seeker"
- onClick={() => setActiveSection('seeker')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'seeker' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <LayoutGrid size={13} aria-hidden="true" /> 
- DISCOVERY STREAM
- {preparedCount > 0 && (
- <span className="px-1.5 py-0.2 rounded-sm text-[10px] bg-amber-950 text-amber-300 border border-amber-500/40" aria-label={`${preparedCount} prepared`}>
- {preparedCount}
- </span>
- )}
- </button>
+          {/* 5-Way Tab View Switcher */}
+          <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-[#0a0c10]/90 backdrop-blur-md p-1 rounded-sm border border-amber-500/15 max-w-full overflow-x-auto scrollbar-none shrink-0 ">
+            <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1">
+              <button
+                role="tab"
+                aria-selected={activeSection === 'seeker'}
+                aria-controls="panel-seeker"
+                onClick={() => setActiveSection('seeker')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'seeker'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <LayoutGrid size={13} aria-hidden="true" />
+                DISCOVERY STREAM
+                {preparedCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-sm text-[10px] bg-amber-950 text-amber-300 border border-amber-500/40" aria-label={`${preparedCount} prepared`}>
+                    {preparedCount}
+                  </span>
+                )}
+              </button>
 
- <button
- role="tab"
- aria-selected={activeSection === 'highlights'}
- aria-controls="panel-highlights"
- onClick={() => setActiveSection('highlights')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'highlights' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <Zap size={13} className={activeSection === 'highlights' ? 'text-slate-950' : 'text-amber-400'} aria-hidden="true" /> 
- ACTION QUEUE
- </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'highlights'}
+                aria-controls="panel-highlights"
+                onClick={() => setActiveSection('highlights')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'highlights'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <Zap size={13} className={activeSection === 'highlights' ? 'text-slate-950' : 'text-amber-400'} aria-hidden="true" />
+                ACTION QUEUE
+              </button>
 
- <button
- role="tab"
- aria-selected={activeSection === 'kanban'}
- aria-controls="panel-kanban"
- onClick={() => setActiveSection('kanban')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'kanban' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <Sliders size={13} aria-hidden="true" /> 
- APPLICATION KANBAN
- </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'kanban'}
+                aria-controls="panel-kanban"
+                onClick={() => setActiveSection('kanban')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'kanban'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <Sliders size={13} aria-hidden="true" />
+                APPLICATION KANBAN
+              </button>
 
- <button
- role="tab"
- aria-selected={activeSection === 'remote'}
- aria-controls="panel-remote"
- onClick={() => setActiveSection('remote')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'remote' 
- ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white -emerald-900/30 border border-emerald-400/30' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <Globe size={13} className={activeSection === 'remote' ? 'text-white' : 'text-emerald-400'} aria-hidden="true" /> 
- REMOTE ROLES
- {remoteJobsCount > 0 && (
- <span className="ml-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
- {remoteJobsCount}
- </span>
- )}
- </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'remote'}
+                aria-controls="panel-remote"
+                onClick={() => setActiveSection('remote')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'remote'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white -emerald-900/30 border border-emerald-400/30'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <Globe size={13} className={activeSection === 'remote' ? 'text-white' : 'text-emerald-400'} aria-hidden="true" />
+                REMOTE ROLES
+                {remoteJobsCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                    {remoteJobsCount}
+                  </span>
+                )}
+              </button>
 
- <button
- role="tab"
- aria-selected={activeSection === 'market'}
- aria-controls="panel-market"
- onClick={() => setActiveSection('market')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'market' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <TrendingUp size={13} aria-hidden="true" /> 
- MARKET INTEL
- </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'market'}
+                aria-controls="panel-market"
+                onClick={() => setActiveSection('market')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'market'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <TrendingUp size={13} aria-hidden="true" />
+                MARKET INTEL
+              </button>
 
- <button
- role="tab"
- aria-selected={activeSection === 'analytics'}
- aria-controls="panel-analytics"
- onClick={() => setActiveSection('analytics')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'analytics' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <Target size={13} aria-hidden="true" /> 
- ANALYTICS
- </button>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'analytics'}
+                aria-controls="panel-analytics"
+                onClick={() => setActiveSection('analytics')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'analytics'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <Target size={13} aria-hidden="true" />
+                ANALYTICS & FUNNEL
+              </button>
 
- <button
- role="tab"
- aria-selected={activeSection === 'operations'}
- aria-controls="panel-operations"
- onClick={() => setActiveSection('operations')}
- className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
- activeSection === 'operations' 
- ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50' 
- : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
- }`}
- >
- <CalendarClock size={13} aria-hidden="true" /> OPERATIONS
- </button>
- </div>
- </nav>
+              <button
+                role="tab"
+                aria-selected={activeSection === 'operations'}
+                aria-controls="panel-operations"
+                onClick={() => setActiveSection('operations')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                  activeSection === 'operations'
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black -amber-950/40 border border-amber-300/50'
+                    : 'text-stone-400 hover:text-[#fbf9f4] hover:bg-stone-900/80 border border-transparent'
+                }`}
+              >
+                <CalendarClock size={13} aria-hidden="true" />
+                STRATEGIC OPS
+              </button>
+            </div>
+          </nav>
+        </div>
+      </header>
 
- </div>
- </header>
- 
- {/* Dynamic Industry Theme & Live Profile Scrape Banner */}
- {(profileScrapeStatus || (showSuggestions && suggestedTitles.length > 0)) && (
- <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-3 sm:px-5 lg:px-6 py-2.5 animate-in slide-in-from-top-2 duration-300 font-mono text-xs ">
- <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
- <div className="flex items-center gap-3 flex-wrap">
- <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-black uppercase tracking-wider industry-accent-badge -xs">
- <span className="w-2 h-2 rounded-sm animate-pulse" style={{ backgroundColor: currentIndustryTheme.accent }} />
- {currentIndustryTheme.name}
- </span>
- <span className="text-slate-300 font-bold flex items-center gap-2">
- {profileScrapeMsg || `Profile Scraper Active — Theme aligned to ${currentIndustryTheme.name}`}
- </span>
- </div>
+      {/* Dynamic Industry Theme & Live Profile Scrape Banner */}
+      {(profileScrapeStatus || (showSuggestions && suggestedTitles.length > 0)) && (
+        <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md px-3 sm:px-5 lg:px-6 py-2.5 animate-in slide-in-from-top-2 duration-300 font-mono text-xs ">
+          <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[11px] font-black uppercase tracking-wider industry-accent-badge -xs">
+                <span className="w-2 h-2 rounded-sm animate-pulse" style={{ backgroundColor: currentIndustryTheme.accent }} />
+                {currentIndustryTheme.name}
+              </span>
+              <span className="text-slate-300 font-bold flex items-center gap-2">
+                {profileScrapeMsg || `Profile Scraper Active — Theme aligned to ${currentIndustryTheme.name}`}
+              </span>
+            </div>
 
- {suggestedTitles.length > 0 && showSuggestions && (
- <div className="flex items-center gap-2 flex-wrap text-[11px]">
- <span className="text-slate-400 font-bold uppercase shrink-0">SUGGESTED TITLES:</span>
- {suggestedTitles.slice(0, 4).map(title => (
- <button
- key={title}
- onClick={() => handleAddSuggestedTitle(title)}
- className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-slate-950/80 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-slate-300 hover:text-white transition-all cursor-pointer font-bold group"
- title={`Add "${title}" to target titles`}
- >
- <span>+ {title}</span>
- </button>
- ))}
- <button
- onClick={() => setShowSuggestions(false)}
- className="text-slate-500 hover:text-slate-300 p-1 rounded-sm hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
- title="Dismiss title suggestions"
- >
- <XIcon size={13} />
- </button>
- </div>
- )}
- </div>
- </div>
- )}
+            {suggestedTitles.length > 0 && showSuggestions && (
+              <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                <span className="text-slate-400 font-bold uppercase shrink-0">SUGGESTED TITLES:</span>
+                {suggestedTitles.slice(0, 4).map(title => (
+                  <button
+                    key={title}
+                    onClick={() => handleAddSuggestedTitle(title)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-slate-950/80 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-slate-300 hover:text-white transition-all cursor-pointer font-bold group"
+                    title={`Add "${title}" to target titles`}
+                  >
+                    <span>+ {title}</span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => setShowSuggestions(false)}
+                  className="text-slate-500 hover:text-slate-300 p-1 rounded-sm hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+                  title="Dismiss title suggestions"
+                >
+                  <XIcon size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
- {/* Main Workspace Dashboard Container */}
+      {/* Main Workspace Dashboard Container */}
+      <main className="w-full px-2 sm:px-4 lg:px-6 py-2.5 pb-24 md:pb-6 space-y-3.5 flex-1">
+        {/* Proactive Agent Copilot Intelligence Bar */}
+        <CopilotBar
+          jobs={jobs}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenGenerator={(j) => setSelectedForGenerator(j)}
+          onNavigateView={(view) => setActiveSection(view)}
+        />
 
- <main className="w-full px-2 sm:px-4 lg:px-6 py-2.5 pb-24 md:pb-6 space-y-3.5 flex-1">
- {/* Proactive Agent Copilot Intelligence Bar */}
- <CopilotBar 
- jobs={jobs} 
- onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- onNavigateView={(view) => setActiveSection(view)}
- />
+        {/* Profile Completeness Hub & Calibration CTA */}
+        {profileCompleteness && profileCompleteness.score < 100 && !isCompletenessDismissed && (
+          <div className="bg-slate-900/95 border border-amber-500/30 rounded-sm p-3.5 text-xs space-y-2.5 relative animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-sm bg-amber-500/20 text-amber-400 border border-amber-400/30 shrink-0">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 font-mono font-bold text-white uppercase text-xs">
+                    <span>PROFILE COMPLETENESS: {profileCompleteness.score}%</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-sm bg-amber-950 text-amber-300 border border-amber-500/30">
+                      +{100 - profileCompleteness.score}% MATCH BOOST AVAILABLE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 font-sans mt-0.5">
+                    {profileCompleteness.improvements[0]?.description || 'Complete remaining profile details to calibrate discovery and unlock precision match scoring.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProfile(activeProfile);
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-black font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <span>{profileCompleteness.improvements[0]?.actionLabel || 'Improve Profile'}</span>
+                  <ArrowRight size={12} className="stroke-[3]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCompletenessDismissed(true)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-sm hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Dismiss for this session"
+                >
+                  <XIcon size={14} />
+                </button>
+              </div>
+            </div>
 
- {/* Profile Completeness Hub & Calibration CTA */}
- {profileCompleteness && profileCompleteness.score < 100 && !isCompletenessDismissed && (
- <div className="bg-slate-900/95 border border-amber-500/30 rounded-sm p-3.5 text-xs space-y-2.5 relative animate-in fade-in duration-200">
- <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
- <div className="flex items-center gap-3">
- <div className="p-2 rounded-sm bg-amber-500/20 text-amber-400 border border-amber-400/30 shrink-0">
- <Sparkles size={16} />
- </div>
- <div>
- <div className="flex items-center gap-2 font-mono font-bold text-white uppercase text-xs">
- <span>PROFILE COMPLETENESS: {profileCompleteness.score}%</span>
- <span className="text-[10px] px-2 py-0.5 rounded-sm bg-amber-950 text-amber-300 border border-amber-500/30">
- +{100 - profileCompleteness.score}% MATCH BOOST AVAILABLE
- </span>
- </div>
- <p className="text-[11px] text-slate-300 font-sans mt-0.5">
- {profileCompleteness.improvements[0]?.description || 'Complete remaining profile details to calibrate discovery and unlock precision match scoring.'}
- </p>
- </div>
- </div>
- <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
- <button
- type="button"
- onClick={() => {
- setEditingProfile(activeProfile);
- setIsProfileModalOpen(true);
- }}
- className="px-3 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-black font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
- >
- <span>{profileCompleteness.improvements[0]?.actionLabel || 'Improve Profile'}</span>
- <ArrowRight size={12} className="stroke-[3]" />
- </button>
- <button
- type="button"
- onClick={() => setIsCompletenessDismissed(true)}
- className="p-1.5 text-slate-400 hover:text-white rounded-sm hover:bg-slate-800 transition-colors cursor-pointer"
- title="Dismiss for this session"
- >
- <XIcon size={14} />
- </button>
- </div>
- </div>
+            {/* Progress Track */}
+            <div className="w-full h-1.5 bg-slate-800 rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-sm transition-all duration-500"
+                style={{ width: `${profileCompleteness.score}%` }}
+              />
+            </div>
+          </div>
+        )}
 
- {/* Progress Track */}
- <div className="w-full h-1.5 bg-slate-800 rounded-sm overflow-hidden">
- <div
- className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-sm transition-all duration-500"
- style={{ width: `${profileCompleteness.score}%` }}
- />
- </div>
- </div>
- )}
+        {/* Dynamic View Component */}
+        {loading ? (
+          <DashboardGridSkeleton />
+        ) : (
+          <>
+            {activeSection === 'seeker' && (
+              <SafeErrorBoundary sectionName="Job Feed & Discoveries">
+                <PrimeTargetSpotlight
+                  jobs={jobs}
+                  profile={activeProfile}
+                  applications={applicationsList}
+                  onOpenJobModal={(job) => setSelectedJob(job)}
+                  onOpenGenerator={(job) => setSelectedForGenerator(job)}
+                  onJobStatusUpdate={(jobId, status, updatedJob) => updateJobStatus(jobId, status, updatedJob)}
+                />
+                <JobSeeker
+                  jobs={jobs}
+                  activeProfile={activeProfile}
+                  scrapeProgress={scrapeProgress}
+                  onSelectJob={(job) => setSelectedJob(job)}
+                  onRejectJob={rejectJob}
+                  onUnrejectJob={unrejectJob}
+                  baseLocation={baseLocation}
+                  onDispatchAsyncApplication={handleDispatchAsyncApplication}
+                  asyncGeneratingIds={asyncGeneratingIds}
+                  onOpenBatchApply={() => setIsBatchApplyOpen(true)}
+                  onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
+                  onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
+                  onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
+                  onSaveCustomDocs={(jobId, docData) => {
+                    updateJobStatus(jobId, 'Package Prepared / To Submit', {
+                      hasCustomDocs: true,
+                      resumeText: docData.resumeText,
+                      coverLetterText: docData.coverLetterText,
+                      docsModel: docData.model,
+                      docsGeneratedAt: docData.generatedAt || new Date().toISOString(),
+                    });
+                  }}
+                />
+              </SafeErrorBoundary>
+            )}
 
- {/* Dynamic View Component */}
- {loading ? (
- <DashboardGridSkeleton />
- ) : (
- <>
- {activeSection === 'seeker' && (
- <SafeErrorBoundary sectionName="Job Feed & Discoveries">
- <PrimeTargetSpotlight
- jobs={jobs}
- profile={activeProfile}
- applications={applicationsList}
- onOpenJobModal={(job) => setSelectedJob(job)}
- onOpenGenerator={(job) => setSelectedForGenerator(job)}
- onJobStatusUpdate={(jobId, status, updatedJob) => updateJobStatus(jobId, status, updatedJob)}
- />
- <JobSeeker 
- jobs={jobs} 
- activeProfile={activeProfile}
- scrapeProgress={scrapeProgress}
- onSelectJob={(job) => setSelectedJob(job)} 
- onRejectJob={rejectJob}
- onUnrejectJob={unrejectJob}
- baseLocation={baseLocation} 
- onDispatchAsyncApplication={handleDispatchAsyncApplication}
- asyncGeneratingIds={asyncGeneratingIds}
- onOpenBatchApply={() => setIsBatchApplyOpen(true)}
- onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
- onTriggerScrape={() => triggerDiscoveryScrape(activeProfile)}
- onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
- onSaveCustomDocs={(jobId, docData) => {
- updateJobStatus(jobId, 'Package Prepared / To Submit', {
- hasCustomDocs: true,
- resumeText: docData.resumeText,
- coverLetterText: docData.coverLetterText,
- docsModel: docData.model,
- docsGeneratedAt: docData.generatedAt || new Date().toISOString()
- });
- }}
- />
- </SafeErrorBoundary>
- )}
+            {activeSection === 'highlights' && (
+              <SafeErrorBoundary sectionName="Action Highlights">
+                <ActionHighlights
+                  jobs={jobs}
+                  onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                  onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+                  onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
+                  onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
+                  onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
+                  onSelectJob={(j) => setSelectedJob(j)}
+                  onJobStatusUpdate={(id, status, extra) => updateJobStatus(id, status, extra)}
+                />
+              </SafeErrorBoundary>
+            )}
 
- {activeSection === 'highlights' && (
- <SafeErrorBoundary sectionName="Action Highlights">
- <ActionHighlights 
- jobs={jobs}
- onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
- onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
- onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
- onOpenOfferHub={(j) => setSelectedForOfferHub(j)}
- onOpenExecutiveDossier={(j) => setSelectedForDossier(j)}
- onSelectJob={(j) => setSelectedJob(j)}
- onJobStatusUpdate={(id, status, extra) => updateJobStatus(id, status, extra)}
- />
- </SafeErrorBoundary>
- )}
+            {activeSection === 'kanban' && (
+              <SafeErrorBoundary sectionName="Application Pipeline Kanban">
+                <ApplicationPipeline
+                  onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                  onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)}
+                  onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
+                  jobs={jobs}
+                  loading={loading}
+                  onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+                  onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                />
+              </SafeErrorBoundary>
+            )}
 
- {activeSection === 'kanban' && (
- <SafeErrorBoundary sectionName="Application Pipeline Kanban">
- <ApplicationPipeline
- onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
- onOpenInterviewPrep={(j) => setSelectedForInterviewPrep(j)} 
- onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
- jobs={jobs} 
- loading={loading}
- onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- />
- </SafeErrorBoundary>
- )}
+            {activeSection === 'remote' && (
+              <SafeErrorBoundary sectionName="Remote Roles Command Hub">
+                <Suspense fallback={<DashboardGridSkeleton count={6} />}>
+                  <RemoteRolesSection
+                    jobs={jobs}
+                    onSelectJob={(j) => setSelectedJob(j)}
+                    onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                    onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
+                    onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
+                  />
+                </Suspense>
+              </SafeErrorBoundary>
+            )}
 
- {activeSection === 'remote' && (
- <SafeErrorBoundary sectionName="Remote Roles Command Hub">
- <Suspense fallback={<DashboardGridSkeleton count={6} />}>
- <RemoteRolesSection
- jobs={jobs}
- onSelectJob={(j) => setSelectedJob(j)}
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- onOpenMockInterview={(j) => setSelectedForMockInterview(j)}
- onOpenCheatSheet={(j) => setSelectedForCheatSheet(j)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
+            {activeSection === 'market' && (
+              <SafeErrorBoundary sectionName="Market Intelligence">
+                <MarketIntelligence jobs={jobs} />
+              </SafeErrorBoundary>
+            )}
 
- {activeSection === 'market' && (
- <SafeErrorBoundary sectionName="Market Intelligence">
- <MarketIntelligence jobs={jobs} />
- </SafeErrorBoundary>
- )}
+            {activeSection === 'analytics' && (
+              <SafeErrorBoundary sectionName="Analytics & Telemetry">
+                <AnalyticsDashboard
+                  jobs={jobs}
+                  onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+                  onSelectJob={(j) => setSelectedJob(j)}
+                  onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                />
+              </SafeErrorBoundary>
+            )}
 
- {activeSection === 'analytics' && (
- <SafeErrorBoundary sectionName="Analytics & Telemetry">
- <AnalyticsDashboard 
- jobs={jobs} 
- onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
- onSelectJob={(j) => setSelectedJob(j)}
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- />
- </SafeErrorBoundary>
- )}
-
- {activeSection === 'operations' && (
- <SafeErrorBoundary sectionName="Career Operations">
- <CareerOperations jobs={jobs} />
- </SafeErrorBoundary>
- )}
- </>
- )}
-  </main>
+            {activeSection === 'operations' && (
+              <SafeErrorBoundary sectionName="Career Operations">
+                <CareerOperations jobs={jobs} />
+              </SafeErrorBoundary>
+            )}
+          </>
+        )}
+      </main>
 
       {/* Mobile Slide-Out Drawer */}
       {isMobileDrawerOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" 
+          <div
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
             onClick={() => setIsMobileDrawerOpen(false)}
             aria-hidden="true"
           />
@@ -1973,635 +1426,62 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
       {/* Floating Background Application Notifications */}
       {backgroundNotifications.length > 0 && (
         <div className="fixed bottom-20 md:bottom-10 right-4 sm:right-6 z-50 space-y-2 max-w-sm w-full font-mono px-3 sm:px-0">
- {backgroundNotifications.map(n => (
- <div key={n.id} className="bg-slate-900 border-2 border-emerald-500 text-white p-3.5 rounded-sm flex items-start gap-3 animate-in slide-in-from-bottom duration-300">
- <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-sm shrink-0">
- <CheckCircle2 size={18} />
- </div>
- <div className="min-w-0 flex-1">
- <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">PACKAGE READY & DRIVE SYNCED</div>
- <div className="text-xs font-bold text-white truncate">{n.company}</div>
- <div className="text-[11px] text-slate-300 truncate">{n.title}</div>
- </div>
- </div>
- ))}
- </div>
- )}
+          {backgroundNotifications.map(n => (
+            <div key={n.id} className="bg-slate-900 border-2 border-emerald-500 text-white p-3.5 rounded-sm flex items-start gap-3 animate-in slide-in-from-bottom duration-300">
+              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-sm shrink-0">
+                <CheckCircle2 size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">PACKAGE READY & DRIVE SYNCED</div>
+                <div className="text-xs font-bold text-white truncate">{n.company}</div>
+                <div className="text-[11px] text-slate-300 truncate">{n.title}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
- {/* Job Details Modal */}
- {liveSelectedJob && (
- <SafeErrorBoundary sectionName="Job Detail Modal" onClose={() => setSelectedJob(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <JobModal
- onOpenMockInterview={(j) => { setSelectedJob(null); setSelectedForMockInterview(j); }}
- onOpenInterviewPrep={(j) => { setSelectedJob(null); setSelectedForInterviewPrep(j); }} 
- onOpenOutreach={(j) => { setSelectedJob(null); setSelectedForOutreach(j); }}
- onOpenOfferHub={(j) => { setSelectedForOfferHub(j); }}
- onOpenExecutiveDossier={(j) => { setSelectedForDossier(j); }}
- onOpenInfluenceHub={(j) => { setSelectedForInfluenceHub(j); }}
- onOpenAtsDiagnostic={(j) => { setSelectedForAtsDiagnostic(j); }}
- onOpenLinkedInInbound={(j) => { setSelectedForLinkedInInbound(j); }}
- onOpenCoverLetterPolarizer={(j) => { setSelectedForCoverLetterPolarizer(j); }}
- onOpenScreeningSolver={(j) => { setSelectedForScreeningSolver(j); }}
- onOpenCareerCompass={() => { setSelectedJob(null); setIsCareerModalOpen(true); }}
- onOpenKscGenerator={(j) => { setSelectedForKscGenerator(j); }}
- onOpenSeekPass={(j) => { setSelectedForSeekPass(j); }}
- onOpenCheatSheet={(j) => { setSelectedForCheatSheet(j); }}
+      {/* Modal Dialogs Container */}
+      <DashboardModals
+        modalState={modalState}
+        jobs={jobs}
+        activeProfile={activeProfile}
+        setActiveProfile={setActiveProfile}
+        editingProfile={editingProfile}
+        setEditingProfile={setEditingProfile}
+        updateJobStatus={updateJobStatus}
+        rejectJob={rejectJob}
+        unrejectJob={unrejectJob}
+        refetch={refetch}
+        addToast={addToast}
+        announce={announce}
+        activeScoringWeights={activeScoringWeights}
+        handleApplyCustomWeights={handleApplyCustomWeights}
+        setActiveSection={setActiveSection}
+        triggerDiscoveryScrape={triggerDiscoveryScrape}
+        setBaseLocation={setBaseLocation}
+        currentUser={currentUser}
+        setAuthUser={setAuthUser}
+      />
 
- onOpenRecruiterCrm={(j) => { setSelectedForRecruiterCrm(j); setIsRecruiterCrmOpen(true); }}
- onOpenFunnelIntel={() => { setSelectedJob(null); setIsFunnelModalOpen(true); }}
- job={liveSelectedJob} 
- onClose={() => setSelectedJob(null)} 
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- onOpenAutoApply={(j) => setSelectedAutoApplyJob(j)}
- onJobStatusUpdate={(target, status, extra) => {
- if (typeof target === 'object' && target !== null) {
- const updated = target;
- updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
- setSelectedJob(updated);
- addToast(`Status updated: ${updated.status || 'Updated'}`, 'success');
- announce(`Job status updated to ${updated.status || 'Updated'}`);
- } else {
- const jobId = target;
- const updated = updateJobStatus(jobId, status, extra);
- if (updated) setSelectedJob(updated);
- addToast(`Status updated: ${status || 'Updated'}`, 'success');
- announce(`Job status updated to ${status || 'Updated'}`);
- }
- }}
- onRejectJob={(id) => {
- rejectJob(id);
- setSelectedJob(null);
- addToast('Job hidden from board', 'info');
- }}
- onUnrejectJob={(id) => {
- unrejectJob(id);
- setSelectedJob(prev => prev ? { ...prev, isRejected: false, status: 'Discovered' } : null);
- addToast('Job restored to board', 'success');
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
+      {/* Fixed Bottom Status Bar */}
+      <footer className="fixed bottom-0 left-0 right-0 h-7 bg-slate-900 border-t border-slate-800 text-slate-400 font-mono text-[11px] font-bold px-4 flex items-center justify-between z-50 select-none ">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 text-emerald-400">
+            <span>⚡ V3.0 AUTONOMOUS ENGINE</span>
+          </div>
+          <div className="flex items-center gap-1 text-slate-500 hidden sm:flex">
+            <span>Active Feed: {jobs.length} jobs</span>
+          </div>
+        </div>
 
- {/* 1-Click Auto-Apply Execution Modal */}
- {selectedAutoApplyJob && (
- <SafeErrorBoundary sectionName="Auto-Apply Engine" onClose={() => setSelectedAutoApplyJob(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <AutoApplyModal
- job={selectedAutoApplyJob}
- onClose={() => setSelectedAutoApplyJob(null)}
- onJobStatusUpdate={(updated) => {
- updateJobStatus(updated.id || `${updated.company}_${updated.title}`, updated.status, updated);
- setSelectedAutoApplyJob(updated);
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Generator Modal */}
- {liveSelectedForGenerator && (
- <SafeErrorBoundary sectionName="Document Generator" onClose={() => setSelectedForGenerator(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <GeneratorModal 
- job={liveSelectedForGenerator} 
- onClose={() => setSelectedForGenerator(null)} 
- onUpdateStatus={(jobId, status, extraData) => {
- updateJobStatus(jobId, status, extraData);
- }}
- onSaveCustomDocs={(jobId, docData) => {
- updateJobStatus(jobId, 'Package Prepared / To Submit', {
- hasCustomDocs: true,
- resumeText: docData.resumeText,
- coverLetterText: docData.coverLetterText,
- docsModel: docData.model,
- docsGeneratedAt: docData.generatedAt || new Date().toISOString()
- });
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Interview Prep Super Intelligence Modal */}
- 
- {/* Mock Interview Modal */}
- {liveSelectedForMockInterview && (
- <SafeErrorBoundary sectionName="Mock Interview" onClose={() => setSelectedForMockInterview(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <MockInterviewModal 
- job={liveSelectedForMockInterview} 
- onClose={() => setSelectedForMockInterview(null)} 
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {liveSelectedForInterviewPrep && (
- <SafeErrorBoundary sectionName="Interview Preparation" onClose={() => setSelectedForInterviewPrep(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <InterviewPrepModal 
- job={liveSelectedForInterviewPrep} 
- onClose={() => setSelectedForInterviewPrep(null)} 
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Interview Master Cheat Sheet Modal */}
- {liveSelectedForCheatSheet && (
- <SafeErrorBoundary sectionName="Interview Master Cheat Sheet" onClose={() => setSelectedForCheatSheet(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <InterviewCheatSheetModal
- isOpen={Boolean(liveSelectedForCheatSheet)}
- job={liveSelectedForCheatSheet}
- userProfile={activeProfile}
- onClose={() => setSelectedForCheatSheet(null)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Outreach & Follow-Up Modal */}
- {liveSelectedForOutreach && (
- <SafeErrorBoundary sectionName="Recruiter Outreach & Follow-up" onClose={() => setSelectedForOutreach(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <FollowUpEmailModal 
- job={liveSelectedForOutreach} 
- onClose={() => setSelectedForOutreach(null)} 
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Offer Action Hub Modal */}
- {liveSelectedForOfferHub && (
- <SafeErrorBoundary sectionName="Offer Action Hub" onClose={() => setSelectedForOfferHub(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <OfferActionHubModal 
- job={liveSelectedForOfferHub} 
- isOpen={Boolean(liveSelectedForOfferHub)}
- onClose={() => setSelectedForOfferHub(null)} 
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Executive Briefing Dossier Modal */}
- {liveSelectedForDossier && (
- <SafeErrorBoundary sectionName="Executive Briefing Dossier" onClose={() => setSelectedForDossier(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <ExecutiveDossierModal
- job={liveSelectedForDossier}
- profile={activeProfile}
- isOpen={Boolean(liveSelectedForDossier)}
- onClose={() => setSelectedForDossier(null)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 19: Post-Interview Tactical Influence & Debrief Hub Modal */}
- {liveSelectedForInfluenceHub && (
- <SafeErrorBoundary sectionName="Post-Interview Influence Hub" onClose={() => setSelectedForInfluenceHub(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <InterviewInfluenceModal
- job={liveSelectedForInfluenceHub}
- userProfile={activeProfile}
- isOpen={Boolean(liveSelectedForInfluenceHub)}
- onClose={() => setSelectedForInfluenceHub(null)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 20: ATS Sentinel & Parser Diagnostic Hub Modal */}
- {liveSelectedForAtsDiagnostic && (
- <SafeErrorBoundary sectionName="ATS Sentinel Hub" onClose={() => setSelectedForAtsDiagnostic(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <AtsDiagnosticModal
- job={liveSelectedForAtsDiagnostic}
- profile={activeProfile}
- isOpen={Boolean(liveSelectedForAtsDiagnostic)}
- onClose={() => setSelectedForAtsDiagnostic(null)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 21: LinkedIn Inbound Sourcing Radar & Boolean Indexing Modal */}
- {liveSelectedForLinkedInInbound && (
- <SafeErrorBoundary sectionName="LinkedIn Inbound Hub" onClose={() => setSelectedForLinkedInInbound(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <LinkedInInboundModal
- job={liveSelectedForLinkedInInbound}
- isOpen={Boolean(liveSelectedForLinkedInInbound)}
- onClose={() => setSelectedForLinkedInInbound(null)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 22: Cover Letter Swappability Analyzer & Anti-Template Polarizer Modal */}
- {liveSelectedForCoverLetterPolarizer && (
- <SafeErrorBoundary sectionName="Cover Letter Polarizer" onClose={() => setSelectedForCoverLetterPolarizer(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <CoverLetterPolarizerModal
- job={liveSelectedForCoverLetterPolarizer}
- onClose={() => setSelectedForCoverLetterPolarizer(null)}
- onSaveCoverLetter={(jobId, text) => {
- updateJobStatus(jobId, liveSelectedForCoverLetterPolarizer.status || 'Applied', {
- coverLetterText: text,
- hasCustomDocs: true,
- });
- addToast('Polarized cover letter saved to job card', 'success');
- }}
- userProfile={activeProfile}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 23: Application Friction & Screening Questionnaire Solver Modal */}
- {liveSelectedForScreeningSolver && (
- <SafeErrorBoundary sectionName="Screening Questionnaire Solver" onClose={() => setSelectedForScreeningSolver(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <ScreeningSolverModal
- job={liveSelectedForScreeningSolver}
- onClose={() => setSelectedForScreeningSolver(null)}
- userProfile={activeProfile}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 24: Key Selection Criteria (KSC) Generator Modal */}
- {liveSelectedForKscGenerator && (
- <SafeErrorBoundary sectionName="Key Selection Criteria Generator" onClose={() => setSelectedForKscGenerator(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <KscGeneratorModal
- job={liveSelectedForKscGenerator}
- onClose={() => setSelectedForKscGenerator(null)}
- userProfile={activeProfile}
- onSaveKscToJob={(jobId, text) => {
- updateJobStatus(jobId, liveSelectedForKscGenerator.status || 'Applied', {
- kscStatementText: text,
- hasCustomDocs: true,
- });
- addToast('KSC capability statement saved to job dossier', 'success');
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Phase 25: SEEK Pass & Verified Credentials Pre-Qualification Modal */}
- {liveSelectedForSeekPass && (
- <SafeErrorBoundary sectionName="SEEK Pass Pre-Qualification Auditor" onClose={() => setSelectedForSeekPass(null)}>
- <Suspense fallback={<ModalSkeleton />}>
- <SeekPassModal
- job={liveSelectedForSeekPass}
- onClose={() => setSelectedForSeekPass(null)}
- userProfile={activeProfile}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Recruiter & Talent CRM Hub Modal */}
- {isRecruiterCrmOpen && (
- <SafeErrorBoundary sectionName="Recruiter CRM Hub" onClose={() => { setIsRecruiterCrmOpen(false); setSelectedForRecruiterCrm(null); }}>
- <Suspense fallback={<ModalSkeleton />}>
- <RecruiterRelationshipModal
- isOpen={isRecruiterCrmOpen}
- onClose={() => {
- setIsRecruiterCrmOpen(false);
- setSelectedForRecruiterCrm(null);
- }}
- activeJob={selectedForRecruiterCrm}
- onOpenFollowUpEmail={(recruiterInfo) => {
- setIsRecruiterCrmOpen(false);
- setSelectedForOutreach({
- ...(selectedForRecruiterCrm || {}),
- contactEmail: recruiterInfo.recipientEmail,
- company: recruiterInfo.company || selectedForRecruiterCrm?.company || '',
- });
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Funnel & Pipeline Velocity Intelligence Modal */}
- {isFunnelModalOpen && (
- <SafeErrorBoundary sectionName="Talent Funnel Intelligence" onClose={() => setIsFunnelModalOpen(false)}>
- <Suspense fallback={<ModalSkeleton />}>
- <FunnelIntelligenceModal
- isOpen={isFunnelModalOpen}
- onClose={() => setIsFunnelModalOpen(false)}
- jobs={jobs}
- currentSector={activeProfile?.industry || 'all'}
- onSelectJob={(j) => {
- setIsFunnelModalOpen(false);
- setSelectedJob(j);
- }}
- onOpenRecruiterCrm={() => {
- setIsFunnelModalOpen(false);
- setIsRecruiterCrmOpen(true);
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Strategic Career Roadmap & Trajectory Compass Modal */}
- {isCareerModalOpen && (
- <SafeErrorBoundary sectionName="Career Vector Matrix" onClose={() => setIsCareerModalOpen(false)}>
- <Suspense fallback={<ModalSkeleton />}>
- <CareerMatrixModal
- isOpen={isCareerModalOpen}
- onClose={() => setIsCareerModalOpen(false)}
- profile={activeProfile}
- currentSector={activeProfile?.industry || 'all'}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Custom Job / External Link Generator Modal */}
- {isCustomJobModalOpen && (
- <Suspense fallback={<ModalSkeleton />}>
- <CustomJobModal
- isOpen={isCustomJobModalOpen}
- onClose={() => setIsCustomJobModalOpen(false)}
- onJobCreated={(newJob) => {
- refetch();
- }}
- onOpenGenerator={(j) => setSelectedForGenerator(j)}
- />
- </Suspense>
- )}
-
- {/* Omni-Command Palette Modal */}
- {isCommandPaletteOpen && (
- <SafeErrorBoundary sectionName="Command Palette">
- <Suspense fallback={<ModalSkeleton />}>
- <CommandPalette 
- isOpen={isCommandPaletteOpen}
- onClose={() => setIsCommandPaletteOpen(false)}
- jobs={jobs}
- onSelectJob={(j) => { setSelectedJob(j); setIsCommandPaletteOpen(false); }}
- onNavigateView={(view) => { setActiveSection(view); setIsCommandPaletteOpen(false); }}
- onOpenSettings={() => setIsSettingsOpen(true)}
- />
- onOpenWorkforceAustralia={() => { setIsWorkforceModalOpen(true); setIsCommandPaletteOpen(false); }}
- showWorkforceAustralia={isWorkforceEnabled}
-
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Batch Application Dispatcher Modal */}
- {isBatchApplyOpen && (
- <SafeErrorBoundary sectionName="Batch Apply Dispatcher">
- <Suspense fallback={<ModalSkeleton />}>
- <BatchApplyModal 
- jobs={jobs}
- isOpen={isBatchApplyOpen}
- onClose={() => setIsBatchApplyOpen(false)}
- onJobStatusUpdate={(updatedJob) => updateJobStatus(updatedJob.id || `${updatedJob.company}_${updatedJob.title}`, updatedJob.status, updatedJob)}
- onNavigateToTracker={() => setActiveSection('kanban')}
- onComplete={(results) => {
- results.forEach(res => {
- if (res.success) {
- updateJobStatus(res.job.id || `${res.job.company}_${res.job.title}`, 'Applied / Confirmation Received', res.result);
- }
- });
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Candidate Personalization & Resume Upload Modal */}
- {isProfileModalOpen && (
- <SafeErrorBoundary sectionName="Profile Manager">
- <Suspense fallback={<ModalSkeleton />}>
- <ProfileModal 
- isOpen={isProfileModalOpen}
- profile={editingProfile}
- onClose={() => {
- setIsProfileModalOpen(false);
- setEditingProfile(null);
- }}
- onProfileSaved={(savedProfile) => {
- const profileToUse = Array.isArray(savedProfile) ? savedProfile[0] : (savedProfile || getActiveProfile());
- if (profileToUse) {
- setActiveProfile(profileToUse);
- if (profileToUse.suburb || profileToUse.location) {
- setBaseLocation(profileToUse.suburb || profileToUse.location);
- }
- // Full onboarding pipeline: theme, personalised backend search
- // queries, seeded ranking preferences, and a default saved search —
- // then trigger discovery once the backend has the new queries.
- runProfileOnboardingPipeline(profileToUse).finally(() => {
- triggerDiscoveryScrape(profileToUse);
- });
- refetch();
- }
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Google Authentication & Client Config Modal */}
- {isAuthModalOpen && (
- <SafeErrorBoundary sectionName="Settings & Health Sync">
- <Suspense fallback={<ModalSkeleton />}>
- <AuthModal 
- isOpen={isAuthModalOpen}
- onClose={() => setIsAuthModalOpen(false)}
- activeProfile={activeProfile}
- jobs={jobs}
- onAuthChange={(user) => {
- setAuthUser(user);
- if (user) {
- setIsGoogleIntegrationOpen(true);
- }
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Google Sheets Tracker & Gmail Scanner Integration Modal */}
- {isGoogleIntegrationOpen && (
- <SafeErrorBoundary sectionName="Google Integration Modal">
- <Suspense fallback={<ModalSkeleton />}>
- <GoogleIntegrationModal 
- isOpen={isGoogleIntegrationOpen}
- onClose={() => setIsGoogleIntegrationOpen(false)}
- jobs={jobs}
- activeProfile={activeProfile}
- onImportGmailJobs={(importedJobs) => {
- importedJobs.forEach(j => {
- updateJobStatus(j.id, j.status, j);
- if (currentUser?.accessToken && currentUser?.spreadsheetId) {
- upsertApplicationInSheet(currentUser.accessToken, currentUser.spreadsheetId, j, activeProfile);
- }
- });
- }}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
- {/* Workforce Australia PBAS Reporting Hub Modal */}
- {isWorkforceModalOpen && (
- <SafeErrorBoundary sectionName="Workforce Australia Modal">
- <Suspense fallback={<ModalSkeleton />}>
- <WorkforceAustraliaModal
- isOpen={isWorkforceModalOpen}
- onClose={() => setIsWorkforceModalOpen(false)}
- jobs={jobs}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
-
- {/* Dashboard Settings & LLM Configuration Modal */}
- {isSettingsOpen && (
- <SafeErrorBoundary sectionName="Settings Modal">
- <Suspense fallback={<ModalSkeleton />}>
- <SettingsModal
- isOpen={isSettingsOpen}
- onClose={() => setIsSettingsOpen(false)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Market Skill Gap Intelligence Modal */}
- {isSkillGapModalOpen && (
- <SafeErrorBoundary sectionName="Skill Gap Modal">
- <Suspense fallback={<ModalSkeleton />}>
- <SkillGapModal
- jobs={jobs}
- userProfile={activeProfile}
- onClose={() => setIsSkillGapModalOpen(false)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
- {/* Comparative Opportunity Matrix Modal */}
- {isCompareModalOpen && (
- <SafeErrorBoundary sectionName="Job Compare Modal">
- <Suspense fallback={<ModalSkeleton />}>
- <JobCompareModal
- jobs={compareJobs}
- onClose={() => setIsCompareModalOpen(false)}
- onSelectForApply={(j) => setSelectedForGenerator(j)}
- />
- </Suspense>
- </SafeErrorBoundary>
- )}
-
-  {/* Phase 5.3: Real-Time Visual ATS PDF Studio Modal */}
-  {isPdfStudioOpen && (
-  <SafeErrorBoundary sectionName="Visual ATS PDF Studio" onClose={() => setIsPdfStudioOpen(false)}>
-  <Suspense fallback={<ModalSkeleton />}>
-  <PdfPreviewModal
-  isOpen={isPdfStudioOpen}
-  onClose={() => setIsPdfStudioOpen(false)}
-  initialProfile={activeProfile}
-  />
-  </Suspense>
-  </SafeErrorBoundary>
-  )}
-
-  {/* Phase 5.4: Interactive Scoring Matrix Tuner Modal */}
-  {isScoringTunerOpen && (
-  <SafeErrorBoundary sectionName="Scoring Matrix Tuner" onClose={() => setIsScoringTunerOpen(false)}>
-  <Suspense fallback={<ModalSkeleton />}>
-  <ScoringTunerModal
-  isOpen={isScoringTunerOpen}
-  onClose={() => setIsScoringTunerOpen(false)}
-  jobs={jobs}
-  currentWeights={activeScoringWeights}
-  onApply={handleApplyCustomWeights}
-  />
-  </Suspense>
-  </SafeErrorBoundary>
-  )}
-
-  {/* Phase 6.1: Voice Mock Interview Studio Modal */}
-  {isVoiceInterviewOpen && (
-  <SafeErrorBoundary sectionName="Voice Mock Interview Studio" onClose={() => setIsVoiceInterviewOpen(false)}>
-  <Suspense fallback={<ModalSkeleton />}>
-  <VoiceMockInterviewModal
-  isOpen={isVoiceInterviewOpen}
-  onClose={() => setIsVoiceInterviewOpen(false)}
-  />
-  </Suspense>
-  </SafeErrorBoundary>
-  )}
-
-  {/* Scraper Health & Autonomous Self-Healing Modal */}
-  {isSourceSelfHealOpen && (
-  <SafeErrorBoundary sectionName="Scraper Health & Self-Healing" onClose={() => setIsSourceSelfHealOpen(false)}>
-  <Suspense fallback={<ModalSkeleton />}>
-  <SourceSelfHealModal
-  isOpen={isSourceSelfHealOpen}
-  initialSource={selfHealSource}
-  onClose={() => {
-    setIsSourceSelfHealOpen(false);
-    setSelfHealSource(null);
-  }}
-  />
-  </Suspense>
-  </SafeErrorBoundary>
-  )}
-
-  {/* Platform Built-In AI & Subscription Pricing Modal */}
-  {isPricingModalOpen && (
-    <SafeErrorBoundary sectionName="Subscription and Plans" onClose={() => setIsPricingModalOpen(false)}>
-      <Suspense fallback={<ModalSkeleton />}>
-        <PricingModal
-          isOpen={isPricingModalOpen}
-          onClose={() => setIsPricingModalOpen(false)}
-          onOpenKeyModal={() => {
-            setIsPricingModalOpen(false);
-            setIsSettingsOpen(true);
-          }}
-          reason={pricingModalReason}
-        />
-      </Suspense>
-    </SafeErrorBoundary>
-  )}
-
-
- {/* Fixed Bottom Status Bar */}
- <footer className="fixed bottom-0 left-0 right-0 h-7 bg-slate-900 border-t border-slate-800 text-slate-400 font-mono text-[11px] font-bold px-4 flex items-center justify-between z-50 select-none ">
- <div className="flex items-center gap-4">
- <div className="flex items-center gap-1 text-emerald-400">
- <span>⚡ V3.0 AUTONOMOUS ENGINE</span>
- </div>
- <div className="flex items-center gap-1 text-slate-500 hidden sm:flex">
- <span>Active Feed: {jobs.length} jobs</span>
- </div>
- </div>
-
-
- <div className="flex items-center gap-3">
- <span className="text-slate-500">React 19 / Vite 6</span>
- <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-black text-[10px]">
- {baseLocation.split(' ')[0]}
- </span>
- </div>
- </footer>
- </div>
- );
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500">React 19 / Vite 6</span>
+          <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-black text-[10px]">
+            {baseLocation.split(' ')[0]}
+          </span>
+        </div>
+      </footer>
+    </div>
+  );
 };

@@ -1,29 +1,65 @@
 /**
  * generationService.js
- * Handles AI-powered resume + cover letter generation, Interview Prep,
- * Market Intelligence, and Autonomous Agent Heuristics.
+ * Facade and core coordinator for AI-powered document generation, interview prep,
+ * market analytics, and autonomous application submission.
+ *
+ * Modular sub-domains:
+ * - ./prompts/applicationDocsPrompt
+ * - ./prompts/interviewGuidePrompt
+ * - ./prompts/semanticGapPrompt
+ * - ./prompts/linkedInOptimizationPrompt
+ * - ./parsers/atsAuditParser
  */
+
 import { getActiveProfile } from './profileService';
 import { getBackendApiBase } from './apiConfig';
 import { callAIProxy } from './billingService';
+import { 
+  getLlmConfig, 
+  saveLlmConfig, 
+  PROVIDERS, 
+  getActiveApiKey as getActiveApiKeyFromConfig, 
+  getActiveModel as getActiveModelFromConfig, 
+  setActiveApiKey as setActiveApiKeyInConfig, 
+  setActiveModel as setActiveModelInConfig 
+} from './llmConfig';
 
-const MASTER_RESUME_HIGHLIGHTS = `
-SAM LUDWIG — Senior IT Infrastructure & M365 Engineer
-Location: Melbourne, VIC | Phone: 0405 993 245 | Email: sam.ludwig@gmail.com
-Australian Citizen | Clearance Eligible: Baseline / NV1 | LinkedIn: linkedin.com/in/sam-ludwig
+// Re-export Prompts
+export {
+  MASTER_RESUME_HIGHLIGHTS,
+  buildGenerationPrompts
+} from './prompts/applicationDocsPrompt';
 
-CAREER METRICS (real, verified):
-- 660,000+ users: Managed Southern Hemisphere's largest SharePoint farm (Dept. of Education VIC)
-- 99.9% uptime: Multi-year production SharePoint operations in government SLA environment
-- 87% processing time reduction: PowerShell automation at Knosys (2hr → 15min per batch)
-- 25% deployment cycle reduction: CI/CD pipelines at Engage Squared
-- 15% repeat incident reduction: RCA-driven preventive measures at Capgemini/Dept. Ed VIC
-- 95% SLA resolution: L3 application support at Knosys (Cotton On, Harvey Norman, Healthscope)
-- >90% SLA resolution: 40+ concurrent tickets at Capgemini
-- 100+ clinical endpoints migrated: Windows 11 at St John of God with zero patient care disruption
-- 5+ bespoke SPFx solutions: For Victoria Police, Transurban, Cimic Group
-- 200+ SharePoint sites automated: MFA compliance audit automation (PnP PowerShell)
-`;
+export {
+  INTERVIEW_SECTOR_DATA,
+  detectJobSector,
+  getSectorInterviewPrep,
+  buildInterviewGuidePrompts
+} from './prompts/interviewGuidePrompt';
+
+export {
+  buildSemanticGapPrompt,
+  buildFallbackSemanticDiagnostic
+} from './prompts/semanticGapPrompt';
+
+export {
+  buildLinkedInOptimizationPrompt,
+  buildClientSideLinkedInPackage,
+  buildFallbackLinkedInOptimization
+} from './prompts/linkedInOptimizationPrompt';
+
+// Re-export ATS Parsers & Audits
+export {
+  extractJobKeywords,
+  calculateAtsScore,
+  parseGeneratedPackageContent,
+  runDocumentQualityAudit
+} from './parsers/atsAuditParser';
+
+import { MASTER_RESUME_HIGHLIGHTS, buildGenerationPrompts } from './prompts/applicationDocsPrompt';
+import { detectJobSector, getSectorInterviewPrep } from './prompts/interviewGuidePrompt';
+import { buildClientSideLinkedInPackage, buildFallbackLinkedInOptimization } from './prompts/linkedInOptimizationPrompt';
+import { extractJobKeywords, calculateAtsScore, parseGeneratedPackageContent, runDocumentQualityAudit } from './parsers/atsAuditParser';
 
 export const CANDIDATE_PROFILE = {
   name: 'Sam Ludwig',
@@ -39,16 +75,6 @@ export const CANDIDATE_PROFILE = {
   ],
   certifications: ['AZ-104 (Azure Administrator)', 'ITIL 4 Foundation', 'AZ-900 (Azure Fundamentals)']
 };
-
-import { 
-  getLlmConfig, 
-  saveLlmConfig, 
-  PROVIDERS, 
-  getActiveApiKey as getActiveApiKeyFromConfig, 
-  getActiveModel as getActiveModelFromConfig, 
-  setActiveApiKey as setActiveApiKeyInConfig, 
-  setActiveModel as setActiveModelInConfig 
-} from './llmConfig';
 
 export const AVAILABLE_MODELS = [
   { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet (⭐ Recommended Elite Writer)', description: 'Industry-leading executive voice, nuanced ATS keyword tailoring, and high-impact accomplishment bullets' },
@@ -73,51 +99,6 @@ export const getActiveModel = () => {
 
 export const setActiveModel = (model) => {
   setActiveModelInConfig(model);
-};
-
-/**
- * Extract key terms from a job description for ATS scoring
- */
-export const extractJobKeywords = (jobDescription) => {
-  const text = (jobDescription || '').toLowerCase();
-  const keywordGroups = {
-    'Microsoft 365': ['microsoft 365', 'm365', 'office 365', 'o365'],
-    'SharePoint': ['sharepoint'],
-    'Azure': ['azure', 'azure ad', 'entra id'],
-    'Intune': ['intune', 'mdm', 'endpoint management'],
-    'Autopilot': ['autopilot', 'zero-touch'],
-    'PowerShell': ['powershell', 'scripting', 'automation'],
-    'Active Directory': ['active directory', 'ad ds', 'ldap', 'group policy'],
-    'Windows Server': ['windows server', 'server administration'],
-    'Exchange': ['exchange online', 'exchange hybrid', 'exchange'],
-    'Teams': ['microsoft teams', 'teams admin'],
-    'ServiceNow': ['servicenow', 'itsm'],
-    'ITIL': ['itil', 'service management', 'incident management'],
-    'Security': ['security', 'compliance', 'essential 8', 'acsc', 'cyber'],
-    'Python': ['python'],
-    'Networking': ['network', 'tcp/ip', 'dns', 'dhcp', 'vpn', 'cisco', 'fortinet'],
-    'Virtualisation': ['vmware', 'vsphere', 'hyper-v', 'virtualisation', 'virtualization'],
-    'Linux': ['linux', 'unix', 'rhel', 'ubuntu'],
-    'DevOps': ['devops', 'ci/cd', 'azure devops', 'git', 'pipeline', 'terraform', 'ansible', 'docker', 'kubernetes'],
-    'L3 Support': ['level 3', 'l3', 'tier 3', 'escalation', 'senior support'],
-    'Infrastructure': ['infrastructure', 'systems administrator', 'sysadmin', 'cloud engineer'],
-    'Government': ['government', 'aps', 'public sector', 'defence', 'federal', 'state government'],
-    'Healthcare': ['healthcare', 'hospital', 'clinical', 'health'],
-  };
-
-  return Object.entries(keywordGroups)
-    .filter(([, terms]) => terms.some(t => text.includes(t)))
-    .map(([keyword]) => keyword);
-};
-
-/**
- * Calculate ATS match score between job and candidate
- */
-export const calculateAtsScore = (jobDescription) => {
-  const matched = extractJobKeywords(jobDescription);
-  const total = 22; // total keyword groups
-  const base = 55;
-  return Math.min(98, Math.round(base + (matched.length / total) * 43));
 };
 
 /**
@@ -198,23 +179,7 @@ Yours sincerely,
 ${candidateName}
 `;
 
-  const linkedInOptimization = `### BOOLEAN-OPTIMIZED LINKEDIN HEADLINES
-1. ${title} | Microsoft 365 & Azure Cloud Specialist | ACSC Essential 8 & Intune Engineer
-2. Senior Systems Engineer | Enterprise Infrastructure Architect | PowerShell Automation & SOE
-3. Cloud & Workplace Specialist | Entra ID & M365 Security | 99.9% Uptime Production Lead
-
-### RECRUITER SEARCH INDEX (ABOUT SECTION)
-Senior Systems Engineer and Enterprise Cloud Specialist with over a decade of experience architecting resilient workplace, identity, and automation solutions across Australian enterprise and government sectors. Specialized in Microsoft 365 (M365, Office 365), Azure Cloud, Microsoft Entra ID (Azure AD), Intune MDM, Windows Server, VMware, and advanced PowerShell automation.
-
-Core Competencies & Boolean Recruiter Keywords:
-- Systems Engineering, Cloud Architecture, Modern Workplace Administration
-- Microsoft 365, Azure, Entra ID, Intune, Autopilot, Active Directory, Exchange Hybrid
-- PowerShell 7, PnP PowerShell, REST APIs, Graph API, Python Scripting
-- ACSC Essential 8, Cyber Security Maturity, SOE Packaging, GPO Hardening
-- ITSM, ITIL 4, ServiceNow, L3 Incident Management, Root Cause Analysis (RCA)
-- High-Availability Operations: 660k+ users, 99.9% uptime, 87% process acceleration
-`;
-
+  const linkedInOptimization = buildClientSideLinkedInPackage(title, company);
   const diagnostic = `Strong semantic density detected across core infrastructure, cloud identity, and endpoint automation. High-conviction alignment for ${title} at ${company} with verified high-scale public and private sector achievements.`;
 
   return {
@@ -226,155 +191,6 @@ Core Competencies & Boolean Recruiter Keywords:
     model: 'Grounded AI Generator (Verified Career Record)',
     elapsedMs: 250
   };
-};
-
-/**
- * Parses raw generated document package into its discrete structural parts.
- *
- * @param {string} content - Raw AI output text with standard delimiters.
- * @returns {Object} Structured components: { diagnostic, resume, coverLetter, linkedInOptimization }.
- */
-export const parseGeneratedPackageContent = (content = '') => {
-  const finalContent = content || '';
-  const diagIdx = finalContent.indexOf('===DIAGNOSTIC===');
-  const resIdx = finalContent.indexOf('===RESUME===');
-  const clIdx = finalContent.indexOf('===COVER_LETTER===');
-  const liIdx = finalContent.indexOf('===LINKEDIN_OPTIMIZATION===');
-
-  let diagnostic = '';
-  let resume = '';
-  let coverLetter = '';
-  let linkedInOptimization = '';
-
-  if (diagIdx !== -1) {
-    const diagEnd = resIdx !== -1 ? resIdx : (clIdx !== -1 ? clIdx : finalContent.length);
-    diagnostic = finalContent.slice(diagIdx + '===DIAGNOSTIC==='.length, diagEnd).trim();
-  }
-
-  if (resIdx !== -1) {
-    const resEnd = clIdx !== -1 ? clIdx : (liIdx !== -1 ? liIdx : finalContent.length);
-    resume = finalContent.slice(resIdx + '===RESUME==='.length, resEnd).trim();
-  } else if (clIdx !== -1) {
-    const startOffset = diagIdx !== -1 && diagnostic ? diagIdx + '===DIAGNOSTIC==='.length + diagnostic.length : 0;
-    resume = finalContent.slice(startOffset, clIdx).trim();
-  } else {
-    resume = finalContent.trim();
-  }
-
-  if (clIdx !== -1) {
-    const clEnd = liIdx !== -1 ? liIdx : finalContent.length;
-    coverLetter = finalContent.slice(clIdx + '===COVER_LETTER==='.length, clEnd).trim();
-  }
-
-  if (liIdx !== -1) {
-    linkedInOptimization = finalContent.slice(liIdx + '===LINKEDIN_OPTIMIZATION==='.length).trim();
-  }
-
-  return {
-    diagnostic,
-    resume,
-    coverLetter,
-    linkedInOptimization
-  };
-};
-
-/**
- * Builds system and user prompts for ATS application synthesis.
- *
- * @param {Object} job - Target job entity.
- * @param {Object} profile - Candidate profile record.
- * @returns {{systemPrompt: string, userPrompt: string, candidateSummary: string}}
- */
-export const buildGenerationPrompts = (job, profile) => {
-  const candidateSummary = [profile.fullWorkExperienceText, profile.workHistorySummary]
-    .filter(value => typeof value === 'string' && value.trim())
-    .join('\n\n') || MASTER_RESUME_HIGHLIGHTS;
-
-  const systemPrompt = `You are a Principal Talent Acquisition Architect and Expert ATS Optimization Agent for ${profile.name}. Your sole objective is to process the candidate's master profile and the target job description to generate a highly optimized resume, a distinct non-generic cover letter, and an inbound LinkedIn Boolean search index. You operate on the foundational understanding that recruitment is mediated first by mechanical document parsers (Workday, Taleo, Textkernel, Sovren, JobAdder), second by semantic AI screening (neural embeddings and cosine similarity), and third by fatigued human recruiters scanning in an F-pattern for 7.4 seconds.
-
-CANDIDATE MASTER PROFILE & VERIFIED CAREER RECORD:
-Name: ${profile.name}
-Title: ${profile.title}
-Location: ${profile.location}
-Phone: ${profile.phone}
-Email: ${profile.email}
-Work Rights: ${profile.workRights}
-Clearance: ${profile.clearance}
-Core Skills: ${(profile.coreSkills || []).join(', ')}
-Certifications: ${(profile.certifications || []).join(', ')}
-
-DETAILED WORK HISTORY & ACCOMPLISHMENTS (PROFILE SOURCE OF TRUTH):
-${candidateSummary}
-
-Use this profile history as the authoritative source for BOTH the resume and cover letter. Preserve relevant role names, dates, responsibilities, and measurable accomplishments. Do not substitute generic or default career history when this field is present.
-
-STRICT ARCHITECTURAL PHASES & CONSTRAINTS:
-
-PHASE 1: INGESTION & SEMANTIC GAP ANALYSIS (DIAGNOSTIC)
-- Identify core competencies, technical requirements, and assumed business outcomes of the target job.
-- Perform Semantic Gap Analysis: identify where the candidate's profile lacks semantic density against the role (conceptual alignment, not exact keyword counts).
-- Provide a brief, brutal diagnostic (maximum 3 sentences) informing the user of their weakest areas against the target role to determine if the role is worth pursuing.
-
-PHASE 2: RESUME STRUCTURAL ENGINEERING (THE MECHANICAL PARSING LAYER)
-- Strict Single-Column Layout: Under NO circumstances generate Markdown tables, sidebars, multi-columns, or complex grid structures. Flow must be strictly top-to-bottom to prevent text-layer scrambling in Workday, Taleo, and Textkernel.
-- Standardized Section Taxonomy: Use ONLY universally recognized section headers:
-  ## PROFESSIONAL SUMMARY
-  ## SKILLS
-  ## WORK EXPERIENCE
-  ## EDUCATION
-  ## REFEREES
-- Contact Information: Place contact information directly in the primary body text at the exact top of the document (under candidate name and target role title). Never format as header/footer.
-- Chronology: Strict reverse-chronological order. Each role must feature explicit date ranges (e.g. MM/YYYY – MM/YYYY or Year – Year) to ensure tenure calculation algorithms succeed.
-- Australian Market Localization: Format for 2 to 3 pages of deep, evidence-based detail (A4 standard). Append a mandatory "## REFEREES" section at the end (listing "Available upon request" or contact placeholders). Strictly EXCLUDE personal demographic data (no photo, age, marital status, religion) to avoid legal discrimination flags. Use Australian English spelling (organisation, prioritise, analyse, centre).
-
-PHASE 3: 7.4-SECOND HUMAN TRIAGE & F-PATTERN OPTIMIZATION (THE COGNITIVE LAYER)
-- Front-Load All Bullet Points: Recruiters scan vertically down the left margin in an F-pattern. The first 3 to 4 words of EVERY bullet point MUST contain the active verb and the quantified metric (e.g., "Reduced processing time by 87%...", "Maintained 99.9% production uptime..."). Never bury outcomes at the end of long sentences.
-- Contextual Embedding: Integrate the target role's terminology naturally into full sentences to maximize vector cosine similarity. Do not engage in keyword stuffing or isolated word lists.
-- Eradication of Corporate Fluff: Strictly ban subjective jargon ("results-driven", "team player", "passionate", "detail-oriented", "go-getter", "synergy", "think outside the box", "hit the ground running", "proactive"). Replace every generic assertion with factual claims of scale (budget, team size, users, SLA, latency, uptime, percentages).
-
-PHASE 4: COVER LETTER DRAFTING (THE HUMAN INTERFACE)
-- The Anti-Template Rule: Under NO circumstances open with standard AI clichés like "I am writing to apply for...", "I am pleased to apply...", or "With a proven track record...".
-- The Swappability Test: The cover letter must be tailored so specifically to the company's trajectory, products, culture, or stated challenges that if a competitor's name were swapped in, the letter would make no sense.
-- Tone: Opinionated, confident, direct, authentic voice.
-- Strict 3-Paragraph Structure (250–350 words total):
-  * Paragraph 1 (The Hook): A sharp, insightful hook about the company's current trajectory, product, or challenge.
-  * Paragraph 2 (The Proof Points): The single most relevant narrative of the candidate solving an identical problem, backed by concrete metrics.
-  * Paragraph 3 (The Close): Highlighting location (${profile.location}), work rights (${profile.workRights}), readiness, and a confident low-friction call to action for a brief discussion.
-
-PHASE 5: INBOUND SOURCING OPTIMIZATION (LINKEDIN BOOLEAN INDEXING)
-- Generate 3 Boolean-friendly LinkedIn Headlines with exact literal titles recruiters search for (e.g., Title 1 | Title 2 | Core Capability).
-- Draft a keyword-rich "About" section designed as a search index for LinkedIn Recruiter / Sales Navigator queries, grouping technical domains and synonyms (OR logic) naturally.
-
-OUTPUT FORMAT & EXACT DELIMITERS:
-Output the four sections separated by EXACTLY these delimiters:
-===DIAGNOSTIC===
-[Max 3 sentences semantic gap diagnostic]
-===RESUME===
-[Full Single-Column ATS Tailored Resume with Referees]
-===COVER_LETTER===
-[Bespoke 3-Paragraph Cover Letter]
-===LINKEDIN_OPTIMIZATION===
-[3 Boolean Headlines + Keyword-Rich About Section Index]`;
-
-  const userPrompt = `TARGET JOB:
-Title: ${job.title}
-Company: ${job.company}
-Location: ${job.location || 'Melbourne, VIC'}
-${job.salary ? `Salary: ${job.salary}` : ''}
-Job Details & Requirements:
-${job.notes || job.description || 'Enterprise professional responsibilities and core deliverable execution.'}
-
-Generate in strict sequence:
-===DIAGNOSTIC===
-[Diagnostic]
-===RESUME===
-[Resume]
-===COVER_LETTER===
-[Cover Letter]
-===LINKEDIN_OPTIMIZATION===
-[LinkedIn Headlines & About Index]`;
-
-  return { systemPrompt, userPrompt, candidateSummary };
 };
 
 /**
@@ -601,39 +417,7 @@ export const generateApplicationDocs = async (job, onProgress, onLog, candidateP
 
   log(`Stream complete (${finalContent.length} chars). Splitting ATS Resume, Cover Letter & LinkedIn Assets…`, 'success');
 
-  const diagIdx = finalContent.indexOf('===DIAGNOSTIC===');
-  const resIdx = finalContent.indexOf('===RESUME===');
-  const clIdx = finalContent.indexOf('===COVER_LETTER===');
-  const liIdx = finalContent.indexOf('===LINKEDIN_OPTIMIZATION===');
-
-  let diagnostic = '';
-  let resume = '';
-  let coverLetter = '';
-  let linkedInOptimization = '';
-
-  if (diagIdx !== -1) {
-    const diagEnd = resIdx !== -1 ? resIdx : (clIdx !== -1 ? clIdx : finalContent.length);
-    diagnostic = finalContent.slice(diagIdx + '===DIAGNOSTIC==='.length, diagEnd).trim();
-  }
-
-  if (resIdx !== -1) {
-    const resEnd = clIdx !== -1 ? clIdx : (liIdx !== -1 ? liIdx : finalContent.length);
-    resume = finalContent.slice(resIdx + '===RESUME==='.length, resEnd).trim();
-  } else if (clIdx !== -1) {
-    const startOffset = diagIdx !== -1 && diagnostic ? diagIdx + '===DIAGNOSTIC==='.length + diagnostic.length : 0;
-    resume = finalContent.slice(startOffset, clIdx).trim();
-  } else {
-    resume = finalContent.trim();
-  }
-
-  if (clIdx !== -1) {
-    const clEnd = liIdx !== -1 ? liIdx : finalContent.length;
-    coverLetter = finalContent.slice(clIdx + '===COVER_LETTER==='.length, clEnd).trim();
-  }
-
-  if (liIdx !== -1) {
-    linkedInOptimization = finalContent.slice(liIdx + '===LINKEDIN_OPTIMIZATION==='.length).trim();
-  }
+  const { diagnostic, resume, coverLetter, linkedInOptimization } = parseGeneratedPackageContent(finalContent);
 
   log(`Document synthesis complete (${resume.length + coverLetter.length} chars). Running Quality Gate…`, 'success');
 
@@ -735,241 +519,8 @@ export const generateInterviewGuide = async (job, onProgress, profileOverride = 
   const jobText = `${job?.title || ''} ${job?.description || ''} ${job?.notes || ''}`.toLowerCase();
   const profileText = `${candidateProfile?.industry || ''} ${candidateProfile?.title || ''}`.toLowerCase();
 
-  let sector = 'technology';
-  if (/nurs|health|medic|clinic|patient|aged care|hospital|doctor|allied health|physio/i.test(jobText)) {
-    sector = 'healthcare';
-  } else if (/construct|builder|site supervisor|site manager|carpenter|trade|whs|foreman|estimator|civil/i.test(jobText)) {
-    sector = 'trades';
-  } else if (/account|cpa|\bca\b|tax|financ|bookkeep|payroll|ledger|audit|treasury/i.test(jobText)) {
-    sector = 'finance';
-  } else if (/legal|lawyer|counsel|paralegal|solicitor|barrister|litigat/i.test(jobText)) {
-    sector = 'legal';
-  } else if (/nurs|health|medic|clinic|patient|aged care|hospital|doctor|allied health|physio/i.test(profileText)) {
-    sector = 'healthcare';
-  } else if (/construct|builder|site supervisor|site manager|carpenter|trade|whs|foreman|estimator|civil/i.test(profileText)) {
-    sector = 'trades';
-  } else if (/account|cpa|\bca\b|tax|financ|bookkeep|payroll|ledger|audit|treasury/i.test(profileText)) {
-    sector = 'finance';
-  } else if (/legal|lawyer|counsel|paralegal|solicitor|barrister|litigat/i.test(profileText)) {
-    sector = 'legal';
-  }
-
-  const isSectorMatch = candidateProfile?.industry && (
-    (sector === 'healthcare' && /health|nurs|medic/i.test(candidateProfile.industry)) ||
-    (sector === 'finance' && /financ|account/i.test(candidateProfile.industry)) ||
-    (sector === 'trades' && /trade|construct/i.test(candidateProfile.industry)) ||
-    (sector === 'legal' && /legal|law/i.test(candidateProfile.industry)) ||
-    (sector === 'technology' && /tech|it|engineer/i.test(candidateProfile.industry))
-  );
-
-  let questions = [];
-  let talkingPoints = [];
-  let recommendedQuestionsToAsk = [];
-
-  if (sector === 'healthcare') {
-    questions = [
-      {
-        type: 'Clinical Acuity & Rapid Response',
-        question: `Describe a clinical situation where a patient deteriorated rapidly under your care. How did you assess, escalate, and stabilize them?`,
-        answerStrategy: `Use the STAR format detailing rapid MET call activation, structured ISBAR clinical handover to the medical registrar, and immediate airway/breathing/circulation stabilization per AHPRA & NSQHS protocols.`,
-        keyMetric: 'Immediate MET activation / 100% vital stabilization'
-      },
-      {
-        type: 'Medication Safety & Clinical Governance',
-        question: `How do you ensure zero medication administration errors and strict NSQHS compliance during high-turnover shift handovers?`,
-        answerStrategy: `Detail independent 5-rights double verification, meticulous clinical documentation in electronic medical records (EMR), and adherence to NSQHS Standard 4 (Medication Safety).`,
-        keyMetric: 'Zero dispensing errors / 100% NSQHS compliance'
-      },
-      {
-        type: 'Patient & Family Advocacy',
-        question: `How do you handle difficult de-escalation with an anxious patient or distressed family members regarding care planning?`,
-        answerStrategy: `Highlight compassionate active listening, clear plain-language clinical explanation, de-escalation techniques, and collaborative coordination with senior medical staff.`,
-        keyMetric: 'Proven patient advocacy & compassionate resolution'
-      },
-      {
-        type: 'Multidisciplinary Coordination',
-        question: `Give an example of collaborating with allied health, medical officers, and discharge coordinators to navigate a complex patient discharge.`,
-        answerStrategy: `Discuss liaising across multidisciplinary specialists to ensure post-acute community support, comprehensive discharge summaries, and minimizing readmission risk.`,
-        keyMetric: 'On-schedule discharge / zero preventable readmission'
-      }
-    ];
-    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
-      ? candidateProfile.interviewTalkingPoints
-      : [
-          'AHPRA Registered Nurse with comprehensive clinical experience across acute and community settings',
-          'Rigorous adherence to NSQHS National Safety and Quality Health Service Standards',
-          'Proficient in electronic health record (EMR/eMR) clinical documentation and ISBAR handover',
-          'Advanced clinical assessment, patient advocacy, and emergency MET call escalation protocols',
-          'Unrestricted Australian work rights, complete immunisation compliance, and valid WWCC/police check'
-        ];
-    recommendedQuestionsToAsk = [
-      'What is the standard nurse-to-patient staffing ratio across shifts on this ward?',
-      'Which electronic medical record (EMR) platform and clinical handover workflow does the unit currently utilise?',
-      'What continuing professional development and clinical specialization pathways does the organization support?'
-    ];
-  } else if (sector === 'finance') {
-    questions = [
-      {
-        type: 'Statutory Close & AASB / IFRS Compliance',
-        question: `Walk through your methodology for managing a high-pressure month-end or year-end financial close while ensuring strict AASB / IFRS compliance.`,
-        answerStrategy: `Detail balance sheet reconciliations, variance analysis, accruals, and internal audit compliance under Australian Accounting Standards Board (AASB) frameworks.`,
-        keyMetric: '100% on-time month-end close / clean audit opinion'
-      },
-      {
-        type: 'Variance Analysis & Operational Margin',
-        question: `Describe a situation where you identified a significant budget-to-actual expenditure variance and partnered with department heads to resolve it.`,
-        answerStrategy: `Explain conducting deep-dive ledger variance analysis, isolating root causes in operational spend, and establishing corrective forecast models that preserved departmental margins.`,
-        keyMetric: 'Identified 12%+ budget variance / protected margin'
-      },
-      {
-        type: 'ERP Systems & Process Automation',
-        question: `How have you utilized ERP platforms (SAP, Xero, MYOB) or spreadsheet automation to eliminate manual reconciliation errors?`,
-        answerStrategy: `Discuss authoring automated reconciliations, streamlining general ledger postings, and integrating sub-ledger data to cut reporting turnaround cycles.`,
-        keyMetric: 'Cut reconciliation cycle time by 40%+'
-      },
-      {
-        type: 'Executive Financial Communication',
-        question: `How do you present complex financial models and P&L results to non-financial executives to guide commercial strategy?`,
-        answerStrategy: `Highlight converting complex financial statements into high-level dashboard summaries with clear commercial risk-benefit trade-offs.`,
-        keyMetric: 'Executive consensus on strategic annual budget'
-      }
-    ];
-    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
-      ? candidateProfile.interviewTalkingPoints
-      : [
-          'CPA / CA qualified financial specialist with proven track record in end-to-end statutory reporting',
-          'Deep expertise in AASB / IFRS standards, ATO compliance, and Australian Business Activity Statements (BAS)',
-          'Proficient across enterprise ERP systems (SAP, Xero, MYOB) and advanced financial modeling',
-          'Demonstrated capability managing multi-million-dollar ledger reconciliations and clean internal audits'
-        ];
-    recommendedQuestionsToAsk = [
-      'What does the company\'s financial systems and automation roadmap look like over the next 12 months?',
-      'How are budget variance reviews structured between finance and operational business units?',
-      'What are the primary strategic objectives for the finance team heading into the upcoming fiscal year?'
-    ];
-  } else if (sector === 'trades') {
-    questions = [
-      {
-        type: 'WHS Safety & SWMS Hazard Intervention',
-        question: `Describe a situation on an active worksite where you identified a high-risk safety violation or SWMS non-compliance. How did you intervene?`,
-        answerStrategy: `Detail issuing an immediate stop-work directive, reviewing the subcontractor\'s Safe Work Method Statement (SWMS), and conducting a mandatory pre-start safety briefing.`,
-        keyMetric: 'Zero lost-time injuries (LTI) across project lifecycle'
-      },
-      {
-        type: 'Critical Path & Weather Delay Recovery',
-        question: `How do you manage critical path delays caused by inclement weather or material supply chain bottlenecks to maintain handover milestones?`,
-        answerStrategy: `Discuss resequencing concurrent trade packages, adjusting site working hours safely, and communicating milestone adjustments with client project managers.`,
-        keyMetric: 'Recovered 2-week weather delay to achieve on-time handover'
-      },
-      {
-        type: 'Pre-Handover QA & Defect Rectification',
-        question: `Walk through your process for conducting pre-handover quality inspections and enforcing subcontractor defect rectification.`,
-        answerStrategy: `Explain utilizing digital defect tracking platforms (Procore / PlanGrid) to enforce sign-offs and ensure zero outstanding defect notices at Practical Completion.`,
-        keyMetric: '100% defect-free handover at Practical Completion'
-      },
-      {
-        type: 'Cost Tracking & Variation Control',
-        question: `How do you track site expenditure against bill of quantities and verify progress claims to prevent margin erosion?`,
-        answerStrategy: `Describe assessing subcontractor progress claims on-site against actual physical completion and enforcing formal variation approvals before work commences.`,
-        keyMetric: 'Prevented unauthorized variation scope creep'
-      }
-    ];
-    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
-      ? candidateProfile.interviewTalkingPoints
-      : [
-          'Licensed site leader with valid CPCCWHS1001 White Card and comprehensive SafeWork WHS governance',
-          'Proven track record delivering commercial and residential building packages on time and on budget',
-          'Expertise in subcontractor trade sequencing, SWMS reviews, and digital site management platforms',
-          'Zero-harm safety culture with exemplary incident-free track record'
-        ];
-    recommendedQuestionsToAsk = [
-      'What digital project and safety management tools (e.g. Procore, HammerTech) are standardized across your sites?',
-      'How does the company manage subcontractor pre-qualification and quality assurance benchmarks?',
-      'What is the upcoming project pipeline across the next 12 to 24 months?'
-    ];
-  } else if (sector === 'legal') {
-    questions = [
-      {
-        type: 'Contractual Risk & Indemnity Negotiation',
-        question: `When negotiating high-stakes commercial agreements, how do you handle aggressive indemnity and liability cap pushback from counterparties?`,
-        answerStrategy: `Explain risk-based negotiation, structuring mutual liability caps aligned with contract value, and carving out gross negligence and confidentiality breaches.`,
-        keyMetric: 'Mitigated enterprise liability while closing multi-million contract'
-      },
-      {
-        type: 'Regulatory Compliance & Australian Consumer Law',
-        question: `How do you advise commercial marketing and product teams to ensure new offerings strictly comply with Australian Consumer Law (ACL)?`,
-        answerStrategy: `Detail reviewing promotional claims against misleading or deceptive conduct standards (Section 18 ACL) and establishing compliant customer terms.`,
-        keyMetric: '100% compliance record with zero regulatory notices'
-      },
-      {
-        type: 'Commercial Dispute Resolution',
-        question: `Describe a contentious supplier or customer dispute you resolved without resorting to formal litigation.`,
-        answerStrategy: `Detail pre-litigation correspondence, objective contract interpretation, and leading commercial negotiation that preserved business relationships.`,
-        keyMetric: 'Resolved commercial dispute saving $150k+ in legal costs'
-      },
-      {
-        type: 'Executive Risk Advisory',
-        question: `How do you balance legal risk mitigation with commercial imperatives when business leaders are pressing for rapid deal execution?`,
-        answerStrategy: `Discuss presenting executive summaries with red-amber-green risk matrices and commercial alternatives rather than simply saying "no".`,
-        keyMetric: 'Maintained 48-hour contract review SLA for priority deals'
-      }
-    ];
-    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
-      ? candidateProfile.interviewTalkingPoints
-      : [
-          'Admitted Legal Practitioner with current Australian Practising Certificate',
-          'Extensive experience drafting, negotiating, and risk-profiling complex commercial contracts',
-          'Deep knowledge of Australian Consumer Law, Corporations Act, privacy, and regulatory frameworks',
-          'Commercially pragmatic legal partner trusted by executive and commercial leadership'
-        ];
-    recommendedQuestionsToAsk = [
-      'How is the legal function integrated into commercial contract workflows and sales approval gates?',
-      'What contract lifecycle management (CLM) or legal ops software does the in-house team use?',
-      'What is the balance between in-house legal handling versus external counsel panel engagement?'
-    ];
-  } else {
-    // Default Technology & Engineering
-    questions = [
-      {
-        type: 'Technical Challenge & Infrastructure',
-        question: `How would you architect and automate endpoint compliance for distributed or hybrid cloud infrastructure?`,
-        answerStrategy: `Highlight multi-cloud migration and automation experience, emphasizing zero downtime, SOE compliance, and security baseline adherence.`,
-        keyMetric: 'Zero downtime / 100% SOE compliance'
-      },
-      {
-        type: 'Incident / SLA Management',
-        question: `Describe a situation where you had to manage a critical production outage under strict SLA pressure.`,
-        answerStrategy: `Use the STAR format detailing root cause analysis (RCA) and preventative automation that permanently eliminated repeat incidents.`,
-        keyMetric: '99.9% uptime / fast SLA restoration'
-      },
-      {
-        type: 'Process Automation & Optimization',
-        question: `Give an example of how you used scripting or Infrastructure-as-Code to eliminate repetitive operational toil.`,
-        answerStrategy: `Reference authoring modular automation scripts cutting processing times and removing human error from provisioning pipelines.`,
-        keyMetric: '80%+ reduction in manual processing time'
-      },
-      {
-        type: 'Stakeholder & Communication',
-        question: `How do you bridge technical engineering requirements with non-technical business or executive stakeholders?`,
-        answerStrategy: `Discuss translating engineering trade-offs into commercial business impact, ensuring business operations run without disruption.`,
-        keyMetric: 'Seamless stakeholder alignment'
-      }
-    ];
-    talkingPoints = (isSectorMatch && candidateProfile?.interviewTalkingPoints?.length)
-      ? candidateProfile.interviewTalkingPoints
-      : [
-          'Enterprise infrastructure specialist with proven experience in hybrid cloud and automated systems',
-          'ACSC Essential 8 & ISO 27001 security compliance operationalization',
-          'Extensive automation track record eliminating repetitive toil through scripting and IaC',
-          'Australian Citizen with security clearance readiness',
-          'Proven ability to maintain 99.9%+ system availability in SLA environments'
-        ];
-    recommendedQuestionsToAsk = [
-      'What does the current IT automation and cloud roadmap look like over the next 12 months?',
-      'How does the team currently measure and enforce security maturity and SLA reliability?',
-      'What are the primary friction points in your current incident response and L3 escalation workflows?'
-    ];
-  }
+  const sector = detectJobSector(jobText, profileText);
+  const prep = getSectorInterviewPrep(sector, candidateProfile);
 
   return {
     jobTitle: job.title,
@@ -977,9 +528,9 @@ export const generateInterviewGuide = async (job, onProgress, profileOverride = 
     atsScore,
     keywords,
     sector,
-    questions,
-    talkingPoints,
-    recommendedQuestionsToAsk
+    questions: prep.questions,
+    talkingPoints: prep.talkingPoints,
+    recommendedQuestionsToAsk: prep.recommendedQuestionsToAsk
   };
 };
 
@@ -1137,193 +688,6 @@ export const generateAgentInsights = (jobs = [], overrides = {}) => {
     readyToApplyCount: highMatchJobs.length,
     staleCount: staleJobs.length,
     priorityActions
-  };
-};
-
-/**
- * Pre-Submission Adversarial Quality Gate & Double-Check Engine
- */
-export const runDocumentQualityAudit = (job, resumeText = '', coverLetterText = '') => {
-  const resume = resumeText || '';
-  const cl = coverLetterText || '';
-  const jobTitle = (job.title || '').trim();
-  const jobDesc = (job.notes || job.description || '').toLowerCase();
-  const profile = getActiveProfile() || CANDIDATE_PROFILE;
-  const candName = profile?.name || 'Candidate';
-  const candEmail = profile?.email || '';
-  const candPhone = profile?.phone || '';
-
-  // 1. Exact Title Mirroring Check
-  const titleMirrored = resume.toLowerCase().includes(jobTitle.toLowerCase());
-
-  // 2. Mechanical Parsing Integrity (Strict Single-Column, Zero Tables/Grids)
-  // Enterprise ATS parsers (Workday, Taleo, Textkernel) scramble multi-column layouts and markdown tables
-  const hasMarkdownTable = /\|[\s-:]+\|/.test(resume);
-  const singleColumnCompliant = !hasMarkdownTable;
-
-  // 3. ATS Semantic Keyword Match Rate
-  const requiredKeywords = extractJobKeywords(jobDesc);
-  const matchedInResume = requiredKeywords.filter(kw => resume.toLowerCase().includes(kw.toLowerCase()));
-  const missingKeywords = requiredKeywords.filter(kw => !resume.toLowerCase().includes(kw.toLowerCase()));
-  const keywordScore = requiredKeywords.length > 0 ? Math.round((matchedInResume.length / requiredKeywords.length) * 100) : 95;
-
-  // 4. Outcome-Led Metric Verification & Factual Scale (Phase 3 Achievement Anchoring)
-  const metricPatterns = [
-    /\b\d{1,3}%\b/g,
-    /\b\d{1,3}(?:,\d{3})+\+?\b/g,
-    /\b\$\d+[\d,]*\b/g,
-    /\b\d+\+\s*(?:clinical|endpoints|users|sites|devices|servers|stakeholders|engineers)\b/gi,
-    /\b\d+hr\s*→\s*\d+min\b/gi,
-    /\b\d+\.?\d*%\s*(?:uptime|reduction|resolution)\b/gi
-  ];
-  const metricsFound = [];
-  metricPatterns.forEach(p => {
-    const matches = resume.match(p) || [];
-    metricsFound.push(...matches);
-  });
-  const hasStrongMetrics = metricsFound.length >= 3;
-
-  // 5. Australian Market Standards: Mandatory Referees Section
-  const hasReferees = /(?:##\s*(?:REFEREES|REFERENCES)|REFEREES|REFERENCES)/i.test(resume);
-
-  // 6. Contact & Identity Integrity Check (Body Text Placement)
-  const hasName = resume.toLowerCase().includes(candName.toLowerCase()) || resume.includes('SAM LUDWIG') || resume.includes('Sam Ludwig');
-  const hasEmailOrPhone = (candEmail && resume.toLowerCase().includes(candEmail.toLowerCase())) ||
-                          (candPhone && resume.includes(candPhone.replace(/\s+/g, ''))) ||
-                          resume.includes('sam.ludwig@gmail.com') ||
-                          resume.includes('0405 993 245');
-  const hasClearanceOrRights = /Australian Citizen|Permanent Resident|Clearance|Baseline|NV1|Work Rights/i.test(resume);
-  const contactIntegrity = hasName && (hasEmailOrPhone || hasClearanceOrRights);
-
-  // 7. Anti-Cliché & Executive Voice Enforcer
-  const forbiddenCliches = [
-    'passionate', 'team player', 'results-driven', 'go-getter', 
-    'synergy', 'think outside the box', 'hit the ground running',
-    'proactive', 'detail-oriented', 'self-starter', 'dynamic'
-  ];
-  const foundCliches = forbiddenCliches.filter(c => 
-    resume.toLowerCase().includes(c) || cl.toLowerCase().includes(c)
-  );
-
-  // 8. Anti-Template Cover Letter Verification (Phase 4 Human Interface)
-  const genericCoverLetterOpeners = [
-    'i am writing to apply', 'i am applying for', 'i am pleased to submit',
-    'i am excited to apply', 'i am thrilled to apply', 'with a proven track record',
-    'i would like to apply'
-  ];
-  const foundGenericOpeners = genericCoverLetterOpeners.filter(opener => 
-    cl.toLowerCase().includes(opener)
-  );
-  const antiTemplateCompliant = foundGenericOpeners.length === 0;
-
-  // 9. Australian English Standards
-  const usSpellings = ['organization', 'prioritize', 'standardize', 'analyze', 'program '];
-  const foundUsSpellings = usSpellings.filter(s => 
-    resume.toLowerCase().includes(s) || cl.toLowerCase().includes(s)
-  );
-
-  // 10. Cover Letter 3-Paragraph Standard & Swappability Test
-  const clWords = cl.trim() ? cl.trim().split(/\s+/).length : 0;
-  const clWordCountValid = clWords >= 160 && clWords <= 450;
-  const clHasCompany = cl.toLowerCase().includes((job.company || '').toLowerCase());
-  const clHasCta = cl.toLowerCase().includes('sincerely') || cl.toLowerCase().includes('discuss') || cl.toLowerCase().includes('welcome') || cl.toLowerCase().includes('regards') || cl.toLowerCase().includes('conversation');
-  const clStructureValid = clHasCompany && clHasCta && clWordCountValid;
-
-  // Checks array
-  const checks = [
-    {
-      id: 'title_mirror',
-      name: 'Exact Job Title Mirroring',
-      category: 'ATS Strategy #1',
-      passed: titleMirrored,
-      weight: 15,
-      detail: titleMirrored ? `Resume header mirrors "${jobTitle}" exactly.` : `Missing exact role title "${jobTitle}" in header.`
-    },
-    {
-      id: 'single_column_mechanical',
-      name: 'Mechanical ATS Parser Compliance',
-      category: 'Mechanical Parsing Layer',
-      passed: singleColumnCompliant,
-      weight: 10,
-      detail: singleColumnCompliant 
-        ? 'Strict single-column flow verified. Zero parsing-hazardous tables or grids detected (Workday/Taleo/Textkernel compliant).' 
-        : 'Detected markdown tables or grid syntax that can trigger text-layer scrambling in enterprise parsers.'
-    },
-    {
-      id: 'keyword_coverage',
-      name: 'Core ATS Semantic Keyword Coverage',
-      category: 'ATS Keyword Match',
-      passed: keywordScore >= 70,
-      weight: 15,
-      detail: `${matchedInResume.length} of ${requiredKeywords.length || 1} required technical keywords verified in resume body.`,
-      missing: missingKeywords
-    },
-    {
-      id: 'quantified_outcomes',
-      name: 'Achievement Anchoring & Factual Scale',
-      category: 'Recruiter Impact',
-      passed: hasStrongMetrics,
-      weight: 15,
-      detail: `Detected ${metricsFound.length} verified metrics (e.g. 660,000+ users, 87% reduction, 99.9% uptime).`
-    },
-    {
-      id: 'referees_section',
-      name: 'Australian Market Referees Compliance',
-      category: 'Australian Localization',
-      passed: hasReferees,
-      weight: 10,
-      detail: hasReferees ? 'Mandatory Australian Referees section verified.' : 'Missing "Referees" section expected by Australian enterprise ATS & recruiters.'
-    },
-    {
-      id: 'contact_integrity',
-      name: 'Identity, Contact & Clearance Integrity',
-      category: 'Compliance',
-      passed: contactIntegrity,
-      weight: 10,
-      detail: 'Contact details placed in primary body text (never in header/footer zone discarded by Workday).'
-    },
-    {
-      id: 'anti_cliche',
-      name: 'Executive Voice & Anti-Template Standard',
-      category: 'Tone & Style',
-      passed: foundCliches.length === 0 && antiTemplateCompliant,
-      weight: 10,
-      detail: (foundCliches.length === 0 && antiTemplateCompliant)
-        ? 'Zero clichés detected. Distinct, outcome-led voice passing Anti-Template standards.'
-        : `Flagged: ${[...foundCliches, ...foundGenericOpeners].join(', ')}.`
-    },
-    {
-      id: 'spelling_standard',
-      name: 'Australian English Spelling Verification',
-      category: 'Localization',
-      passed: foundUsSpellings.length === 0,
-      weight: 5,
-      detail: foundUsSpellings.length === 0 ? 'All terminology complies with Australian English (organisation, prioritise, analyse).' : `US spellings detected: ${foundUsSpellings.join(', ')}.`
-    },
-    {
-      id: 'cl_structure',
-      name: 'Cover Letter 3-Paragraph & Swappability Test',
-      category: 'Cover Letter',
-      passed: cl ? clStructureValid : true,
-      weight: 10,
-      detail: cl ? `Cover letter has ${clWords} words with verified company reference and confident CTA.` : 'Cover letter ready to synthesize.'
-    }
-  ];
-
-  const passedWeight = checks.filter(c => c.passed).reduce((acc, c) => acc + c.weight, 0);
-  const isReadyToSubmit = passedWeight >= 80;
-
-  return {
-    overallScore: passedWeight,
-    isReadyToSubmit,
-    checks,
-    matchedKeywords: matchedInResume,
-    missingKeywords,
-    metricsFound,
-    wordCount: {
-      resumeWords: resume ? resume.trim().split(/\s+/).length : 0,
-      coverLetterWords: clWords
-    }
   };
 };
 
@@ -1612,19 +976,5 @@ export const fetchLinkedInOptimization = async (job, profile = null) => {
     console.warn('Backend LinkedIn optimization request failed, using client fallback:', err);
   }
 
-  const role = job?.title || 'Systems Engineer';
-  return {
-    job_title: role,
-    headlines: [
-      `${role} | Microsoft 365 & Azure Cloud Infrastructure | Baseline Eligible`,
-      `Infrastructure Engineer | PowerShell Automation & Entra ID | 99.9% SLA`,
-      `Senior IT Systems Engineer | ACSC Essential 8 & Modern Workplace`
-    ],
-    about_index: `Senior Systems Engineer specializing in Microsoft 365, Azure Cloud, and automation.\n• Core Titles: ${role} | Systems Administrator | Cloud Engineer\n• Cloud: Azure, Entra ID, Intune, M365\n• Automation: PowerShell, CI/CD, Scripting`,
-    boolean_search_strings: {
-      title_and_cloud: `("${role}" OR "Systems Engineer") AND (Azure OR "Microsoft 365") AND Melbourne`
-    }
-  };
+  return buildFallbackLinkedInOptimization(job, candidateProfile);
 };
-
-

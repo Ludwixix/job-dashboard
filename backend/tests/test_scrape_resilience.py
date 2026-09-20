@@ -151,9 +151,7 @@ def test_scrape_coordinator_single_flight_coalescing(tmp_path):
     # Only 1 query should have been enqueued, the other 39 coalesced / deduplicated
     enqueued_count = sum(1 for r in results if r.get("status") == "enqueued")
     coalesced_count = sum(
-        1
-        for r in results
-        if r.get("status") in ("already_queued", "in_flight", "cooldown")
+        1 for r in results if r.get("status") in ("already_queued", "in_flight", "cooldown")
     )
     assert enqueued_count == 1
     assert coalesced_count == 39

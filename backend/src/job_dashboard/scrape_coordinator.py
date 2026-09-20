@@ -75,9 +75,7 @@ class ScrapeCoordinator:
                 "errors": list(self._errors[-5:]),
             }
 
-    def enqueue_query(
-        self, query: SearchQuery, app, force: bool = False
-    ) -> dict[str, Any]:
+    def enqueue_query(self, query: SearchQuery, app, force: bool = False) -> dict[str, Any]:
         """Enqueue a single query, coalescing if already in flight or queued."""
         key = self._make_key(query)
         term = getattr(query, "term", str(query)).strip()
@@ -149,13 +147,9 @@ class ScrapeCoordinator:
                 self._active_query_display = f"{term} ({loc})" if loc else term
 
             try:
-                logger.info(
-                    f"ScrapeCoordinator executing gateway query: {term} [{loc}]"
-                )
+                logger.info(f"ScrapeCoordinator executing gateway query: {term} [{loc}]")
                 pipeline = ScrapePipeline(
-                    app.sources,
-                    days=14,
-                    health_check=getattr(app, "health_check", False),
+                    app.sources, days=14, health_check=getattr(app, "health_check", False)
                 )
                 fresh = pipeline.run([query])
                 if pipeline.errors:
@@ -180,9 +174,7 @@ class ScrapeCoordinator:
                     try:
                         app.repository.replace_jobs(fresh_materialized)
                     except Exception as repo_err:
-                        logger.warning(
-                            f"Error persisting fresh jobs to repository: {repo_err}"
-                        )
+                        logger.warning(f"Error persisting fresh jobs to repository: {repo_err}")
 
                     # Update jobs_combined.json
                     try:
@@ -204,9 +196,7 @@ class ScrapeCoordinator:
                     self._last_scraped_at = now_iso
 
             except Exception as exc:
-                logger.error(
-                    f"ScrapeCoordinator failed processing {term}: {exc}", exc_info=True
-                )
+                logger.error(f"ScrapeCoordinator failed processing {term}: {exc}", exc_info=True)
                 with self._lock:
                     self._errors.append(f"{term}: {exc}")
             finally:
@@ -225,3 +215,4 @@ class ScrapeCoordinator:
         self._stop_event.set()
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=2.0)
+

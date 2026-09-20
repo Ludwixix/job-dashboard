@@ -654,14 +654,14 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     try {
       const text = await extractTextFromFile(file);
       setResumeText(text);
-      await handleParseResumeText(text);
+      await handleParseResumeText(text, profileData);
     } catch (err) {
       console.warn('PDF.js extractTextFromFile error, attempting fallback reader:', err);
       const reader = new FileReader();
       reader.onload = (event) => {
         const fallbackText = event.target?.result || '';
         setResumeText(fallbackText);
-        handleParseResumeText(fallbackText);
+        handleParseResumeText(fallbackText, profileData);
       };
       reader.readAsText(file);
     } finally {
@@ -669,7 +669,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     }
   };
 
-  const handleParseResumeText = async (textToParse = resumeText) => {
+  const handleParseResumeText = async (textToParse = resumeText, currentProfile = profileData) => {
     if (!textToParse.trim()) return;
 
     let cleanText = textToParse;
@@ -687,30 +687,48 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     try {
       const apiKey = getActiveApiKey();
       const model = getActiveModel();
-      const parsed = await parseResumeWithAI(cleanText, apiKey, model);
+      const parsed = await parseResumeWithAI(cleanText, apiKey, model, currentProfile.industry);
 
       if (parsed) {
-        setProfileData(prev => ({
-          ...prev,
-          name: parsed.name || prev.name,
-          title: parsed.title || prev.title,
-          email: parsed.email || prev.email,
-          phone: parsed.phone || prev.phone,
-          location: parsed.location || prev.location,
-          suburb: parsed.suburb || prev.suburb,
-          workRights: parsed.workRights || prev.workRights,
-          clearance: parsed.clearance || prev.clearance,
-          targetSalary: parsed.targetSalary || prev.targetSalary,
-          targetTitles: parsed.targetTitles?.length ? parsed.targetTitles : prev.targetTitles,
-          coreSkills: parsed.coreSkills?.length ? parsed.coreSkills : prev.coreSkills,
-          certifications: parsed.certifications || prev.certifications,
-          workHistorySummary: parsed.workHistorySummary || prev.workHistorySummary,
-          fullWorkExperienceText: parsed.fullWorkExperienceText || cleanText
-        }));
-        setParseSuccessMsg('✨ AI Resume Successfully Extracted! Your titles, skills and metrics are loaded.');
+        setProfileData(prev => {
+          const effectiveIndustry = prev.industry || parsed.industry || 'Healthcare & Medical';
+          
+          // Guard: if candidate selected non-IT industry in Step 3, do NOT allow IT engineer titles to clobber
+          let titles = parsed.targetTitles?.length ? parsed.targetTitles : prev.targetTitles;
+          if (effectiveIndustry !== 'Technology & IT') {
+            const hasItTitles = titles.some(t => /systems|devops|cloud|infrastructure|software|linux|m365/i.test(t));
+            if (hasItTitles) {
+              titles = prev.targetTitles?.length ? prev.targetTitles : [prev.title || parsed.title || 'Specialist'];
+            }
+          }
+          let title = parsed.title || prev.title;
+          if (effectiveIndustry !== 'Technology & IT' && /systems|devops|cloud|infrastructure|software/i.test(title)) {
+            title = prev.title || titles[0] || 'Specialist';
+          }
+
+          return {
+            ...prev,
+            name: parsed.name && parsed.name !== 'Candidate' ? parsed.name : prev.name,
+            title: title,
+            industry: effectiveIndustry,
+            email: parsed.email || prev.email,
+            phone: parsed.phone || prev.phone,
+            location: parsed.location || prev.location,
+            suburb: parsed.suburb || prev.suburb,
+            workRights: parsed.workRights || prev.workRights,
+            clearance: parsed.clearance || prev.clearance,
+            targetSalary: parsed.targetSalary || prev.targetSalary,
+            targetTitles: titles,
+            coreSkills: [...new Set([...(prev.coreSkills || []), ...(parsed.coreSkills || [])])],
+            certifications: [...new Set([...(prev.certifications || []), ...(parsed.certifications || [])])],
+            workHistorySummary: parsed.workHistorySummary || prev.workHistorySummary,
+            fullWorkExperienceText: parsed.fullWorkExperienceText || cleanText
+          };
+        });
+        setParseSuccessMsg('✨ Resume Successfully Analyzed! Your titles, skills and experience are calibrated.');
       }
     } catch {
-      const clientParsed = parseResumeTextClientSide(cleanText);
+      const clientParsed = parseResumeTextClientSide(cleanText, currentProfile);
       setProfileData(prev => ({ 
         ...prev, 
         ...clientParsed, 

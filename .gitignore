@@ -42,3 +42,5 @@ Thumbs.db
 .idea/
 .vscode/
 *Candidate*.pdf
+.agents/
+ORIGINAL_REQUEST.md

@@ -502,6 +502,7 @@ export function DashboardModals({
             <ProfileModal
               isOpen={flags.isProfileModalOpen}
               profile={editingProfile}
+              initialTab={flags.profileModalInitialTab || 'edit'}
               onClose={() => {
                 setFlags.setIsProfileModalOpen(false);
                 if (setEditingProfile) setEditingProfile(null);
@@ -513,9 +514,7 @@ export function DashboardModals({
                   if (profileToUse.suburb || profileToUse.location) {
                     if (setBaseLocation) setBaseLocation(profileToUse.suburb || profileToUse.location);
                   }
-                  runProfileOnboardingPipeline(profileToUse).finally(() => {
-                    if (triggerDiscoveryScrape) triggerDiscoveryScrape(profileToUse);
-                  });
+                  runProfileOnboardingPipeline(profileToUse).catch(() => {});
                   if (typeof refetch === 'function') refetch();
                 }
               }}

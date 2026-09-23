@@ -15,7 +15,8 @@ export function calculateProfileCompleteness(profile = {}) {
   const improvements = [];
 
   // 1. Identity & Name (15 pts)
-  if (profile.name && profile.name.trim().length > 1) {
+  const name = profile.name || profile.full_name || profile.candidateName || profile.candidate_name;
+  if (name && String(name).trim().length > 1) {
     score += 15;
   } else {
     improvements.push({
@@ -29,7 +30,8 @@ export function calculateProfileCompleteness(profile = {}) {
   }
 
   // 2. Industry & Seniority (15 pts)
-  if (profile.industry && profile.industry.trim().length > 1) {
+  const industry = profile.industry || profile.targetIndustry || profile.domain;
+  if (industry && String(industry).trim().length > 1) {
     score += 15;
   } else {
     improvements.push({
@@ -43,10 +45,11 @@ export function calculateProfileCompleteness(profile = {}) {
   }
 
   // 3. Target Role Titles (15 pts)
-  const titles = Array.isArray(profile.targetTitles) && profile.targetTitles.length > 0
-    ? profile.targetTitles
+  const rawTitles = profile.targetTitles || profile.target_titles || profile.targetRoles || profile.target_roles || [];
+  const titles = Array.isArray(rawTitles) && rawTitles.length > 0
+    ? rawTitles
     : profile.title ? [profile.title] : [];
-  if (titles.length > 0) {
+  if (titles.length >= 1) {
     score += 15;
   } else {
     improvements.push({
@@ -59,19 +62,22 @@ export function calculateProfileCompleteness(profile = {}) {
     });
   }
 
-  // 4. Core Skills & Keywords (15 pts)
-  const skills = Array.isArray(profile.coreSkills) ? profile.coreSkills : [];
-  if (skills.length >= 6) {
-    score += 15;
+  // 4. Core Skills & Keywords (20 pts)
+  const rawSkills = profile.coreSkills || profile.core_skills || profile.skills || [];
+  const skills = Array.isArray(rawSkills)
+    ? rawSkills.filter(Boolean)
+    : (typeof rawSkills === 'string' ? rawSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
+  if (skills.length >= 3) {
+    score += 20;
   } else if (skills.length > 0) {
-    score += 8;
+    score += 10;
     improvements.push({
       id: 'skills',
       category: 'ATS Keywords',
-      title: `Add more core skills (${skills.length}/6 added)`,
+      title: `Add 1-2 more core skills (${skills.length}/3 added)`,
       description: 'Increases ATS match accuracy and unlocks higher fit scoring tiers.',
-      points: 7,
-      actionLabel: 'Expand Skills (+7%)'
+      points: 10,
+      actionLabel: 'Expand Skills (+10%)'
     });
   } else {
     improvements.push({
@@ -79,13 +85,14 @@ export function calculateProfileCompleteness(profile = {}) {
       category: 'ATS Keywords',
       title: 'Add core skills and competencies',
       description: 'Essential for matching job descriptions and keywords.',
-      points: 15,
-      actionLabel: 'Add Core Skills (+15%)'
+      points: 20,
+      actionLabel: 'Add Core Skills (+20%)'
     });
   }
 
   // 5. Location & Commute (15 pts)
-  if (profile.location && profile.location.trim().length > 1) {
+  const loc = profile.location || profile.locationPreference || profile.location_preference || profile.suburb || profile.city;
+  if (loc && String(loc).trim().length > 1) {
     score += 15;
   } else {
     improvements.push({
@@ -98,44 +105,25 @@ export function calculateProfileCompleteness(profile = {}) {
     });
   }
 
-  // 6. Resume / Work History (15 pts)
+  // 6. Resume / Work History (20 pts)
+  const historySummary = profile.workHistorySummary || profile.work_history_summary || profile.summary || '';
+  const historyText = profile.fullWorkExperienceText || profile.full_work_experience_text || profile.workExperience || profile.experience || '';
+  const hasProjects = Array.isArray(profile.projects) && profile.projects.length > 0;
   const hasHistory = Boolean(
-    (profile.workHistorySummary && profile.workHistorySummary.trim().length > 10) ||
-    (profile.fullWorkExperienceText && profile.fullWorkExperienceText.trim().length > 30) ||
-    (profile.summary && profile.summary.trim().length > 20)
+    (historySummary && historySummary.trim().length > 10) ||
+    (historyText && historyText.trim().length > 30) ||
+    hasProjects
   );
   if (hasHistory) {
-    score += 15;
+    score += 20;
   } else {
     improvements.push({
       id: 'resume',
       category: 'Experience',
       title: 'Add work experience or upload resume',
       description: 'Unlocks STAR achievement extraction and tailored application synthesis.',
-      points: 15,
-      actionLabel: 'Add Experience (+15%)'
-    });
-  }
-
-  // 7. AI Key / Reasoning Engine (10 pts)
-  let hasAiKey = false;
-  try {
-    const rawConfig = typeof window !== 'undefined' ? localStorage.getItem('job_dashboard_llm_config') : null;
-    if (rawConfig) {
-      const parsedConfig = JSON.parse(rawConfig);
-      hasAiKey = Boolean(parsedConfig.apiKey && parsedConfig.apiKey.length > 3);
-    }
-  } catch {}
-  if (hasAiKey) {
-    score += 10;
-  } else {
-    improvements.push({
-      id: 'aiEngine',
-      category: 'AI Engine',
-      title: 'Connect AI Reasoning Key (Optional)',
-      description: 'Powers automated document tuning, bespoke cover letters, and interview coaching.',
-      points: 10,
-      actionLabel: 'Connect AI Key (+10%)'
+      points: 20,
+      actionLabel: 'Add Experience (+20%)'
     });
   }
 

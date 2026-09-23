@@ -406,14 +406,15 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     }
 
     // 3. Target Job Titles (15 pts)
-    if (profileData.targetTitles?.length >= 2) {
+    const rawTitles = profileData.targetTitles || profileData.target_titles || profileData.targetRoles || profileData.target_roles || [];
+    const titles = (Array.isArray(rawTitles) && rawTitles.length > 0 ? rawTitles : (profileData.title ? [profileData.title] : [])).filter(Boolean);
+    if (titles.length >= 1) {
       score += 15;
     } else {
-      const missing = Math.max(1, 2 - (profileData.targetTitles?.length || 0));
       improvements.push({
         id: 'targetTitles',
         category: 'Search Queries',
-        title: `Configure ${missing} more target role title${missing > 1 ? 's' : ''}`,
+        title: 'Add target role title',
         description: 'Directly drives automated job gateway queries across Seek, Indeed & Adzuna.',
         points: 15,
         stepTarget: 4,
@@ -422,14 +423,16 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
     }
 
     // 4. Core Skills & ATS Keywords (20 pts)
-    if (profileData.coreSkills?.length >= 6) {
+    const rawSkills = profileData.coreSkills || profileData.core_skills || profileData.skills || [];
+    const skills = (Array.isArray(rawSkills) ? rawSkills : (typeof rawSkills === 'string' ? rawSkills.split(',') : [])).map(s => String(s).trim()).filter(Boolean);
+    if (skills.length >= 3) {
       score += 20;
-    } else if (profileData.coreSkills?.length >= 3) {
+    } else if (skills.length > 0) {
       score += 10;
       improvements.push({
         id: 'coreSkills',
         category: 'ATS Optimization',
-        title: 'Add 3+ domain skills or tools',
+        title: `Add 1-2 more core skills (${skills.length}/3 added)`,
         description: 'Expands semantic match coverage to unlock 85%+ high-fit candidate tiers.',
         points: 10,
         stepTarget: 4,
@@ -439,7 +442,7 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
       improvements.push({
         id: 'coreSkills',
         category: 'ATS Optimization',
-        title: 'Add 4+ core domain skills',
+        title: 'Add 3+ core domain skills',
         description: 'Required by recruiter ATS algorithmic filters to rank your profile.',
         points: 20,
         stepTarget: 4,
@@ -756,8 +759,15 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
  const handleAddSkill = (skillToAdd = newSkillInput) => {
  const trimmed = (skillToAdd || '').trim();
- if (trimmed && !profileData.coreSkills.includes(trimmed)) {
- setProfileData(prev => ({ ...prev, coreSkills: [...prev.coreSkills, trimmed] }));
+ if (trimmed) {
+ const items = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+ setProfileData(prev => {
+ const next = [...prev.coreSkills];
+ for (const item of items) {
+ if (!next.includes(item)) next.push(item);
+ }
+ return { ...prev, coreSkills: next };
+ });
  setNewSkillInput('');
  }
  };
@@ -768,8 +778,15 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
 
  const handleAddTitle = (titleToAdd = newTitleInput) => {
  const trimmed = (titleToAdd || '').trim();
- if (trimmed && !profileData.targetTitles.includes(trimmed)) {
- setProfileData(prev => ({ ...prev, targetTitles: [...prev.targetTitles, trimmed] }));
+ if (trimmed) {
+ const items = trimmed.split(',').map(t => t.trim()).filter(Boolean);
+ setProfileData(prev => {
+ const next = [...prev.targetTitles];
+ for (const item of items) {
+ if (!next.includes(item)) next.push(item);
+ }
+ return { ...prev, targetTitles: next };
+ });
  setNewTitleInput('');
  }
  };
@@ -782,13 +799,31 @@ export const OnboardingFlow = ({ onComplete, initialUser = null, onSignOut = nul
   const handleFinalSubmit = async () => {
     setIsLaunching(true);
     setLaunchMessage('Saving candidate profile to secure database...');
-    const titles = profileData.targetTitles?.length ? profileData.targetTitles : (profileData.targetRoles || []);
+
+    let titles = profileData.targetTitles?.length ? [...profileData.targetTitles] : (profileData.targetRoles ? [...profileData.targetRoles] : []);
+    if (newTitleInput && newTitleInput.trim()) {
+      for (const t of newTitleInput.split(',').map(item => item.trim()).filter(Boolean)) {
+        if (!titles.includes(t)) titles.push(t);
+      }
+      setNewTitleInput('');
+    }
+
+    let skills = profileData.coreSkills?.length ? [...profileData.coreSkills] : [];
+    if (newSkillInput && newSkillInput.trim()) {
+      for (const s of newSkillInput.split(',').map(item => item.trim()).filter(Boolean)) {
+        if (!skills.includes(s)) skills.push(s);
+      }
+      setNewSkillInput('');
+    }
+
     const seniority = profileData.seniorityLevel || profileData.seniority || 'Senior';
     const loc = profileData.location || profileData.locationPreference || '';
     const finalProfileData = {
       ...profileData,
       targetTitles: titles,
       targetRoles: [...titles],
+      coreSkills: skills,
+      core_skills: [...skills],
       seniorityLevel: seniority,
       seniority: seniority,
       location: loc,

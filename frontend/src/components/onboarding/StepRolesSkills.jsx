@@ -259,7 +259,11 @@ export function StepRolesSkills({
  </button>
  <button
  type="button"
- onClick={() => setStep(5)}
+ onClick={() => {
+ if (newTitleInput && newTitleInput.trim()) handleAddTitle();
+ if (newSkillInput && newSkillInput.trim()) handleAddSkill();
+ setStep(5);
+ }}
  className="px-6 py-2.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-white font-black transition-colors cursor-pointer flex items-center justify-center gap-1.5"
  >
  Continue to Location & Preferences <ArrowRight size={14} />

@@ -71,6 +71,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
     setActiveProfile,
     editingProfile,
     setEditingProfile,
+    setProfileModalInitialTab,
     profileCompleteness,
     isCompletenessDismissed,
     setIsCompletenessDismissed,
@@ -1032,6 +1033,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   type="button"
                   onClick={() => {
                     setEditingProfile(activeProfile);
+                    if (setProfileModalInitialTab) setProfileModalInitialTab('edit');
                     setIsProfileModalOpen(true);
                   }}
                   className="px-3 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 text-black font-mono font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5"

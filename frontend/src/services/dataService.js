@@ -426,10 +426,17 @@ export const fetchJobsFromApi = async ({
   if (sortBy) params.set('sortBy', sortBy);
 
   try {
-    const res = await fetch(`${apiBase}/api/jobs?${params.toString()}`, {
+    let res = await fetch(`${apiBase}/api/jobs?${params.toString()}`, {
       // Allow sufficient time for indexed job queries
       signal: AbortSignal.timeout(45000)
     });
+    if (res.status === 503) {
+      // Polite 1.5s retry on transient gateway queueing / container scaling
+      await new Promise(r => setTimeout(r, 1500));
+      res = await fetch(`${apiBase}/api/jobs?${params.toString()}`, {
+        signal: AbortSignal.timeout(45000)
+      });
+    }
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.jobs) && data.jobs.length > 0) {

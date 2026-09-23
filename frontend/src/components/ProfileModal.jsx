@@ -22,6 +22,7 @@ import { getLearnedContext, evolveProfileFromLearnedContext } from '../services/
 
 import { extractTextFromFile, extractTextFromPastedPdfString } from '../utils/documentParser';
 import { runProfileOnboardingPipeline } from '../services/profileOnboardingPipeline';
+import { suggestRelatedTitles } from '../services/jobQueryService';
 
 const INDUSTRY_OPTIONS = [
  'Technology & IT',
@@ -47,6 +48,29 @@ const SENIORITY_OPTIONS = [
  'Manager / Lead',
  'Executive / Director'
 ];
+
+const resolveTargetTitles = (p) => {
+ if (!p) return [];
+ const raw = p.targetTitles || p.target_titles || p.targetRoles || p.target_roles;
+ if (Array.isArray(raw) && raw.length > 0) return [...raw];
+ if (typeof raw === 'string' && raw.trim()) return raw.split(',').map(t => t.trim()).filter(Boolean);
+ if (typeof localStorage !== 'undefined') {
+  try {
+   const stored = JSON.parse(localStorage.getItem('userTargetTitles') || '[]');
+   if (Array.isArray(stored) && stored.length > 0) return stored;
+  } catch {}
+ }
+ if (p.title && String(p.title).trim()) return [String(p.title).trim()];
+ return [];
+};
+
+const resolveCoreSkills = (p) => {
+ if (!p) return [];
+ const raw = p.coreSkills || p.core_skills || p.skills;
+ if (Array.isArray(raw) && raw.length > 0) return [...raw];
+ if (typeof raw === 'string' && raw.trim()) return raw.split(',').map(s => s.trim()).filter(Boolean);
+ return [];
+};
 
 export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initialTab = 'upload' }) => {
  const [activeTab, setActiveTab] = useState(initialTab);
@@ -82,8 +106,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  targetSalary: current.targetSalary || current.target_salary || '',
  keyStrengths: current.keyStrengths?.length ? [...current.keyStrengths] : (current.key_strengths?.length ? [...current.key_strengths] : []),
  managementStyle: current.managementStyle || '',
- targetTitles: current.targetTitles?.length ? [...current.targetTitles] : (current.target_titles?.length ? [...current.target_titles] : []),
- coreSkills: current.coreSkills?.length ? [...current.coreSkills] : (current.core_skills?.length ? [...current.core_skills] : []),
+ targetTitles: resolveTargetTitles(current),
+ coreSkills: resolveCoreSkills(current),
  certifications: current.certifications?.length ? [...current.certifications] : [],
  interviewTalkingPoints: current.interviewTalkingPoints?.length ? [...current.interviewTalkingPoints] : [],
  workHistorySummary: current.workHistorySummary || '',
@@ -96,6 +120,10 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  const [newCertInput, setNewCertInput] = useState('');
  const [newStrengthInput, setNewStrengthInput] = useState('');
  const [newTalkingPointInput, setNewTalkingPointInput] = useState('');
+
+ const suggestedTitles = React.useMemo(() => {
+  return suggestRelatedTitles(formData);
+ }, [formData.industry, formData.targetTitles]);
 
  // Synchronize active profile data whenever modal opens
  useEffect(() => {
@@ -119,8 +147,8 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  targetSalary: active.targetSalary || active.target_salary || '',
  keyStrengths: active.keyStrengths?.length ? [...active.keyStrengths] : (active.key_strengths?.length ? [...active.key_strengths] : []),
  managementStyle: active.managementStyle || '',
- targetTitles: active.targetTitles?.length ? [...active.targetTitles] : (active.target_titles?.length ? [...active.target_titles] : []),
- coreSkills: active.coreSkills?.length ? [...active.coreSkills] : (active.core_skills?.length ? [...active.core_skills] : []),
+ targetTitles: resolveTargetTitles(active),
+ coreSkills: resolveCoreSkills(active),
  certifications: active.certifications?.length ? [...active.certifications] : [],
  interviewTalkingPoints: active.interviewTalkingPoints?.length ? [...active.interviewTalkingPoints] : [],
  workHistorySummary: active.workHistorySummary || '',
@@ -134,8 +162,9 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  setTestResult(null);
  setSaveSuccess(false);
  setParseError('');
+ setActiveTab(initialTab || (active?.name ? 'edit' : 'upload'));
  }
- }, [isOpen, profile]);
+ }, [isOpen, profile, initialTab]);
 
  if (!isOpen) return null;
 
@@ -229,13 +258,18 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  };
 
  // Tag Handlers
- const handleAddTitle = () => {
- if (newTitleInput.trim() && !formData.targetTitles.includes(newTitleInput.trim())) {
- setFormData(prev => ({
- ...prev,
- targetTitles: [...prev.targetTitles, newTitleInput.trim()]
- }));
- setNewTitleInput('');
+ const handleAddTitle = (titleToAdd) => {
+ const raw = typeof titleToAdd === 'string' ? titleToAdd : newTitleInput;
+ if (raw && raw.trim()) {
+ const items = raw.split(',').map(t => t.trim()).filter(Boolean);
+ setFormData(prev => {
+ const next = [...prev.targetTitles];
+ for (const item of items) {
+ if (!next.some(t => t.toLowerCase() === item.toLowerCase())) next.push(item);
+ }
+ return { ...prev, targetTitles: next };
+ });
+ if (typeof titleToAdd !== 'string') setNewTitleInput('');
  }
  };
 
@@ -247,11 +281,15 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  };
 
  const handleAddSkill = () => {
- if (newSkillInput.trim() && !formData.coreSkills.includes(newSkillInput.trim())) {
- setFormData(prev => ({
- ...prev,
- coreSkills: [...prev.coreSkills, newSkillInput.trim()]
- }));
+ if (newSkillInput.trim()) {
+ const items = newSkillInput.split(',').map(s => s.trim()).filter(Boolean);
+ setFormData(prev => {
+ const next = [...prev.coreSkills];
+ for (const item of items) {
+ if (!next.includes(item)) next.push(item);
+ }
+ return { ...prev, coreSkills: next };
+ });
  setNewSkillInput('');
  }
  };
@@ -264,11 +302,15 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  };
 
  const handleAddCert = () => {
- if (newCertInput.trim() && !formData.certifications.includes(newCertInput.trim())) {
- setFormData(prev => ({
- ...prev,
- certifications: [...prev.certifications, newCertInput.trim()]
- }));
+ if (newCertInput.trim()) {
+ const items = newCertInput.split(',').map(c => c.trim()).filter(Boolean);
+ setFormData(prev => {
+ const next = [...prev.certifications];
+ for (const item of items) {
+ if (!next.includes(item)) next.push(item);
+ }
+ return { ...prev, certifications: next };
+ });
  setNewCertInput('');
  }
  };
@@ -281,11 +323,15 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  };
 
  const handleAddStrength = () => {
- if (newStrengthInput.trim() && !formData.keyStrengths.includes(newStrengthInput.trim())) {
- setFormData(prev => ({
- ...prev,
- keyStrengths: [...prev.keyStrengths, newStrengthInput.trim()]
- }));
+ if (newStrengthInput.trim()) {
+ const items = newStrengthInput.split(',').map(str => str.trim()).filter(Boolean);
+ setFormData(prev => {
+ const next = [...prev.keyStrengths];
+ for (const item of items) {
+ if (!next.includes(item)) next.push(item);
+ }
+ return { ...prev, keyStrengths: next };
+ });
  setNewStrengthInput('');
  }
  };
@@ -323,12 +369,85 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  if (isSaving) return;
  setIsSaving(true);
 
+ // Auto-commit any un-added input values before saving so user input is never lost
+ const finalTitles = [...formData.targetTitles];
+ if (newTitleInput.trim()) {
+ for (const t of newTitleInput.split(',').map(item => item.trim()).filter(Boolean)) {
+ if (!finalTitles.some(existing => existing.toLowerCase() === t.toLowerCase())) finalTitles.push(t);
+ }
+ setNewTitleInput('');
+ }
+
+ // Guarantee Primary Market Title is included in finalTitles if present
+ if (formData.title && formData.title.trim()) {
+ const primary = formData.title.trim();
+ if (!finalTitles.some(t => t.toLowerCase() === primary.toLowerCase())) {
+ finalTitles.unshift(primary);
+ }
+ }
+
+ // If finalTitles is still empty, seed defaults from suggestRelatedTitles
+ if (finalTitles.length === 0) {
+ const suggested = suggestRelatedTitles({ ...formData, targetTitles: [] });
+ if (suggested && suggested.length > 0) {
+ finalTitles.push(...suggested.slice(0, 3));
+ }
+ }
+
+ const primaryTitle = formData.title?.trim() || (finalTitles.length > 0 ? finalTitles[0] : '');
+
+ const finalSkills = [...formData.coreSkills];
+ if (newSkillInput.trim()) {
+ for (const s of newSkillInput.split(',').map(item => item.trim()).filter(Boolean)) {
+ if (!finalSkills.some(existing => existing.toLowerCase() === s.toLowerCase())) finalSkills.push(s);
+ }
+ setNewSkillInput('');
+ }
+
+ const finalCerts = [...formData.certifications];
+ if (newCertInput.trim()) {
+ for (const c of newCertInput.split(',').map(item => item.trim()).filter(Boolean)) {
+ if (!finalCerts.some(existing => existing.toLowerCase() === c.toLowerCase())) finalCerts.push(c);
+ }
+ setNewCertInput('');
+ }
+
+ const finalStrengths = [...formData.keyStrengths];
+ if (newStrengthInput.trim()) {
+ for (const str of newStrengthInput.split(',').map(item => item.trim()).filter(Boolean)) {
+ if (!finalStrengths.some(existing => existing.toLowerCase() === str.toLowerCase())) finalStrengths.push(str);
+ }
+ setNewStrengthInput('');
+ }
+
+ const finalTalkingPoints = [...formData.interviewTalkingPoints];
+ if (newTalkingPointInput.trim() && !finalTalkingPoints.includes(newTalkingPointInput.trim())) {
+ finalTalkingPoints.push(newTalkingPointInput.trim());
+ setNewTalkingPointInput('');
+ }
+
  saveLlmConfig({
  provider: llmProvider,
  model: llmModel,
  apiKey: apiKey
  });
- const saved = saveProfile(formData);
+
+ const dataToSave = {
+ ...formData,
+ title: primaryTitle,
+ targetTitles: finalTitles,
+ targetRoles: [...finalTitles],
+ target_titles: [...finalTitles],
+ target_roles: [...finalTitles],
+ coreSkills: finalSkills,
+ core_skills: [...finalSkills],
+ certifications: finalCerts,
+ keyStrengths: finalStrengths,
+ interviewTalkingPoints: finalTalkingPoints
+ };
+
+ setFormData(dataToSave);
+ const saved = saveProfile(dataToSave);
  runProfileOnboardingPipeline(saved).catch(() => {});
  setSaveSuccess(true);
  if (onProfileSaved) {
@@ -650,7 +769,16 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
  <input
  type="text"
  value={formData.title}
- onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+ onChange={(e) => {
+  const val = e.target.value;
+  setFormData(prev => {
+   let nextTitles = [...prev.targetTitles];
+   if (nextTitles.length === 0 || (nextTitles.length === 1 && nextTitles[0] === prev.title)) {
+    nextTitles = val.trim() ? [val.trim()] : [];
+   }
+   return { ...prev, title: val, targetTitles: nextTitles };
+  });
+ }}
  className="w-full p-2.5 rounded-sm bg-slate-950 border border-slate-800 text-white focus:border-teal-500 focus:outline-none text-xs"
  placeholder="e.g. Senior Systems Engineer"
  />
@@ -767,33 +895,81 @@ export const ProfileModal = ({ profile, isOpen, onClose, onProfileSaved, initial
 
  {/* Target Job Titles Tag Editor */}
  <div className="space-y-2 pt-2 border-t border-slate-800">
+ <div className="flex items-center justify-between">
  <label className="text-[11px] font-bold text-teal-300 flex items-center gap-1.5">
  <Target size={13} /> TARGET JOB TITLES (Auto-matches scraping feeds & telemetry)
  </label>
+ {formData.targetTitles.length > 0 && (
+ <span className="text-[10px] font-mono text-teal-400/80">
+ {formData.targetTitles.length} active {formData.targetTitles.length === 1 ? 'target' : 'targets'}
+ </span>
+ )}
+ </div>
+
  <div className="flex flex-wrap gap-1.5 p-2.5 rounded-sm bg-slate-950 border border-slate-800 min-h-[44px]">
- {formData.targetTitles.map((t, idx) => (
+ {formData.targetTitles.length === 0 ? (
+ <span className="text-slate-500 text-xs italic flex items-center gap-1.5">
+ <AlertCircle size={13} className="text-amber-400" />
+ No target titles added yet. Add a role title below or pick from suggestions to auto-match job feeds.
+ </span>
+ ) : (
+ formData.targetTitles.map((t, idx) => (
  <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-teal-950/80 border border-teal-500/40 text-teal-300 text-[11px] font-bold">
  {t}
- <button onClick={() => handleRemoveTitle(t)} className="text-slate-400 hover:text-white cursor-pointer ml-1">×</button>
+ <button onClick={() => handleRemoveTitle(t)} className="text-slate-400 hover:text-white cursor-pointer ml-1" title="Remove title">×</button>
  </span>
- ))}
+ ))
+ )}
  </div>
+
+ {/* Primary Title Quick Add Pill if not already in target titles */}
+ {formData.title && formData.title.trim() && !formData.targetTitles.some(t => t.toLowerCase() === formData.title.trim().toLowerCase()) && (
+ <div className="flex items-center gap-2 pt-0.5">
+ <button
+ type="button"
+ onClick={() => handleAddTitle(formData.title.trim())}
+ className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xs bg-teal-950/90 border border-teal-500/60 text-teal-300 hover:bg-teal-900 text-[11px] font-bold cursor-pointer transition-colors"
+ >
+ <Plus size={12} /> Add Primary Title: "{formData.title.trim()}"
+ </button>
+ </div>
+ )}
+
  <div className="flex gap-2">
  <input
  type="text"
  value={newTitleInput}
  onChange={(e) => setNewTitleInput(e.target.value)}
  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTitle())}
- placeholder="Add target title (e.g. Cloud Architect)..."
+ placeholder="Add target title (e.g. Cloud Architect, Systems Engineer)..."
  className="flex-1 p-2 rounded-sm bg-slate-950 border border-slate-800 text-slate-200 focus:border-teal-500 focus:outline-none text-xs"
  />
  <button
- onClick={handleAddTitle}
+ onClick={() => handleAddTitle()}
  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-sm font-bold cursor-pointer transition-colors"
  >
  <Plus size={14} /> Add
  </button>
  </div>
+
+ {/* Suggested Titles Chips */}
+ {suggestedTitles && suggestedTitles.length > 0 && (
+ <div className="flex flex-wrap items-center gap-1.5 pt-1">
+ <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+ Suggested for {formData.industry || 'Your Field'}:
+ </span>
+ {suggestedTitles.slice(0, 6).map(title => (
+ <button
+ key={title}
+ type="button"
+ onClick={() => handleAddTitle(title)}
+ className="px-2 py-0.5 rounded-xs bg-slate-950 hover:bg-teal-950 border border-slate-800 hover:border-teal-500/40 text-slate-400 hover:text-teal-300 text-[10px] font-medium transition-colors cursor-pointer"
+ >
+ + {title}
+ </button>
+ ))}
+ </div>
+ )}
  </div>
 
  {/* Core Skills Tag Editor */}

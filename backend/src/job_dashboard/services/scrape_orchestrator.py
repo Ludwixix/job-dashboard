@@ -69,9 +69,7 @@ class ScrapeOrchestrationService:
                         SearchQuery(
                             term=item.get("term", ""),
                             location=item.get("location", "Melbourne, VIC"),
-                            stream=item.get(
-                                "stream", detect_query_stream(item.get("term", ""))
-                            ),
+                            stream=item.get("stream", detect_query_stream(item.get("term", ""))),
                             group=item.get("group", ""),
                             weight=float(item.get("weight", 1.0)),
                             exclude_terms=tuple(item.get("exclude_terms", ())),
@@ -80,9 +78,7 @@ class ScrapeOrchestrationService:
                     )
             return queries
         except Exception as err:
-            logger.warning(
-                f"Failed to read search queries from {self.search_queries_path}: {err}"
-            )
+            logger.warning(f"Failed to read search queries from {self.search_queries_path}: {err}")
             return list(defaults or [])
 
     def save_search_queries(self) -> None:
@@ -145,9 +141,7 @@ class ScrapeOrchestrationService:
                     SearchQuery(
                         term=str(q.get("term")).strip(),
                         location=str(q.get("location") or "Melbourne, VIC"),
-                        stream=str(
-                            q.get("stream") or detect_query_stream(str(q.get("term")))
-                        ),
+                        stream=str(q.get("stream") or detect_query_stream(str(q.get("term")))),
                         enabled=bool(q.get("enabled", True)),
                     )
                 )
@@ -172,10 +166,8 @@ class ScrapeOrchestrationService:
                     continue
 
             # 2. Query Scrape Cache: Check if scraped within TTL
-            if (
-                not force
-                and self.repository
-                and self.repository.is_query_cached(term, loc, ttl_hours=ttl_hours)
+            if not force and self.repository and self.repository.is_query_cached(
+                term, loc, ttl_hours=ttl_hours
             ):
                 cached_query_terms.append(term)
             else:
@@ -184,9 +176,7 @@ class ScrapeOrchestrationService:
         pipeline_errors = []
         if queries_to_scrape:
             if on_progress:
-                on_progress(
-                    f"Scanning {len(queries_to_scrape)} live employment gateways...", 10
-                )
+                on_progress(f"Scanning {len(queries_to_scrape)} live employment gateways...", 10)
             pipeline = ScrapePipeline(
                 self.sources, days=14, health_check=self.health_check
             )
@@ -214,3 +204,4 @@ class ScrapeOrchestrationService:
             "total_jobs": len(all_jobs),
         }
         return all_jobs, pipeline_errors, cache_stats
+

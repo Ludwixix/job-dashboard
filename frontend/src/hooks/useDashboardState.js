@@ -118,6 +118,7 @@ export function useDashboardState({
   const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
   const [editingProfile, setEditingProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalInitialTab, setProfileModalInitialTab] = useState('edit');
   const [isCompletenessDismissed, setIsCompletenessDismissed] = useState(false);
   const profileCompleteness = useMemo(() => calculateProfileCompleteness(activeProfile), [activeProfile]);
 
@@ -462,6 +463,7 @@ export function useDashboardState({
       isBatchApplyOpen,
       isCustomJobModalOpen,
       isProfileModalOpen,
+      profileModalInitialTab,
       isSettingsOpen,
       isSkillGapModalOpen,
       isCompareModalOpen,
@@ -484,6 +486,7 @@ export function useDashboardState({
       setIsBatchApplyOpen,
       setIsCustomJobModalOpen,
       setIsProfileModalOpen,
+      setProfileModalInitialTab,
       setIsSettingsOpen,
       setIsSkillGapModalOpen,
       setIsCompareModalOpen,
@@ -546,6 +549,8 @@ export function useDashboardState({
     setActiveProfile,
     editingProfile,
     setEditingProfile,
+    profileModalInitialTab,
+    setProfileModalInitialTab,
     profileCompleteness,
     isCompletenessDismissed,
     setIsCompletenessDismissed,

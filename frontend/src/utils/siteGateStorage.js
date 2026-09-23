@@ -19,3 +19,4 @@ export function setSiteUnlocked(unlocked = true) {
     console.warn('Could not persist site unlock state:', e);
   }
 }
+

@@ -353,7 +353,13 @@ export const buildQueriesFromProfile = (profile) => {
   };
 
   // 1. Explicit target titles / target roles — highest priority
-  const titles = profile.targetTitles || profile.targetRoles || profile.target_titles || profile.target_roles || [];
+  let titles = profile.targetTitles || profile.targetRoles || profile.target_titles || profile.target_roles || [];
+  if (!Array.isArray(titles) && typeof titles === 'string') {
+    titles = titles.split(',').map(t => t.trim()).filter(Boolean);
+  }
+  if ((!titles || titles.length === 0) && profile.title && String(profile.title).trim()) {
+    titles = [String(profile.title).trim()];
+  }
   for (const title of titles) {
     add(title, 'core', 1.5);
     if ((profile.openToRemote || profile.includeRemote) && queries.length < maxQueries) {
@@ -448,10 +454,11 @@ export const triggerProfileScrape = async (profile, options = {}) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         queries, 
+        async: options.async !== undefined ? options.async : true,
         force: Boolean(options.force),
         ttl_hours: options.ttl_hours !== undefined ? options.ttl_hours : 12.0
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();

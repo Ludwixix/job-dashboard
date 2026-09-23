@@ -1,1 +1,0 @@
-import"./rolldown-runtime-hePW80VL.js";import{i as e,t}from"./vendor-react-D0Ec-185.js";import{t as n}from"./InterviewSuiteModal-BZjsKap5.js";e();var r=t(),i=e=>(0,r.jsx)(n,{...e,initialTab:`prep`});export{i as InterviewPrepModal};

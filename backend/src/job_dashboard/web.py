@@ -132,10 +132,21 @@ def _persist_profile_to_all_sinks(
         profile_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
     # Cross-populate naming convention aliases
-    if "targetRoles" in profile_data and "targetTitles" not in profile_data:
-        profile_data["targetTitles"] = list(profile_data["targetRoles"])
-    elif "targetTitles" in profile_data and "targetRoles" not in profile_data:
-        profile_data["targetRoles"] = list(profile_data["targetTitles"])
+    titles = (
+        profile_data.get("targetTitles")
+        or profile_data.get("target_titles")
+        or profile_data.get("targetRoles")
+        or profile_data.get("target_roles")
+        or []
+    )
+    if isinstance(titles, str):
+        titles = [t.strip() for t in titles.split(",") if t.strip()]
+    if not titles and profile_data.get("title"):
+        titles = [str(profile_data["title"]).strip()]
+    profile_data["targetTitles"] = list(titles)
+    profile_data["target_titles"] = list(titles)
+    profile_data["targetRoles"] = list(titles)
+    profile_data["target_roles"] = list(titles)
 
     if "seniority" in profile_data and "seniorityLevel" not in profile_data:
         profile_data["seniorityLevel"] = profile_data["seniority"]

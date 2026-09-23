@@ -177,10 +177,25 @@ export const saveProfile = (updatedProfile, options = {}) => {
   };
 
   // Cross-populate aliases so both frontend and backend conventions are always complete
-  if (profile.targetTitles && !profile.targetRoles) {
-    profile.targetRoles = [...profile.targetTitles];
-  } else if (profile.targetRoles && !profile.targetTitles) {
-    profile.targetTitles = [...profile.targetRoles];
+  let resolvedTitles = [];
+  if (Array.isArray(profile.targetTitles) && profile.targetTitles.length > 0) {
+    resolvedTitles = [...profile.targetTitles];
+  } else if (Array.isArray(profile.targetRoles) && profile.targetRoles.length > 0) {
+    resolvedTitles = [...profile.targetRoles];
+  } else if (Array.isArray(profile.target_titles) && profile.target_titles.length > 0) {
+    resolvedTitles = [...profile.target_titles];
+  } else if (Array.isArray(profile.target_roles) && profile.target_roles.length > 0) {
+    resolvedTitles = [...profile.target_roles];
+  } else if (profile.title && String(profile.title).trim()) {
+    resolvedTitles = [String(profile.title).trim()];
+  }
+  profile.targetTitles = resolvedTitles;
+  profile.targetRoles = [...resolvedTitles];
+  profile.target_titles = [...resolvedTitles];
+  profile.target_roles = [...resolvedTitles];
+
+  if (!profile.title && resolvedTitles.length > 0) {
+    profile.title = resolvedTitles[0];
   }
 
   if (profile.seniorityLevel && !profile.seniority) {

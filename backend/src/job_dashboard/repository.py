@@ -1166,6 +1166,32 @@ class JobRepository:
                 )
                 return cur.rowcount > 0
 
+    def get_application_events(
+        self, user_id_or_job_id: str, job_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Retrieve audit timeline events for an application ordered by occurrence time."""
+        target_job_id = job_id if job_id is not None else user_id_or_job_id
+        with get_db_connection(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id, job_id, from_status, to_status, occurred_at
+                FROM application_events
+                WHERE job_id = ?
+                ORDER BY occurred_at DESC, id DESC
+                """,
+                (str(target_job_id),),
+            ).fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "job_id": r[1],
+                    "from_status": r[2],
+                    "to_status": r[3],
+                    "occurred_at": r[4],
+                }
+                for r in rows
+            ]
+
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         with get_db_connection(self.path) as conn:
             row = conn.execute(

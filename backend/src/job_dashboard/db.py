@@ -8,7 +8,6 @@ virtual table (jobs_fts), and automatic synchronization triggers.
 from __future__ import annotations
 
 import sqlite3
-from typing import Any
 
 from .logging import get_logger
 

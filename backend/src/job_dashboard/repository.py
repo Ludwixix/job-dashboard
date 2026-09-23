@@ -184,18 +184,6 @@ class JobRepository:
                 except sqlite3.OperationalError:
                     pass
 
-            # Backfill jobs_fts virtual index if empty
-            try:
-                fts_row = conn.execute("SELECT count(*) FROM jobs_fts").fetchone()
-                fts_count = fts_row[0] if fts_row else 0
-                if fts_count == 0:
-                    conn.execute("""
-                        INSERT INTO jobs_fts(id, title, company, stream, description)
-                        SELECT id, title, company, stream, description FROM jobs
-                    """)
-            except Exception as fts_pop_err:
-                logger.debug(f"jobs_fts backfill note: {fts_pop_err}")
-
             default_flags = [
                 (
                     "automated_gmail_sync",
@@ -299,14 +287,7 @@ class JobRepository:
     @staticmethod
     def _sanitize_fts_query(term: str) -> str:
         """Sanitize raw search term into a safe SQLite FTS5 query string."""
-        import re
-
-        if not term:
-            return ""
-        tokens = re.findall(r"\w+", str(term))
-        if not tokens:
-            return ""
-        return " AND ".join(f'"{t}"*' for t in tokens)
+        return sanitize_fts5_query(term)
 
     def find_fresh_matching_jobs(
         self,
@@ -357,12 +338,15 @@ class JobRepository:
                     conn.row_factory = sqlite3.Row
                     rows = conn.execute(
                         f"""SELECT j.data_json, j.status, j.posted
-                            FROM jobs_fts f
-                            JOIN jobs j ON f.id = j.id
+                            FROM jobs j
+                            JOIN jobs_fts f ON j.rowid = f.rowid
                             WHERE f.jobs_fts MATCH ? AND {where_fts}
                             ORDER BY j.score DESC, j.posted DESC LIMIT ?""",
                         fts_params + [limit * 2],
                     ).fetchall()
+            except sqlite3.OperationalError as fts_err:
+                logger.debug(f"FTS5 query operational fallback: {fts_err}")
+                rows = []
             except Exception as fts_err:
                 logger.debug(f"FTS5 query fallback: {fts_err}")
                 rows = []
@@ -802,18 +786,66 @@ class JobRepository:
 
             where_sql = " AND ".join(clauses)
 
-            with get_db_connection(self.path) as conn:
-                conn.row_factory = sqlite3.Row
+            fts_success = False
+            rows = []
+            if search:
+                fts_query = sanitize_fts5_query(search)
+                if fts_query:
+                    try:
+                        fts_clauses = [
+                            "lower(jobs.source) != 'gmail'",
+                            "jobs_fts MATCH ?",
+                        ]
+                        fts_params: list[Any] = [fts_query]
+                        if industry and industry.lower() != "all":
+                            fts_clauses.append(
+                                "(lower(jobs.stream) LIKE ? OR lower(jobs.data_json) LIKE ?)"
+                            )
+                            fts_params.extend(
+                                [
+                                    f"%{industry.strip().lower()}%",
+                                    f"%{industry.strip().lower()}%",
+                                ]
+                            )
+                        if remote is not None:
+                            fts_clauses.append("jobs.remote = ?")
+                            fts_params.append(1 if remote else 0)
+                        fts_where_sql = " AND ".join(fts_clauses)
+                        with get_db_connection(self.path) as conn:
+                            conn.row_factory = sqlite3.Row
+                            rows = conn.execute(
+                                f"SELECT jobs.data_json, jobs.status, jobs.created_at, jobs.updated_at, jobs_fts.rank "
+                                f"FROM jobs "
+                                f"JOIN jobs_fts ON jobs.rowid = jobs_fts.rowid "
+                                f"WHERE {fts_where_sql} "
+                                f"ORDER BY jobs_fts.rank",
+                                fts_params,
+                            ).fetchall()
+                        fts_success = True
+                    except sqlite3.OperationalError as e:
+                        logger.warning(
+                            f"FTS5 query failed for '{search}' ({e}), falling back to LIKE"
+                        )
+                        fts_success = False
+                    except Exception as e:
+                        logger.warning(
+                            f"FTS5 query error for '{search}' ({e}), falling back to LIKE"
+                        )
+                        fts_success = False
 
-                # Public job reads are intentionally materialized and filtered in
-                # Python: SQLite's lexical ORDER BY would place values such as
-                # "Featured" above ISO dates, and it cannot reliably interpret
-                # provider-relative values such as "9d ago". This also keeps
-                # workflow/email records out of the public index.
-                rows = conn.execute(
-                    f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql}",
-                    params,
-                ).fetchall()
+            if not fts_success:
+                with get_db_connection(self.path) as conn:
+                    conn.row_factory = sqlite3.Row
+
+                    # Public job reads are intentionally materialized and filtered in
+                    # Python: SQLite's lexical ORDER BY would place values such as
+                    # "Featured" above ISO dates, and it cannot reliably interpret
+                    # provider-relative values such as "9d ago". This also keeps
+                    # workflow/email records out of the public index.
+                    rows = conn.execute(
+                        f"SELECT data_json, status, created_at, updated_at FROM jobs WHERE {where_sql}",
+                        params,
+                    ).fetchall()
 
             jobs = []
             for row in rows:
@@ -858,6 +890,9 @@ class JobRepository:
                     -job.get("_posted_timestamp", 0.0),
                 )
             )
+        elif fts_success and sort_by in ("newest", "relevance", "rank"):
+            # Results from FTS5 query are ordered by jobs_fts.rank; preserve this ranking
+            pass
         else:
             jobs.sort(key=lambda job: job.get("_posted_timestamp", 0.0), reverse=True)
 

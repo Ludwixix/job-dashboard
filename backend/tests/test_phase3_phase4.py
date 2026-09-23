@@ -62,3 +62,86 @@ def test_email_classifier_detects_offer():
     category, confidence = classifier.classify(email)
     assert category == "offer_extended"
     assert confidence >= 0.7
+
+
+def test_decomposed_job_index_service(tmp_path):
+    from job_dashboard.services import JobIndexService
+
+    service = JobIndexService(
+        data_dir=tmp_path,
+        initial_jobs=[
+            {
+                "id": "j1",
+                "title": "DevOps Engineer",
+                "company": "Canva",
+                "url": "https://example.com/j1",
+            },
+            {
+                "id": "j2",
+                "title": "Staff Platform Engineer",
+                "company": "Atlassian",
+                "url": "https://example.com/j2",
+            },
+        ],
+    )
+
+    # Test O(1) dual lookups
+    assert service.get_job("j1")["title"] == "DevOps Engineer"
+    assert service.get_job_by_url("https://example.com/j2")["id"] == "j2"
+    assert service.get_job("nonexistent") is None
+
+    # Test materialization
+    raw = [
+        {"title": "Cloud Architect", "company": "Google", "description": "Cloud infra"}
+    ]
+    mat = service.materialize_jobs(raw)
+    assert len(mat) == 1
+    assert mat[0]["company"] == "Google"
+
+    # Test upsert
+    service.upsert_jobs(mat)
+    assert len(service.get_jobs()) == 3
+
+
+def test_decomposed_scrape_orchestration_service(tmp_path):
+    from job_dashboard.repository import JobRepository
+    from job_dashboard.services import ScrapeOrchestrationService, JobIndexService
+
+    repo = JobRepository(str(tmp_path / "jobs.sqlite3"))
+    index_service = JobIndexService(tmp_path, repository=repo, initial_jobs=[])
+    scrape_service = ScrapeOrchestrationService(
+        data_dir=tmp_path,
+        repository=repo,
+        job_index=index_service,
+    )
+
+    # Save and reload search queries
+    scrape_service.save_search_queries()
+    loaded_queries = scrape_service._load_search_queries()
+    assert isinstance(loaded_queries, list)
+
+    # Check coordinator access
+    assert scrape_service.coordinator is not None
+    assert scrape_service.coordinator.get_queue_depth() == 0
+
+
+def test_decomposed_application_workflow_service(tmp_path):
+    from job_dashboard.repository import JobRepository
+    from job_dashboard.services import ApplicationWorkflowService
+
+    repo = JobRepository(str(tmp_path / "jobs.sqlite3"))
+    workflow_service = ApplicationWorkflowService(data_dir=tmp_path, repository=repo)
+
+    # Update application status
+    updated = workflow_service.update_application_status(
+        user_id="user_test_1",
+        job_id="job_test_1",
+        status="applied",
+        notes="Applied via company portal",
+    )
+    assert updated["status"] == "applied"
+
+    # Verify event audit trail
+    events = workflow_service.get_application_events("job_test_1")
+    assert len(events) >= 1
+    assert events[0]["to_status"] == "applied"

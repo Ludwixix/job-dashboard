@@ -418,3 +418,65 @@ def test_job_intelligence_persistence(tmp_path):
     refetched = repo.get_job_intelligence("job_123", "executive_dossier")
     assert refetched["data"]["score"] == 98
     assert refetched["model_name"] == "google/gemini-2.0-flash-exp:free"
+
+
+def test_fts5_indexing_and_fast_search(tmp_path):
+    from datetime import datetime, timezone
+    from job_dashboard.repository import JobRepository
+
+    db_path = tmp_path / "test_fts.sqlite3"
+    repo = JobRepository(str(db_path))
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    jobs = [
+        {
+            "id": "job_fts_1",
+            "title": "Principal Kubernetes Architect",
+            "company": "Canva",
+            "location": "Melbourne, VIC",
+            "description": "Leading cloud infrastructure and Docker container orchestration.",
+            "source": "seek",
+            "posted": now_iso,
+            "stream": "core",
+            "score": 95,
+        },
+        {
+            "id": "job_fts_2",
+            "title": "Senior Frontend React Developer",
+            "company": "Atlassian",
+            "location": "Sydney, NSW",
+            "description": "Building modern React and TypeScript design systems.",
+            "source": "indeed",
+            "posted": now_iso,
+            "stream": "core",
+            "score": 88,
+        },
+    ]
+
+    repo.replace_jobs(jobs)
+
+    # Search via FTS5 MATCH on keyword in title
+    k8s_matches = repo.find_fresh_matching_jobs("Kubernetes")
+    assert len(k8s_matches) == 1
+    assert k8s_matches[0]["id"] == "job_fts_1"
+
+    # Search via FTS5 MATCH on keyword in description
+    container_matches = repo.find_fresh_matching_jobs("container orchestration")
+    assert len(container_matches) == 1
+    assert container_matches[0]["id"] == "job_fts_1"
+
+    # Search React
+    react_matches = repo.find_fresh_matching_jobs("React Developer")
+    assert len(react_matches) == 1
+    assert react_matches[0]["id"] == "job_fts_2"
+
+    # Confirm composite indices were created in schema
+    with repo.get_connection() as conn:
+        indices = [
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            ).fetchall()
+        ]
+        assert "idx_user_apps_user_updated" in indices
+        assert "idx_app_events_job" in indices

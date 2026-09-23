@@ -33,7 +33,9 @@ from ..system_metrics import get_system_telemetry
 logger = logging.getLogger(__name__)
 
 
-def _resolve_user_id(handler, query_params: dict[str, list[str]] | None = None) -> str | None:
+def _resolve_user_id(
+    handler, query_params: dict[str, list[str]] | None = None
+) -> str | None:
     """Resolve user ID via bearer token, headers, or query params."""
     uid = get_auth_user_id(handler)
     if uid:
@@ -128,6 +130,22 @@ def handle_scrape_refresh(handler):
 
     force = bool(payload.get("force", False))
     ttl_hours = float(payload.get("ttl_hours", 12.0))
+    coordinator = getattr(app, "scrape_coordinator", None)
+    is_async = bool(payload.get("async", False)) or handler.path.endswith("/api/scrape")
+
+    if is_async and coordinator:
+        enqueued_results = coordinator.enqueue_queries(queries, app, force=force)
+        handler.send_json(
+            202,
+            {
+                "success": True,
+                "enqueued": True,
+                "queue_depth": coordinator.get_queue_depth(),
+                "coordinator_status": coordinator.get_status(),
+                "queries": enqueued_results,
+            },
+        )
+        return
 
     try:
         jobs, errors, cache_stats = app.refresh(
@@ -138,9 +156,7 @@ def handle_scrape_refresh(handler):
             f"/api/refresh scrape failed, returning cached DB jobs: {refresh_err}"
         )
         try:
-            cached_result = app.repository.query_jobs_paginated(
-                page=1, page_size=5000
-            )
+            cached_result = app.repository.query_jobs_paginated(page=1, page_size=5000)
             jobs = cached_result.get("jobs", [])
         except Exception:
             jobs = []
@@ -215,7 +231,10 @@ def handle_scrape_stream(handler):
                     SearchQuery(
                         term=str(item.get("term") or ""),
                         location=str(item.get("location") or "Melbourne, VIC"),
-                        stream=str(item.get("stream") or detect_query_stream(str(item.get("term") or ""))),
+                        stream=str(
+                            item.get("stream")
+                            or detect_query_stream(str(item.get("term") or ""))
+                        ),
                         group=str(item.get("group") or ""),
                         weight=float(item.get("weight", 1.0)),
                         exclude_terms=tuple(item.get("exclude_terms") or ()),
@@ -226,6 +245,7 @@ def handle_scrape_stream(handler):
             queries = list(app.search_queries)
 
     try:
+
         def on_progress(stage: str, percent: float):
             data = json.dumps({"stage": stage, "percent": percent})
             handler.wfile.write(f"data: {data}\n\n".encode("utf-8"))
@@ -276,7 +296,9 @@ def handle_post_search_criteria(handler):
     app = handler.app
     payload = get_json_body(handler)
     if isinstance(payload, dict):
-        raw_queries = payload.get("queries", payload.get("items", payload.get("searchCriteria", [])))
+        raw_queries = payload.get(
+            "queries", payload.get("items", payload.get("searchCriteria", []))
+        )
     elif isinstance(payload, list):
         raw_queries = payload
     else:
@@ -367,7 +389,11 @@ def handle_source_health(handler):
         "scrape_in_progress": getattr(app, "scrape_in_progress", False),
         "scheduler_active": getattr(app, "scheduler_active", True),
     }
-    checks = app.health_check.get_recent_checks(hours=hours) if getattr(app, "health_check", None) else []
+    checks = (
+        app.health_check.get_recent_checks(hours=hours)
+        if getattr(app, "health_check", None)
+        else []
+    )
     handler.send_json(
         200,
         {
@@ -476,9 +502,7 @@ def handle_telemetry_status(handler):
             if bool(settings.adzuna_app_id and settings.adzuna_api_key)
             else "configured",
             "badge": "🟢 Active" if bool(settings.adzuna_app_id) else "🟡 Standby",
-            "has_credentials": bool(
-                settings.adzuna_app_id and settings.adzuna_api_key
-            ),
+            "has_credentials": bool(settings.adzuna_app_id and settings.adzuna_api_key),
         },
         "remoteok": {
             "name": "RemoteOK",
@@ -686,4 +710,3 @@ def handle_backup_snapshot(handler):
 def handle_openapi_spec(handler):
     """Generate OpenAPI 3.0 specification for all backend REST endpoints."""
     handler.send_json(200, generate_openapi_spec())
-

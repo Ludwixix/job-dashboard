@@ -24,7 +24,6 @@ const PsychologyDecoderModal = lazy(() => import('./PsychologyDecoderModal').the
 
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { dispatchDirectApplicationSubmission, hasGeneratedApplicationDocs } from '../services/generationService';
-import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { 
  calculateCandidateJobMatch, 
  calculateCandidateDistanceKm,
@@ -1549,8 +1548,9 @@ export const JobSeeker = ({
  <>
  <button
  type="button"
- onClick={() => {
+ onClick={async () => {
  setOpenKebabJobId(null);
+ const { downloadResumePdf } = await import('../utils/pdfGenerator');
  downloadResumePdf(job.resumeText, job, currentProfile);
  }}
  className="w-full px-3 py-2 rounded-sm hover:bg-emerald-950 text-slate-200 hover:text-emerald-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
@@ -1560,8 +1560,9 @@ export const JobSeeker = ({
  </button>
  <button
  type="button"
- onClick={() => {
+ onClick={async () => {
  setOpenKebabJobId(null);
+ const { downloadCoverLetterPdf } = await import('../utils/pdfGenerator');
  downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
  }}
  className="w-full px-3 py-2 rounded-sm hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
@@ -1773,8 +1774,9 @@ export const JobSeeker = ({
  <>
  <button
  type="button"
- onClick={(e) => { 
+ onClick={async (e) => { 
  e.stopPropagation(); 
+ const { downloadResumePdf, downloadCoverLetterPdf } = await import('../utils/pdfGenerator');
  dispatchDirectApplicationSubmission(job, onJobStatusUpdate, downloadResumePdf, downloadCoverLetterPdf, currentProfile);
  }}
  className="flex-1 py-2.5 px-3 rounded-sm font-black text-xs transition-all border flex items-center justify-center gap-1.5 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-500 -emerald-500/20 active:scale-95 min-h-[44px] touch-target-44"

@@ -96,7 +96,7 @@ describe('Dashboard Top-Level Integration', () => {
     
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/SEARCH APPLICATIONS\.\.\./i)).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
 
     // Switch to Analytics section
     const analyticsTab = screen.getByRole('tab', { name: /ANALYTICS/i });

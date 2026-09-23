@@ -31,6 +31,11 @@ from xml.sax.saxutils import escape
 
 from .router import app_router
 from . import routes
+from .services import (
+    ApplicationWorkflowService,
+    JobIndexService,
+    ScrapeOrchestrationService,
+)
 
 
 from reportlab.lib import colors
@@ -162,13 +167,17 @@ def _persist_profile_to_all_sinks(
         app.dashboard.profile = res
 
     # 1b. Auto-synchronize search discovery queries from the new profile
-    if hasattr(app, "suggested_search_queries") and hasattr(app, "update_search_queries"):
+    if hasattr(app, "suggested_search_queries") and hasattr(
+        app, "update_search_queries"
+    ):
         try:
             suggested = app.suggested_search_queries()
             if suggested:
                 app.update_search_queries(suggested)
         except Exception as sq_err:
-            logger.debug(f"Could not auto-update search queries on profile persist: {sq_err}")
+            logger.debug(
+                f"Could not auto-update search queries on profile persist: {sq_err}"
+            )
 
     # 2. Write to data_dir / job_profile.json for persistent state
     if hasattr(app, "data_dir") and app.data_dir:
@@ -293,6 +302,23 @@ class DashboardApp:
         from .scrape_coordinator import ScrapeCoordinator
 
         self.scrape_coordinator = ScrapeCoordinator(repo=self.repository)
+        self.job_index = JobIndexService(
+            data_dir=self.data_dir,
+            repository=self.repository,
+            dashboard_service=self.dashboard,
+            initial_jobs=self.jobs,
+        )
+        self.scrape_orchestrator = ScrapeOrchestrationService(
+            data_dir=self.data_dir,
+            repository=self.repository,
+            job_index=self.job_index,
+            sources=self.sources,
+            health_check=self.health_check,
+        )
+        self.application_workflow = ApplicationWorkflowService(
+            data_dir=self.data_dir,
+            repository=self.repository,
+        )
         self.lock = threading.Lock()
         self.db_ready_event = threading.Event()
         if self.jobs:
@@ -650,7 +676,9 @@ class DashboardApp:
         s = str(ind_raw or "").lower()
         if any(k in s for k in ("health", "nurs", "medic", "clinic")):
             return "Healthcare & Medical"
-        if any(k in s for k in ("tech", "cloud", "software", "it", "developer", "data")):
+        if any(
+            k in s for k in ("tech", "cloud", "software", "it", "developer", "data")
+        ):
             return "Technology & IT"
         if any(k in s for k in ("finance", "account", "bank", "cpa")):
             return "Finance & Accounting"
@@ -1657,6 +1685,11 @@ class DashboardApp:
                 fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
                 pipeline_errors = pipeline.errors
                 self.source_health = getattr(pipeline, "source_health", {})
+
+                if getattr(self, "scrape_coordinator", None):
+                    for q in queries_to_scrape:
+                        key = self.scrape_coordinator._make_key(q)
+                        self.scrape_coordinator._cooldown_tracker[key] = time.time()
 
                 if fresh:
                     if on_progress:

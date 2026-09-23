@@ -6,17 +6,18 @@ import { useScrapeOrchestrator } from '../hooks/useScrapeOrchestrator';
 import { JobSeeker } from './JobSeeker';
 import { MarketIntelligence } from './MarketIntelligence';
 import { ActionHighlights } from './ActionHighlights';
-import { ApplicationPipeline } from './ApplicationPipeline';
-import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { CopilotBar } from './CopilotBar';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SafeErrorBoundary } from './SafeErrorBoundary';
 import { DashboardGridSkeleton } from './SkeletonLoaders';
 import PrimeTargetSpotlight from './PrimeTargetSpotlight';
-import CyberpunkAmbientMode from './CyberpunkAmbientMode';
 import { CareerOperations } from './CareerOperations';
 import { TelemetryDesk } from './TelemetryDesk';
 import { DashboardModals } from './dashboard/DashboardModals';
+
+import { ApplicationPipeline } from './ApplicationPipeline';
+const AnalyticsDashboard = lazy(() => import('./AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
+const CyberpunkAmbientMode = lazy(() => import('./CyberpunkAmbientMode'));
 
 import { startAutopilot } from '../services/autopilotAgent';
 import { generateApplicationDocs } from '../services/generationService';
@@ -302,14 +303,16 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   if (viewMode === 'ambient') {
     return (
       <SafeErrorBoundary>
-        <CyberpunkAmbientMode
-          jobs={jobs}
-          profile={activeProfile}
-          applications={applicationsList}
-          onReturnToDashboard={() => setViewMode('dashboard')}
-          onOpenJobModal={(job) => setSelectedJob(job)}
-          onOpenGenerator={(job) => setSelectedForGenerator(job)}
-        />
+        <Suspense fallback={<div className="min-h-screen bg-[#070605] flex items-center justify-center font-mono text-[#d48b38]">LOADING AMBIENT HUD...</div>}>
+          <CyberpunkAmbientMode
+            jobs={jobs}
+            profile={activeProfile}
+            applications={applicationsList}
+            onReturnToDashboard={() => setViewMode('dashboard')}
+            onOpenJobModal={(job) => setSelectedJob(job)}
+            onOpenGenerator={(job) => setSelectedForGenerator(job)}
+          />
+        </Suspense>
         <DashboardModals
           modalState={modalState}
           jobs={jobs}
@@ -1150,12 +1153,14 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
 
             {activeSection === 'analytics' && (
               <SafeErrorBoundary sectionName="Analytics & Telemetry">
-                <AnalyticsDashboard
-                  jobs={jobs}
-                  onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
-                  onSelectJob={(j) => setSelectedJob(j)}
-                  onOpenGenerator={(j) => setSelectedForGenerator(j)}
-                />
+                <Suspense fallback={<DashboardGridSkeleton count={6} />}>
+                  <AnalyticsDashboard
+                    jobs={jobs}
+                    onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+                    onSelectJob={(j) => setSelectedJob(j)}
+                    onOpenGenerator={(j) => setSelectedForGenerator(j)}
+                  />
+                </Suspense>
               </SafeErrorBoundary>
             )}
 

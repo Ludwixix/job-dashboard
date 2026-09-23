@@ -7,12 +7,72 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .db import init_db, init_fts5_index
 from .db_pool import get_connection_pool, get_db_connection
 from .logging import get_logger
 
 logger = get_logger("job_dashboard.repository")
 
 STATUSES = ("sourced", "shortlisted", "applied", "interviewing", "offer", "rejected")
+
+
+def sanitize_fts5_query(term: str, prefix_last: bool = True) -> str:
+    """Sanitize user search terms into a secure, syntax-valid SQLite FTS5 query string.
+
+    Handles:
+    - Quoted phrases ("front end")
+    - Technical characters (C++, C#, .NET)
+    - Stray boolean operators (AND, OR, NOT)
+    - Trailing wildcard prefix matching for incremental typing
+    """
+    if not term or not str(term).strip():
+        return ""
+    raw = str(term).strip()
+    pattern = re.compile(r"\"([^\"]*)\"|(\S+)")
+    matches = list(pattern.finditer(raw))
+    if not matches:
+        return ""
+
+    tokens: list[str] = []
+    for i, match in enumerate(matches):
+        phrase, word = match.groups()
+        is_last = i == len(matches) - 1
+
+        if phrase is not None:
+            clean_phrase = phrase.strip().replace('"', '""')
+            if clean_phrase:
+                tokens.append(f'"{clean_phrase}"')
+        elif word:
+            clean_word = word.strip('"').replace('"', '""')
+            if not clean_word:
+                continue
+            upper_word = clean_word.upper()
+            if upper_word in ("AND", "OR", "NOT"):
+                if tokens and tokens[-1] not in ("AND", "OR", "NOT") and not is_last:
+                    tokens.append(upper_word)
+            else:
+                has_trailing_star = clean_word.endswith("*")
+                base_word = clean_word.rstrip("*")
+                if not base_word:
+                    continue
+                if (
+                    is_last
+                    and prefix_last
+                    and not has_trailing_star
+                    and len(base_word) > 1
+                ):
+                    tokens.append(f'"{base_word}"*')
+                elif has_trailing_star:
+                    tokens.append(f'"{base_word}"*')
+                else:
+                    tokens.append(f'"{base_word}"')
+
+    while tokens and tokens[-1] in ("AND", "OR", "NOT"):
+        tokens.pop()
+    while tokens and tokens[0] in ("AND", "OR", "NOT"):
+        tokens.pop(0)
+
+    return " ".join(tokens)
 
 
 def generate_dedupe_key(company: str, title: str, url: str, location: str = "") -> str:
@@ -103,217 +163,7 @@ class JobRepository:
         self._check_and_recover_db()
         with get_db_connection(self.path) as conn:
             conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA busy_timeout=5000;")
-            conn.execute("PRAGMA synchronous=NORMAL;")
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS jobs (
-                    id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL,
-                    location TEXT, description TEXT, source TEXT, url TEXT, posted TEXT,
-                    remote INTEGER NOT NULL DEFAULT 0, stream TEXT, score INTEGER,
-                    data_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'sourced',
-                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted);
-                CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);
-                CREATE INDEX IF NOT EXISTS idx_jobs_stream ON jobs(stream);
-                CREATE TABLE IF NOT EXISTS users (
-                    id TEXT PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    name TEXT,
-                    password_hash TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    google_id TEXT DEFAULT '',
-                    picture TEXT DEFAULT '',
-                    passkey_id TEXT DEFAULT '',
-                    email_verified INTEGER DEFAULT 0,
-                    email_verification_code TEXT DEFAULT '',
-                    email_verification_expires_at TEXT DEFAULT ''
-                );
-                CREATE TABLE IF NOT EXISTS user_applications (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    job_id TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'sourced',
-                    notes TEXT DEFAULT '',
-                    resume_text TEXT DEFAULT '',
-                    cover_letter_text TEXT DEFAULT '',
-                    resume_url TEXT DEFAULT '',
-                    cover_letter_url TEXT DEFAULT '',
-                    applied_at TEXT,
-                    job_data_json TEXT DEFAULT '{}',
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(user_id, job_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_user_apps_user ON user_applications(user_id);
-                CREATE TABLE IF NOT EXISTS application_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
-                    from_status TEXT, to_status TEXT NOT NULL, occurred_at TEXT NOT NULL,
-                    FOREIGN KEY(job_id) REFERENCES jobs(id)
-                );
-                CREATE TABLE IF NOT EXISTS user_profiles (
-                    user_id TEXT PRIMARY KEY,
-                    profile_data_json TEXT NOT NULL DEFAULT '{}',
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS user_preferences (
-                    user_id TEXT PRIMARY KEY,
-                    prefs_json TEXT NOT NULL DEFAULT '{}',
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS generated_documents (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    job_id TEXT NOT NULL,
-                    doc_type TEXT NOT NULL,
-                    content_text TEXT NOT NULL,
-                    model_name TEXT DEFAULT '',
-                    metadata_json TEXT DEFAULT '{}',
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_gen_docs_user_job ON generated_documents(user_id, job_id);
-                CREATE TABLE IF NOT EXISTS job_psychology (
-                    job_id TEXT PRIMARY KEY,
-                    company TEXT DEFAULT '',
-                    title TEXT DEFAULT '',
-                    insights_json TEXT NOT NULL DEFAULT '{}',
-                    model_name TEXT DEFAULT '',
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS job_intelligence (
-                    job_id TEXT NOT NULL,
-                    tool_key TEXT NOT NULL,
-                    intelligence_json TEXT NOT NULL DEFAULT '{}',
-                    model_name TEXT DEFAULT '',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY(job_id, tool_key)
-                );
-                CREATE INDEX IF NOT EXISTS idx_job_intel_job ON job_intelligence(job_id);
-                CREATE TABLE IF NOT EXISTS interview_sessions (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    job_id TEXT NOT NULL,
-                    company TEXT DEFAULT '',
-                    title TEXT DEFAULT '',
-                    session_data_json TEXT NOT NULL DEFAULT '{}',
-                    score REAL DEFAULT 0.0,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_interview_user_job ON interview_sessions(user_id, job_id);
-                CREATE TABLE IF NOT EXISTS query_scrape_cache (
-                    query_key TEXT PRIMARY KEY,
-                    term TEXT NOT NULL,
-                    location TEXT NOT NULL,
-                    last_scraped_at TEXT NOT NULL,
-                    result_count INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_query_cache_term ON query_scrape_cache(term);
-                CREATE TABLE IF NOT EXISTS user_saved_searches (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    query_json TEXT NOT NULL DEFAULT '{}',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(user_id, name)
-                );
-                CREATE INDEX IF NOT EXISTS idx_saved_searches_user ON user_saved_searches(user_id, updated_at DESC);
-                CREATE TABLE IF NOT EXISTS application_reminders (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    job_id TEXT NOT NULL,
-                    reminder_type TEXT NOT NULL,
-                    remind_at TEXT NOT NULL,
-                    dismissed_at TEXT,
-                    details_json TEXT NOT NULL DEFAULT '{}',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_reminders_due ON application_reminders(user_id, remind_at, dismissed_at);
-                CREATE TABLE IF NOT EXISTS network_contacts (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL DEFAULT 'default_user',
-                    name TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT '',
-                    organization TEXT NOT NULL DEFAULT '',
-                    contact_type TEXT NOT NULL DEFAULT 'agency_recruiter',
-                    sector TEXT NOT NULL DEFAULT 'technology',
-                    email TEXT DEFAULT '',
-                    phone TEXT DEFAULT '',
-                    linkedin_url TEXT DEFAULT '',
-                    notes TEXT DEFAULT '',
-                    relationship_health TEXT NOT NULL DEFAULT 'warm',
-                    cadence_frequency_days INTEGER NOT NULL DEFAULT 14,
-                    last_interaction_date TEXT,
-                    next_follow_up_date TEXT,
-                    associated_job_ids_json TEXT NOT NULL DEFAULT '[]',
-                    interactions_json TEXT NOT NULL DEFAULT '[]',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_net_contacts_user ON network_contacts(user_id);
-                CREATE INDEX IF NOT EXISTS idx_net_contacts_health ON network_contacts(relationship_health);
-                CREATE INDEX IF NOT EXISTS idx_net_contacts_followup ON network_contacts(next_follow_up_date);
-                CREATE TABLE IF NOT EXISTS candidate_matches (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    job_id TEXT NOT NULL,
-                    score INTEGER NOT NULL DEFAULT 0,
-                    fit TEXT NOT NULL DEFAULT 'moderate',
-                    reasons_json TEXT NOT NULL DEFAULT '[]',
-                    matched_at TEXT NOT NULL,
-                    reviewed INTEGER NOT NULL DEFAULT 0,
-                    status TEXT NOT NULL DEFAULT 'matched',
-                    UNIQUE(user_id, job_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_matches_user_score ON candidate_matches(user_id, score DESC);
-                CREATE TABLE IF NOT EXISTS feature_flags (
-                    key TEXT PRIMARY KEY,
-                    enabled INTEGER NOT NULL DEFAULT 1,
-                    description TEXT NOT NULL DEFAULT '',
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS provider_cookies (
-                    provider TEXT PRIMARY KEY,
-                    headers_json TEXT NOT NULL DEFAULT '{}',
-                    cookies_json TEXT NOT NULL DEFAULT '{}',
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS user_subscriptions (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    stripe_customer_id TEXT DEFAULT '',
-                    stripe_subscription_id TEXT DEFAULT '',
-                    plan_tier TEXT NOT NULL DEFAULT 'free',
-                    status TEXT NOT NULL DEFAULT 'inactive',
-                    current_period_start TEXT NOT NULL,
-                    current_period_end TEXT NOT NULL,
-                    cancel_at_period_end INTEGER DEFAULT 0,
-                    monthly_token_allowance INTEGER DEFAULT 500000,
-                    trial_generations_remaining INTEGER DEFAULT 3,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    FOREIGN KEY(user_id) REFERENCES users(id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_user_subs_user ON user_subscriptions(user_id);
-                CREATE INDEX IF NOT EXISTS idx_user_subs_stripe_cust ON user_subscriptions(stripe_customer_id);
-                CREATE TABLE IF NOT EXISTS user_token_ledger (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    billing_period_month TEXT NOT NULL,
-                    prompt_tokens INTEGER DEFAULT 0,
-                    completion_tokens INTEGER DEFAULT 0,
-                    total_tokens INTEGER DEFAULT 0,
-                    cost_usd REAL DEFAULT 0.0,
-                    call_count INTEGER DEFAULT 0,
-                    last_call_at TEXT NOT NULL,
-                    UNIQUE(user_id, billing_period_month),
-                    FOREIGN KEY(user_id) REFERENCES users(id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_token_ledger_user ON user_token_ledger(user_id);
-            """)
+            init_db(conn)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
                 "ALTER TABLE user_applications ADD COLUMN company_domain TEXT DEFAULT ''",
@@ -333,6 +183,18 @@ class JobRepository:
                     conn.execute(col_sql)
                 except sqlite3.OperationalError:
                     pass
+
+            # Backfill jobs_fts virtual index if empty
+            try:
+                fts_row = conn.execute("SELECT count(*) FROM jobs_fts").fetchone()
+                fts_count = fts_row[0] if fts_row else 0
+                if fts_count == 0:
+                    conn.execute("""
+                        INSERT INTO jobs_fts(id, title, company, stream, description)
+                        SELECT id, title, company, stream, description FROM jobs
+                    """)
+            except Exception as fts_pop_err:
+                logger.debug(f"jobs_fts backfill note: {fts_pop_err}")
 
             default_flags = [
                 (
@@ -434,6 +296,18 @@ class JobRepository:
                     ),
                 )
 
+    @staticmethod
+    def _sanitize_fts_query(term: str) -> str:
+        """Sanitize raw search term into a safe SQLite FTS5 query string."""
+        import re
+
+        if not term:
+            return ""
+        tokens = re.findall(r"\w+", str(term))
+        if not tokens:
+            return ""
+        return " AND ".join(f'"{t}"*' for t in tokens)
+
     def find_fresh_matching_jobs(
         self,
         term: str,
@@ -466,12 +340,40 @@ class JobRepository:
 
         where_sql = " AND ".join(clauses)
 
-        with get_db_connection(self.path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                f"SELECT data_json, status, posted FROM jobs WHERE {where_sql} ORDER BY score DESC, posted DESC",
-                params,
-            ).fetchall()
+        # Attempt high-performance SQLite FTS5 query first
+        fts_query = self._sanitize_fts_query(term)
+        rows = []
+        if fts_query:
+            try:
+                fts_clauses = ["lower(j.source) != 'gmail'"]
+                fts_params: list[Any] = [fts_query]
+                if loc_clean and loc_clean not in ("australia", "all", "remote"):
+                    city_match = loc_clean.split(",")[0].strip()
+                    if city_match:
+                        fts_clauses.append("(lower(j.location) LIKE ? OR j.remote = 1)")
+                        fts_params.append(f"%{city_match}%")
+                where_fts = " AND ".join(fts_clauses)
+                with get_db_connection(self.path) as conn:
+                    conn.row_factory = sqlite3.Row
+                    rows = conn.execute(
+                        f"""SELECT j.data_json, j.status, j.posted
+                            FROM jobs_fts f
+                            JOIN jobs j ON f.id = j.id
+                            WHERE f.jobs_fts MATCH ? AND {where_fts}
+                            ORDER BY j.score DESC, j.posted DESC LIMIT ?""",
+                        fts_params + [limit * 2],
+                    ).fetchall()
+            except Exception as fts_err:
+                logger.debug(f"FTS5 query fallback: {fts_err}")
+                rows = []
+
+        if not rows:
+            with get_db_connection(self.path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    f"SELECT data_json, status, posted FROM jobs WHERE {where_sql} ORDER BY score DESC, posted DESC",
+                    params,
+                ).fetchall()
 
         now_utc = datetime.now(timezone.utc)
         results = []

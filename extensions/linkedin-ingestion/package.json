@@ -1,0 +1,16 @@
+{
+  "name": "job-dashboard-linkedin-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Extract and ingest LinkedIn jobs and recommendations directly into Job Dashboard.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:icons": "python3 scripts/generate_icons.py"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "vitest": "^1.6.0"
+  }
+}

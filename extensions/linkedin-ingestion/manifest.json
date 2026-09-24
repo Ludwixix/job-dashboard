@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Job Dashboard Ingestion",
+  "version": "1.0.0",
+  "description": "Extract and ingest LinkedIn jobs and recommendations directly into Job Dashboard.",
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Job Dashboard Ingestion",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.linkedin.com/jobs/*"],
+      "js": ["src/content/content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://job-dashboard-6xrdvjlrcq-ts.a.run.app/*",
+    "http://localhost:8000/*",
+    "*://*.linkedin.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/extractor.js",
+        "src/content/recommender.js",
+        "src/content/pacer.js"
+      ],
+      "matches": ["*://*.linkedin.com/*"]
+    }
+  ]
+}

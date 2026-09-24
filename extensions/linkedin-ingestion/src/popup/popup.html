@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Dashboard Ingestion</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="hud-container">
+    <!-- Header -->
+    <header class="hud-header">
+      <div class="brand">
+        <div class="logo-orb">
+          <svg class="icon-logo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3v13m0 0l-4-4m4 4l4-4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Job Dashboard</span>
+          <span class="brand-subtitle">LinkedIn Ingestion</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="connection-pill" class="status-pill status-checking" title="Checking backend connectivity...">
+          <span class="status-dot"></span>
+          <span id="connection-label" class="status-text">Probing...</span>
+        </div>
+        <button id="btn-toggle-settings" class="btn-icon" aria-label="Settings" title="Configure endpoints and auth">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Context / Non-LinkedIn Warning Banner (Hidden by default) -->
+    <div id="page-notice" class="page-notice hidden">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span id="page-notice-text">Navigate to a LinkedIn job page (e.g. linkedin.com/jobs/) to import.</span>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="hud-main">
+      <!-- Action 1: Import Current Job -->
+      <section class="card-action">
+        <div class="card-action-info">
+          <div class="card-action-icon cyan-glow">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div class="card-action-meta">
+            <h3>Active Opportunity</h3>
+            <p id="current-job-preview">Ready to ingest current job details</p>
+          </div>
+        </div>
+        <button id="btn-import-current" class="btn btn-primary">
+          <span class="btn-spinner hidden"></span>
+          <span class="btn-text">Import Current Job</span>
+        </button>
+      </section>
+
+      <!-- Action 2: Scan Recommended Feed -->
+      <section class="card-action">
+        <div class="card-action-info">
+          <div class="card-action-icon teal-glow">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div class="card-action-meta">
+            <h3>Recommended Feed</h3>
+            <p id="feed-status-preview">Scan and batch import visible cards</p>
+          </div>
+        </div>
+        <button id="btn-scan-feed" class="btn btn-secondary">
+          <span class="btn-spinner hidden"></span>
+          <span class="btn-text">Scan Feed</span>
+        </button>
+      </section>
+
+      <!-- Batch Queue Panel (Displayed when cards found) -->
+      <section id="batch-panel" class="batch-panel hidden">
+        <div class="batch-header">
+          <div class="batch-title">
+            <span>Detected Opportunities</span>
+            <span id="batch-count-badge" class="badge">0</span>
+          </div>
+          <button id="btn-import-batch" class="btn btn-sm btn-accent">
+            Import All (<span id="batch-btn-count">0</span>)
+          </button>
+        </div>
+
+        <div id="batch-progress" class="batch-progress hidden">
+          <div class="progress-bar-bg">
+            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+          </div>
+          <span id="progress-text" class="progress-text">Pacing 0 / 0...</span>
+        </div>
+
+        <div id="batch-card-list" class="batch-card-list"></div>
+      </section>
+
+      <!-- Status Toast / Alert -->
+      <div id="toast-container" class="toast-container hidden">
+        <div id="toast-message" class="toast"></div>
+      </div>
+    </main>
+
+    <!-- Configuration Drawer (Slide-up or toggle) -->
+    <aside id="settings-drawer" class="settings-drawer hidden">
+      <div class="drawer-header">
+        <h4>Settings & Telemetry</h4>
+        <button id="btn-close-settings" class="btn-icon" aria-label="Close settings">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="drawer-content">
+        <div class="form-group">
+          <label for="setting-override-mode">Routing Mode</label>
+          <select id="setting-override-mode" class="form-input">
+            <option value="auto">Auto (Localhost 8000 -> Cloud Run Fallback)</option>
+            <option value="custom">Custom Backend URL Override</option>
+          </select>
+        </div>
+
+        <div id="custom-url-group" class="form-group hidden">
+          <label for="setting-custom-url">Custom Backend URL</label>
+          <input id="setting-custom-url" type="url" class="form-input" placeholder="http://localhost:8000">
+        </div>
+
+        <div class="form-group">
+          <label for="setting-auth-token">Bearer Auth Token (Optional)</label>
+          <input id="setting-auth-token" type="password" class="form-input" placeholder="Optional JWT / API token">
+        </div>
+
+        <div class="form-group">
+          <label for="setting-user-id">User ID (Optional)</label>
+          <input id="setting-user-id" type="text" class="form-input" placeholder="Optional X-User-Id">
+        </div>
+
+        <button id="btn-save-settings" class="btn btn-sm btn-primary w-full">Save Settings</button>
+
+        <div class="telemetry-section">
+          <h5>Recent Import History</h5>
+          <div id="telemetry-list" class="telemetry-list">
+            <div class="telemetry-empty">No recent imports recorded.</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Footer -->
+    <footer class="hud-footer">
+      <span class="version-label">v1.0.0 • Antigravity Engine</span>
+      <a id="link-dashboard" class="footer-link" href="#" target="_blank">Open Dashboard ↗</a>
+    </footer>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import concurrent.futures
 import time
 import json
 import threading
@@ -151,7 +152,9 @@ def test_scrape_coordinator_single_flight_coalescing(tmp_path):
     # Only 1 query should have been enqueued, the other 39 coalesced / deduplicated
     enqueued_count = sum(1 for r in results if r.get("status") == "enqueued")
     coalesced_count = sum(
-        1 for r in results if r.get("status") in ("already_queued", "in_flight", "cooldown")
+        1
+        for r in results
+        if r.get("status") in ("already_queued", "in_flight", "cooldown")
     )
     assert enqueued_count == 1
     assert coalesced_count == 39
@@ -191,3 +194,54 @@ def test_scrape_status_endpoint(tmp_path):
     assert sent["data"]["success"] is True
     assert "queue_depth" in sent["data"]
     assert "is_scraping" in sent["data"]
+
+
+def test_scrape_coordinator_timeout_resilience(tmp_path):
+    """Verify that when a scraper hangs, ScrapeCoordinator times out and continues gracefully."""
+    repo = JobRepository(tmp_path / "jobs.db")
+    coordinator = ScrapeCoordinator(
+        repo=repo, max_workers=1, inter_query_delay_seconds=0.01
+    )
+
+    mock_app = MagicMock()
+    mock_app.repository = repo
+    mock_app.sources = []
+    mock_app.health_check = False
+    mock_app.data_dir = tmp_path
+    mock_app.jobs = []
+    mock_app.lock = threading.Lock()
+    mock_app.jobs_path = tmp_path / "jobs.json"
+    mock_app.materialize_jobs = lambda jobs: jobs
+
+    query = SearchQuery("Slow Role", "Melbourne, VIC")
+
+    # Patch ScrapePipeline.run to simulate a hanging scraper that takes longer than timeout
+    with patch("job_dashboard.scrape_coordinator.ScrapePipeline") as mock_pipeline_cls:
+        instance = mock_pipeline_cls.return_value
+        instance.errors = []
+
+        def slow_run(q):
+            time.sleep(0.5)
+            return []
+
+        instance.run = slow_run
+
+        # Temporarily set timeout inside worker by patching ThreadPoolExecutor future
+        with patch(
+            "concurrent.futures.Future.result",
+            side_effect=concurrent.futures.TimeoutError(),
+        ):
+            coordinator.enqueue_query(query, mock_app)
+            time.sleep(0.1)
+
+            # Wait for worker to finish processing the single task
+            for _ in range(20):
+                if coordinator.get_queue_depth() == 0 and not coordinator.is_busy():
+                    break
+                time.sleep(0.05)
+
+            status = coordinator.get_status()
+            assert any("timed out" in err for err in status["errors"])
+            assert coordinator.get_queue_depth() == 0
+
+    coordinator.stop()

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from job_dashboard.sources import ScrapePipeline, SearchQuery
 
 
@@ -19,13 +20,14 @@ def test_public_jobs_hides_non_new_jobs_by_default(tmp_path):
 
     app = DashboardApp({}, [], tmp_path)
     app.sync_tracker = lambda: None
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     app.jobs = [
         {
             "id": "new",
             "title": "New Role",
             "company": "Acme",
             "description": "Cloud",
-            "posted": "2026-08-25",
+            "posted": today,
             "url": "https://example.test/new",
         },
         {
@@ -33,7 +35,7 @@ def test_public_jobs_hides_non_new_jobs_by_default(tmp_path):
             "title": "Applied Role",
             "company": "Acme",
             "description": "Cloud",
-            "posted": "2026-08-25",
+            "posted": today,
             "url": "https://example.test/applied",
         },
     ]

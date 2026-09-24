@@ -37,33 +37,42 @@ def main():
     # Cloud Run requires binding to 0.0.0.0
     host = os.environ.get("HOST") or args.host or "0.0.0.0"
 
-
     # Validate and warn about missing credentials
     from .logging import get_logger
+
     startup_logger = get_logger("job_dashboard.startup")
-    
+
     if settings.seek_enabled:
         startup_logger.info("Seek scraper enabled")
-    
+
     if settings.adzuna_app_id and settings.adzuna_api_key:
         startup_logger.info("Adzuna credentials loaded")
     else:
-        startup_logger.warning("Adzuna credentials not found (set ADZUNA_APP_ID and ADZUNA_API_KEY)")
-    
+        startup_logger.warning(
+            "Adzuna credentials not found (set ADZUNA_APP_ID and ADZUNA_API_KEY)"
+        )
+
     if settings.openrouter_api_key:
         startup_logger.info("OpenRouter API key loaded")
     else:
-        startup_logger.warning("OpenRouter API key not found (set JOB_DASHBOARD_OPENROUTER_API_KEY)")
+        startup_logger.warning(
+            "OpenRouter API key not found (set JOB_DASHBOARD_OPENROUTER_API_KEY)"
+        )
 
     # Cloud Run's filesystem is ephemeral: restore the last known-good index
     # and profile data from GCS BEFORE loading the profile or opening SQLite,
     # so scraped jobs and candidate intelligence survive cold starts and redeploys.
     if settings.gcs_data_bucket:
         from .gcs_backup import restore_from_gcs
-        is_cloud_prod = bool(os.getenv("K_SERVICE") or os.getenv("ENVIRONMENT") == "production")
+
+        is_cloud_prod = bool(
+            os.getenv("K_SERVICE") or os.getenv("ENVIRONMENT") == "production"
+        )
         restore_from_gcs(settings.gcs_data_bucket, args.data_dir, force=is_cloud_prod)
     else:
-        startup_logger.warning("JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts")
+        startup_logger.warning(
+            "JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts"
+        )
 
     # Resolve job profile path across persistent data dir, Docker container (/app), and local repository
     profile_candidates = [
@@ -80,49 +89,69 @@ def main():
     # Dual-sink check: if jobs.sqlite3 has an updated user profile in user_profiles, prefer it
     try:
         from .db_pool import get_db_connection
+
         db_path = args.data_dir / "jobs.sqlite3"
         if db_path.exists():
             with get_db_connection(db_path) as conn:
-                row = conn.execute("SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1").fetchone()
+                row = conn.execute(
+                    "SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1"
+                ).fetchone()
                 if row and row[0]:
                     import json
+
                     db_profile = json.loads(row[0])
                     if isinstance(db_profile, dict) and db_profile.get("name"):
                         profile = {**profile, **db_profile}
-                        startup_logger.info(f"Loaded persistent user profile from database: {profile.get('name')} ({profile.get('id')})")
+                        startup_logger.info(
+                            f"Loaded persistent user profile from database: {profile.get('name')} ({profile.get('id')})"
+                        )
                         # Sync back to data_dir / job_profile.json if missing
                         data_profile_file = args.data_dir / "job_profile.json"
                         if not data_profile_file.exists():
                             try:
                                 args.data_dir.mkdir(parents=True, exist_ok=True)
-                                with open(data_profile_file, "w", encoding="utf-8") as f:
+                                with open(
+                                    data_profile_file, "w", encoding="utf-8"
+                                ) as f:
                                     json.dump(profile, f, indent=2, ensure_ascii=False)
                             except Exception:
                                 pass
     except Exception as db_prof_err:
-        startup_logger.warning(f"Could not check user_profiles database table on startup: {db_prof_err}")
+        startup_logger.warning(
+            f"Could not check user_profiles database table on startup: {db_prof_err}"
+        )
 
-    sources = [IndeedJobSpySource(
-        proxy=settings.proxy_url,
-        multi_board=settings.multi_board_enabled,
-        browser_fallback=settings.stealth_browser_enabled,
-    )]
-    if settings.seek_enabled:
-        sources.append(SeekApiSource(
-            max_pages=settings.seek_max_pages,
-            max_results=settings.seek_max_results,
-            pause_seconds=settings.seek_pause_seconds,
-            endpoint=settings.seek_api_endpoint,
-            allow_browser_fallback=settings.seek_browser_fallback and settings.stealth_browser_enabled,
-            cache_path=settings.seek_cache_path,
-            allow_cache_fallback=settings.seek_cache_fallback,
-            allow_cross_source_fallback=settings.multi_board_enabled,
+    sources = [
+        IndeedJobSpySource(
             proxy=settings.proxy_url,
-        ))
-    sources.extend([AdzunaApiSource(
-        app_id=settings.adzuna_app_id,
-        api_key=settings.adzuna_api_key,
-    ), RemoteOkApiSource()])
+            multi_board=settings.multi_board_enabled,
+            browser_fallback=settings.stealth_browser_enabled,
+        )
+    ]
+    if settings.seek_enabled:
+        sources.append(
+            SeekApiSource(
+                max_pages=settings.seek_max_pages,
+                max_results=settings.seek_max_results,
+                pause_seconds=settings.seek_pause_seconds,
+                endpoint=settings.seek_api_endpoint,
+                allow_browser_fallback=settings.seek_browser_fallback
+                and settings.stealth_browser_enabled,
+                cache_path=settings.seek_cache_path,
+                allow_cache_fallback=settings.seek_cache_fallback,
+                allow_cross_source_fallback=settings.multi_board_enabled,
+                proxy=settings.proxy_url,
+            )
+        )
+    sources.extend(
+        [
+            AdzunaApiSource(
+                app_id=settings.adzuna_app_id,
+                api_key=settings.adzuna_api_key,
+            ),
+            RemoteOkApiSource(),
+        ]
+    )
     if not args.no_linkedin and settings.linkedin_enabled:
         sources.append(LinkedInBrowserSource(proxy=settings.proxy_url))
     generator = OpenRouterDocumentGenerator(
@@ -130,22 +159,33 @@ def main():
         args.guidelines_dir,
         model=settings.llm_model,
         api_key=settings.openrouter_api_key,
-        examples_dir=args.examples_dir
+        examples_dir=args.examples_dir,
     )
     from .scrape import resolve_cli_queries
+
     initial_queries = resolve_cli_queries(None, profile_path=profile_path)
     app = DashboardApp(profile, sources, args.data_dir, generator, initial_queries)
 
     def synchronize():
         try:
-            app.refresh(app.search_queries)
-            print("Sources refreshed in the background.", flush=True)
+            if getattr(app, "scrape_coordinator", None):
+                app.scrape_coordinator.enqueue_queries(
+                    app.search_queries, app, force=False
+                )
+                print("Sources enqueued to background ScrapeCoordinator.", flush=True)
+            else:
+                app.refresh(app.search_queries)
+                print("Sources refreshed in the background.", flush=True)
         except Exception as error:
             print(f"Source refresh failed: {error}", flush=True)
         if settings.gcs_data_bucket:
             from .gcs_backup import backup_to_gcs
+
             backup_to_gcs(settings.gcs_data_bucket, args.data_dir)
-        if list(PROJECT_ROOT.glob("client_secret_*.json")) and (args.data_dir / "gmail_token.json").exists():
+        if (
+            list(PROJECT_ROOT.glob("client_secret_*.json"))
+            and (args.data_dir / "gmail_token.json").exists()
+        ):
             try:
                 app.scan_gmail(days=7)
                 print("Gmail scanned in the background (last 7 days).", flush=True)
@@ -160,7 +200,7 @@ def main():
                 last_time = float(digest_flag.read_text())
                 if time.time() - last_time < 86400:
                     should_send = False
-            
+
             if should_send:
                 app.send_daily_digest()
                 digest_flag.write_text(str(time.time()))

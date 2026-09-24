@@ -22,7 +22,12 @@ from .base import (
     resolve_search_location,
     sanitize_html,
 )
-from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
+from .browser import (
+    BotBlockedError,
+    create_stealth_browser,
+    is_challenge_page,
+    wait_for_challenge_clearance,
+)
 from .proxy import ProxyRotator
 
 logger = get_logger("job_dashboard.sources.seek")
@@ -77,7 +82,9 @@ class SeekApiSource:
             try:
                 records = list(self._search_browser(query))
                 if records:
-                    logger.info(f"SEEK stealth browser fallback recovered {len(records)} jobs for '{query.term}'")
+                    logger.info(
+                        f"SEEK stealth browser fallback recovered {len(records)} jobs for '{query.term}'"
+                    )
                     return iter(records)
                 failures.append("stealth browser returned no jobs")
             except Exception as browser_error:
@@ -88,7 +95,9 @@ class SeekApiSource:
             try:
                 records = list(self._search_cache(query))
                 if records:
-                    logger.info(f"SEEK cache fallback recovered {len(records)} jobs for '{query.term}'")
+                    logger.info(
+                        f"SEEK cache fallback recovered {len(records)} jobs for '{query.term}'"
+                    )
                     return iter(records)
                 failures.append("cache returned no jobs")
             except Exception as cache_error:
@@ -99,13 +108,19 @@ class SeekApiSource:
             try:
                 records = list(self._search_cross_source(query))
                 if records:
-                    logger.info(f"Cross-source gateway fallback recovered {len(records)} Australian jobs for '{query.term}'")
+                    logger.info(
+                        f"Cross-source gateway fallback recovered {len(records)} Australian jobs for '{query.term}'"
+                    )
                     return iter(records)
                 failures.append("cross-source returned no jobs")
             except Exception as cross_error:
                 failures.append(f"cross-source: {cross_error}")
 
-        if not self.allow_browser_fallback and not self.allow_cache_fallback and not self.allow_cross_source_fallback:
+        if (
+            not self.allow_browser_fallback
+            and not self.allow_cache_fallback
+            and not self.allow_cross_source_fallback
+        ):
             detail = failures[0] if failures else "API unavailable"
             raise SeekUnavailableError(f"public API unavailable: {detail}")
         raise SeekUnavailableError("; ".join(failures) or "all fallbacks exhausted")
@@ -115,18 +130,31 @@ class SeekApiSource:
         collected = 0
         proxy_url = self.proxy_rotator.get_proxy()
         loc = resolve_search_location(query)
-        where_val = "All Australia" if loc.lower() in ("australia", "all australia", "remote", "anywhere in australia", "anywhere") else loc
+        where_val = (
+            "All Australia"
+            if loc.lower()
+            in (
+                "australia",
+                "all australia",
+                "remote",
+                "anywhere in australia",
+                "anywhere",
+            )
+            else loc
+        )
         while True:
             if page >= self.max_pages or collected >= self.max_results:
                 return
-            params = urllib.parse.urlencode({
-                "siteKey": "AU-Main",
-                "where": where_val,
-                "keywords": query.term,
-                "pageSize": self.page_size,
-                "page": page,
-                "sortmode": "ListedDate",
-            })
+            params = urllib.parse.urlencode(
+                {
+                    "siteKey": "AU-Main",
+                    "where": where_val,
+                    "keywords": query.term,
+                    "pageSize": self.page_size,
+                    "page": page,
+                    "sortmode": "ListedDate",
+                }
+            )
             request = urllib.request.Request(
                 f"{self.endpoint}?{params}",
                 headers={
@@ -155,26 +183,36 @@ class SeekApiSource:
             if self.pause_seconds:
                 time.sleep(self.pause_seconds)
 
-    def _request_json(self, request: urllib.request.Request, proxy_url: str | None = None) -> Any:
+    def _request_json(
+        self, request: urllib.request.Request, proxy_url: str | None = None
+    ) -> Any:
         opener = urllib.request.build_opener()
         if proxy_url:
-            opener.add_handler(urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+            opener.add_handler(
+                urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+            )
         for attempt in range(self.retries + 1):
             try:
                 with opener.open(request, timeout=self.timeout) as response:
                     return json.loads(response.read().decode("utf-8"))
             except HTTPError as error:
                 if error.code in (401, 403):
-                    raise SeekUnavailableError(f"SEEK denied the request (HTTP {error.code})") from error
+                    raise SeekUnavailableError(
+                        f"SEEK denied the request (HTTP {error.code})"
+                    ) from error
                 if error.code != 429 and not 500 <= error.code < 600:
-                    raise SeekUnavailableError(f"SEEK returned HTTP {error.code}") from error
+                    raise SeekUnavailableError(
+                        f"SEEK returned HTTP {error.code}"
+                    ) from error
                 if attempt >= self.retries:
-                    raise SeekUnavailableError(f"SEEK remained unavailable (HTTP {error.code})") from error
-                time.sleep(min(30.0, 2.0 ** attempt))
+                    raise SeekUnavailableError(
+                        f"SEEK remained unavailable (HTTP {error.code})"
+                    ) from error
+                time.sleep(min(30.0, 2.0**attempt))
             except (URLError, TimeoutError, json.JSONDecodeError) as error:
                 if attempt >= self.retries:
                     raise SeekUnavailableError("SEEK request failed") from error
-                time.sleep(min(30.0, 2.0 ** attempt))
+                time.sleep(min(30.0, 2.0**attempt))
 
     def _search_browser(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         if not self.allow_browser_fallback:
@@ -186,19 +224,27 @@ class SeekApiSource:
 
         playwright_proxy = self.proxy_rotator.get_playwright_proxy()
         with sync_playwright() as playwright:
-            browser, context = create_stealth_browser(playwright, headless=True, proxy=playwright_proxy)
+            browser, context = create_stealth_browser(
+                playwright, headless=True, proxy=playwright_proxy
+            )
             page = context.new_page()
             try:
                 slug = query.term.replace(" ", "-")
                 loc = resolve_search_location(query)
-                if loc.lower() in ("australia", "all australia", "remote", "anywhere in australia", "anywhere"):
+                if loc.lower() in (
+                    "australia",
+                    "all australia",
+                    "remote",
+                    "anywhere in australia",
+                    "anywhere",
+                ):
                     url = f"https://www.seek.com.au/{slug}-jobs/in-All-Australia?daterange=14"
                 else:
                     loc_slug = re.sub(r"[^a-zA-Z0-9]+", "-", loc.strip()).strip("-")
                     url = f"https://www.seek.com.au/{slug}-jobs/in-All-{loc_slug}?daterange=14"
-                page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                wait_for_challenge_clearance(page, max_wait_seconds=5.0)
-                page.wait_for_timeout(2500)
+                page.goto(url, wait_until="domcontentloaded", timeout=12000)
+                wait_for_challenge_clearance(page, max_wait_seconds=3.0)
+                page.wait_for_timeout(1000)
 
                 if is_challenge_page(page.title()):
                     raise BotBlockedError("Cloudflare challenge encountered on SEEK")
@@ -243,27 +289,32 @@ class SeekApiSource:
                 continue
             if not is_recent(record, days=14):
                 continue
-            searchable = " ".join(str(record.get(field) or "") for field in (
-                "title", "company", "location", "description", "tags"
-            )).casefold()
+            searchable = " ".join(
+                str(record.get(field) or "")
+                for field in ("title", "company", "location", "description", "tags")
+            ).casefold()
             if term in searchable:
                 record_id = str(record.get("id") or "")
                 sal_raw = str(record.get("salary") or "")
                 bracket = parse_salary_bracket(sal_raw)
                 cleaned = clean_description(record.get("description", ""))
-                matched.append(JobRecord(
-                    id=record_id if record_id else None,
-                    provider_job_id=record_id.replace("seek-", "") if record_id else str(record.get("url", "")),
-                    provider="seek",
-                    title=str(record.get("title", "")),
-                    company=str(record.get("company", "")),
-                    location=str(record.get("location", "")),
-                    work_mode="remote" if record.get("remote") else "onsite",
-                    url=str(record.get("url", "")),
-                    raw_description=sanitize_html(cleaned),
-                    key_requirements=[query.term, query.stream],
-                    salary=bracket,
-                ))
+                matched.append(
+                    JobRecord(
+                        id=record_id if record_id else None,
+                        provider_job_id=record_id.replace("seek-", "")
+                        if record_id
+                        else str(record.get("url", "")),
+                        provider="seek",
+                        title=str(record.get("title", "")),
+                        company=str(record.get("company", "")),
+                        location=str(record.get("location", "")),
+                        work_mode="remote" if record.get("remote") else "onsite",
+                        url=str(record.get("url", "")),
+                        raw_description=sanitize_html(cleaned),
+                        key_requirements=[query.term, query.stream],
+                        salary=bracket,
+                    )
+                )
             if len(matched) >= self.max_results:
                 break
         yield from matched
@@ -278,7 +329,11 @@ class SeekApiSource:
         proxy_url = self.proxy_rotator.get_proxy()
         proxies_arg = [proxy_url] if proxy_url else None
         loc = resolve_search_location(query)
-        is_rem = "remote" in query.term.lower() or loc.lower() in ("remote", "australia", "all australia")
+        is_rem = "remote" in query.term.lower() or loc.lower() in (
+            "remote",
+            "australia",
+            "all australia",
+        )
         try:
             results = scrape_jobs(
                 site_name=["zip_recruiter", "glassdoor"],
@@ -300,19 +355,23 @@ class SeekApiSource:
                     sal_raw = str(row.get("salary", "") or "")
                     bracket = parse_salary_bracket(sal_raw)
                     cleaned = clean_description(row.get("description", ""))
-                    output.append(JobRecord(
-                        id=f"seek-cross-{abs(hash(url))}",
-                        provider_job_id=url,
-                        provider="seek",
-                        title=str(row.get("title", "") or ""),
-                        company=str(row.get("company", "") or ""),
-                        location=str(row.get("location", "") or query.location),
-                        work_mode="remote" if bool(row.get("is_remote", False)) else "onsite",
-                        url=url,
-                        raw_description=sanitize_html(cleaned),
-                        key_requirements=[query.term, query.stream],
-                        salary=bracket,
-                    ))
+                    output.append(
+                        JobRecord(
+                            id=f"seek-cross-{abs(hash(url))}",
+                            provider_job_id=url,
+                            provider="seek",
+                            title=str(row.get("title", "") or ""),
+                            company=str(row.get("company", "") or ""),
+                            location=str(row.get("location", "") or query.location),
+                            work_mode="remote"
+                            if bool(row.get("is_remote", False))
+                            else "onsite",
+                            url=url,
+                            raw_description=sanitize_html(cleaned),
+                            key_requirements=[query.term, query.stream],
+                            salary=bracket,
+                        )
+                    )
                 return iter(output)
         except Exception as err:
             logger.warning(f"Cross-source fallback failed: {err}")
@@ -321,27 +380,52 @@ class SeekApiSource:
 
 def _seek_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
     identifier = str(job.get("id", "") or "")
-    advertiser = job.get("advertiser") if isinstance(job.get("advertiser"), Mapping) else {}
+    advertiser = (
+        job.get("advertiser") if isinstance(job.get("advertiser"), Mapping) else {}
+    )
     places = job.get("places") if isinstance(job.get("places"), Mapping) else {}
-    location = places.get("label") or ", ".join(filter(None, [job.get("area"), job.get("state")]))
+    location = places.get("label") or ", ".join(
+        filter(None, [job.get("area"), job.get("state")])
+    )
     url = f"https://www.seek.com.au/job/{identifier}" if identifier else ""
     work_types = job.get("workType") or []
-    stable_id = identifier or re.sub(r"[^a-z0-9]+", "-", f"{job.get('title', '')}-{advertiser.get('description', '')}".lower()).strip("-")
-    is_remote = any(str(item.get("label", "")).lower() == "remote" for item in work_types)
+    stable_id = identifier or re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        f"{job.get('title', '')}-{advertiser.get('description', '')}".lower(),
+    ).strip("-")
+    is_remote = any(
+        str(item.get("label", "")).lower() == "remote" for item in work_types
+    )
     raw_desc = str(job.get("teaser") or job.get("description") or "")
-    sanitized_desc = sanitize_html(raw_desc) if "<" in raw_desc else clean_description(raw_desc)
+    sanitized_desc = (
+        sanitize_html(raw_desc) if "<" in raw_desc else clean_description(raw_desc)
+    )
     raw_salary = str(job.get("salary") or job.get("salaryLabel", "") or "")
-    salary_bracket = parse_salary_bracket(raw_salary, title=str(job.get("title", "")), estimate_if_missing=True)
-    raw_posted = str(job.get("listingDate") or job.get("listingDateDisplay") or job.get("posted") or "")
+    salary_bracket = parse_salary_bracket(
+        raw_salary, title=str(job.get("title", "")), estimate_if_missing=True
+    )
+    raw_posted = str(
+        job.get("listingDate")
+        or job.get("listingDateDisplay")
+        or job.get("posted")
+        or ""
+    )
     posted_date = canonical_posted_date(raw_posted) if raw_posted else None
-    is_remote = is_remote or "remote" in f"{location} {job.get('title', '')}".lower() or "wfh" in f"{location} {job.get('title', '')}".lower()
+    is_remote = (
+        is_remote
+        or "remote" in f"{location} {job.get('title', '')}".lower()
+        or "wfh" in f"{location} {job.get('title', '')}".lower()
+    )
 
     return JobRecord(
         id=f"seek-{stable_id}" if stable_id else None,
         provider_job_id=identifier or stable_id,
         provider="seek",
         title=str(job.get("title", "")),
-        company=str(advertiser.get("description", job.get("advertiserDescription", ""))),
+        company=str(
+            advertiser.get("description", job.get("advertiserDescription", ""))
+        ),
         location=location,
         work_mode="remote" if is_remote else "onsite",
         url=url,
@@ -391,7 +475,9 @@ def extract_seek_job_id(url_or_id: str) -> str | None:
     if seek_prefix_match:
         return seek_prefix_match.group(1)
     # Check URL patterns e.g. seek.com.au/job/93979774 or au.seek.com/job/93979774
-    url_match = re.search(r"(?:seek\.com\.au|seek\.com)/job/(\d+)", cleaned, re.IGNORECASE)
+    url_match = re.search(
+        r"(?:seek\.com\.au|seek\.com)/job/(\d+)", cleaned, re.IGNORECASE
+    )
     if url_match:
         return url_match.group(1)
     # Generic /job/12345678 if 'seek' is in the string
@@ -408,9 +494,15 @@ def extract_seek_description_from_html(html_content: str) -> str:
         return ""
 
     # Strategy 1: window.SEEK_REDUX_DATA
-    m = re.search(r"window\.SEEK_REDUX_DATA\s*=\s*(.*?);\s*(?:window\.SEEK_|</script>)", html_content, re.DOTALL)
+    m = re.search(
+        r"window\.SEEK_REDUX_DATA\s*=\s*(.*?);\s*(?:window\.SEEK_|</script>)",
+        html_content,
+        re.DOTALL,
+    )
     if not m:
-        m = re.search(r"window\.SEEK_REDUX_DATA\s*=\s*(.*?);\s*</script>", html_content, re.DOTALL)
+        m = re.search(
+            r"window\.SEEK_REDUX_DATA\s*=\s*(.*?);\s*</script>", html_content, re.DOTALL
+        )
     if m:
         try:
             data = json.loads(m.group(1).strip())
@@ -422,20 +514,36 @@ def extract_seek_description_from_html(html_content: str) -> str:
             pass
 
     # Strategy 2: DOM container data-automation="jobAdDetails"
-    dom_match = re.search(r'data-automation=["\']jobAdDetails["\'][^>]*>(.*?)(?:<div class="[^"]*advertiser|data-automation="jobActions"|data-automation="shareJob"|</div>\s*</div>\s*</div>\s*</section>)', html_content, re.DOTALL | re.IGNORECASE)
+    dom_match = re.search(
+        r'data-automation=["\']jobAdDetails["\'][^>]*>(.*?)(?:<div class="[^"]*advertiser|data-automation="jobActions"|data-automation="shareJob"|</div>\s*</div>\s*</div>\s*</section>)',
+        html_content,
+        re.DOTALL | re.IGNORECASE,
+    )
     if not dom_match:
-        dom_match = re.search(r'data-automation=["\']jobAdDetails["\'][^>]*>(.*?)</div>', html_content, re.DOTALL | re.IGNORECASE)
+        dom_match = re.search(
+            r'data-automation=["\']jobAdDetails["\'][^>]*>(.*?)</div>',
+            html_content,
+            re.DOTALL | re.IGNORECASE,
+        )
     if dom_match:
         cleaned = clean_description(dom_match.group(1))
         if len(cleaned) >= 30:
             return cleaned
 
     # Strategy 3: JSON-LD Schema.org JobPosting
-    ld_matches = re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html_content, re.DOTALL)
+    ld_matches = re.findall(
+        r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        html_content,
+        re.DOTALL,
+    )
     for raw_ld in ld_matches:
         try:
             parsed_ld = json.loads(raw_ld)
-            items = parsed_ld.get("@graph", [parsed_ld]) if isinstance(parsed_ld, dict) else []
+            items = (
+                parsed_ld.get("@graph", [parsed_ld])
+                if isinstance(parsed_ld, dict)
+                else []
+            )
             for item in items:
                 if isinstance(item, dict) and item.get("@type") == "JobPosting":
                     desc = item.get("description")
@@ -449,7 +557,7 @@ def extract_seek_description_from_html(html_content: str) -> str:
         content_blocks = re.findall(
             r'<(?:article|section|main|div[^>]*class=["\'][^"\']*(?:job|description|content|details)[^"\']*["\'])[^>]*>(.*?)</(?:article|section|main|div)>',
             html_content,
-            re.DOTALL | re.IGNORECASE
+            re.DOTALL | re.IGNORECASE,
         )
         for block in content_blocks:
             cleaned = clean_description(block)
@@ -460,9 +568,15 @@ def extract_seek_description_from_html(html_content: str) -> str:
 
     # Strategy 5: Paragraph cluster heuristic
     try:
-        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html_content, re.DOTALL | re.IGNORECASE)
+        paragraphs = re.findall(
+            r"<p[^>]*>(.*?)</p>", html_content, re.DOTALL | re.IGNORECASE
+        )
         if len(paragraphs) >= 2:
-            combined = "\n\n".join(clean_description(p) for p in paragraphs if len(clean_description(p)) > 20)
+            combined = "\n\n".join(
+                clean_description(p)
+                for p in paragraphs
+                if len(clean_description(p)) > 20
+            )
             if len(combined) >= 50:
                 return combined
     except Exception:
@@ -475,7 +589,7 @@ def fetch_seek_job_description(
     url_or_id: str,
     timeout: float = 8.0,
     proxy_url: str | None = None,
-    allow_browser_fallback: bool = True
+    allow_browser_fallback: bool = True,
 ) -> str:
     """Fetch and parse the full detailed job description for a Seek listing."""
     job_id = extract_seek_job_id(url_or_id)
@@ -501,7 +615,9 @@ def fetch_seek_job_description(
     req = urllib.request.Request(target_url, headers=headers)
     opener = urllib.request.build_opener()
     if proxy_url:
-        opener.add_handler(urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+        opener.add_handler(
+            urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+        )
 
     try:
         with opener.open(req, timeout=timeout) as response:
@@ -517,11 +633,16 @@ def fetch_seek_job_description(
         try:
             from playwright.sync_api import sync_playwright
             from .browser import create_stealth_browser
+
             with sync_playwright() as playwright:
                 browser, context = create_stealth_browser(playwright, headless=True)
                 page = context.new_page()
                 try:
-                    page.goto(target_url, wait_until="domcontentloaded", timeout=int(timeout * 1500))
+                    page.goto(
+                        target_url,
+                        wait_until="domcontentloaded",
+                        timeout=int(timeout * 1500),
+                    )
                     page.wait_for_timeout(1000)
                     html = page.content()
                     desc = extract_seek_description_from_html(html)

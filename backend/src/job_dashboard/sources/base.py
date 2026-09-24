@@ -397,8 +397,9 @@ def ensure_descriptions(jobs: Iterable[Mapping[str, Any]]) -> list[dict[str, Any
     """Fill provider omissions without allowing enrichment failure to drop a job."""
     enriched = []
     for raw in jobs:
-        job = dict(raw)
-        description = clean_description(job.get("description", ""))
+        job = raw.to_dict() if hasattr(raw, "to_dict") else dict(raw)
+        raw_desc = job.get("description") or job.get("raw_description") or ""
+        description = clean_description(raw_desc)
         if not description:
             description = _page_description(
                 str(job.get("url") or job.get("application_route") or "")

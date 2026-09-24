@@ -201,7 +201,7 @@ def main():
                 if time.time() - last_time < 86400:
                     should_send = False
 
-            if should_send:
+            if should_send and hasattr(app, "send_daily_digest"):
                 app.send_daily_digest()
                 digest_flag.write_text(str(time.time()))
                 print("Daily email digest generated.", flush=True)

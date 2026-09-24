@@ -151,12 +151,25 @@ class JobRepository:
             pool = get_connection_pool(db_path)
             pool.cleanup(log_cleanup=False)
             try:
-                os.remove(db_path)
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                wal_file = Path(f"{db_path}-wal")
+                shm_file = Path(f"{db_path}-shm")
+                if wal_file.exists():
+                    try:
+                        wal_file.unlink()
+                    except Exception:
+                        pass
+                if shm_file.exists():
+                    try:
+                        shm_file.unlink()
+                    except Exception:
+                        pass
                 logger.info(
-                    f"Deleted corrupt DB at {db_path}. Fresh schema will be created."
+                    f"Deleted corrupt DB at {db_path} and associated WAL/SHM files. Fresh schema will be created."
                 )
-            except FileNotFoundError:
-                pass
+            except Exception as rm_err:
+                logger.warning(f"Error during DB removal: {rm_err}")
 
     def _init_schema(self):
         """Initialize database schema, auto-recovering from corruption."""

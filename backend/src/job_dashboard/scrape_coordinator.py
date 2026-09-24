@@ -158,7 +158,8 @@ class ScrapeCoordinator:
                     days=14,
                     health_check=getattr(app, "health_check", False),
                 )
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                try:
                     future = executor.submit(pipeline.run, [query])
                     try:
                         fresh = future.result(timeout=45.0)
@@ -171,6 +172,8 @@ class ScrapeCoordinator:
                             self._errors.append(
                                 f"{term}: Scrape gateway timed out (45s ceiling)"
                             )
+                finally:
+                    executor.shutdown(wait=False, cancel_futures=True)
 
                 if pipeline.errors:
                     with self._lock:

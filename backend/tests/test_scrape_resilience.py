@@ -245,3 +245,57 @@ def test_scrape_coordinator_timeout_resilience(tmp_path):
             assert coordinator.get_queue_depth() == 0
 
     coordinator.stop()
+
+
+def test_scrape_pipeline_source_timeout_preserves_other_sources():
+    """Verify that if one source times out in ScrapePipeline, other sources' jobs are preserved."""
+    from job_dashboard.sources import ScrapePipeline
+
+    class FastSource:
+        name = "fast_indeed"
+
+        def search(self, query):
+            return [
+                {
+                    "id": "fast-01",
+                    "title": "Senior Systems Engineer",
+                    "company": "Fast Corp",
+                    "url": "https://fast/1",
+                    "posted": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "description": "Great systems engineer role",
+                }
+            ]
+
+    class HangingSource:
+        name = "slow_seek"
+
+        def search(self, query):
+            time.sleep(2.0)
+            return [
+                {
+                    "id": "slow-01",
+                    "title": "Senior Cloud Engineer",
+                    "company": "Slow Corp",
+                    "url": "https://slow/1",
+                    "posted": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                }
+            ]
+
+    pipeline = ScrapePipeline(
+        sources=[FastSource(), HangingSource()],
+        days=14,
+        source_timeout=0.1,  # Fast 100ms timeout for test
+    )
+
+    query = SearchQuery("Senior Systems Engineer", "Melbourne, VIC")
+    jobs = pipeline.run([query])
+
+    # Fast source jobs must be preserved!
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == "fast-01"
+    assert jobs[0]["title"] == "Senior Systems Engineer"
+
+    # Hanging source should have timed out and logged error
+    assert pipeline.source_health["slow_seek"]["success"] is False
+    assert "Timeout after 0.1s" in pipeline.source_health["slow_seek"]["last_error"]
+    assert any("slow_seek" in err and "Timeout" in err for err in pipeline.errors)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import concurrent.futures
+import os
 import re
 import time
 import urllib.parse
@@ -418,11 +420,21 @@ class ScrapePipeline:
         days: int = 14,
         pause_seconds: float = 0.0,
         health_check: HealthCheck | None = None,
+        source_timeout: float | None = None,
     ):
         self.sources = tuple(sources)
         self.days = days
         self.pause_seconds = pause_seconds
         self.health_check = health_check
+        if source_timeout is None:
+            try:
+                self.source_timeout = float(
+                    os.environ.get("JOB_DASHBOARD_SOURCE_TIMEOUT", "12.0")
+                )
+            except ValueError:
+                self.source_timeout = 12.0
+        else:
+            self.source_timeout = source_timeout
         self.source_health: dict[str, dict[str, Any]] = {}
         self.errors: list[str] = []
 
@@ -520,7 +532,18 @@ class ScrapePipeline:
                         min(89, 10 + int((completed_attempts / total_attempts) * 75)),
                     )
                 try:
-                    results = source.search(query)
+                    if self.source_timeout and self.source_timeout > 0:
+                        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                        try:
+                            future = executor.submit(
+                                lambda s, q: list(s.search(q)), source, query
+                            )
+                            results = future.result(timeout=self.source_timeout)
+                        finally:
+                            executor.shutdown(wait=False, cancel_futures=True)
+                    else:
+                        results = list(source.search(query))
+
                     health["queries"] += 1
                     health["success"] = True
                     health["last_success"] = datetime.now(timezone.utc).isoformat()
@@ -534,6 +557,15 @@ class ScrapePipeline:
                         ):
                             collected.append(job)
                             health["jobs"] += 1
+                except (concurrent.futures.TimeoutError, TimeoutError):
+                    health["queries"] += 1
+                    health["last_error"] = f"Timeout after {self.source_timeout}s"
+                    logger.warning(
+                        f"Source {source.name} timed out after {self.source_timeout}s for query '{query.term}'"
+                    )
+                    self.errors.append(
+                        f"{source.name} / {query.term}: Timeout after {self.source_timeout}s"
+                    )
                 except Exception as error:
                     health["queries"] += 1
                     health["last_error"] = str(error)

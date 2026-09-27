@@ -1,4 +1,5 @@
 import { registerDynamicModelPricing } from './llmCostService';
+import { getBackendApiBase } from './apiConfig';
 
 export const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
 export const STORAGE_KEY_OR_MODELS = 'openrouter_cached_models';
@@ -34,11 +35,11 @@ export const normalizeOpenRouterModel = (m = {}) => {
   };
 };
 
-// Self-heal: If localStorage has bloated legacy models (> 50KB), prune immediately
+// Self-heal: If localStorage has bloated corrupted cache (> 300KB), prune safely
 if (typeof window !== 'undefined') {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_OR_MODELS);
-    if (raw && raw.length > 50000) {
+    if (raw && raw.length > 300000) {
       localStorage.removeItem(STORAGE_KEY_OR_MODELS);
     }
   } catch {
@@ -60,7 +61,7 @@ export const getOpenRouterModels = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_OR_MODELS);
       if (raw) {
-        if (raw.length > 50000) {
+        if (raw.length > 300000) {
           localStorage.removeItem(STORAGE_KEY_OR_MODELS);
           return PROVIDERS.openrouter.models;
         }
@@ -80,7 +81,7 @@ export const getOpenRouterModels = () => {
 };
 
 /**
- * Asynchronously fetches all available models from OpenRouter's public endpoint.
+ * Asynchronously fetches all available models from OpenRouter via backend proxy or direct endpoint.
  *
  * @param {Object} [options]
  * @param {boolean} [options.force=false]
@@ -98,6 +99,44 @@ export const fetchOpenRouterModels = async ({ force = false } = {}) => {
     }
   }
 
+  // 1. First attempt: Query backend cached proxy /api/ai/models (bypasses browser CORS & network drops)
+  try {
+    const apiBase = getBackendApiBase();
+    const backendRes = await fetch(`${apiBase}/api/ai/models`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (backendRes.ok) {
+      const data = await backendRes.json();
+      if (Array.isArray(data?.models) && data.models.length > 0) {
+        const normalized = data.models.map(normalizeOpenRouterModel).filter(m => Boolean(m.id));
+        inMemoryOpenRouterModels = normalized;
+        registerDynamicModelPricing(normalized);
+
+        if (typeof window !== 'undefined') {
+          try {
+            const leanForCache = normalized.map(m => ({
+              id: m.id,
+              name: m.name,
+              isFree: m.isFree,
+              pricing: m.pricing,
+              context_length: m.context_length
+            }));
+            localStorage.setItem(STORAGE_KEY_OR_MODELS, JSON.stringify(leanForCache));
+            localStorage.setItem(STORAGE_KEY_OR_TIMESTAMP, String(Date.now()));
+          } catch {
+            console.warn('OpenRouter models cached in memory only (localStorage quota)');
+          }
+        }
+        return normalized;
+      }
+    }
+  } catch (backendErr) {
+    // Proceed to direct OpenRouter endpoint if backend proxy unreachable
+  }
+
+  // 2. Second attempt: Direct HTTPS fetch from OpenRouter public API
   try {
     const res = await fetch(OPENROUTER_MODELS_ENDPOINT, {
       method: 'GET',
@@ -120,17 +159,16 @@ export const fetchOpenRouterModels = async ({ force = false } = {}) => {
 
       if (typeof window !== 'undefined') {
         try {
-          // Store only a lightweight subset (top 50 models without long descriptions, ~4KB)
-          const leanForCache = normalized.slice(0, 50).map(m => ({
+          const leanForCache = normalized.map(m => ({
             id: m.id,
             name: m.name,
             isFree: m.isFree,
-            pricing: m.pricing
+            pricing: m.pricing,
+            context_length: m.context_length
           }));
           localStorage.setItem(STORAGE_KEY_OR_MODELS, JSON.stringify(leanForCache));
           localStorage.setItem(STORAGE_KEY_OR_TIMESTAMP, String(Date.now()));
         } catch {
-          // If storage quota is still tight, silently purge the models cache to free space
           try {
             localStorage.removeItem(STORAGE_KEY_OR_MODELS);
           } catch {}

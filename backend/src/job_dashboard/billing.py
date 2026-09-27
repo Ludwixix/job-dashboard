@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone, timedelta
@@ -24,6 +25,11 @@ if TYPE_CHECKING:
 logger = get_logger("job_dashboard.billing")
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+
+_cached_models: list[dict[str, Any]] = []
+_cached_models_timestamp: float = 0.0
+_MODELS_CACHE_TTL = 3600.0  # 1 hour in-memory cache
 
 # Model pricing rates in USD per 1M tokens (prompt, completion)
 MODEL_PRICING_PER_MILLION = {
@@ -58,6 +64,110 @@ def get_server_openrouter_key() -> str:
         os.getenv("JOB_DASHBOARD_OPENROUTER_API_KEY", "")
         or os.getenv("OPENROUTER_API_KEY", "")
     ).strip()
+
+
+def fetch_openrouter_models_catalog(force: bool = False) -> list[dict[str, Any]]:
+    """Fetch all available models from OpenRouter with 1-hour in-memory cache and lean payload structure."""
+    global _cached_models, _cached_models_timestamp
+    now = time.time()
+    if (
+        not force
+        and _cached_models
+        and (now - _cached_models_timestamp < _MODELS_CACHE_TTL)
+    ):
+        return _cached_models
+
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "JobDashboard/1.0",
+    }
+    server_key = get_server_openrouter_key()
+    if server_key:
+        headers["Authorization"] = f"Bearer {server_key}"
+
+    try:
+        req = urllib.request.Request(OPENROUTER_MODELS_URL, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw_models = data.get("data", [])
+            normalized = []
+            for m in raw_models:
+                mid = m.get("id")
+                if not mid:
+                    continue
+                pricing = m.get("pricing") or {}
+                prompt_p = str(pricing.get("prompt", "0"))
+                comp_p = str(pricing.get("completion", "0"))
+                is_free = mid.endswith(":free") or (
+                    prompt_p in ("0", "0.0") and comp_p in ("0", "0.0")
+                )
+                normalized.append(
+                    {
+                        "id": mid,
+                        "name": m.get("name") or mid,
+                        "description": (m.get("description") or "")[:250],
+                        "context_length": m.get("context_length") or 0,
+                        "pricing": {
+                            "prompt": prompt_p,
+                            "completion": comp_p,
+                        },
+                        "isFree": is_free,
+                    }
+                )
+            if normalized:
+                _cached_models = normalized
+                _cached_models_timestamp = now
+                logger.info(
+                    f"Refreshed OpenRouter models catalog: {len(normalized)} models cached."
+                )
+                return _cached_models
+    except Exception as e:
+        logger.warning(f"Failed to fetch live OpenRouter models catalog: {e}")
+        if _cached_models:
+            return _cached_models
+
+    return _cached_models or [
+        {
+            "id": "anthropic/claude-3.7-sonnet",
+            "name": "Claude 3.7 Sonnet",
+            "description": "State-of-the-art hybrid reasoning model.",
+            "context_length": 200000,
+            "pricing": {"prompt": "0.000003", "completion": "0.000015"},
+            "isFree": False,
+        },
+        {
+            "id": "openai/gpt-4o",
+            "name": "OpenAI GPT-4o",
+            "description": "High-intelligence flagship model.",
+            "context_length": 128000,
+            "pricing": {"prompt": "0.0000025", "completion": "0.00001"},
+            "isFree": False,
+        },
+        {
+            "id": "google/gemini-2.0-flash-001",
+            "name": "Google Gemini 2.0 Flash",
+            "description": "High speed, low latency.",
+            "context_length": 1000000,
+            "pricing": {"prompt": "0.0000001", "completion": "0.0000004"},
+            "isFree": False,
+        },
+        {
+            "id": "z-ai/glm-5.3-flash",
+            "name": "GLM 5.3 Flash",
+            "description": "Fast flash model.",
+            "context_length": 128000,
+            "pricing": {"prompt": "0.0000001", "completion": "0.0000001"},
+            "isFree": False,
+        },
+        {
+            "id": "meta-llama/llama-3.3-70b-instruct:free",
+            "name": "Meta: Llama 3.3 70B Instruct (free)",
+            "description": "Free high performance open weights model.",
+            "context_length": 131072,
+            "pricing": {"prompt": "0", "completion": "0"},
+            "isFree": True,
+        },
+    ]
 
 
 def forward_to_openrouter(
@@ -270,8 +380,11 @@ def process_stripe_webhook(
         if webhook_secret:
             try:
                 import stripe
+
                 stripe.api_key = stripe_key
-                event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, webhook_secret
+                )
             except ImportError:
                 logger.info("Stripe SDK not installed, parsing webhook JSON directly.")
                 event = json.loads(payload.decode("utf-8"))

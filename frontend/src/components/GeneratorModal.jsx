@@ -3,14 +3,14 @@ import {
  X, Sparkles, FileText, Check, Copy, ExternalLink, FileUser,
  Zap, BarChart3, AlertCircle, Clock, Send,
  ShieldCheck, CheckCircle2, AlertTriangle, Settings,
- Cpu, KeyRound, Download
+ Cpu, KeyRound, Download, Search, RefreshCw
 } from 'lucide-react';
 import { 
  generateApplicationDocs, extractJobKeywords, calculateAtsScore, 
  runDocumentQualityAudit, getActiveApiKey, setActiveApiKey,
  getActiveModel, setActiveModel, AVAILABLE_MODELS
 } from '../services/generationService';
-import { PROVIDERS, getLlmConfig, saveLlmConfig } from '../services/llmConfig';
+import { PROVIDERS, getLlmConfig, saveLlmConfig, fetchOpenRouterModels, getOpenRouterModels } from '../services/llmConfig';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { getActiveProfile } from '../services/profileService';
 import { downloadAtsDocxResume } from '../services/dataService';
@@ -95,12 +95,93 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  const [selectedModel, setSelectedModel] = useState(() => getLlmConfig().model || 'z-ai/glm-5.3-flash');
  const [savedSettingsSuccess, setSavedSettingsSuccess] = useState(false);
 
+ // OpenRouter Dynamic Models State
+ const [openRouterModels, setOpenRouterModels] = useState(() => getOpenRouterModels());
+ const [isSyncingOpenRouter, setIsSyncingOpenRouter] = useState(false);
+ const [modelSearchQuery, setModelSearchQuery] = useState('');
+ const [modelFilterTab, setModelFilterTab] = useState('all'); // 'all' | 'free' | 'featured'
+
  useEffect(() => {
- const config = getLlmConfig();
- setActiveProvider(config.provider || 'openrouter');
- setInputKey(config.apiKey || '');
- setSelectedModel(config.model || 'z-ai/glm-5.3-flash');
+   let isMounted = true;
+   const config = getLlmConfig();
+   setActiveProvider(config.provider || 'openrouter');
+   setInputKey(config.apiKey || '');
+   setSelectedModel(config.model || 'z-ai/glm-5.3-flash');
+
+   if (showSettings && (config.provider || 'openrouter') === 'openrouter') {
+     fetchOpenRouterModels()
+       .then((models) => {
+         if (isMounted && models && models.length > 0) {
+           setOpenRouterModels(models);
+         }
+       })
+       .catch(() => {});
+   }
+   return () => {
+     isMounted = false;
+   };
  }, [showSettings]);
+
+ const handleSyncOpenRouterModels = async () => {
+   setIsSyncingOpenRouter(true);
+   try {
+     const models = await fetchOpenRouterModels({ force: true });
+     if (models && models.length > 0) {
+       setOpenRouterModels(models);
+     }
+   } catch (e) {
+     console.warn('Sync OpenRouter models error:', e);
+   } finally {
+     setIsSyncingOpenRouter(false);
+   }
+ };
+
+ const freeModelsCount = useMemo(() => {
+   return (openRouterModels || []).filter(m => m.isFree).length;
+ }, [openRouterModels]);
+
+ const featuredModelsCount = useMemo(() => {
+   const ids = (PROVIDERS.openrouter.models || []).map(p => p.id);
+   return (openRouterModels || []).filter(m => ids.includes(m.id)).length;
+ }, [openRouterModels]);
+
+ const filteredOpenRouterModels = useMemo(() => {
+   const list = openRouterModels || [];
+   const query = (modelSearchQuery || '').toLowerCase().trim();
+
+   return list.filter((m) => {
+     if (modelFilterTab === 'free' && !m.isFree) return false;
+     if (modelFilterTab === 'featured') {
+       const featuredIds = (PROVIDERS.openrouter.models || []).map(p => p.id);
+       if (!featuredIds.includes(m.id)) return false;
+     }
+     if (!query) return true;
+     const idMatch = m.id.toLowerCase().includes(query);
+     const nameMatch = (m.name || '').toLowerCase().includes(query);
+     const descMatch = (m.description || '').toLowerCase().includes(query);
+     return idMatch || nameMatch || descMatch;
+   });
+ }, [openRouterModels, modelSearchQuery, modelFilterTab]);
+
+ const selectedModelMeta = useMemo(() => {
+   if (activeProvider === 'openrouter') {
+     const found = (openRouterModels || []).find(m => m.id === selectedModel);
+     if (found) return found;
+   }
+   const meta = PROVIDERS[activeProvider] || PROVIDERS.openrouter;
+   return meta.models?.find(m => m.id === selectedModel) || null;
+ }, [activeProvider, openRouterModels, selectedModel]);
+
+ const formatModelPrice = (m) => {
+   if (!m) return '';
+   if (m.isFree || m.id?.endsWith(':free')) {
+     return '✨ Free Tier ($0.00)';
+   }
+   const pIn = parseFloat(m.pricing?.prompt ?? 0) * 1_000_000;
+   const pOut = parseFloat(m.pricing?.completion ?? 0) * 1_000_000;
+   if (pIn === 0 && pOut === 0) return '✨ Free Tier ($0.00)';
+   return `$${pIn < 0.01 ? pIn.toFixed(3) : pIn.toFixed(2)} in / $${pOut < 0.01 ? pOut.toFixed(3) : pOut.toFixed(2)} out per 1M`;
+ };
 
  // Debounced auto-save when user edits in the studio
  useEffect(() => {
@@ -428,28 +509,193 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
 
  {/* Model Selector */}
  <div className="space-y-2.5">
+ <div className="flex items-center justify-between">
  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
  <Cpu size={13} className="text-amber-400" /> Active LLM Model
  </label>
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
- {(PROVIDERS[activeProvider]?.models || AVAILABLE_MODELS).map(m => (
- <div
- key={m.id}
- onClick={() => setSelectedModel(m.id)}
- className={`p-3 rounded-sm border cursor-pointer transition-all ${
- selectedModel === m.id
- ? 'bg-amber-950/60 border-amber-500 text-white '
- : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
- }`}
- >
- <div className="flex items-center justify-between">
- <span className="text-xs font-bold text-slate-200">{m.name}</span>
- {selectedModel === m.id && <Check size={14} className="text-amber-400" />}
+ {activeProvider === 'openrouter' && (
+   <button
+     type="button"
+     onClick={handleSyncOpenRouterModels}
+     disabled={isSyncingOpenRouter}
+     className="text-[11px] font-mono text-slate-400 hover:text-amber-300 flex items-center gap-1.5 px-2 py-0.5 rounded-sm border border-slate-800 hover:border-amber-500/40 bg-slate-950/40 cursor-pointer disabled:opacity-50 transition-all"
+     title="Fetch live updated model catalog from OpenRouter"
+   >
+     <RefreshCw size={11} className={isSyncingOpenRouter ? 'animate-spin text-amber-400' : ''} />
+     <span>{isSyncingOpenRouter ? 'Syncing...' : 'Sync Models'}</span>
+   </button>
+ )}
  </div>
- <p className="text-[11px] text-slate-500 mt-1">{m.description}</p>
- </div>
- ))}
- </div>
+
+ {activeProvider === 'openrouter' ? (
+   <div className="space-y-3">
+     {/* Quick Preset Chips */}
+     <div className="space-y-1">
+       <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Quick Presets:</span>
+       <div className="flex flex-wrap gap-1.5">
+         {[
+           { id: 'z-ai/glm-5.3-flash', label: '⚡ GLM 5.3 Flash' },
+           { id: 'anthropic/claude-3.7-sonnet', label: '🧠 Claude 3.7' },
+           { id: 'openai/gpt-4o', label: '🌟 GPT-4o' },
+           { id: 'google/gemini-2.0-flash-001', label: '⚡ Gemini 2.0' },
+           { id: 'deepseek/deepseek-chat', label: '🚀 DeepSeek V3' },
+           { id: 'meta-llama/llama-3.3-70b-instruct:free', label: '✨ Llama 3.3 Free' },
+         ].map(preset => (
+           <button
+             key={preset.id}
+             type="button"
+             onClick={() => setSelectedModel(preset.id)}
+             className={`px-2 py-1 rounded text-[10px] font-mono transition-all cursor-pointer ${
+               selectedModel === preset.id
+                 ? 'bg-amber-500/30 text-amber-200 border border-amber-500/60 font-bold'
+                 : 'bg-slate-950/60 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-slate-200'
+             }`}
+           >
+             {preset.label}
+           </button>
+         ))}
+       </div>
+     </div>
+
+     {/* Filter Tabs */}
+     <div className="flex items-center gap-1.5 p-1 bg-slate-950/60 border border-slate-800 rounded-sm">
+       <button
+         type="button"
+         onClick={() => setModelFilterTab('all')}
+         className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+           modelFilterTab === 'all'
+             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+             : 'text-slate-400 hover:text-slate-200'
+         }`}
+       >
+         All ({openRouterModels.length})
+       </button>
+       <button
+         type="button"
+         onClick={() => setModelFilterTab('free')}
+         className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+           modelFilterTab === 'free'
+             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+             : 'text-slate-400 hover:text-emerald-300'
+         }`}
+       >
+         ✨ Free ({freeModelsCount})
+       </button>
+       <button
+         type="button"
+         onClick={() => setModelFilterTab('featured')}
+         className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+           modelFilterTab === 'featured'
+             ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+             : 'text-slate-400 hover:text-purple-300'
+         }`}
+       >
+         ⭐ Featured ({featuredModelsCount})
+       </button>
+     </div>
+
+     {/* Search Input */}
+     <div className="relative">
+       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+       <input
+         type="text"
+         value={modelSearchQuery}
+         onChange={(e) => setModelSearchQuery(e.target.value)}
+         placeholder="Search 440+ OpenRouter models..."
+         className="w-full bg-slate-950 border border-slate-700/80 rounded-sm pl-9 pr-8 py-2 text-base sm:text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500"
+       />
+       {modelSearchQuery && (
+         <button
+           type="button"
+           onClick={() => setModelSearchQuery('')}
+           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+           title="Clear search"
+         >
+           <X size={13} />
+         </button>
+       )}
+     </div>
+
+     {/* Dropdown Select */}
+     <div className="space-y-1.5">
+       <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+         <label htmlFor="generator-model-select">
+           Select Model ({filteredOpenRouterModels.length} available):
+         </label>
+         {selectedModel && (
+           <span className="text-amber-300 font-bold truncate max-w-[240px]">Active: {selectedModel}</span>
+         )}
+       </div>
+
+       <select
+         id="generator-model-select"
+         value={selectedModel}
+         onChange={(e) => setSelectedModel(e.target.value)}
+         className="w-full bg-slate-950 border border-slate-700/80 rounded-sm px-3 py-2.5 text-base sm:text-xs text-white font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
+       >
+         {filteredOpenRouterModels.map((m) => (
+           <option key={m.id} value={m.id} className="bg-slate-900 text-white py-1">
+             {m.isFree ? '✨ [FREE] ' : ''}{m.name || m.id} — ({m.id})
+           </option>
+         ))}
+       </select>
+
+       {/* Selected Model Details Card */}
+       {selectedModelMeta && (
+         <div className="p-3 rounded-sm bg-gradient-to-r from-amber-950/40 via-slate-950 to-slate-950 border border-amber-500/40 text-xs space-y-1.5 mt-2">
+           <div className="flex flex-wrap items-center justify-between gap-2">
+             <div className="flex items-center gap-2">
+               <span className="font-bold text-white text-xs">{selectedModelMeta.name || selectedModelMeta.id}</span>
+               {selectedModelMeta.isFree ? (
+                 <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                   ✨ ZERO COST / FREE
+                 </span>
+               ) : (
+                 <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-500/30">
+                   {formatModelPrice(selectedModelMeta)}
+                 </span>
+               )}
+             </div>
+             {selectedModelMeta.context_length > 0 && (
+               <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                 {(selectedModelMeta.context_length / 1000).toFixed(0)}k max context
+               </span>
+             )}
+           </div>
+           {selectedModelMeta.description && (
+             <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-2">
+               {selectedModelMeta.description}
+             </p>
+           )}
+           <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1">
+             <span>API Model ID:</span>
+             <code className="text-amber-300/90 font-semibold">{selectedModelMeta.id}</code>
+           </div>
+         </div>
+       )}
+     </div>
+   </div>
+ ) : (
+   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+   {(PROVIDERS[activeProvider]?.models || AVAILABLE_MODELS).map(m => (
+   <div
+   key={m.id}
+   onClick={() => setSelectedModel(m.id)}
+   className={`p-3 rounded-sm border cursor-pointer transition-all ${
+   selectedModel === m.id
+   ? 'bg-amber-950/60 border-amber-500 text-white '
+   : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+   }`}
+   >
+   <div className="flex items-center justify-between">
+   <span className="text-xs font-bold text-slate-200">{m.name}</span>
+   {selectedModel === m.id && <Check size={14} className="text-amber-400" />}
+   </div>
+   <p className="text-[11px] text-slate-500 mt-1">{m.description}</p>
+   </div>
+   ))}
+   </div>
+ )}
  </div>
  </div>
 

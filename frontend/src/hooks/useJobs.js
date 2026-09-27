@@ -40,10 +40,10 @@ export const useJobs = () => {
   useEffect(() => { writeLS(LS_OVERRIDES, overrides); }, [overrides]);
 
   // ── Load remote data ──────────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options = {}) => {
     try {
       setLoading(true);
-      const data = await fetchJobsData();
+      const data = await fetchJobsData(options);
       setRawJobs(data);
       setError(null);
     } catch (err) {
@@ -54,13 +54,29 @@ export const useJobs = () => {
     }
   }, []);
 
+  const refetch = useCallback(() => loadData({ force: true }), [loadData]);
+
   useEffect(() => {
     let mounted = true;
     loadData().finally(() => { if (!mounted) return; });
-    return () => { mounted = false; };
-  }, [loadData]);
 
-  const refetch = loadData;
+    const handleRefreshRequested = () => {
+      if (mounted) {
+        loadData({ force: true });
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('jobs-refresh-requested', handleRefreshRequested);
+    }
+
+    return () => {
+      mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('jobs-refresh-requested', handleRefreshRequested);
+      }
+    };
+  }, [loadData]);
 
   // ── Merge overrides + non-responsive policy + rejection flags ──────────────
   const [currentTime] = useState(() => Date.now());

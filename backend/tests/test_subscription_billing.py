@@ -208,14 +208,24 @@ def test_ai_proxy_free_trial_and_exhaustion(tmp_path):
         "usage": {"prompt_tokens": 100, "completion_tokens": 50},
     }
 
-    with patch("job_dashboard.billing.get_server_openrouter_key", return_value="test_key"), \
-         patch("job_dashboard.billing.forward_to_openrouter", return_value=mock_res):
+    with (
+        patch(
+            "job_dashboard.billing.get_server_openrouter_key", return_value="test_key"
+        ),
+        patch("job_dashboard.billing.forward_to_openrouter", return_value=mock_res),
+    ):
         # 1st call: should succeed under trial
-        payload = {"model": "google/gemini-2.0-flash", "messages": [{"role": "user", "content": "test"}]}
+        payload = {
+            "model": "google/gemini-2.0-flash",
+            "messages": [{"role": "user", "content": "test"}],
+        }
         body = json.dumps(payload).encode("utf-8")
         handler = handler_cls.__new__(handler_cls)
         handler.path = "/api/ai/proxy"
-        handler.headers = {"Content-Length": str(len(body)), "Authorization": f"Bearer {token}"}
+        handler.headers = {
+            "Content-Length": str(len(body)),
+            "Authorization": f"Bearer {token}",
+        }
         handler.rfile = io.BytesIO(body)
         handler.wfile = io.BytesIO()
         handler.client_address = ("127.0.0.1", 12345)
@@ -234,7 +244,10 @@ def test_ai_proxy_free_trial_and_exhaustion(tmp_path):
         # 2nd call: trial exhausted, should return 402 Payment Required
         handler2 = handler_cls.__new__(handler_cls)
         handler2.path = "/api/ai/proxy"
-        handler2.headers = {"Content-Length": str(len(body)), "Authorization": f"Bearer {token}"}
+        handler2.headers = {
+            "Content-Length": str(len(body)),
+            "Authorization": f"Bearer {token}",
+        }
         handler2.rfile = io.BytesIO(body)
         handler2.wfile = io.BytesIO()
         handler2.client_address = ("127.0.0.1", 12345)
@@ -296,3 +309,65 @@ def test_stripe_webhook_activates_subscription(tmp_path):
         assert sub["stripe_customer_id"] == "cus_stripe_real_123"
         assert sub["monthly_token_allowance"] == 500000
 
+
+def test_fetch_openrouter_models_catalog_and_endpoint(tmp_path):
+    """Test OpenRouter models catalog fetching, caching, and GET /api/ai/models route."""
+    from job_dashboard.billing import fetch_openrouter_models_catalog
+    from job_dashboard.web import DashboardApp, make_handler
+
+    # Mock response from OpenRouter
+    mock_payload = {
+        "data": [
+            {
+                "id": "anthropic/claude-3.7-sonnet",
+                "name": "Claude 3.7 Sonnet",
+                "description": "Hybrid reasoning model",
+                "context_length": 200000,
+                "pricing": {"prompt": "0.000003", "completion": "0.000015"},
+            },
+            {
+                "id": "meta-llama/llama-3.3-70b-instruct:free",
+                "name": "Llama 3.3 70B (free)",
+                "description": "Free open weights model",
+                "context_length": 131072,
+                "pricing": {"prompt": "0", "completion": "0"},
+            },
+        ]
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(mock_payload).encode("utf-8")
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        models = fetch_openrouter_models_catalog(force=True)
+        assert len(models) == 2
+        assert models[0]["id"] == "anthropic/claude-3.7-sonnet"
+        assert models[0]["isFree"] is False
+        assert models[1]["id"] == "meta-llama/llama-3.3-70b-instruct:free"
+        assert models[1]["isFree"] is True
+
+    # Test via HTTP GET /api/ai/models
+    app = DashboardApp(profile={}, sources=[], data_dir=tmp_path)
+    handler_cls = make_handler(app)
+    handler = handler_cls.__new__(handler_cls)
+    handler.path = "/api/ai/models"
+    handler.headers = {}
+    handler.rfile = io.BytesIO()
+    handler.wfile = io.BytesIO()
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.requestline = "GET /api/ai/models HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    handler.command = "GET"
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+
+    handler.do_GET()
+    assert handler.send_response.call_args[0][0] == 200
+
+    out_bytes = handler.wfile.getvalue()
+    res_data = json.loads(out_bytes.decode("utf-8"))
+    assert res_data["success"] is True
+    assert res_data["count"] >= 2
+    assert any(m["id"] == "anthropic/claude-3.7-sonnet" for m in res_data["models"])

@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { getActiveProfile } from '../services/profileService';
+import { generateClientSideTailoredDocs } from '../services/generationService';
 
 /**
  * Format string safely for filenames
@@ -12,8 +13,17 @@ const sanitizeFilename = (str) => {
  * Executive Resume PDF Generator
  */
 export const downloadResumePdf = (resumeText, job, candidateProfile, filename) => {
-  if (!resumeText) return;
   const profile = candidateProfile || getActiveProfile();
+  let textToRender = (typeof resumeText === 'string' && resumeText.trim())
+    ? resumeText.trim()
+    : (job?.resumeText || job?.resume || '');
+
+  if (!textToRender && job) {
+    const fallback = generateClientSideTailoredDocs(job, profile);
+    textToRender = fallback.resume;
+  }
+  if (!textToRender) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -37,12 +47,17 @@ export const downloadResumePdf = (resumeText, job, candidateProfile, filename) =
     }
   };
 
-  const lines = resumeText.split('\n');
+  const lines = textToRender.split('\n');
 
   lines.forEach((rawLine) => {
     let line = rawLine.trim();
     if (!line) {
       y += 2.2;
+      return;
+    }
+
+    // Skip raw section delimiters
+    if (/^===?[A-Z_\s-]+===?$/i.test(line)) {
       return;
     }
 
@@ -103,7 +118,11 @@ export const downloadResumePdf = (resumeText, job, candidateProfile, filename) =
     }
 
     // 3. Role / Position Heading (H3: ### Role Title | Company or Role — Company)
-    if (line.startsWith('### ') || (line.includes('—') && line.length < 80) || (line.includes('|') && (line.includes('20') || line.includes('Capgemini') || line.includes('Post') || line.includes('Knosys') || line.includes('Engage') || line.includes('Health') || line.includes('Education')))) {
+    const isRoleHeader = line.startsWith('### ') ||
+      ((line.includes('—') || line.includes(' - ')) && line.length < 150 && (/(?:19|20)\d{2}|Present|Current/i.test(line))) ||
+      (line.includes('|') && (/(?:19|20)\d{2}|Present|Current/i.test(line)));
+
+    if (isRoleHeader) {
       checkPageBreak(8);
       const roleText = line.replace(/^###\s*/, '').replace(/\*\*/g, '');
       doc.setFont('helvetica', 'bold');
@@ -186,8 +205,17 @@ export const downloadResumePdf = (resumeText, job, candidateProfile, filename) =
  * Executive Cover Letter PDF Generator
  */
 export const downloadCoverLetterPdf = (coverLetterText, job, candidateProfile, filename) => {
-  if (!coverLetterText) return;
   const profile = candidateProfile || getActiveProfile();
+  let textToRender = (typeof coverLetterText === 'string' && coverLetterText.trim())
+    ? coverLetterText.trim()
+    : (job?.coverLetterText || job?.coverLetter || '');
+
+  if (!textToRender && job) {
+    const fallback = generateClientSideTailoredDocs(job, profile);
+    textToRender = fallback.coverLetter;
+  }
+  if (!textToRender) return;
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -256,11 +284,19 @@ export const downloadCoverLetterPdf = (coverLetterText, job, candidateProfile, f
   y += 6;
 
   // ── Body Paragraphs ────────────────────────────────────────────────────────
-  const paragraphs = coverLetterText.split(/\n\s*\n/).filter(Boolean);
+  const paragraphs = textToRender
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    .filter(p => p && !/^===?[A-Z_\s-]+===?$/i.test(p));
 
   paragraphs.forEach((para) => {
     let text = para.trim().replace(/\*\*/g, '');
     checkPageBreak(6);
+
+    // Skip raw delimiters
+    if (/^===?[A-Z_\s-]+===?$/i.test(text)) {
+      return;
+    }
 
     // Skip if already rendered in header
     if (text.startsWith('RE:') || text.startsWith('Re:') || text.startsWith('Dear ') && text.length < 50) {

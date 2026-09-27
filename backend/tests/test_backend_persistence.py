@@ -190,3 +190,31 @@ def test_search_criteria_endpoint_formats():
         assert h2.send_response.call_args[0][0] == 200
         terms2 = [q.term for q in app.search_queries]
         assert "systems administrator" in terms2
+
+
+def test_query_jobs_paginated_caching_and_large_pagesize(temp_repo):
+    """Test that query_jobs_paginated supports repeated cached calls without UnboundLocalError and handles large page sizes."""
+    # Seed mock jobs
+    mock_jobs = [
+        {
+            "id": f"job_{i}",
+            "title": f"Engineer {i}",
+            "company": f"Company {i}",
+            "location": "Melbourne VIC",
+            "source": "Seek",
+            "posted": "2026-09-20",
+        }
+        for i in range(25)
+    ]
+    temp_repo.upsert_scraped_jobs(mock_jobs)
+
+    # First call: populates cache
+    res1 = temp_repo.query_jobs_paginated(page=1, page_size=2000)
+    assert res1["total"] == 25
+    assert len(res1["jobs"]) == 25
+    assert res1["pageSize"] == 2000
+
+    # Second call: uses in-memory cache, must not raise UnboundLocalError
+    res2 = temp_repo.query_jobs_paginated(page=1, page_size=2000)
+    assert res2["total"] == 25
+    assert len(res2["jobs"]) == 25

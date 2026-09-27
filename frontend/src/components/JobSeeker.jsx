@@ -776,6 +776,9 @@ export const JobSeeker = ({
  setScrapeSuccess(true);
  setTimeout(() => setScrapeSuccess(false), 5000);
  }
+ if (typeof window !== 'undefined') {
+ window.dispatchEvent(new CustomEvent('jobs-refresh-requested'));
+ }
  } catch (err) {
  console.warn("Backend scraper call fallback:", err);
  setScrapedCount(24);
@@ -1563,7 +1566,7 @@ export const JobSeeker = ({
  onClick={async () => {
  setOpenKebabJobId(null);
  const { downloadCoverLetterPdf } = await import('../utils/pdfGenerator');
- downloadCoverLetterPdf(hasCustomDocs.coverLetter, job, currentProfile);
+ downloadCoverLetterPdf(job.coverLetterText || job.coverLetter, job, currentProfile);
  }}
  className="w-full px-3 py-2 rounded-sm hover:bg-amber-950 text-slate-200 hover:text-amber-300 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
  >

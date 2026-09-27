@@ -638,15 +638,15 @@ let inFlightFetchJobsPromise = null;
  * Main fetch function for populating the active dashboard state.
  * Queries /api/jobs (or cached jobs), deduplicates them cleanly, and merges user-scoped applications.
  */
-export const fetchJobsData = async () => {
-  if (inFlightFetchJobsPromise) {
+export const fetchJobsData = async ({ page = 1, pageSize = 2000, force = false } = {}) => {
+  if (inFlightFetchJobsPromise && !force) {
     return inFlightFetchJobsPromise;
   }
 
   inFlightFetchJobsPromise = (async () => {
     try {
       const [apiJobsResult, userApps] = await Promise.all([
-        fetchJobsFromApi({ page: 1, pageSize: 300 }),
+        fetchJobsFromApi({ page, pageSize }),
         fetchUserApplications()
       ]);
 

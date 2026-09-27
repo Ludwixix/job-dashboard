@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { 
   generateClientSideTailoredDocs, 
-  runDocumentQualityAudit 
+  runDocumentQualityAudit,
+  parseGeneratedPackageContent
 } from '../generationService';
 
 describe('Resume & Cover Letter Optimization Architecture (Resume_Optimization.md)', () => {
@@ -137,5 +138,45 @@ With a proven track record, I am thrilled to apply.
 
     const antiClicheCheck = audit.checks.find(c => c.id === 'anti_cliche');
     expect(antiClicheCheck.passed).toBe(true);
+  });
+
+  it('reliably parses LLM package output with markdown and whitespace delimiter variations', () => {
+    const rawLlmOutput = `
+Here is your tailored application package:
+
+### ===DIAGNOSTIC===
+Strong alignment across enterprise systems and cloud infrastructure.
+
+## ===RESUME===
+# SAM LUDWIG
+Senior Infrastructure Engineer
+Melbourne, VIC
+
+## PROFESSIONAL SUMMARY
+Experienced engineer with 10 years enterprise history.
+
+## REFEREES
+Available upon request.
+
+**===COVER_LETTER===**
+Dear Sovereign Cyber Hiring Team,
+
+Scaling reliable cloud systems requires precision and operational discipline.
+
+Yours sincerely,
+Sam Ludwig
+
+===LINKEDIN_OPTIMIZATION===
+Senior Infrastructure Specialist | M365 Architect
+`;
+
+    const parsed = parseGeneratedPackageContent(rawLlmOutput);
+
+    expect(parsed.diagnostic).toContain('Strong alignment across enterprise systems');
+    expect(parsed.resume).toContain('# SAM LUDWIG');
+    expect(parsed.resume).toContain('## REFEREES');
+    expect(parsed.coverLetter).toContain('Dear Sovereign Cyber Hiring Team');
+    expect(parsed.coverLetter).toContain('Yours sincerely');
+    expect(parsed.linkedInOptimization).toContain('Senior Infrastructure Specialist');
   });
 });

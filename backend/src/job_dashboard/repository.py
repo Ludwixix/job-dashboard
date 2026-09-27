@@ -753,8 +753,9 @@ class JobRepository:
     ) -> dict[str, Any]:
         """Query jobs with database-level pagination, search filtering, and sorting."""
         page = max(1, int(page))
-        page_size = max(1, min(500, int(page_size)))
+        page_size = max(1, min(5000, int(page_size)))
         offset = (page - 1) * page_size
+        fts_success = False
 
         is_default_query = (
             not search

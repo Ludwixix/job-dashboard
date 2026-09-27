@@ -29,7 +29,9 @@ from ..sources import extract_seek_job_id, fetch_portal_description
 logger = logging.getLogger(__name__)
 
 
-def _resolve_user_id(handler, query_params: dict[str, list[str]] | None = None) -> str | None:
+def _resolve_user_id(
+    handler, query_params: dict[str, list[str]] | None = None
+) -> str | None:
     """Resolve user ID via bearer token, headers, or query params."""
     uid = get_auth_user_id(handler)
     if uid:
@@ -74,7 +76,7 @@ def handle_get_jobs(handler):
     except (ValueError, TypeError):
         page = 1
     try:
-        page_size = max(1, min(500, int(query_params.get("pageSize", ["50"])[0])))
+        page_size = max(1, min(5000, int(query_params.get("pageSize", ["50"])[0])))
     except (ValueError, TypeError):
         page_size = 50
 
@@ -332,9 +334,13 @@ def handle_job_explanation(handler):
     user_id = _resolve_user_id(handler, query_params)
 
     # Support both snake_case and camelCase parameters
-    job_id = (query_params.get("job_id") or query_params.get("jobId") or [""])[0].strip()
+    job_id = (query_params.get("job_id") or query_params.get("jobId") or [""])[
+        0
+    ].strip()
     if not job_id:
-        handler.send_json(400, {"success": False, "error": "jobId or job_id parameter is required."})
+        handler.send_json(
+            400, {"success": False, "error": "jobId or job_id parameter is required."}
+        )
         return
 
     job_data = app.repository.get_job(job_id)
@@ -349,7 +355,9 @@ def handle_job_explanation(handler):
         handler.send_json(404, {"error": "Job not found"})
         return
 
-    profile = (app.repository.get_user_profile(user_id) if user_id else None) or getattr(app.dashboard, "profile", None)
+    profile = (
+        app.repository.get_user_profile(user_id) if user_id else None
+    ) or getattr(app.dashboard, "profile", None)
     if not profile:
         handler.send_json(
             401,
@@ -541,10 +549,7 @@ def handle_get_application_file(handler, filename: str, **kwargs):
     """Serve generated application files (PDF / Markdown) safely from data_dir."""
     app = handler.app
     target = (app.data_dir / "applications" / filename).resolve()
-    if (
-        target.parent == (app.data_dir / "applications").resolve()
-        and target.is_file()
-    ):
+    if target.parent == (app.data_dir / "applications").resolve() and target.is_file():
         data = target.read_bytes()
         handler.send_response(200)
         content_type = (
@@ -647,7 +652,11 @@ def handle_post_dossier_generate(handler):
     app = handler.app
     payload = get_json_body(handler)
     job_id = payload.get("job_id") or payload.get("id") or ""
-    job = payload.get("job") or (app.repository.get_job(job_id) if job_id else None) or payload
+    job = (
+        payload.get("job")
+        or (app.repository.get_job(job_id) if job_id else None)
+        or payload
+    )
     profile = (
         payload.get("profile")
         or payload.get("candidateProfile")
@@ -680,9 +689,7 @@ def handle_dossier_export_markdown(handler):
 @app_router.post(r"^/api/jobs/(?P<job_id>[^/]+)/compare$")
 def handle_job_compare(handler, job_id: str, **kwargs):
     """Queue multi-model comparison generation for a job."""
-    handler.send_json(
-        202, {"status": "queued", **handler.app.start_compare(job_id)}
-    )
+    handler.send_json(202, {"status": "queued", **handler.app.start_compare(job_id)})
 
 
 @app_router.get(r"^/api/compare/(?P<comparison_id>[^/]+)$")
@@ -850,7 +857,9 @@ def handle_career_roadmap(handler):
     query_params = get_query_params(handler)
     payload = get_json_body(handler) if handler.command == "POST" else {}
     sector = payload.get("sector") or query_params.get("sector", [None])[0]
-    target_level = payload.get("target_level") or query_params.get("target_level", [None])[0]
+    target_level = (
+        payload.get("target_level") or query_params.get("target_level", [None])[0]
+    )
     profile = payload.get("profile")
     if not profile:
         user_id = _resolve_user_id(handler, query_params)
@@ -1134,4 +1143,3 @@ def handle_smart_applications_search(handler):
     search_query = query.get("q", [""])[0]
     result = handler.app.search_smart_applications(search_query)
     handler.send_json(200, {"applications": result})
-

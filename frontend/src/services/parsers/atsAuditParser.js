@@ -79,38 +79,67 @@ export const calculateAtsScore = (jobDescription) => {
  */
 export const parseGeneratedPackageContent = (content = '') => {
   const finalContent = content || '';
-  const diagIdx = finalContent.indexOf('===DIAGNOSTIC===');
-  const resIdx = finalContent.indexOf('===RESUME===');
-  const clIdx = finalContent.indexOf('===COVER_LETTER===');
-  const liIdx = finalContent.indexOf('===LINKEDIN_OPTIMIZATION===');
+
+  // Resilient section matching accommodating markdown headings (###, ##, #), bold (**), spacing, and punctuation variations
+  const diagRegex = /(?:^|\n)\s*(?:#+\s*)?(?:\*\*|__)?\s*===?\s*DIAGNOSTIC\s*===?(?:\*\*|__)?\s*(?:\n|$)/i;
+  const resRegex = /(?:^|\n)\s*(?:#+\s*)?(?:\*\*|__)?\s*===?\s*RESUME\s*===?(?:\*\*|__)?\s*(?:\n|$)/i;
+  const clRegex = /(?:^|\n)\s*(?:#+\s*)?(?:\*\*|__)?\s*===?\s*COVER[_\s-]*LETTER\s*===?(?:\*\*|__)?\s*(?:\n|$)/i;
+  const liRegex = /(?:^|\n)\s*(?:#+\s*)?(?:\*\*|__)?\s*===?\s*LINKEDIN[_\s-]*OPTIMIZATION\s*===?(?:\*\*|__)?\s*(?:\n|$)/i;
+
+  const findSection = (regex) => {
+    const match = regex.exec(finalContent);
+    if (!match) return { index: -1, length: 0 };
+    return { index: match.index, length: match[0].length };
+  };
+
+  const diag = findSection(diagRegex);
+  const res = findSection(resRegex);
+  const cl = findSection(clRegex);
+  const li = findSection(liRegex);
 
   let diagnostic = '';
   let resume = '';
   let coverLetter = '';
   let linkedInOptimization = '';
 
-  if (diagIdx !== -1) {
-    const diagEnd = resIdx !== -1 ? resIdx : (clIdx !== -1 ? clIdx : finalContent.length);
-    diagnostic = finalContent.slice(diagIdx + '===DIAGNOSTIC==='.length, diagEnd).trim();
+  if (diag.index !== -1) {
+    const start = diag.index + diag.length;
+    const end = res.index !== -1 ? res.index : (cl.index !== -1 ? cl.index : (li.index !== -1 ? li.index : finalContent.length));
+    diagnostic = finalContent.slice(start, end).trim();
   }
 
-  if (resIdx !== -1) {
-    const resEnd = clIdx !== -1 ? clIdx : (liIdx !== -1 ? liIdx : finalContent.length);
-    resume = finalContent.slice(resIdx + '===RESUME==='.length, resEnd).trim();
-  } else if (clIdx !== -1) {
-    const startOffset = diagIdx !== -1 && diagnostic ? diagIdx + '===DIAGNOSTIC==='.length + diagnostic.length : 0;
-    resume = finalContent.slice(startOffset, clIdx).trim();
+  if (res.index !== -1) {
+    const start = res.index + res.length;
+    const end = cl.index !== -1 ? cl.index : (li.index !== -1 ? li.index : finalContent.length);
+    resume = finalContent.slice(start, end).trim();
+  } else if (cl.index !== -1) {
+    const start = diag.index !== -1 ? diag.index + diag.length + (diagnostic ? diagnostic.length : 0) : 0;
+    resume = finalContent.slice(start, cl.index).trim();
   } else {
-    resume = finalContent.trim();
+    // Delimiter wasn't found - check if there's a markdown heading for cover letter
+    const headingCl = /(?:^|\n)#+\s*COVER[_\s-]*LETTER/i.exec(finalContent);
+    if (headingCl) {
+      resume = finalContent.slice(0, headingCl.index).trim();
+      coverLetter = finalContent.slice(headingCl.index).trim();
+    } else {
+      resume = finalContent.trim();
+    }
   }
 
-  if (clIdx !== -1) {
-    const clEnd = liIdx !== -1 ? liIdx : finalContent.length;
-    coverLetter = finalContent.slice(clIdx + '===COVER_LETTER==='.length, clEnd).trim();
+  if (cl.index !== -1) {
+    const start = cl.index + cl.length;
+    const end = li.index !== -1 ? li.index : finalContent.length;
+    coverLetter = finalContent.slice(start, end).trim();
+  } else if (!coverLetter) {
+    const headingCl = /(?:^|\n)#+\s*COVER[_\s-]*LETTER[^\n]*\n([\s\S]*?)(?:(?:^|\n)#+\s*(?:LINKEDIN|REFEREES)|$)/i.exec(finalContent);
+    if (headingCl && headingCl[1]) {
+      coverLetter = headingCl[1].trim();
+    }
   }
 
-  if (liIdx !== -1) {
-    linkedInOptimization = finalContent.slice(liIdx + '===LINKEDIN_OPTIMIZATION==='.length).trim();
+  if (li.index !== -1) {
+    const start = li.index + li.length;
+    linkedInOptimization = finalContent.slice(start).trim();
   }
 
   return {

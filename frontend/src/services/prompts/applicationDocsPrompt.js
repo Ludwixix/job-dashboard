@@ -29,22 +29,46 @@ CAREER METRICS (real, verified):
  * @returns {{systemPrompt: string, userPrompt: string, candidateSummary: string}}
  */
 export const buildGenerationPrompts = (job, profile) => {
-  const candidateSummary = [profile.fullWorkExperienceText, profile.workHistorySummary]
+  const candName = profile?.name?.trim() || 'Sam Ludwig';
+  const candTitle = profile?.title?.trim() || job?.title || 'Senior Systems & Infrastructure Engineer';
+  const candLocation = profile?.location?.trim() || 'Melbourne, VIC';
+  const candPhone = profile?.phone?.trim() || '0405 993 245';
+  const candEmail = profile?.email?.trim() || 'sam.ludwig@gmail.com';
+  const candRights = profile?.workRights?.trim() || 'Australian Citizen (Unrestricted)';
+  const candClearance = profile?.clearance?.trim() || 'Baseline / NV1 Eligible';
+  const candSkills = (Array.isArray(profile?.coreSkills) && profile.coreSkills.length > 0)
+    ? profile.coreSkills.join(', ')
+    : 'Microsoft 365, Azure, Entra ID, Intune, Autopilot, PowerShell, Windows Server, VMware, ACSC Essential 8, ServiceNow';
+  const candCerts = (Array.isArray(profile?.certifications) && profile.certifications.length > 0)
+    ? profile.certifications.join(', ')
+    : 'AZ-104 (Azure Administrator), ITIL 4 Foundation, AZ-900';
+
+  // Format array-based experience if fullWorkExperienceText is absent
+  let formattedExperience = '';
+  if (Array.isArray(profile?.experience) && profile.experience.length > 0) {
+    formattedExperience = profile.experience.map(exp => {
+      const header = `${exp.title || 'Role'} — ${exp.company || 'Company'} (${exp.startDate || exp.dates || ''} – ${exp.endDate || 'Present'})`;
+      const bullets = Array.isArray(exp.bulletPoints) ? exp.bulletPoints.map(b => `- ${b}`).join('\n') : (exp.description || '');
+      return `${header}\n${bullets}`;
+    }).join('\n\n');
+  }
+
+  const candidateSummary = [profile?.fullWorkExperienceText, profile?.workHistorySummary, formattedExperience]
     .filter(value => typeof value === 'string' && value.trim())
     .join('\n\n') || MASTER_RESUME_HIGHLIGHTS;
 
-  const systemPrompt = `You are a Principal Talent Acquisition Architect and Expert ATS Optimization Agent for ${profile.name}. Your sole objective is to process the candidate's master profile and the target job description to generate a highly optimized resume, a distinct non-generic cover letter, and an inbound LinkedIn Boolean search index. You operate on the foundational understanding that recruitment is mediated first by mechanical document parsers (Workday, Taleo, Textkernel, Sovren, JobAdder), second by semantic AI screening (neural embeddings and cosine similarity), and third by fatigued human recruiters scanning in an F-pattern for 7.4 seconds.
+  const systemPrompt = `You are a Principal Talent Acquisition Architect and Expert ATS Optimization Agent for ${candName}. Your sole objective is to process the candidate's master profile and the target job description to generate a highly optimized resume, a distinct non-generic cover letter, and an inbound LinkedIn Boolean search index. You operate on the foundational understanding that recruitment is mediated first by mechanical document parsers (Workday, Taleo, Textkernel, Sovren, JobAdder), second by semantic AI screening (neural embeddings and cosine similarity), and third by fatigued human recruiters scanning in an F-pattern for 7.4 seconds.
 
 CANDIDATE MASTER PROFILE & VERIFIED CAREER RECORD:
-Name: ${profile.name}
-Title: ${profile.title}
-Location: ${profile.location}
-Phone: ${profile.phone}
-Email: ${profile.email}
-Work Rights: ${profile.workRights}
-Clearance: ${profile.clearance}
-Core Skills: ${(profile.coreSkills || []).join(', ')}
-Certifications: ${(profile.certifications || []).join(', ')}
+Name: ${candName}
+Title: ${candTitle}
+Location: ${candLocation}
+Phone: ${candPhone}
+Email: ${candEmail}
+Work Rights: ${candRights}
+Clearance: ${candClearance}
+Core Skills: ${candSkills}
+Certifications: ${candCerts}
 
 DETAILED WORK HISTORY & ACCOMPLISHMENTS (PROFILE SOURCE OF TRUTH):
 ${candidateSummary}

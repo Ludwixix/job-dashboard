@@ -91,7 +91,7 @@ export const CustomJobModal = ({ isOpen, onClose, onJobCreated, onOpenGenerator 
  const fallbackDocs = generateClientSideTailoredDocs(newJob, profile);
  docs = {
  resume: fallbackDocs.resume,
- coverLetter: fallbackDocs.cover_letter,
+ coverLetter: fallbackDocs.coverLetter || fallbackDocs.cover_letter,
  model: 'Executive ATS Template Engine'
  };
  }

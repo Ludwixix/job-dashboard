@@ -23,6 +23,22 @@ def handle_billing_status(handler):
     handler.send_json(200, res)
 
 
+@app_router.get("/api/ai/models")
+def handle_ai_models(handler):
+    """Retrieve catalog of available OpenRouter models with in-memory caching."""
+    from ..billing import fetch_openrouter_models_catalog
+
+    models = fetch_openrouter_models_catalog()
+    handler.send_json(
+        200,
+        {
+            "success": True,
+            "models": models,
+            "count": len(models),
+        },
+    )
+
+
 @app_router.post("/api/ai/proxy")
 def handle_ai_proxy(handler):
     """Secure proxy for server-side AI requests with subscription validation and token metering."""

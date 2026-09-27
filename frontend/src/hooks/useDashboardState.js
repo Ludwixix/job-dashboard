@@ -11,6 +11,7 @@ import { syncProfileQueriesToBackend } from '../services/profileOnboardingPipeli
 
 // Client routing path mappings
 export const SECTION_ROUTES = {
+  career_mode: '/career-mode',
   seeker: '/',
   highlights: '/highlights',
   kanban: '/pipeline',
@@ -23,6 +24,9 @@ export const SECTION_ROUTES = {
 export const ROUTE_SECTIONS = {
   '/': 'seeker',
   '/seeker': 'seeker',
+  '/career-mode': 'career_mode',
+  '/sam-mode': 'career_mode',
+  '/cockpit': 'career_mode',
   '/highlights': 'highlights',
   '/pipeline': 'kanban',
   '/kanban': 'kanban',
@@ -112,7 +116,22 @@ export function useDashboardState({
   addToast = null,
 } = {}) {
   // Navigation
-  const [activeSection, setActiveSection] = useState('seeker'); // 'seeker', 'kanban', 'market', 'tracker'
+  const [activeSection, setActiveSection] = useState(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('sam_mode_active') === 'true') {
+      return 'career_mode';
+    }
+    return 'seeker';
+  });
+
+  // Listen for global Sam Mode toggle events
+  useEffect(() => {
+    const handleSamModeToggled = (e) => {
+      const isSamActive = Boolean(e?.detail?.active);
+      setActiveSection(isSamActive ? 'career_mode' : 'seeker');
+    };
+    window.addEventListener('sam-mode-toggled', handleSamModeToggled);
+    return () => window.removeEventListener('sam-mode-toggled', handleSamModeToggled);
+  }, []);
 
   // Profile
   const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());

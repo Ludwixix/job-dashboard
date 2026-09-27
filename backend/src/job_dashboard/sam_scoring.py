@@ -272,12 +272,14 @@ SAM_VERIFIED_MILESTONES: list[dict[str, Any]] = [
         ),
     },
     {
-        "id": "nbn_layer1",
-        "employer": "National Broadband Network (NBN) & PolaAir",
+        "id": "nbn_bsa_layer1",
+        "employer": "BSA Limited. / National Broadband Network (NBN)",
         "category": "physical_infrastructure",
         "headline": "Layer 1 Telecommunications Cabling & Physical Systems Diagnostics",
         "evidence": "Deployed Layer 1 physical infrastructure (fibre optic and copper structured cabling), NTDs, and routing equipment across commercial networks, with deep diagnostic RCA methodologies.",
         "trigger_keywords": (
+            "bsa",
+            "bsa limited",
             "nbn",
             "cabling",
             "fibre",

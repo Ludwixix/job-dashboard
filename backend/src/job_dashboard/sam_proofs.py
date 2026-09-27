@@ -42,8 +42,8 @@ class VerifiedMilestone:
 VERIFIED_MILESTONES: list[VerifiedMilestone] = [
     VerifiedMilestone(
         id="VIC_DEPT_ED_SCALE",
-        employer="Capgemini / Dept of Education Victoria",
-        period="Dec 2021 – Present",
+        employer="Department of Education / Capgemini",
+        period="Dec 2021 – Dec 2025",
         domains=["enterprise_scale", "modern_workplace", "service_operations"],
         empirical_metrics={
             "users": 660000,
@@ -73,8 +73,8 @@ VERIFIED_MILESTONES: list[VerifiedMilestone] = [
     ),
     VerifiedMilestone(
         id="VIC_DEPT_ED_MFA",
-        employer="Dept of Education Victoria / Capgemini",
-        period="Dec 2021 – Present",
+        employer="Department of Education / Capgemini",
+        period="Dec 2021 – Dec 2025",
         domains=["automation_security", "enterprise_scale"],
         empirical_metrics={
             "audited_sites": 200,
@@ -96,8 +96,8 @@ VERIFIED_MILESTONES: list[VerifiedMilestone] = [
     ),
     VerifiedMilestone(
         id="AUS_POST_AUTOMATION",
-        employer="Australia Post (via Capgemini)",
-        period="2023 – 2024 / Feb 2026 – Jun 2026",
+        employer="Australia Post",
+        period="Feb 2026 – Sep 2026",
         domains=["endpoint_fleet", "service_operations", "automation_security"],
         empirical_metrics={
             "hours_saved_monthly": 100,
@@ -114,14 +114,14 @@ VERIFIED_MILESTONES: list[VerifiedMilestone] = [
         verifiable_claim=(
             "Engineered custom keystroke injection automation within ServiceNow, programmatically managing ITSM tickets "
             "and saving hundreds of hours of manual entry per month under restrictive security controls. Managed full enterprise "
-            "endpoint lifecycle: Windows 10/11 SOE builds, Autopilot/UEM enrolment, and NIST-compliant sanitisation."
+            "endpoint lifecycle: Windows 10/11 SOE builds, Autopilot/UEM enrolment, and NIST-compliant sanitisation at Australia Post's Burnley hub."
         ),
         summary_bullet="ITSM & Endpoint Fleet Governance: Built custom ServiceNow keystroke automation saving hundreds of hours monthly and administered enterprise SOE fleet at Australia Post.",
     ),
     VerifiedMilestone(
         id="ST_JOHN_OF_GOD_CLINICAL",
         employer="St John of God Health Care",
-        period="2023 / Oct 2025 – Jan 2026",
+        period="Oct 2025 – Jan 2026",
         domains=["clinical_healthcare", "endpoint_fleet"],
         empirical_metrics={
             "clinical_endpoints": 100,

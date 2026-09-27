@@ -542,7 +542,10 @@ class TestTier1FeatureCoverage:
         profile = data["profile"]
         assert profile.get("id") == "sam_ludwig"
         assert profile.get("name") == "Sam Ludwig"
-        assert "Senior Infrastructure" in profile.get("title", "")
+        assert any(
+            t in profile.get("title", "")
+            for t in ("Senior Infrastructure", "IT Infrastructure Consultant")
+        )
         assert profile.get("yearsOfExperience") == 10
         assert "Australian Citizen" in profile.get("workRights", "")
         assert "Baseline" in profile.get("clearance", "")

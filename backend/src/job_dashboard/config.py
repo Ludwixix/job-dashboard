@@ -58,8 +58,14 @@ class Settings:
         self.openrouter_api_key = os.getenv("JOB_DASHBOARD_OPENROUTER_API_KEY")
 
         # Adzuna configuration
-        self.adzuna_app_id = os.getenv("JOB_DASHBOARD_ADZUNA_APP_ID")
-        self.adzuna_api_key = os.getenv("JOB_DASHBOARD_ADZUNA_API_KEY")
+        self.adzuna_app_id = (
+            os.getenv("JOB_DASHBOARD_ADZUNA_APP_ID") or os.getenv("ADZUNA_APP_ID")
+        )
+        self.adzuna_api_key = (
+            os.getenv("JOB_DASHBOARD_ADZUNA_API_KEY")
+            or os.getenv("ADZUNA_API_KEY")
+            or os.getenv("ADZUNA_APP_KEY")
+        )
 
         # Gmail configuration
         self.gmail_username = os.getenv("JOB_DASHBOARD_GMAIL_USERNAME")

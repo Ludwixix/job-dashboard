@@ -1100,6 +1100,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
                   <CareerModeCockpit
                     jobs={jobs}
                     onUpdateStatus={(id, status, extra) => updateJobStatus(id, status, extra)}
+                    onSelectJob={(job) => setSelectedJob(job)}
                   />
                 </Suspense>
               </SafeErrorBoundary>

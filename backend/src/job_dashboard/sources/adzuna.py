@@ -40,8 +40,17 @@ class AdzunaApiSource:
         self.api_key = api_key
 
     def _get_params(self, query: SearchQuery) -> dict[str, Any] | None:
-        app_id = self.app_id or os.getenv("ADZUNA_APP_ID")
-        api_key = self.api_key or os.getenv("ADZUNA_API_KEY")
+        app_id = (
+            self.app_id
+            or os.getenv("JOB_DASHBOARD_ADZUNA_APP_ID")
+            or os.getenv("ADZUNA_APP_ID")
+        )
+        api_key = (
+            self.api_key
+            or os.getenv("JOB_DASHBOARD_ADZUNA_API_KEY")
+            or os.getenv("ADZUNA_API_KEY")
+            or os.getenv("ADZUNA_APP_KEY")
+        )
         if not app_id or not api_key:
             return None
         loc = resolve_search_location(query)

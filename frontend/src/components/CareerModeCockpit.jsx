@@ -22,7 +22,7 @@ import { ApplicationStudioModal } from './ApplicationStudioModal';
  * @param {Function} [props.onUpdateStatus] - Job tracker status update callback.
  * @returns {React.ReactElement}
  */
-export const CareerModeCockpit = ({ jobs = [], onUpdateStatus }) => {
+export const CareerModeCockpit = ({ jobs = [], onUpdateStatus, onSelectJob }) => {
   const [overview, setOverview] = useState(null);
   const [matches, setMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -391,7 +391,8 @@ export const CareerModeCockpit = ({ jobs = [], onUpdateStatus }) => {
             return (
               <div
                 key={job.id}
-                className="p-4 sm:p-5 rounded-sm bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all duration-200 space-y-3 hover:shadow-lg"
+                onClick={() => onSelectJob && onSelectJob(job)}
+                className="p-4 sm:p-5 rounded-sm bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all duration-200 space-y-3 hover:shadow-lg cursor-pointer"
               >
                 {/* Job Header */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -492,7 +493,10 @@ export const CareerModeCockpit = ({ jobs = [], onUpdateStatus }) => {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setSelectedJobForStudio(job)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedJobForStudio(job);
+                      }}
                       className="px-3.5 py-2 rounded-sm bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-xs min-h-[44px] sm:min-h-0 touch-target-44"
                     >
                       <Sparkles size={13} />

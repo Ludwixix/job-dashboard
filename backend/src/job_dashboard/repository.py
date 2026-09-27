@@ -750,6 +750,7 @@ class JobRepository:
         industry: str = "",
         remote: bool | None = None,
         sort_by: str = "newest",
+        source: str = "",
     ) -> dict[str, Any]:
         """Query jobs with database-level pagination, search filtering, and sorting."""
         page = max(1, int(page))
@@ -761,6 +762,7 @@ class JobRepository:
             not search
             and (not industry or industry.lower() == "all")
             and remote is None
+            and (not source or source.lower() == "all")
         )
         if (
             is_default_query
@@ -772,6 +774,10 @@ class JobRepository:
             # Gmail messages are workflow records, not public job listings.
             clauses = ["lower(source) != 'gmail'"]
             params: list[Any] = []
+
+            if source and source.lower() != "all":
+                clauses.append("lower(source) = ?")
+                params.append(source.strip().lower())
 
             if search:
                 search_pattern = f"%{search.strip().lower()}%"

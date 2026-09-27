@@ -320,8 +320,21 @@ def is_recent(
 def normalize_posted_date(value: Any, now: datetime | None = None) -> str:
     """Normalize ISO and relative provider dates to an ISO calendar date."""
     text = str(value or "").strip().lower()
+    if not text:
+        return ""
     current = now or datetime.now(timezone.utc)
-    relative = re.fullmatch(r"(\d+)\s*d(?:ays?)?\s*ago", text)
+    if (
+        text in ("today", "posted today", "just now")
+        or re.search(
+            r"\b\d+\s*(?:h(?:ours?)?|m(?:in(?:utes?)?)?|s(?:ec(?:onds?)?)?)\s*ago\b",
+            text,
+        )
+        or any(k in text for k in ("hour", "minute", "just now"))
+    ):
+        return current.date().isoformat()
+    if text in ("yesterday", "posted yesterday"):
+        return (current - timedelta(days=1)).date().isoformat()
+    relative = re.search(r"(\d+)\s*d(?:ays?)?\s*ago", text)
     if relative:
         return (current - timedelta(days=int(relative.group(1)))).date().isoformat()
     try:
@@ -339,8 +352,21 @@ def normalize_posted_date(value: Any, now: datetime | None = None) -> str:
 def canonical_posted_date(value: Any, captured_at: datetime | None = None) -> str:
     """Convert provider-relative dates to absolute dates at capture time."""
     text = str(value or "").strip().lower()
+    if not text:
+        return ""
     captured = captured_at or datetime.now(timezone.utc)
-    relative = re.fullmatch(r"(\d+)\s*d(?:ays?)?\s*ago(?:\s*[•|].*)?", text)
+    if (
+        text in ("today", "posted today", "just now")
+        or re.search(
+            r"\b\d+\s*(?:h(?:ours?)?|m(?:in(?:utes?)?)?|s(?:ec(?:onds?)?)?)\s*ago\b",
+            text,
+        )
+        or any(k in text for k in ("hour", "minute", "just now"))
+    ):
+        return captured.date().isoformat()
+    if text in ("yesterday", "posted yesterday"):
+        return (captured - timedelta(days=1)).date().isoformat()
+    relative = re.search(r"(\d+)\s*d(?:ays?)?\s*ago", text)
     if relative:
         return (captured - timedelta(days=int(relative.group(1)))).date().isoformat()
     return normalize_posted_date(value, captured) or ""

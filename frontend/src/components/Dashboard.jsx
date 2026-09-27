@@ -67,6 +67,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
   });
 
   const {
+    isSam,
     activeSection,
     setActiveSection,
     activeProfile,
@@ -763,11 +764,13 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             </span>
           </button>
 
-          {/* Sam Mode Header Toggle */}
-          <SamModeHeaderToggle
-            isActive={activeSection === 'career_mode'}
-            onToggle={(active) => setActiveSection(active ? 'career_mode' : 'seeker')}
-          />
+          {/* Sam Mode Header Toggle (Restricted to sam.ludwig@gmail.com) */}
+          {isSam && (
+            <SamModeHeaderToggle
+              isActive={activeSection === 'career_mode'}
+              onToggle={(active) => setActiveSection(active ? 'career_mode' : 'seeker')}
+            />
+          )}
 
           {/* Provider Mesh Telemetry Desk */}
           <TelemetryDesk onOpenSelfHeal={(src) => { setSelfHealSource(src); setIsSourceSelfHealOpen(true); }} />
@@ -847,24 +850,26 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           {/* 5-Way Tab View Switcher */}
           <nav aria-label="Dashboard views" className="flex items-center gap-1.5 bg-[#0a0c10]/90 backdrop-blur-md p-1 rounded-sm border border-amber-500/15 max-w-full overflow-x-auto scrollbar-none shrink-0 ">
             <div role="tablist" aria-label="Dashboard views" className="flex items-center gap-1">
-              {/* Dedicated Sam Mode Cockpit Tab */}
-              <button
-                role="tab"
-                aria-selected={activeSection === 'career_mode'}
-                aria-controls="panel-career-mode"
-                onClick={() => setActiveSection('career_mode')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
-                  activeSection === 'career_mode'
-                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black border border-amber-300/50 shadow-xs'
-                    : 'text-amber-400/90 hover:text-white hover:bg-stone-900/80 border border-amber-500/25'
-                }`}
-              >
-                <Crown size={13} className={activeSection === 'career_mode' ? 'text-slate-950' : 'text-amber-400'} aria-hidden="true" />
-                SAM MODE
-                <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-950 text-amber-300 border border-amber-500/40">
-                  COCKPIT
-                </span>
-              </button>
+              {/* Dedicated Sam Mode Cockpit Tab (Restricted to sam.ludwig@gmail.com) */}
+              {isSam && (
+                <button
+                  role="tab"
+                  aria-selected={activeSection === 'career_mode'}
+                  aria-controls="panel-career-mode"
+                  onClick={() => setActiveSection('career_mode')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 active:scale-95 ${
+                    activeSection === 'career_mode'
+                      ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black border border-amber-300/50 shadow-xs'
+                      : 'text-amber-400/90 hover:text-white hover:bg-stone-900/80 border border-amber-500/25'
+                  }`}
+                >
+                  <Crown size={13} className={activeSection === 'career_mode' ? 'text-slate-950' : 'text-amber-400'} aria-hidden="true" />
+                  SAM MODE
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-950 text-amber-300 border border-amber-500/40">
+                    COCKPIT
+                  </span>
+                </button>
+              )}
 
               <button
                 role="tab"
@@ -1094,7 +1099,7 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
           <DashboardGridSkeleton />
         ) : (
           <>
-            {activeSection === 'career_mode' && (
+            {isSam && activeSection === 'career_mode' && (
               <SafeErrorBoundary sectionName="Sam Mode Career Cockpit">
                 <Suspense fallback={<DashboardGridSkeleton count={4} />}>
                   <CareerModeCockpit
@@ -1258,13 +1263,15 @@ export const Dashboard = ({ currentUser, onSignOut }) => {
             {/* Secondary Views Navigation */}
             <div className="p-3 border-b border-slate-800/80 space-y-1">
               <div className="text-[9px] text-slate-500 uppercase font-black px-2 py-1">NAVIGATION PORTALS</div>
-              <button
-                type="button"
-                onClick={() => { setActiveSection('career_mode'); setIsMobileDrawerOpen(false); }}
-                className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'career_mode' ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-black' : 'text-amber-300 hover:bg-slate-900 border border-amber-500/20'}`}
-              >
-                <Crown size={15} className={activeSection === 'career_mode' ? 'text-slate-950' : 'text-amber-400'} /> SAM MODE (COCKPIT)
-              </button>
+              {isSam && (
+                <button
+                  type="button"
+                  onClick={() => { setActiveSection('career_mode'); setIsMobileDrawerOpen(false); }}
+                  className={`w-full px-3 py-2.5 rounded-sm text-xs font-bold flex items-center gap-2.5 transition-colors touch-target-44 cursor-pointer ${activeSection === 'career_mode' ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-black' : 'text-amber-300 hover:bg-slate-900 border border-amber-500/20'}`}
+                >
+                  <Crown size={15} className={activeSection === 'career_mode' ? 'text-slate-950' : 'text-amber-400'} /> SAM MODE (COCKPIT)
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setActiveSection('seeker'); setIsMobileDrawerOpen(false); }}

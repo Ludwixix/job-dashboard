@@ -8,6 +8,7 @@ import { getSpendSummary, subscribeToSpendUpdates } from '../services/llmCostSer
 import { fetchCadenceRadar } from '../services/recruiterCrmService';
 import { applyIndustryTheme, getIndustryTheme } from '../services/industryThemeService';
 import { syncProfileQueriesToBackend } from '../services/profileOnboardingPipeline';
+import { isSamModeUser } from '../utils/samModeAuth';
 
 // Client routing path mappings
 export const SECTION_ROUTES = {
@@ -115,26 +116,38 @@ export function useDashboardState({
   currentUser = null,
   addToast = null,
 } = {}) {
+  // Profile
+  const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
+  const isSam = useMemo(() => isSamModeUser(currentUser, activeProfile), [currentUser, activeProfile]);
+
   // Navigation
   const [activeSection, setActiveSection] = useState(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('sam_mode_active') === 'true') {
+    if (typeof window !== 'undefined' && localStorage.getItem('sam_mode_active') === 'true' && isSamModeUser(currentUser, getActiveProfile())) {
       return 'career_mode';
     }
     return 'seeker';
   });
 
+  // Guard against non-Sam users getting into career_mode
+  useEffect(() => {
+    if (!isSam && activeSection === 'career_mode') {
+      setActiveSection('seeker');
+    }
+  }, [isSam, activeSection]);
+
   // Listen for global Sam Mode toggle events
   useEffect(() => {
     const handleSamModeToggled = (e) => {
       const isSamActive = Boolean(e?.detail?.active);
+      if (isSamActive && !isSam) {
+        setActiveSection('seeker');
+        return;
+      }
       setActiveSection(isSamActive ? 'career_mode' : 'seeker');
     };
     window.addEventListener('sam-mode-toggled', handleSamModeToggled);
     return () => window.removeEventListener('sam-mode-toggled', handleSamModeToggled);
-  }, []);
-
-  // Profile
-  const [activeProfile, setActiveProfile] = useState(() => getActiveProfile());
+  }, [isSam]);
   const [editingProfile, setEditingProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalInitialTab, setProfileModalInitialTab] = useState('edit');
@@ -559,6 +572,7 @@ export function useDashboardState({
 
   return {
     // Navigation
+    isSam,
     activeSection,
     setActiveSection,
     RouteSync,

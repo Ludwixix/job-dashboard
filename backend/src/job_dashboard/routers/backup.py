@@ -22,6 +22,7 @@ def _get_data_dir_and_bucket(request: Request) -> tuple[Path, Optional[str]]:
         env_dir = os.getenv("JOB_DASHBOARD_DATA_DIR")
         data_dir = Path(env_dir) if env_dir else Path.cwd() / "data"
 
+    bucket_name = os.getenv("JOB_DASHBOARD_GCS_BUCKET") or os.getenv("GCS_BUCKET_NAME")
     bucket_name = (
         os.getenv("JOB_DASHBOARD_GCS_DATA_BUCKET")
         or os.getenv("JOB_DASHBOARD_GCS_BUCKET")

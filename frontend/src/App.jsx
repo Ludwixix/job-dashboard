@@ -1,13 +1,12 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
+import SiteGate from './components/SiteGate';
 import { isSiteUnlocked, setSiteUnlocked } from './utils/siteGateStorage';
+import { OnboardingFlow } from './components/OnboardingFlow';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getCurrentSession, validateSession, logoutUser } from './services/authService';
 import { Loader2 } from 'lucide-react';
 import { BrowserRouter } from 'react-router-dom';
-
-const SiteGate = lazy(() => import('./components/SiteGate'));
-const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
 
 function App() {
   const [session, setSession] = useState(() => getCurrentSession());
@@ -56,18 +55,12 @@ function App() {
   if (!isUnlocked) {
     return (
       <ErrorBoundary>
-        <Suspense fallback={
-          <div className="min-h-screen bg-[#070605] flex items-center justify-center font-mono">
-            <Loader2 className="animate-spin text-[#d48b38]" size={36} />
-          </div>
-        }>
-          <SiteGate 
-            onUnlock={(newSession) => {
-              setIsUnlocked(true);
-              setSession(newSession);
-            }} 
-          />
-        </Suspense>
+        <SiteGate 
+          onUnlock={(newSession) => {
+            setIsUnlocked(true);
+            setSession(newSession);
+          }} 
+        />
       </ErrorBoundary>
     );
   }
@@ -75,24 +68,18 @@ function App() {
   if (session && !session.onboardingCompleted) {
     return (
       <ErrorBoundary>
-        <Suspense fallback={
-          <div className="min-h-screen bg-[#070605] flex items-center justify-center font-mono">
-            <Loader2 className="animate-spin text-[#d48b38]" size={36} />
-          </div>
-        }>
-          <OnboardingFlow 
-            initialUser={session}
-            onComplete={(updatedSession) => {
-              setSession(updatedSession || { ...session, onboardingCompleted: true });
-            }}
-            onSignOut={() => {
-              setSiteUnlocked(false);
-              logoutUser();
-              setSession(null);
-              setIsUnlocked(false);
-            }}
-          />
-        </Suspense>
+        <OnboardingFlow 
+          initialUser={session}
+          onComplete={(updatedSession) => {
+            setSession(updatedSession || { ...session, onboardingCompleted: true });
+          }}
+          onSignOut={() => {
+            setSiteUnlocked(false);
+            logoutUser();
+            setSession(null);
+            setIsUnlocked(false);
+          }}
+        />
       </ErrorBoundary>
     );
   }

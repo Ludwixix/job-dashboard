@@ -47,3 +47,4 @@ def test_get_application_events(tmp_path):
     # Verify ordered by occurred_at DESC
     assert events_updated[0]["to_status"] == "Interview Scheduled"
     assert events_updated[1]["to_status"] == "Applied"
+

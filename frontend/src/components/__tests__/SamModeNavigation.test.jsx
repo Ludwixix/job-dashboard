@@ -17,6 +17,16 @@ describe('SamModeHeaderToggle', () => {
     expect(screen.getByText('Off')).toBeInTheDocument();
   });
 
+  it('verifies Sam mode user restriction helper', () => {
+    const { isSamModeUser } = require('../../utils/samModeAuth');
+    expect(isSamModeUser({ email: 'sam.ludwig@gmail.com' })).toBe(true);
+    expect(isSamModeUser({ email: 'SAM.LUDWIG@GMAIL.COM' })).toBe(true);
+    expect(isSamModeUser({ email: 'other@example.com' })).toBe(false);
+    expect(isSamModeUser(null, { email: 'sam.ludwig@gmail.com' })).toBe(true);
+    expect(isSamModeUser(null, { email: 'sarah.jenkins@gmail.com' })).toBe(false);
+    expect(isSamModeUser(null, null)).toBe(false);
+  });
+
   it('renders active state and reflects persistent storage', () => {
     localStorage.setItem('sam_mode_active', 'true');
     render(<SamModeHeaderToggle isActive={true} onToggle={vi.fn()} />);

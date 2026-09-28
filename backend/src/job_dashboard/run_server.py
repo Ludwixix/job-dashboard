@@ -100,7 +100,11 @@ def main():
             "JOB_DASHBOARD_GCS_DATA_BUCKET not set; job index will not persist across cold starts"
         )
 
-    # Resolve job profile path across persistent data dir, Docker container (/app), and local repository
+    # In multi-user mode, each user's profile is stored per-account in SQLite.
+    # We do NOT load a shared job_profile.json into DashboardApp at startup —
+    # doing so would cause every authenticated user's generation paths to fall
+    # back to a single shared/Sam profile. profile_path is only retained for
+    # resolve_cli_queries to build initial search query seeds if available.
     profile_candidates = [
         args.profile,
         args.data_dir / "job_profile.json",
@@ -110,7 +114,8 @@ def main():
         PROJECT_ROOT.parent / "job_profile.json",
     ]
     profile_path = next((p for p in profile_candidates if p and Path(p).exists()), None)
-    profile = load_profile(profile_path) if profile_path else {}
+    # Do not load profile data into shared memory; pass empty dict to DashboardApp.
+    profile = {}
 
     sources = [
         IndeedJobSpySource(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import csv
 import io
 import json
@@ -161,13 +163,17 @@ def _persist_user_profile(
 
     res = app.repository.upsert_user_profile(user_id, profile_data)
     # Auto-synchronize search discovery queries if this is the active user or app is configured
-    if hasattr(app, "suggested_search_queries") and hasattr(app, "update_search_queries"):
+    if hasattr(app, "suggested_search_queries") and hasattr(
+        app, "update_search_queries"
+    ):
         try:
             suggested = app.suggested_search_queries(profile=profile_data)
             if suggested:
                 app.update_search_queries(suggested)
         except Exception as sq_err:
-            logger.debug(f"Could not auto-update search queries on profile persist: {sq_err}")
+            logger.debug(
+                f"Could not auto-update search queries on profile persist: {sq_err}"
+            )
     return res
 
 
@@ -2235,7 +2241,9 @@ def _is_valid_profile(p: Any) -> bool:
     if not p or not isinstance(p, dict):
         return False
     identity_fields = {"id", "name", "email", "updatedAt", "updated_at"}
-    return any(value for key, value in p.items() if key not in identity_fields and value)
+    return any(
+        value for key, value in p.items() if key not in identity_fields and value
+    )
 
 
 def resolve_user_id(handler, query_params=None) -> str | None:
@@ -2376,14 +2384,8 @@ def make_handler(app: DashboardApp):
             profile = None
             if repo and user_id and hasattr(repo, "get_user_profile"):
                 profile = repo.get_user_profile(user_id)
-            if (
-                not profile
-                and hasattr(app, "dashboard")
-                and hasattr(app.dashboard, "profile")
-            ):
-                profile = app.dashboard.profile
-            if not profile and repo and hasattr(repo, "get_profile"):
-                profile = repo.get_profile()
+            # Use only the authenticated user's own profile; never fall back to a
+            # shared/latest profile. An empty profile is returned as unknown signals.
             profile = profile or {}
 
             job_dict = (

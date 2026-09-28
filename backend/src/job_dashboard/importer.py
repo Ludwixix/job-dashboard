@@ -39,7 +39,9 @@ def normalize_status(raw_status: str | None) -> str:
     if not raw_status:
         return "Discovered"
     cleaned = str(raw_status).strip().lower()
-    return STATUS_MAPPING.get(cleaned, "Applied" if "applied" in cleaned else "Discovered")
+    return STATUS_MAPPING.get(
+        cleaned, "Applied" if "applied" in cleaned else "Discovered"
+    )
 
 
 def import_legacy_applications(
@@ -60,7 +62,9 @@ def import_legacy_applications(
     if not user_id or not str(user_id).strip():
         raise ValueError("Explicit user_id is required for legacy application import.")
     if user_id.strip() == "default_user":
-        raise ValueError("Cannot import legacy applications to ownerless 'default_user'.")
+        raise ValueError(
+            "Cannot import legacy applications to ownerless 'default_user'."
+        )
 
     user_id = str(user_id).strip()
     source_file = Path(source_path).resolve()
@@ -71,7 +75,9 @@ def import_legacy_applications(
     backup_path = None
     if backup:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        backup_path = source_file.with_name(f"{source_file.stem}_backup_{ts}{source_file.suffix}")
+        backup_path = source_file.with_name(
+            f"{source_file.stem}_backup_{ts}{source_file.suffix}"
+        )
         shutil.copy2(source_file, backup_path)
         logger.info(f"Created pre-import backup at {backup_path}")
 
@@ -85,7 +91,9 @@ def import_legacy_applications(
     elif isinstance(raw_data, list):
         records = raw_data
     else:
-        raise ValueError("Invalid JSON structure: expected dictionary or list of applications.")
+        raise ValueError(
+            "Invalid JSON structure: expected dictionary or list of applications."
+        )
 
     report = {
         "source_file": str(source_file),
@@ -111,10 +119,7 @@ def import_legacy_applications(
                 continue
 
             job_id = str(
-                item.get("job_id")
-                or item.get("id")
-                or item.get("application_id")
-                or ""
+                item.get("job_id") or item.get("id") or item.get("application_id") or ""
             ).strip()
 
             if not job_id:
@@ -123,13 +128,21 @@ def import_legacy_applications(
                 if comp and tit:
                     job_id = f"{comp}_{tit}"
                 else:
-                    report["errors"].append(f"Record index {idx}: Missing job identifier or company/title")
+                    report["errors"].append(
+                        f"Record index {idx}: Missing job identifier or company/title"
+                    )
                     report["skipped"] += 1
                     continue
 
             status = normalize_status(item.get("status"))
-            applied_at = item.get("applied_at") or item.get("appliedDate") or item.get("created_at")
-            updated_at = item.get("updated_at") or datetime.now(timezone.utc).isoformat()
+            applied_at = (
+                item.get("applied_at")
+                or item.get("appliedDate")
+                or item.get("created_at")
+            )
+            updated_at = (
+                item.get("updated_at") or datetime.now(timezone.utc).isoformat()
+            )
 
             app_data = {
                 "company": item.get("company", ""),
@@ -139,8 +152,10 @@ def import_legacy_applications(
                 "applied_at": applied_at,
                 "resume_text": item.get("resume_text", ""),
                 "cover_letter_text": item.get("cover_letter_text", ""),
-                "resume_url": item.get("generated_resume_path") or item.get("resume_url", ""),
-                "cover_letter_url": item.get("generated_cover_path") or item.get("cover_letter_url", ""),
+                "resume_url": item.get("generated_resume_path")
+                or item.get("resume_url", ""),
+                "cover_letter_url": item.get("generated_cover_path")
+                or item.get("cover_letter_url", ""),
                 "job_data": item,
             }
 
@@ -161,8 +176,3 @@ def import_legacy_applications(
             report["errors"].append(f"Record index {idx} ({job_id}): {str(e)}")
 
     return report
-
-    if not raw_status:
-        return "Discovered"
-    cleaned = str(raw_status).strip().lower()
-    return STATUS_MAPPING.get(cleaned, "Applied" if "applied" in cleaned else "Discovered")

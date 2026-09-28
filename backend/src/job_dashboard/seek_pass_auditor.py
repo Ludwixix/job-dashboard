@@ -7,6 +7,7 @@ calculates SEEK Pass Readiness Scores, and synthesizes 1-click verified response
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -126,7 +127,9 @@ CREDENTIAL_DOMAINS: dict[str, dict[str, Any]] = {
 }
 
 
-def extract_seek_pass_requirements(jd_text: str, job_title: str = "") -> list[dict[str, Any]]:
+def extract_seek_pass_requirements(
+    jd_text: str, job_title: str = ""
+) -> list[dict[str, Any]]:
     """Extract Australian credential requirements from job description text and title."""
     full_text = f"{job_title}\n{jd_text or ''}".lower()
     requirements: list[dict[str, Any]] = []
@@ -150,7 +153,12 @@ def extract_seek_pass_requirements(jd_text: str, job_title: str = "") -> list[di
                 )
                 if not is_mandatory:
                     # Clearances and RTW default to mandatory if stated
-                    if domain_id in ("right_to_work", "security_clearance", "healthcare_ahpra", "ndis_worker"):
+                    if domain_id in (
+                        "right_to_work",
+                        "security_clearance",
+                        "healthcare_ahpra",
+                        "ndis_worker",
+                    ):
                         is_mandatory = True
 
                 req_id = f"{domain_id}_{abs(hash(matched_str)) % 10000:04d}"
@@ -177,7 +185,7 @@ def audit_candidate_credentials(
 ) -> list[dict[str, Any]]:
     """Audit candidate profile against extracted credential requirements."""
     audited: list[dict[str, Any]] = []
-    
+
     # Flatten candidate profile credentials & clearances
     candidate_tokens: list[str] = []
     for key in ["work_rights", "citizenship", "visa_status", "summary", "headline"]:
@@ -185,7 +193,14 @@ def audit_candidate_credentials(
         if isinstance(val, str) and val.strip():
             candidate_tokens.append(val.lower())
 
-    for list_key in ["credentials", "clearances", "security_clearances", "certifications", "licences", "skills"]:
+    for list_key in [
+        "credentials",
+        "clearances",
+        "security_clearances",
+        "certifications",
+        "licences",
+        "skills",
+    ]:
         items = profile.get(list_key, [])
         if isinstance(items, list):
             for item in items:
@@ -200,14 +215,24 @@ def audit_candidate_credentials(
         domain = req["domain"]
         domain_meta = CREDENTIAL_DOMAINS.get(domain, {})
         patterns = domain_meta.get("patterns", [])
-        
+
         # Check if candidate holds this credential
         is_verified = False
         evidence = ""
 
         # Special check for right to work
         if domain == "right_to_work":
-            if any(term in candidate_corpus for term in ["australian citizen", "citizen", "pr", "permanent resident", "full working rights", "unrestricted"]):
+            if any(
+                term in candidate_corpus
+                for term in [
+                    "australian citizen",
+                    "citizen",
+                    "pr",
+                    "permanent resident",
+                    "full working rights",
+                    "unrestricted",
+                ]
+            ):
                 is_verified = True
                 evidence = "Australian Citizen / Permanent Resident with full unrestricted working rights"
         else:
@@ -248,7 +273,9 @@ def audit_candidate_credentials(
     return audited
 
 
-def calculate_readiness_score(audited_requirements: list[dict[str, Any]]) -> dict[str, Any]:
+def calculate_readiness_score(
+    audited_requirements: list[dict[str, Any]],
+) -> dict[str, Any]:
     """Calculate overall SEEK Pass readiness index and knockout risk classification."""
     if not audited_requirements:
         return {
@@ -280,7 +307,9 @@ def calculate_readiness_score(audited_requirements: list[dict[str, Any]]) -> dic
         else:
             action_count += 1
 
-    readiness = int(round((verified_weight / total_weight) * 100)) if total_weight > 0 else 100
+    readiness = (
+        int(round((verified_weight / total_weight) * 100)) if total_weight > 0 else 100
+    )
 
     if knockout_count > 0:
         risk_level = "HIGH_RISK_KNOCKOUT"
@@ -377,7 +406,9 @@ def generate_seek_pass_responses(
     return responses
 
 
-def generate_seek_pass_report(job: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
+def generate_seek_pass_report(
+    job: dict[str, Any], profile: dict[str, Any]
+) -> dict[str, Any]:
     """Generate comprehensive SEEK Pass readiness report and exportable Markdown dossier."""
     job_id = str(job.get("id", ""))
     job_title = job.get("title", "Position")
@@ -404,29 +435,45 @@ def generate_seek_pass_report(job: dict[str, Any], profile: dict[str, Any]) -> d
 
     for item in audited:
         mand_str = "Yes" if item.get("mandatory") else "No"
-        status_icon = "✅ VERIFIED" if item["status"] == "VERIFIED" else ("⛔ KNOCKOUT RISK" if item["status"] == "KNOCKOUT_RISK" else "⚠️ ACTION REQUIRED")
+        status_icon = (
+            "✅ VERIFIED"
+            if item["status"] == "VERIFIED"
+            else (
+                "⛔ KNOCKOUT RISK"
+                if item["status"] == "KNOCKOUT_RISK"
+                else "⚠️ ACTION REQUIRED"
+            )
+        )
         dossier_lines.append(
             f"| {item['name']} | {item['domain']} | {mand_str} | {status_icon} | [{item['authority']}]({item['authority_url']}) | {item['turnaround']} |"
         )
 
     if audited:
-        dossier_lines.extend([
-            "",
-            "### Pre-Screening Questionnaire Response Scripts (1-Click Ready)",
-        ])
-        for resp in responses:
-            dossier_lines.extend([
-                f"**Q: {resp['prompt_question']}**",
-                f"> *\"{resp['response']}\"*",
+        dossier_lines.extend(
+            [
                 "",
-            ])
+                "### Pre-Screening Questionnaire Response Scripts (1-Click Ready)",
+            ]
+        )
+        for resp in responses:
+            dossier_lines.extend(
+                [
+                    f"**Q: {resp['prompt_question']}**",
+                    f'> *"{resp["response"]}"*',
+                    "",
+                ]
+            )
 
-        dossier_lines.extend([
-            "### Recommended Action Plan & Next Steps",
-        ])
+        dossier_lines.extend(
+            [
+                "### Recommended Action Plan & Next Steps",
+            ]
+        )
         for item in audited:
             if item["status"] != "VERIFIED":
-                dossier_lines.append(f"- **{item['name']}**: {item['action_steps']} (Link: {item['authority_url']})")
+                dossier_lines.append(
+                    f"- **{item['name']}**: {item['action_steps']} (Link: {item['authority_url']})"
+                )
 
     dossier_markdown = "\n".join(dossier_lines)
 
@@ -445,4 +492,3 @@ def generate_seek_pass_report(job: dict[str, Any], profile: dict[str, Any]) -> d
         "screening_responses": responses,
         "dossier_markdown": dossier_markdown,
     }
-

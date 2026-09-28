@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 import re
 
 from .models import Job, ScoreResult
+from .types import ScoringError
 from .score import (
     _profile_skills,
     _job_skills,

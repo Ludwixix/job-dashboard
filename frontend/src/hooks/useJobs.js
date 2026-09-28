@@ -225,6 +225,7 @@ export const useJobs = () => {
 
       return next;
     });
+  }, [rawJobs]);
 
   /** Delete an application permanently from SQLite backend and local state */
   const deleteApplication = useCallback(async (targetJobIdentifier) => {
@@ -257,8 +258,6 @@ export const useJobs = () => {
       return false;
     }
     return true;
-  }, [rawJobs]);
-
   }, [rawJobs]);
 
   /** Batch closes all applied jobs that have had no updates for >= 14 days */

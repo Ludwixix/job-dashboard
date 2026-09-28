@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchJobsData, saveUserApplication, normalizeJobKey } from '../services/dataService';
+import { fetchJobsData, saveUserApplication, deleteUserApplication, normalizeJobKey } from '../services/dataService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -225,6 +225,40 @@ export const useJobs = () => {
 
       return next;
     });
+
+  /** Delete an application permanently from SQLite backend and local state */
+  const deleteApplication = useCallback(async (targetJobIdentifier) => {
+    const strId = String(targetJobIdentifier || '');
+    if (!strId) return false;
+
+    // Optimistically remove overrides
+    let prevOverrides = null;
+    setOverrides(prev => {
+      prevOverrides = prev;
+      const next = { ...prev };
+      const match = rawJobs.find(j =>
+        (j.id && String(j.id) === strId) ||
+        `${j.company}_${j.title}` === strId
+      );
+      const key = match ? jobKey(match) : strId;
+      const altKey = match ? `${match.company}_${match.title}` : strId;
+      const normKey = match ? normalizeJobKey(match.company, match.title) : '';
+
+      delete next[key];
+      delete next[altKey];
+      if (normKey) delete next[normKey];
+      return next;
+    });
+
+    const success = await deleteUserApplication(strId);
+    if (!success && prevOverrides) {
+      // Rollback on failure
+      setOverrides(prevOverrides);
+      return false;
+    }
+    return true;
+  }, [rawJobs]);
+
   }, [rawJobs]);
 
   /** Batch closes all applied jobs that have had no updates for >= 14 days */

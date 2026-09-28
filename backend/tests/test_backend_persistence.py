@@ -96,17 +96,20 @@ def test_http_api_routes_persistence(temp_repo, tmp_path):
     import io
     import json
     from unittest.mock import MagicMock
-    from job_dashboard.web import make_handler, DashboardApp
+    from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
 
     mock_app = DashboardApp(profile={}, sources=[], data_dir=tmp_path)
     mock_app.repository = temp_repo
     mock_app.db = temp_repo
     handler_cls = make_handler(mock_app)
+    token = jwt.encode(
+        {"sub": "test_http_user"}, JWT_SECRET, algorithm="HS256"
+    )
 
     # 1. Test POST /api/profile
     handler = handler_cls.__new__(handler_cls)
     handler.path = "/api/profile"
-    handler.headers = {"Content-Length": "73", "X-User-Id": "test_http_user"}
+    handler.headers = {"Content-Length": "73", "Authorization": f"Bearer {token}"}
     payload = json.dumps(
         {"name": "Sam Ludwig", "targetRole": "Senior Systems Engineer"}
     ).encode("utf-8")
@@ -123,8 +126,8 @@ def test_http_api_routes_persistence(temp_repo, tmp_path):
 
     # 2. Test GET /api/profile
     get_handler = handler_cls.__new__(handler_cls)
-    get_handler.path = "/api/profile?user_id=test_http_user"
-    get_handler.headers = {"X-User-Id": "test_http_user"}
+    get_handler.path = "/api/profile"
+    get_handler.headers = {"Authorization": f"Bearer {token}"}
     get_handler.rfile = io.BytesIO()
     get_handler.wfile = io.BytesIO()
     get_handler.send_response = MagicMock()

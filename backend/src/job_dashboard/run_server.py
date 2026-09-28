@@ -9,15 +9,41 @@ from .llm import OpenRouterDocumentGenerator
 from .profile import load_profile
 from .sources import (
     AdzunaApiSource,
+    ApifySeekFallbackSource,
     IndeedJobSpySource,
     LinkedInBrowserSource,
     RemoteOkApiSource,
     SeekApiSource,
+    configure_apify_seek_fallback,
 )
 from .web import DashboardApp, serve
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SYNC_INTERVAL_SECONDS = settings.sync_interval_seconds
+
+
+def _build_seek_source():
+    native_source = SeekApiSource(
+        max_pages=settings.seek_max_pages,
+        max_results=settings.seek_max_results,
+        pause_seconds=settings.seek_pause_seconds,
+        endpoint=settings.seek_api_endpoint,
+        allow_browser_fallback=settings.seek_browser_fallback
+        and settings.stealth_browser_enabled,
+        cache_path=settings.seek_cache_path,
+        allow_cache_fallback=settings.seek_cache_fallback,
+        allow_cross_source_fallback=settings.multi_board_enabled,
+        proxy=settings.proxy_url,
+    )
+    return configure_apify_seek_fallback(
+        native_source,
+        enabled=settings.apify_seek_enabled,
+        api_token=settings.apify_api_token,
+        actor_id=settings.apify_seek_actor_id,
+        max_results=settings.apify_seek_max_results,
+        timeout_secs=settings.apify_seek_timeout_secs,
+        fetch_job_details=settings.apify_seek_fetch_details,
+    )
 
 
 def main():
@@ -86,41 +112,6 @@ def main():
     profile_path = next((p for p in profile_candidates if p and Path(p).exists()), None)
     profile = load_profile(profile_path) if profile_path else {}
 
-    # Dual-sink check: if jobs.sqlite3 has an updated user profile in user_profiles, prefer it
-    try:
-        from .db_pool import get_db_connection
-
-        db_path = args.data_dir / "jobs.sqlite3"
-        if db_path.exists():
-            with get_db_connection(db_path) as conn:
-                row = conn.execute(
-                    "SELECT profile_data_json FROM user_profiles ORDER BY updated_at DESC LIMIT 1"
-                ).fetchone()
-                if row and row[0]:
-                    import json
-
-                    db_profile = json.loads(row[0])
-                    if isinstance(db_profile, dict) and db_profile.get("name"):
-                        profile = {**profile, **db_profile}
-                        startup_logger.info(
-                            f"Loaded persistent user profile from database: {profile.get('name')} ({profile.get('id')})"
-                        )
-                        # Sync back to data_dir / job_profile.json if missing
-                        data_profile_file = args.data_dir / "job_profile.json"
-                        if not data_profile_file.exists():
-                            try:
-                                args.data_dir.mkdir(parents=True, exist_ok=True)
-                                with open(
-                                    data_profile_file, "w", encoding="utf-8"
-                                ) as f:
-                                    json.dump(profile, f, indent=2, ensure_ascii=False)
-                            except Exception:
-                                pass
-    except Exception as db_prof_err:
-        startup_logger.warning(
-            f"Could not check user_profiles database table on startup: {db_prof_err}"
-        )
-
     sources = [
         IndeedJobSpySource(
             proxy=settings.proxy_url,
@@ -129,20 +120,18 @@ def main():
         )
     ]
     if settings.seek_enabled:
-        sources.append(
-            SeekApiSource(
-                max_pages=settings.seek_max_pages,
-                max_results=settings.seek_max_results,
-                pause_seconds=settings.seek_pause_seconds,
-                endpoint=settings.seek_api_endpoint,
-                allow_browser_fallback=settings.seek_browser_fallback
-                and settings.stealth_browser_enabled,
-                cache_path=settings.seek_cache_path,
-                allow_cache_fallback=settings.seek_cache_fallback,
-                allow_cross_source_fallback=settings.multi_board_enabled,
-                proxy=settings.proxy_url,
+        seek_source = _build_seek_source()
+        if settings.apify_seek_enabled and not settings.apify_api_token:
+            startup_logger.warning(
+                "Apify SEEK fallback requested but disabled: APIFY_API_TOKEN is not configured"
             )
-        )
+        elif isinstance(seek_source, ApifySeekFallbackSource):
+            startup_logger.warning(
+                "Paid Apify SEEK fallback enabled for native SEEK failures "
+                f"(actor={settings.apify_seek_actor_id}, max_results={settings.apify_seek_max_results}); "
+                "review actor pricing and site terms before enabling in production"
+            )
+        sources.append(seek_source)
     sources.extend(
         [
             AdzunaApiSource(
@@ -201,7 +190,7 @@ def main():
                 if time.time() - last_time < 86400:
                     should_send = False
 
-            if should_send and hasattr(app, "send_daily_digest"):
+            if should_send:
                 app.send_daily_digest()
                 digest_flag.write_text(str(time.time()))
                 print("Daily email digest generated.", flush=True)

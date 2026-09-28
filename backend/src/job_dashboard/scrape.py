@@ -5,9 +5,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .config import settings
 from .scrape_config import DEFAULT_QUERIES
 from .sources import (
     AdzunaApiSource,
+    ApifySeekFallbackSource,
     IndeedJobSpySource,
     JobSource,
     LinkedInBrowserSource,
@@ -15,31 +17,42 @@ from .sources import (
     ScrapePipeline,
     SearchQuery,
     SeekApiSource,
+    configure_apify_seek_fallback,
     detect_query_stream,
 )
 
 
-from .config import settings
-
-
 def build_sources(names: list[str]) -> list[JobSource]:
+    def build_seek_source() -> JobSource:
+        native_source = SeekApiSource(
+            max_pages=settings.seek_max_pages,
+            max_results=settings.seek_max_results,
+            pause_seconds=settings.seek_pause_seconds,
+            endpoint=settings.seek_api_endpoint,
+            allow_browser_fallback=settings.seek_browser_fallback
+            and settings.stealth_browser_enabled,
+            cache_path=settings.seek_cache_path,
+            allow_cache_fallback=settings.seek_cache_fallback,
+            allow_cross_source_fallback=settings.multi_board_enabled,
+            proxy=settings.proxy_url,
+        )
+        return configure_apify_seek_fallback(
+            native_source,
+            enabled=settings.apify_seek_enabled,
+            api_token=settings.apify_api_token,
+            actor_id=settings.apify_seek_actor_id,
+            max_results=settings.apify_seek_max_results,
+            timeout_secs=settings.apify_seek_timeout_secs,
+            fetch_job_details=settings.apify_seek_fetch_details,
+        )
+
     factories = {
         "indeed": lambda: IndeedJobSpySource(
             browser_fallback=settings.stealth_browser_enabled,
             multi_board=settings.multi_board_enabled,
             proxy=settings.proxy_url,
         ),
-        "seek": lambda: SeekApiSource(
-            max_pages=settings.seek_max_pages,
-            max_results=settings.seek_max_results,
-            pause_seconds=settings.seek_pause_seconds,
-            endpoint=settings.seek_api_endpoint,
-            allow_browser_fallback=settings.seek_browser_fallback and settings.stealth_browser_enabled,
-            cache_path=settings.seek_cache_path,
-            allow_cache_fallback=settings.seek_cache_fallback,
-            allow_cross_source_fallback=settings.multi_board_enabled,
-            proxy=settings.proxy_url,
-        ),
+        "seek": build_seek_source,
         "linkedin": lambda: LinkedInBrowserSource(proxy=settings.proxy_url),
         "adzuna": lambda: AdzunaApiSource(
             app_id=settings.adzuna_app_id,
@@ -140,10 +153,15 @@ def main() -> int:
         if hasattr(source, "proxy_rotator") and args.proxy:
             from .sources.proxy import ProxyRotator
             source.proxy_rotator = ProxyRotator([args.proxy])
-        if isinstance(source, SeekApiSource):
-            source.allow_browser_fallback = args.seek_browser_fallback
-            source.cache_path = args.seek_cache_path
-            source.allow_cache_fallback = args.seek_cache_fallback
+        seek_source = (
+            source.native_source
+            if isinstance(source, ApifySeekFallbackSource)
+            else source
+        )
+        if isinstance(seek_source, SeekApiSource):
+            seek_source.allow_browser_fallback = args.seek_browser_fallback
+            seek_source.cache_path = args.seek_cache_path
+            seek_source.allow_cache_fallback = args.seek_cache_fallback
     
     target_queries = resolve_cli_queries(
         cli_queries=args.queries,

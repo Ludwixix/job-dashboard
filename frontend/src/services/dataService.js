@@ -517,22 +517,77 @@ export const fetchUserApplications = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.applications)) {
-        const combinedMap = new Map();
-        localApps.forEach(a => combinedMap.set(String(a.id || a.job_id), a));
-        data.applications.forEach(a => {
+        // Authenticated server SQLite is the canonical authority.
+        // Update local cache to mirror server applications without reviving deleted items.
+        const validServerApps = data.applications.filter(a => {
           const comp = String(a.company || '').trim().toLowerCase();
           const tit = String(a.title || '').trim().toLowerCase();
-          if (comp && tit && comp !== 'gmail' && !tit.startsWith('exploring a new opportunity')) {
-            combinedMap.set(String(a.job_id || a.id), a);
-          }
+          return comp && tit && comp !== 'gmail' && !tit.startsWith('exploring a new opportunity');
         });
-        return Array.from(combinedMap.values());
+
+        const cacheMap = {};
+        validServerApps.forEach(a => {
+          const key = String(a.job_id || a.id || '');
+          if (key) cacheMap[key] = a;
+        });
+        try {
+          localStorage.setItem('job_dashboard_local_applications', JSON.stringify(cacheMap));
+        } catch {}
+
+        return validServerApps;
       }
     }
   } catch (err) {
     console.warn("Failed to fetch user applications from backend:", err);
   }
   return localApps;
+};
+
+/**
+ * Delete a tracked application both on backend SQLite and in local state.
+ * Returns true if successfully deleted.
+ */
+export const deleteUserApplication = async (jobId) => {
+  const targetId = String(jobId || '').trim();
+  if (!targetId) return false;
+
+  const token = getAuthToken();
+  let serverSuccess = true;
+
+  if (token) {
+    const apiBase = getApiBase();
+    try {
+      const res = await fetch(`${apiBase}/api/applications`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ job_id: targetId })
+      });
+      serverSuccess = res.ok;
+    } catch (err) {
+      console.warn("Failed to delete application on backend:", err);
+      serverSuccess = false;
+    }
+  }
+
+  // Only purge local caches on confirmed backend success (or unauthenticated offline mode)
+  if (serverSuccess) {
+    try {
+      const local = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+      delete local[targetId];
+      localStorage.setItem('job_dashboard_local_applications', JSON.stringify(local));
+    } catch {}
+
+    try {
+      const tracked = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+      const filtered = tracked.filter(a => String(a.id || a.job_id || '') !== targetId);
+      localStorage.setItem('tracked_applications', JSON.stringify(filtered));
+    } catch {}
+  }
+
+  return serverSuccess;
 };
 
 /**

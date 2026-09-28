@@ -21,6 +21,7 @@ sentence-transformers>=2.2.0
 # Web scraping & job sources
 jobspy>=1.1.0
 playwright>=1.40.0
+apify-client>=1.8,<2
 beautifulsoup4>=4.12.0
 requests>=2.31.0
 

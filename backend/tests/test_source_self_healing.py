@@ -14,6 +14,7 @@ from job_dashboard.sources.self_healing import (
     get_source_code_context,
     remediate_runtime,
 )
+from job_dashboard.web import DashboardApp, make_handler
 
 
 class MockApp:
@@ -181,7 +182,6 @@ def test_apply_and_verify_patch_test_failure_triggers_rollback(tmp_path):
 
 def test_web_api_source_health_endpoints(tmp_path):
     from io import BytesIO
-    from job_dashboard.web import DashboardApp, make_handler
 
     mock_source = MagicMock()
     mock_source.name = "Seek"
@@ -232,4 +232,23 @@ def test_web_api_source_health_endpoints(tmp_path):
     assert sent_data["status"] == 200
     assert sent_data["payload"]["success"] is True
     assert "LLM Repair Prompt" in sent_data["payload"]["llm_prompt"]
+
+
+def test_production_handler_dispatches_public_source_health_route(tmp_path):
+    source = MagicMock()
+    source.name = "Seek"
+    app = DashboardApp({}, [source], tmp_path)
+    handler_class = make_handler(app)
+    handler = handler_class.__new__(handler_class)
+    handler.path = "/api/sources/health"
+    response = {}
+    handler.send_json = lambda status, payload: response.update(
+        status=status, payload=payload
+    )
+
+    handler.do_GET()
+
+    assert response["status"] == 200
+    assert response["payload"]["success"] is True
+    assert response["payload"]["sources"][0]["name"] == "Seek"
 

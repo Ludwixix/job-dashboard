@@ -11,6 +11,7 @@ sys.modules["job_dashboard.sources.urllib.request"] = urllib.request
 sys.modules["job_dashboard.sources.urllib.parse"] = urllib.parse
 
 from .adzuna import AdzunaApiSource, _adzuna_record
+from .apify_seek import ApifySeekFallbackSource, configure_apify_seek_fallback
 from .base import (
     JobSource,
     ScrapePipeline,
@@ -73,6 +74,8 @@ __all__ = [
     "deduplicate_jobs",
     "IndeedJobSpySource",
     "AdzunaApiSource",
+    "ApifySeekFallbackSource",
+    "configure_apify_seek_fallback",
     "RemoteOkApiSource",
     "SeekApiSource",
     "LinkedInBrowserSource",

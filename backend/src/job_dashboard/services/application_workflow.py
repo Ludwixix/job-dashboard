@@ -54,13 +54,11 @@ class ApplicationWorkflowService:
             logger.warning(f"Error saving generated documents: {err}")
 
     def get_application_events(
-        self, user_id_or_job_id: str, job_id: str | None = None
+        self, user_id: str, job_id: str
     ) -> list[dict[str, Any]]:
         """Retrieve chronological history of application status transitions."""
         if self.repository:
-            return self.repository.get_application_events(
-                user_id_or_job_id, job_id=job_id
-            )
+            return self.repository.get_application_events(user_id, job_id)
         return []
 
     def update_application_status(

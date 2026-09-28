@@ -173,53 +173,51 @@ def get_query_params(handler) -> dict[str, list[str]]:
 
 
 def get_auth_user_id(handler) -> str | None:
-    """
-    Resolve authenticated user ID from Authorization header (Bearer token),
-    X-User-Id header, or query parameters.
-    """
+    """Resolve identity from a verified bearer token or explicitly enabled demo mode."""
     try:
         headers = getattr(handler, "headers", None)
-        if headers:
-            auth_header = headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1].strip()
+        auth_header = headers.get("Authorization") if headers else None
+        if auth_header:
+            if not auth_header.startswith("Bearer "):
+                return None
+            token = auth_header.removeprefix("Bearer ").strip()
+            try:
+                from .security import decode_token
+
+                decoded = decode_token(token)
+                if decoded and decoded.get("sub"):
+                    return str(decoded["sub"])
+            except Exception:
+                pass
+
+            if jwt is not None:
                 try:
-                    from .security import decode_token
+                    jwt_secret = os.getenv("JWT_SECRET", "super-secret-key-fallback")
+                    try:
+                        from . import web
 
-                    decoded = decode_token(token)
-                    if decoded and decoded.get("sub"):
-                        return str(decoded["sub"])
+                        jwt_secret = getattr(web, "JWT_SECRET", jwt_secret)
+                    except Exception:
+                        pass
+                    payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+                    sub = payload.get("sub")
+                    if sub:
+                        return str(sub)
                 except Exception:
-                    pass
-
-                try:
-                    if jwt is not None:
-                        jwt_secret = os.getenv("JWT_SECRET", "super-secret-key-fallback")
-                        try:
-                            from . import web
-
-                            if hasattr(web, "JWT_SECRET"):
-                                jwt_secret = web.JWT_SECRET
-                        except Exception:
-                            pass
-                        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
-                        sub = payload.get("sub")
-                        if sub:
-                            return str(sub)
-                except Exception:
-                    pass
-
-            uid = headers.get("X-User-Id")
-            if uid and str(uid).strip():
-                return str(uid).strip()
+                    return None
+            return None
 
         query_params = get_query_params(handler)
-        if query_params and "user_id" in query_params:
-            param_val = str(query_params["user_id"][0]).strip()
-            if param_val:
-                return param_val
-        if query_params and query_params.get("demo", [""])[0].lower() in ("true", "1"):
+        demo_enabled = os.getenv("JOB_DASHBOARD_ENABLE_DEMO_AUTH", "").lower() in (
+            "1",
+            "true",
+        )
+        if (
+            demo_enabled
+            and query_params
+            and query_params.get("demo", [""])[0].lower() in ("true", "1")
+        ):
             return "demo_user"
     except Exception:
-        pass
+        return None
     return None

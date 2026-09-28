@@ -24,6 +24,16 @@ export const applicationsApi = {
       body: appData
     });
   },
+  /**
+   * Delete an application
+   */
+  async deleteApplication(jobId) {
+    return await apiRequest('/api/applications', {
+      method: 'DELETE',
+      body: { job_id: jobId }
+    });
+  },
+
 
   /**
    * Sync a batch of applications

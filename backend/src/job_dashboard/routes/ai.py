@@ -49,17 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_user_id(handler, query_params: dict[str, list[str]] | None = None) -> str | None:
-    """Resolve user ID via bearer token, headers, or query params."""
-    uid = get_auth_user_id(handler)
-    if uid:
-        return uid
-    if query_params is None:
-        query_params = get_query_params(handler)
-    if query_params and "user_id" in query_params:
-        p = str(query_params["user_id"][0]).strip()
-        if p:
-            return p
-    return None
+    return get_auth_user_id(handler)
 
 
 def _get_job_seek_pass_report(

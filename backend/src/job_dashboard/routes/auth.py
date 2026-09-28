@@ -55,22 +55,11 @@ def _get_jwt_expiry_hours() -> int:
 
 
 def _is_valid_profile(p: Any) -> bool:
-    """Return True if p is a non-empty, valid candidate profile dictionary."""
+    """Return True if p is a valid candidate profile with career/skill data beyond basic identity fields."""
     if not p or not isinstance(p, dict):
         return False
-    return bool(
-        p.get("coreSkills")
-        or p.get("targetTitles")
-        or p.get("title")
-        or p.get("industry")
-        or p.get("job_titles")
-        or p.get("skills")
-        or p.get("name")
-        or p.get("email")
-        or p.get("fullWorkExperienceText")
-        or p.get("professional_summary")
-        or len(p) >= 2
-    )
+    identity_fields = {"id", "name", "email", "updatedAt", "updated_at"}
+    return any(value for key, value in p.items() if key not in identity_fields and value)
 
 
 def validate_password_complexity(password: str) -> tuple[bool, str]:
@@ -169,7 +158,7 @@ def handle_get_session(handler):
                     "name": payload.get("name"),
                     "email_verified": email_verified,
                 },
-                "profile": user_profile if has_profile else None,
+                "profile": user_profile or None,
                 "has_profile": has_profile,
             },
         )
@@ -226,11 +215,8 @@ def handle_register(handler):
         handler.send_json(400, {"error": "Email already exists"})
         return
 
-    if hasattr(app, "repository") and app.repository:
-        try:
-            app.repository.migrate_default_user(user_id)
-        except Exception as mig_err:
-            logger.warning(f"Could not migrate default_user data for {user_id}: {mig_err}")
+    user_profile = {"id": user_id, "name": name, "email": email}
+    app.repository.upsert_user_profile(user_id, user_profile)
 
     # Create token
     jwt_secret = _get_jwt_secret()
@@ -258,7 +244,7 @@ def handle_register(handler):
             "verification_code_preview": verification_code
             if os.environ.get("ENV") != "production"
             else None,
-            "profile": None,
+            "profile": user_profile,
             "has_profile": False,
         },
     )
@@ -505,6 +491,7 @@ def handle_google_auth(handler):
         return
 
     now = datetime.datetime.now(timezone.utc).isoformat()
+    existing = None
     try:
         with app.db.get_connection() as conn:
             cur = conn.cursor()
@@ -524,16 +511,15 @@ def handle_google_auth(handler):
                     "INSERT INTO users (id, email, name, password_hash, created_at, email_verified) VALUES (?, ?, ?, ?, ?, 1)",
                     (user_id, email, name, dummy_hash, now),
                 )
-                if hasattr(app, "repository") and app.repository:
-                    try:
-                        app.repository.migrate_default_user(user_id)
-                    except Exception as mig_err:
-                        logger.warning(
-                            f"Could not migrate default_user data for {user_id}: {mig_err}"
-                        )
             conn.commit()
     except Exception as e:
         logger.error(f"Error persisting Google user: {e}")
+        handler.send_json(500, {"success": False, "error": "Unable to persist Google account."})
+        return
+
+    if user_id and not app.repository.get_user_profile(user_id):
+        user_profile = {"id": user_id, "name": name, "email": email}
+        app.repository.upsert_user_profile(user_id, user_profile)
 
     jwt_secret = _get_jwt_secret()
     token = jwt.encode(
@@ -791,12 +777,6 @@ def handle_get_profile(handler):
                         "id": user_id,
                         "name": u_name or "",
                         "email": u_email or "",
-                        "title": "",
-                        "industry": "Technology & IT",
-                        "location": "Melbourne, VIC",
-                        "targetTitles": [],
-                        "coreSkills": [],
-                        "keyStrengths": [],
                     }
     except Exception:
         pass

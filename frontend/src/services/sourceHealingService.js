@@ -23,7 +23,8 @@ export const fetchSourcesHealth = async () => {
     throw new Error(`Failed to fetch source health: HTTP ${res.status}`);
   }
 
-  return await res.json();
+  const data = await res.json();
+  return data;
 };
 
 /**

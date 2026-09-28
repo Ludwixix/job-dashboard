@@ -9,7 +9,7 @@ from job_dashboard.profile_builder import (
     synthesize_profile_from_text,
     build_candidate_profile
 )
-from job_dashboard.web import DashboardApp, make_handler
+from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
 
 
 def create_mock_handler(handler_cls, method, path, body=None, headers=None):
@@ -95,6 +95,7 @@ def test_build_candidate_profile_end_to_end():
 def test_api_profile_auto_generate_endpoint(tmp_path):
     app = DashboardApp({}, [], tmp_path)
     handler_cls = make_handler(app)
+    token = jwt.encode({"sub": "usr_sam_101"}, JWT_SECRET, algorithm="HS256")
 
     handler = create_mock_handler(
         handler_cls,
@@ -104,7 +105,7 @@ def test_api_profile_auto_generate_endpoint(tmp_path):
             "raw_text": "Sam Developer\nSenior Full Stack Engineer\nSkills: React, Node.js, Python, PostgreSQL\nSummary: 6 years building modern web apps.",
             "save": True
         },
-        headers={"X-User-Id": "usr_sam_101"}
+        headers={"Authorization": f"Bearer {token}"}
     )
     handler.do_POST()
     assert handler.send_response.call_args[0][0] == 200

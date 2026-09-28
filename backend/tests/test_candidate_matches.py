@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from job_dashboard.repository import JobRepository
-from job_dashboard.web import DashboardApp, make_handler
+from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
 from job_dashboard.models import Job
 
 
@@ -137,6 +137,8 @@ def test_api_matches_endpoints(tmp_path):
         "posted": "2026-09-11"
     })
     handler_cls = make_handler(app)
+    token = jwt.encode({"sub": "usr_cand_1"}, JWT_SECRET, algorithm="HS256")
+    auth_headers = {"Authorization": f"Bearer {token}"}
 
     # Evaluate matches POST
     post_handler = create_mock_handler(
@@ -151,7 +153,7 @@ def test_api_matches_endpoints(tmp_path):
             },
             "min_score": 50
         },
-        headers={"X-User-Id": "usr_cand_1"}
+        headers=auth_headers
     )
     post_handler.do_POST()
     assert post_handler.send_response.call_args[0][0] == 200
@@ -164,7 +166,7 @@ def test_api_matches_endpoints(tmp_path):
         handler_cls,
         "GET",
         "/api/matches",
-        headers={"X-User-Id": "usr_cand_1"}
+        headers=auth_headers
     )
     get_handler.do_GET()
     assert get_handler.send_response.call_args[0][0] == 200

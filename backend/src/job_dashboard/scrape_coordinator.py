@@ -58,6 +58,20 @@ class ScrapeCoordinator:
         loc = getattr(query, "location", "").strip().lower()
         return f"{term}___{loc}"
 
+    @staticmethod
+    def pipeline_timeout(sources, default_source_timeout: float) -> float:
+        """Bound the coordinator wait by the sequential per-source budgets."""
+        budgets = []
+        for source in sources:
+            try:
+                timeout = float(
+                    getattr(source, "source_timeout", default_source_timeout)
+                )
+            except (TypeError, ValueError):
+                timeout = default_source_timeout
+            budgets.append(timeout if timeout > 0 else default_source_timeout)
+        return max(45.0, sum(budgets) + 5.0)
+
     def get_queue_depth(self) -> int:
         return self._queue.qsize()
 
@@ -158,19 +172,22 @@ class ScrapeCoordinator:
                     days=14,
                     health_check=getattr(app, "health_check", False),
                 )
+                timeout = self.pipeline_timeout(
+                    pipeline.sources, pipeline.source_timeout
+                )
                 executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                 try:
                     future = executor.submit(pipeline.run, [query])
                     try:
-                        fresh = future.result(timeout=45.0)
+                        fresh = future.result(timeout=timeout)
                     except concurrent.futures.TimeoutError:
                         logger.warning(
-                            f"ScrapeCoordinator query timed out after 45s: {term} [{loc}]"
+                            f"ScrapeCoordinator query timed out after {timeout:g}s: {term} [{loc}]"
                         )
                         fresh = []
                         with self._lock:
                             self._errors.append(
-                                f"{term}: Scrape gateway timed out (45s ceiling)"
+                                f"{term}: Scrape gateway timed out ({timeout:g}s ceiling)"
                             )
                 finally:
                     executor.shutdown(wait=False, cancel_futures=True)

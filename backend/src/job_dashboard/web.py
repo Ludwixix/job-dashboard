@@ -121,12 +121,13 @@ logger = get_logger("job_dashboard.web")
 TRACKER_CSV_URL = os.environ.get("JOB_DASHBOARD_TRACKER_CSV_URL", "")
 
 
-def _persist_profile_to_all_sinks(
+def _persist_user_profile(
     app: Any, user_id: str, profile_data: dict[str, Any]
 ) -> dict[str, Any]:
-    """Persist candidate profile across SQLite, in-memory dashboard, local JSON files, WAL checkpoint, and GCS."""
+    """Persist candidate profile only under its authenticated account ID in SQLite."""
     from datetime import datetime, timezone
 
+    profile_data = dict(profile_data)
     profile_data["id"] = user_id
     if "updatedAt" not in profile_data and "updated_at" not in profile_data:
         profile_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
@@ -159,85 +160,18 @@ def _persist_profile_to_all_sinks(
         profile_data["locationPreference"] = profile_data["location"]
 
     res = app.repository.upsert_user_profile(user_id, profile_data)
-    email = str(profile_data.get("email") or "").strip().lower()
-    if email and email != user_id:
+    # Auto-synchronize search discovery queries if this is the active user or app is configured
+    if hasattr(app, "suggested_search_queries") and hasattr(app, "update_search_queries"):
         try:
-            app.repository.upsert_user_profile(email, profile_data)
-        except Exception:
-            pass
-    for prefix in ("user_", "prof_"):
-        if user_id.startswith(prefix):
-            clean_id = user_id[len(prefix) :]
-            try:
-                app.repository.upsert_user_profile(clean_id, profile_data)
-            except Exception:
-                pass
-
-    # 1. Update in-memory dashboard profile so subsequent scoring and tools use the live profile
-    if hasattr(app, "dashboard") and app.dashboard:
-        app.dashboard.profile = res
-
-    # 1b. Auto-synchronize search discovery queries from the new profile
-    if hasattr(app, "suggested_search_queries") and hasattr(
-        app, "update_search_queries"
-    ):
-        try:
-            suggested = app.suggested_search_queries()
+            suggested = app.suggested_search_queries(profile=profile_data)
             if suggested:
                 app.update_search_queries(suggested)
         except Exception as sq_err:
-            logger.debug(
-                f"Could not auto-update search queries on profile persist: {sq_err}"
-            )
-
-    # 2. Write to data_dir / job_profile.json for persistent state
-    if hasattr(app, "data_dir") and app.data_dir:
-        data_profile_path = Path(app.data_dir) / "job_profile.json"
-        try:
-            data_profile_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(data_profile_path, "w", encoding="utf-8") as f:
-                json.dump(res, f, indent=2, ensure_ascii=False)
-        except Exception as file_err:
-            logger.debug(f"Could not write profile to {data_profile_path}: {file_err}")
-
-    # 3. Checkpoint SQLite WAL so changes are fully committed to main database file
-    try:
-        from .db_pool import get_db_connection
-
-        with get_db_connection(app.repository.path) as conn:
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    except Exception as cp_err:
-        logger.debug(f"WAL checkpoint warning on profile save: {cp_err}")
-
-    # 4. Immediate backup of job_profile.json to GCS (guarantees completion before Cloud Run throttles CPU)
-    from .config import settings
-
-    if settings.gcs_data_bucket and hasattr(app, "data_dir") and app.data_dir:
-        try:
-            backup_to_gcs(
-                settings.gcs_data_bucket,
-                Path(app.data_dir),
-                filenames=("job_profile.json",),
-            )
-        except Exception as b_err:
-            logger.warning(f"Immediate GCS profile backup warning: {b_err}")
-
-        # Also trigger background backup for the larger sqlite database
-        def _bg_backup():
-            try:
-                backup_to_gcs(
-                    settings.gcs_data_bucket,
-                    Path(app.data_dir),
-                    filenames=("jobs.sqlite3", "jobs.sqlite3-wal"),
-                )
-            except Exception as b_err:
-                logger.warning(
-                    f"GCS database backup failed on profile persist: {b_err}"
-                )
-
-        threading.Thread(target=_bg_backup, daemon=True).start()
-
+            logger.debug(f"Could not auto-update search queries on profile persist: {sq_err}")
     return res
+
+
+_persist_profile_to_all_sinks = _persist_user_profile
 
 
 class DashboardApp:
@@ -713,7 +647,7 @@ class DashboardApp:
             return "Creative & Design"
         return "Technology & IT"
 
-    def suggested_search_queries(self):
+    def suggested_search_queries(self, profile: dict[str, Any] | None = None):
         """Return search terms grounded in the candidate's profile and industry.
 
         Priority:
@@ -722,7 +656,8 @@ class DashboardApp:
         3. Industry-appropriate titles from ``_INDUSTRY_TITLES``.
         All terms are deduplicated and capped at 20 suggestions.
         """
-        profile = self.dashboard.profile
+        if profile is None:
+            profile = self.dashboard.profile
         terms = []
         seen: set[str] = set()
         location = (
@@ -2296,59 +2231,20 @@ class DashboardApp:
 
 
 def _is_valid_profile(p: Any) -> bool:
-    """Return True if p is a non-empty, valid candidate profile dictionary."""
+    """Return True if p is a valid candidate profile with career/skill data beyond basic identity fields."""
     if not p or not isinstance(p, dict):
         return False
-    return bool(
-        p.get("coreSkills")
-        or p.get("targetTitles")
-        or p.get("title")
-        or p.get("industry")
-        or p.get("job_titles")
-        or p.get("skills")
-        or p.get("name")
-        or p.get("email")
-        or p.get("fullWorkExperienceText")
-        or p.get("professional_summary")
-        or len(p) >= 2
-    )
+    identity_fields = {"id", "name", "email", "updatedAt", "updated_at"}
+    return any(value for key, value in p.items() if key not in identity_fields and value)
 
 
 def resolve_user_id(handler, query_params=None) -> str | None:
     """
-    Resolve the authenticated user ID from Authorization Bearer token,
-    explicit X-User-Id header, or query parameters.
-    Returns None if no user identity is provided.
+    Resolve authenticated user ID strictly from verified Bearer token or demo auth.
     """
-    auth_header = handler.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        try:
-            from .security import decode_token
+    from .router import get_auth_user_id
 
-            decoded = decode_token(token)
-            if decoded and decoded.get("sub"):
-                return str(decoded["sub"])
-        except Exception:
-            pass
-        try:
-            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            sub = payload.get("sub")
-            if sub:
-                return str(sub)
-        except Exception:
-            pass
-    uid = handler.headers.get("X-User-Id")
-    if uid and str(uid).strip():
-        return str(uid).strip()
-    if query_params and "user_id" in query_params:
-        param_val = str(query_params["user_id"][0]).strip()
-        if param_val:
-            return param_val
-    # Explicit demo/guest parameter support if requested
-    if query_params and query_params.get("demo", [""])[0].lower() in ("true", "1"):
-        return "demo_user"
-    return None
+    return get_auth_user_id(handler)
 
 
 def validate_password_complexity(password: str) -> tuple[bool, str]:

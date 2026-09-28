@@ -46,3 +46,47 @@ def test_password_hashing_fails_when_secure_libraries_unavailable(monkeypatch):
     with pytest.raises(RuntimeError, match="Insecure password hashing fallback is disabled"):
         manager.hash_password("password")
 
+
+def test_request_identity_uses_bearer_subject_not_caller_supplied_ids(monkeypatch):
+    from types import SimpleNamespace
+
+    from job_dashboard import web
+    from job_dashboard.router import get_auth_user_id
+
+    monkeypatch.setattr(web, "JWT_SECRET", "test-handler-secret")
+    spoofed_handler = SimpleNamespace(
+        headers={"X-User-Id": "victim"},
+        path="/api/profile?user_id=victim&demo=true",
+    )
+
+    assert web.resolve_user_id(spoofed_handler, {"user_id": ["victim"]}) is None
+    assert get_auth_user_id(spoofed_handler) is None
+
+    token = web.jwt.encode(
+        {"sub": "verified-user"}, "test-handler-secret", algorithm="HS256"
+    )
+    authenticated_handler = SimpleNamespace(
+        headers={"Authorization": f"Bearer {token}", "X-User-Id": "victim"},
+        path="/api/profile?user_id=victim",
+    )
+
+    assert web.resolve_user_id(authenticated_handler, {"user_id": ["victim"]}) == "verified-user"
+    assert get_auth_user_id(authenticated_handler) == "verified-user"
+
+
+def test_decorated_route_identity_adapters_ignore_user_id_queries():
+    from types import SimpleNamespace
+
+    from job_dashboard.routes.ai import _resolve_user_id as resolve_ai_user_id
+    from job_dashboard.routes.jobs import _resolve_user_id as resolve_job_user_id
+    from job_dashboard.routes.scrape import _resolve_user_id as resolve_scrape_user_id
+
+    handler = SimpleNamespace(
+        headers={}, path="/api/private?user_id=victim"
+    )
+    spoofed_query = {"user_id": ["victim"]}
+
+    assert resolve_ai_user_id(handler, spoofed_query) is None
+    assert resolve_job_user_id(handler, spoofed_query) is None
+    assert resolve_scrape_user_id(handler, spoofed_query) is None
+

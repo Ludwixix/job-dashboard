@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APM Master Command Center — Sam Ludwig</title>
+    <style>
+        :root {
+            --bg-body: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #334155;
+            --text-subtle: #64748b;
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --primary-soft: #e0f2fe;
+            --success: #059669;
+            --success-soft: #ecfdf5;
+            --warning: #d97706;
+            --warning-soft: #fffbeb;
+            --danger: #dc2626;
+            --danger-soft: #fef2f2;
+            --purple: #7c3aed;
+            --purple-soft: #f5f3ff;
+            --border: #cbd5e1;
+            --border-light: #e2e8f0;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 12px;
+        }
+
+        /* RESPONSIVE GRID - CENTER COLUMN ALWAYS PRIORITY */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr) 320px;
+            grid-template-areas: "left center right";
+            gap: 14px;
+            max-width: 1750px;
+            margin: 0 auto;
+            align-items: start;
+        }
+
+        /* FOCUS MODE TOGGLE (ADHD RELIEF) */
+        body.focus-mode .sidebar-left,
+        body.focus-mode .sidebar-right {
+            display: none !important;
+        }
+        body.focus-mode .layout-grid {
+            grid-template-columns: 1fr !important;
+            grid-template-areas: "center" !important;
+            max-width: 1000px !important;
+        }
+
+        @media (max-width: 1250px) {
+            .layout-grid {
+                grid-template-columns: 260px minmax(0, 1fr);
+                grid-template-areas: 
+                    "left center"
+                    "right center";
+            }
+        }
+
+        @media (max-width: 950px) {
+            .layout-grid {
+                display: flex;
+                flex-direction: column;
+            }
+            .main-column { order: 1; width: 100%; }
+            .sidebar-left { order: 2; width: 100%; position: static; max-height: none; }
+            .sidebar-right { order: 3; width: 100%; position: static; max-height: none; }
+        }
+
+        .sidebar-left { grid-area: left; }
+        .main-column { grid-area: center; }
+        .sidebar-right { grid-area: right; }
+
+        /* STICKY SIDEBARS */
+        .sidebar {
+            position: sticky;
+            top: 12px;
+            max-height: calc(100vh - 24px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        /* CARDS */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 14px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border-light);
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .card-title {
+            font-size: 1.18rem;
+            font-weight: 700;
+            margin: 0;
+            color: #0f172a;
+        }
+
+        .badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-blue { background: var(--primary-soft); color: var(--primary-dark); }
+        .badge-green { background: var(--success-soft); color: var(--success); }
+        .badge-amber { background: var(--warning-soft); color: var(--warning); }
+        .badge-purple { background: var(--purple-soft); color: var(--purple); }
+        .badge-red { background: var(--danger-soft); color: var(--danger); }
+
+        /* 5-SECOND SCAN BAR */
+        .scan-bar {
+            background: #f8fafc;
+            border-left: 4px solid var(--primary);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            padding: 9px 12px;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+            color: #1e293b;
+        }
+        .scan-bar.green-bar { border-left-color: var(--success); background: #f0fdf4; }
+        .scan-bar.amber-bar { border-left-color: var(--warning); background: #fefce8; }
+        .scan-bar.purple-bar { border-left-color: var(--purple); background: #faf5ff; }
+
+        .scan-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-subtle);
+            margin-bottom: 2px;
+        }
+
+        /* NATURAL SPOKEN SCRIPT BOX */
+        .spoken-script {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-left: 4px solid var(--success);
+            padding: 14px 16px;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            font-size: 0.94rem;
+            line-height: 1.65;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+        .spoken-script p { margin: 0 0 10px 0; }
+        .spoken-script p:last-child { margin-bottom: 0; }
+
+        .spoken-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #047857;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        /* BOLD HIGHLIGHTS */
+        .hl { font-weight: 700; color: #0369a1; }
+        .hl-green { font-weight: 700; color: #047857; }
+        .hl-warn { font-weight: 700; color: #b45309; }
+
+        /* TOP NAV / CONTROLS */
+        .controls-bar {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        .filter-btn:hover { background: #e2e8f0; }
+        .filter-btn.active {
+            background: #0284c7;
+            color: #ffffff;
+            border-color: #0284c7;
+        }
+
+        .view-btn {
+            background: #334155;
+            color: #ffffff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .view-btn:hover { background: #1e293b; }
+
+        /* 90-SECOND VISUAL TIMER */
+        .timer-widget {
+            background: #0f172a;
+            color: #f8fafc;
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            margin-bottom: 12px;
+        }
+        .timer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .timer-digits {
+            font-size: 1.4rem;
+            font-weight: 800;
+            font-family: 'Consolas', monospace;
+        }
+        .timer-progress {
+            height: 5px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .timer-fill {
+            height: 100%;
+            width: 100%;
+            background: #10b981;
+            transition: width 1s linear, background-color 0.4s ease;
+        }
+
+        /* TEXTAREAS */
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 12px;
+            background: #fffdf5;
+            resize: vertical;
+            min-height: 50px;
+            margin-top: 6px;
+            box-sizing: border-box;
+            line-height: 1.4;
+        }
+        textarea:focus { outline: 2px solid var(--primary); background: #ffffff; }
+
+        .save-status {
+            font-size: 11px;
+            color: var(--success);
+            margin-top: 2px;
+            display: inline-block;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            font-weight: 600;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="layout-grid">
+
+    <!-- ======================================================== -->
+    <!-- LEFT COLUMN: COCKPIT, TIMERS, TRAPS, ICEBREAKERS        -->
+    <!-- ======================================================== -->
+    <aside class="sidebar sidebar-left">
+
+        <!-- 90-SECOND PACING TIMER -->
+        <div class="timer-widget">
+            <div class="timer-row">
+                <span style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">⏱️ 90s Answer Timer</span>
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="toggleTimer()" id="startTimerBtn" style="background: #334155; color: #fff; border:none; padding:2px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer;">Start</button>
+                    <button onclick="resetTimer()" style="background: #334155; color: #fff; border:none; padding:2px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer;">Reset</button>
+                </div>
+            </div>
+            <div class="timer-row" style="margin-top: 4px;">
+                <span class="timer-digits" id="timerText">01:30</span>
+                <span style="font-size: 0.75rem; color: #94a3b8;" id="timerStatus">Target pace</span>
+            </div>
+            <div class="timer-progress">
+                <div class="timer-fill" id="timerFill"></div>
+            </div>
+        </div>
+
+        <!-- PANEL CUES -->
+        <div class="card" style="padding: 14px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                🎯 The Target: APM (EUC Role)
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
+                <div style="border-left: 3px solid var(--primary); padding-left: 6px;">
+                    <strong style="color: var(--primary-dark);">Company Vibe (APM):</strong>
+                    <div style="color: var(--text-subtle);">Purpose-driven health & human services. Dispersed workforce. Extreme focus on <em>End-User Experience</em> and <em>Reliability</em>.</div>
+                </div>
+                <div style="border-left: 3px solid var(--success); padding-left: 6px;">
+                    <strong style="color: var(--success);">Core Tech Stack:</strong>
+                    <div style="color: var(--text-subtle);">Intune, MECM/SCCM, Nerdio (Azure Virtual Desktop), VDI, Entra ID, BitLocker.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRAPS TO AVOID -->
+        <div class="card" style="border-top: 3px solid var(--danger); background: #fffafb; padding: 12px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: #991b1b; margin-bottom: 6px;">
+                🚫 3 Traps to Avoid
+            </div>
+            <ul style="margin: 0; padding-left: 16px; font-size: 0.78rem; color: #7f1d1d; display:flex; flex-direction:column; gap:4px;">
+                <li><strong>Ignoring "Purpose":</strong> APM is heavily tied to health/disability services. Always tie tech back to helping *people* do their jobs.</li>
+                <li><strong>Bashing SCCM:</strong> If they use MECM + Intune (Co-management), respect the legacy infrastructure. Don't say SCCM is dead.</li>
+                <li><strong>The Nerdio Gap:</strong> Don't just say "I don't know Nerdio." Bridge it instantly to your Azure/AVD and virtualization knowledge.</li>
+            </ul>
+        </div>
+
+        <!-- ICEBREAKERS -->
+        <div class="card" style="padding: 12px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--purple); margin-bottom: 6px;">
+                📋 Logistics & Icebreakers
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 6px; font-size: 0.78rem;">
+                <div style="background:#f8fafc; padding:4px 6px; border-radius:4px; border:1px solid #e2e8f0;">
+                    <strong>Notice:</strong> <span style="color:#64748b;">Immediate / Leave Nov 8-21 (Japan)</span>
+                </div>
+                <div style="background:#f8fafc; padding:4px 6px; border-radius:4px; border:1px solid #e2e8f0;">
+                    <strong>Icebreaker 1:</strong> <span style="color:#64748b;">Rebuilding 2025 Scott Foil RC 20 (Methodical precision).</span>
+                </div>
+                <div style="background:#f8fafc; padding:4px 6px; border-radius:4px; border:1px solid #e2e8f0;">
+                    <strong>Icebreaker 2:</strong> <span style="color:#64748b;">Built 2.7m Tasmanian Oak bench (Hands-on builder).</span>
+                </div>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ======================================================== -->
+    <!-- CENTER COLUMN: NATURAL SPOKEN SCRIPTS & Q&A CARDS       -->
+    <!-- ======================================================== -->
+    <main class="main-column">
+
+        <!-- TOP BAR: FOCUS & LAYOUT SWITCHER -->
+        <div class="controls-bar">
+            <div class="filter-group">
+                <button class="filter-btn active" onclick="filterCategory('all', this)">👁️ All</button>
+                <button class="filter-btn" onclick="filterCategory('cat-pitch', this)">🎯 Pitch</button>
+                <button class="filter-btn" onclick="filterCategory('cat-euc', this)">💻 Intune & EUC</button>
+                <button class="filter-btn" onclick="filterCategory('cat-vdi', this)">☁️ Nerdio & VDI</button>
+                <button class="filter-btn" onclick="filterCategory('cat-sec', this)">🛡️ Security & MFA</button>
+                <button class="filter-btn" onclick="filterCategory('cat-itil', this)">📊 ITIL & Operations</button>
+                <button class="filter-btn" onclick="filterCategory('cat-questions', this)">❓ Questions</button>
+            </div>
+            <div>
+                <button class="view-btn" onclick="toggleFocusMode()" id="focusToggleBtn">🔲 Focus View (Hide Sides)</button>
+            </div>
+        </div>
+
+        <!-- 1. OPENING PITCH -->
+        <div class="card qa-card cat-pitch" id="sec-pitch">
+            <div class="card-header">
+                <h3 class="card-title">1. Opening Pitch: "Tell Me About Yourself"</h3>
+                <span class="badge badge-green">Conversational • ~90 Seconds</span>
+            </div>
+
+            <div class="scan-bar green-bar">
+                <div class="scan-label">⚡ 5-Second Brain Glances:</div>
+                <strong>L2/L3 EUC & Cloud</strong> &rarr; <strong>Intune/MECM Management</strong> &rarr; <strong>Health/Gov Scale (St John / AusPost)</strong> &rarr; <strong>User-Centric Focus</strong>.
+            </div>
+
+            <div class="spoken-script">
+                <div class="spoken-label">🗣️ What to Actually Say (Human & Conversational):</div>
+                <p>
+                    "Thanks for having me. I’m a Senior IT Infrastructure Consultant currently acting as the escalation point for L2/L3 support, with a heavy focus on End User Computing, Microsoft 365, Entra ID, and Intune endpoint management.
+                </p>
+                <p>
+                    My career has been a mix of managing large-scale enterprise environments and delivering hands-on project work. Recently, I completed a targeted contract at <span class="hl">Australia Post</span>, which required me to rapidly adapt to a massive, highly regulated infrastructure environment. Following that, I led an independent, on-site infrastructure cutover at <span class="hl-green">St John of God hospital in Bendigo</span>, ensuring zero disruption to clinical staff.
+                </p>
+                <p>
+                    A big part of my day-to-day involves designing automated application deployments through PowerShell, managing device compliance profiles, and securing endpoints with Conditional Access and BitLocker. 
+                </p>
+                <p>
+                    What really drew me to this EUC Engineer role at APM is the combination of enterprise scale and purpose. You have a highly distributed workforce doing critical health and human services work, and I excel at architecting reliable, secure workspaces—whether that’s via Intune or VDI—so they can actually do their best work without fighting the technology."
+                </p>
+            </div>
+        </div>
+
+        <!-- 2. INTUNE, SCCM & APP DEPLOYMENT -->
+        <div class="card qa-card cat-euc" id="sec-euc">
+            <div class="card-header">
+                <h3 class="card-title">2. Endpoint Management (Intune & MECM)</h3>
+                <span class="badge badge-blue">Modern Device Management</span>
+            </div>
+
+            <div class="scan-bar">
+                <div class="scan-label">⚡ 5-Second Brain Glances:</div>
+                <strong>PowerShell Automation</strong> &rarr; <strong>Intune Baseline Policies</strong> &rarr; <strong>Co-Management mindset</strong> &rarr; <strong>Zero-Touch Provisioning</strong>.
+            </div>
+
+            <p style="font-size:0.88rem; color:#475569; margin: 0 0 8px 0;"><strong>Likely Question:</strong> <em>"Tell us about your experience packaging applications and managing devices with Intune and SCCM."</em></p>
+
+            <div class="spoken-script">
+                <div class="spoken-label">🗣️ What to Actually Say:</div>
+                <p>
+                    "My primary philosophy for endpoint management is driving toward <span class="hl">Zero-Touch Provisioning</span>. If an APM staff member in a remote office opens a new laptop, they should just sign in and let Autopilot and Intune handle the rest.
+                </p>
+                <p>
+                    In my current role, our L2 queue was getting bogged down by manual onboardings. I engineered <span class="hl">PowerShell scripts hitting the Graph API</span> that automatically place users into the correct Entra ID dynamic groups. Those groups are tied directly to Intune deployment profiles, which silently push out departmental applications, compliance policies, and security baselines without IT having to click next fifty times.
+                </p>
+                <p>
+                    If we are looking at a hybrid environment using SCCM and Intune via Co-Management, I completely understand that transition phase. You rely on MECM for heavy legacy app packaging and complex task sequences, while shifting modern workloads like Windows Updates, BitLocker, and compliance policies over to Intune for remote workers."
+                </p>
+            </div>
+        </div>
+
+        <!-- 3. NERDIO & VDI / DAAS (THE BRIDGE) -->
+        <div class="card qa-card cat-vdi" id="sec-vdi">
+            <div class="card-header">
+                <h3 class="card-title">3. Nerdio, VDI & DaaS Architecture</h3>
+                <span class="badge badge-amber">The Knowledge Bridge</span>
+            </div>
+
+            <div class="scan-bar amber-bar">
+                <div class="scan-label">⚡ 5-Second Brain Glances:</div>
+                <strong>AZ-900 Foundation</strong> &rarr; <strong>AVD underlying architecture</strong> &rarr; <strong>Proxmox/Hyper-V Lab</strong> &rarr; <strong>Optimizing compute costs</strong>.
+            </div>
+
+            <p style="font-size:0.88rem; color:#475569; margin: 0 0 8px 0;"><strong>Likely Question:</strong> <em>"We use Nerdio to manage our Virtual Desktop Infrastructure. What's your experience there?"</em></p>
+
+            <div class="spoken-script">
+                <div class="spoken-label">🗣️ What to Actually Say (The Bridge):</div>
+                <p>
+                    "While I haven't been the primary administrator specifically clicking the buttons inside the Nerdio Manager portal, I have a very strong foundation in the <span class="hl-warn">Azure Virtual Desktop (AVD) infrastructure that Nerdio sits on top of</span>. 
+                </p>
+                <p>
+                    Holding my <span class="hl">AZ-900 certification</span> and managing Entra ID daily means I intimately understand the underlying Azure compute, storage, and identity networking required to deliver a DaaS solution. Nerdio is essentially an incredible orchestration layer that automates AVD scaling and image management to save on Azure consumption costs.
+                </p>
+                <p>
+                    Additionally, I run a heavy virtualization stack at home using <span class="hl">Proxmox and Hyper-V</span>, managing segmented VLANs and deploying OpenClaw AI frameworks. I'm deeply comfortable with virtualization concepts—like golden image management, FSLogix profile mounting, and assigning dedicated vs. pooled host pools. Because I know the Microsoft cloud architecture underneath, picking up APM's Nerdio environment will be a very fast transition for me."
+                </p>
+            </div>
+        </div>
+
+        <!-- 4. ENDPOINT SECURITY (MFA, ENCRYPTION, COMPLIANCE) -->
+        <div class="card qa-card cat-sec" id="sec-sec">
+            <div class="card-header">
+                <h3 class="card-title">4. Endpoint Security & Vulnerability Remediation</h3>
+                <span class="badge badge-purple">Entra ID & BitLocker</span>
+            </div>
+
+            <div class="scan-bar purple-bar">
+                <div class="scan-label">⚡ 5-Second Brain Glances:</div>
+                <strong>Conditional Access</strong> &rarr; <strong>Silent BitLocker via Intune</strong> &rarr; <strong>Sign-in log triage</strong> &rarr; <strong>Protecting health data</strong>.
+            </div>
+
+            <p style="font-size:0.88rem; color:#475569; margin: 0 0 8px 0;"><strong>Likely Question:</strong> <em>"How do you ensure endpoints are secure, specifically around MFA, encryption, and access management?"</em></p>
+
+            <div class="spoken-script">
+                <div class="spoken-label">🗣️ What to Actually Say:</div>
+                <p>
+                    "Especially in a human services company like APM, data security on a remote laptop is paramount. My approach relies entirely on <span class="hl">Conditional Access tied to device compliance</span>. 
+                </p>
+                <p>
+                    I ensure that <span class="hl">BitLocker</span> is deployed silently via Endpoint Security policies in Intune, with recovery keys escrowed directly to Entra ID so the helpdesk isn't locked out. If a device fails compliance—say, an antivirus definition drops or BitLocker is suspended—Conditional Access automatically revokes their M365 session tokens until the device is remediated.
+                </p>
+                <p>
+                    When dealing with vulnerabilities, I don't just pass tickets along. If we get MFA loops or access failures, my first stop is the <span class="hl">Entra ID Sign-in logs</span> cross-referenced with Intune device state. I diagnose the exact policy conflict—whether it's a stale compliance token or an untrusted IP location—and implement the fix at the architectural level rather than just resetting the user."
+                </p>
+            </div>
+        </div>
+
+        <!-- 5. ITIL & CONTINUOUS IMPROVEMENT -->
+        <div class="card qa-card cat-itil" id="sec-itil">
+            <div class="card-header">
+                <h3 class="card-title">5. ITIL 4 & Optimizing Operations</h3>
+                <span class="badge badge-green">Incident vs Problem</span>
+            </div>
+
+            <div class="scan-bar green-bar">
+                <div class="scan-label">⚡ 5-Second Brain Glances:</div>
+                <strong>ITIL 4 Foundation</strong> &rarr; <strong>Incident vs Problem Mgmt</strong> &rarr; <strong>Scrum timeboxing</strong> &rarr; <strong>Developer mindset</strong>.
+            </div>
+
+            <p style="font-size:0.88rem; color:#475569; margin: 0 0 8px 0;"><strong>Likely Question:</strong> <em>"How do you prioritize tickets vs. system improvements, and what is your exposure to ITIL?"</em></p>
+
+            <div class="spoken-script">
+                <div class="spoken-label">🗣️ What to Actually Say:</div>
+                <p>
+                    "Holding my <span class="hl">ITIL 4 Foundation certification</span> fundamentally changes how I look at an EUC queue. The biggest distinction I make daily is between Incident Management and Problem Management. 
+                </p>
+                <p>
+                    If the same Teams cache issue or VPN drop hits the L3 queue three times in a week, I don’t close three incidents. That is a Problem. My background in application support at Knosys trained me to trace the actual software logic. I will dive into the application logs, find the root cause, and push a registry fix or an updated configuration profile via Intune to permanently remediate the vulnerability across the whole fleet.
+                </p>
+                <p>
+                    To balance that with project work, I lean on my <span class="hl">Certified Scrum Master</span> training. Once the critical SLA incidents are stable, I timebox my calendar to ensure the strategic roadmap items—like designing a new AVD host pool or testing an application package—actually get delivered."
+                </p>
+            </div>
+        </div>
+
+        <!-- 6. REVERSE QUESTIONS -->
+        <div class="card qa-card cat-questions" id="sec-questions">
+            <div class="card-header">
+                <h3 class="card-title">6. Smart Reverse Questions (For the End)</h3>
+                <span class="badge badge-purple">End on a High Note</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="border-left: 3px solid var(--success); padding: 10px 14px; background: #f0fdf4; border-radius: 0 6px 6px 0;">
+                    <strong style="color: #166534; font-size: 0.88rem;">Question 1 (The Roadmap):</strong>
+                    <p style="font-size: 0.9rem; color: #1e293b; font-style: italic; margin: 4px 0 0 0;">
+                        "Given APM's massive distributed workforce, where is the EUC team currently sitting on the journey from traditional SCCM imaging to full Intune Autopilot and Co-Management?"
+                    </p>
+                </div>
+
+                <div style="border-left: 3px solid var(--primary); padding: 10px 14px; background: #f0f9ff; border-radius: 0 6px 6px 0;">
+                    <strong style="color: #075985; font-size: 0.88rem;">Question 2 (The VDI Strategy):</strong>
+                    <p style="font-size: 0.9rem; color: #1e293b; font-style: italic; margin: 4px 0 0 0;">
+                        "I noticed Nerdio and VDI are key focuses. Is the strategy to move the majority of APM's remote workforce onto Azure Virtual Desktops / Thin Clients for data security, or is it reserved for specific high-compute roles?"
+                    </p>
+                </div>
+                
+                <div style="border-left: 3px solid var(--warning); padding: 10px 14px; background: #fffbeb; border-radius: 0 6px 6px 0;">
+                    <strong style="color: #92400e; font-size: 0.88rem;">Question 3 (Success):</strong>
+                    <p style="font-size: 0.9rem; color: #1e293b; font-style: italic; margin: 4px 0 0 0;">
+                        "If I step into this role, what is the single biggest endpoint challenge or project bottleneck you want me to take off your plate in the first 90 days?"
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- RIGHT COLUMN: SAM'S ARSENAL & 3 BATTLE-TESTED STORIES    -->
+    <!-- ======================================================== -->
+    <aside class="sidebar sidebar-right">
+
+        <!-- SAM'S AUTOMATION ARSENAL -->
+        <div class="card" style="border-top: 4px solid var(--purple); padding: 14px;">
+            <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                🛠️ Sam's Real Scripts & Tools
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+                <div style="background: #fdf4ff; border: 1px solid #f0abfc; padding: 6px 8px; border-radius: 4px;">
+                    <strong style="color: #86198f;">1. PowerShell Graph API Provisioning</strong>
+                    <div style="color: #701a75;">Automates user creation, Entra ID groups, and Intune policy baselines.</div>
+                </div>
+
+                <div style="background: #eff6ff; border: 1px solid #93c5fd; padding: 6px 8px; border-radius: 4px;">
+                    <strong style="color: #1e3a8a;">2. ServiceNow & EUC Triage Tool</strong>
+                    <div style="color: #1d4ed8;">Built Tampermonkey scripts at Australia Post linking ServiceNow to operations.</div>
+                </div>
+
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 8px; border-radius: 4px;">
+                    <strong style="color: #0f172a;">3. Home Lab Virtualization</strong>
+                    <div style="color: #475569;">Proxmox, Hyper-V, VLAN segmentation. Solid base for managing Nerdio/VDI scale.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3 BULLETIZED STAR STORIES -->
+        <div class="card" style="border-top: 4px solid var(--success); padding: 14px;">
+            <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                ⭐ Quick STAR Stories
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.78rem;">
+                <div style="background: #f8fafc; border-left: 3px solid #0284c7; padding: 6px 8px; border-radius: 0 4px 4px 0;">
+                    <strong style="color: #0369a1;">1. Clinical Site Cutover (St John of God)</strong>
+                    <div><strong>S:</strong> Assigned to medical hospital in Bendigo.</div>
+                    <div><strong>A:</strong> Managed all local on-site client expectations & deployment independently.</div>
+                    <div><strong>R:</strong> <span class="hl-green">Concluded flawlessly (Dec 2025). Zero clinical disruption.</span></div>
+                </div>
+
+                <div style="background: #f8fafc; border-left: 3px solid #059669; padding: 6px 8px; border-radius: 0 4px 4px 0;">
+                    <strong style="color: #047857;">2. Enterprise Scale (Australia Post)</strong>
+                    <div><strong>S:</strong> Inherited a massive, heavily regulated enterprise environment.</div>
+                    <div><strong>A:</strong> Adapted quickly to strict governance and mapped complex architecture.</div>
+                    <div><strong>R:</strong> <span class="hl-green">Completed 6-month contract delivering high-tier support</span>.</div>
+                </div>
+
+                <div style="background: #f8fafc; border-left: 3px solid #d97706; padding: 6px 8px; border-radius: 0 4px 4px 0;">
+                    <strong style="color: #b45309;">3. The "Developer Mindset" (Knosys)</strong>
+                    <div><strong>S:</strong> Standard L1/L2s couldn't resolve platform bugs.</div>
+                    <div><strong>A:</strong> Traced application logic and API calls rather than just rebooting.</div>
+                    <div><strong>R:</strong> <span class="hl-green">Bridged the gap to engineering; reduced false escalations</span>.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EMERGENCY RESET ANCHOR -->
+        <div class="card" style="border-top: 3px solid var(--danger); background: #fef2f2; padding: 10px;">
+            <strong style="color: #991b1b; font-size: 0.84rem;">🆘 If Mind Goes Blank:</strong>
+            <div style="font-size: 0.8rem; color: #7f1d1d; font-style: italic; margin-top: 2px;">
+                "Let me take a step back and look at this from a root-cause perspective..."
+            </div>
+            <div style="font-size: 0.74rem; color: #991b1b; margin-top: 4px; font-weight: 600;">
+                1. Check Logs &rarr; 2. Identify CA/Policy Conflict &rarr; 3. Automate Fix
+            </div>
+        </div>
+
+    </aside>
+
+</div>
+
+<script>
+    // CATEGORY FILTER
+    function filterCategory(cat, btn) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+
+        document.querySelectorAll('.qa-card').forEach(card => {
+            if (cat === 'all' || card.classList.contains(cat)) {
+                card.classList.remove('hidden');
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+    }
+
+    // FOCUS MODE TOGGLE
+    function toggleFocusMode() {
+        const body = document.body;
+        const btn = document.getElementById('focusToggleBtn');
+        body.classList.toggle('focus-mode');
+        if (body.classList.contains('focus-mode')) {
+            btn.textContent = '🖥️ Full View (Show Sides)';
+        } else {
+            btn.textContent = '🔲 Focus View (Hide Sides)';
+        }
+    }
+
+    // 90-SECOND PACING TIMER
+    let timerDuration = 90;
+    let timeLeft = timerDuration;
+    let timerInterval = null;
+    let isRunning = false;
+
+    const timerText = document.getElementById('timerText');
+    const timerFill = document.getElementById('timerFill');
+    const timerStatus = document.getElementById('timerStatus');
+    const startBtn = document.getElementById('startTimerBtn');
+
+    function updateTimerDisplay() {
+        const mins = Math.floor(timeLeft / 60);
+        const secs = timeLeft % 60;
+        timerText.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        const pct = (timeLeft / timerDuration) * 100;
+        timerFill.style.width = pct + '%';
+
+        if (timeLeft > 30) {
+            timerFill.style.backgroundColor = '#10b981';
+            timerStatus.textContent = 'Target pace';
+            timerStatus.style.color = '#94a3b8';
+        } else if (timeLeft > 10) {
+            timerFill.style.backgroundColor = '#f59e0b';
+            timerStatus.textContent = 'Wrap up soon';
+            timerStatus.style.color = '#f59e0b';
+        } else {
+            timerFill.style.backgroundColor = '#ef4444';
+            timerStatus.textContent = 'Time to land!';
+            timerStatus.style.color = '#ef4444';
+        }
+    }
+
+    function toggleTimer() {
+        if (isRunning) {
+            clearInterval(timerInterval);
+            isRunning = false;
+            startBtn.textContent = 'Resume';
+        } else {
+            isRunning = true;
+            startBtn.textContent = 'Pause';
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    updateTimerDisplay();
+                } else {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                    startBtn.textContent = 'Start';
+                    timerStatus.textContent = 'Done!';
+                }
+            }, 1000);
+        }
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        isRunning = false;
+        timeLeft = timerDuration;
+        startBtn.textContent = 'Start';
+        updateTimerDisplay();
+    }
+
+    // LOCALSTORAGE PERSISTENT NOTES
+    const textareas = document.querySelectorAll('textarea');
+    textareas.forEach((textarea) => {
+        const key = 'apm-dash:' + textarea.id;
+        const statusSpan = document.getElementById('status-' + textarea.id.replace('note-', ''));
+
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) textarea.value = saved;
+        } catch (e) {}
+
+        let debounce = null;
+        textarea.addEventListener('input', function() {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => {
+                try {
+                    localStorage.setItem(key, textarea.value);
+                    if (statusSpan) {
+                        statusSpan.style.opacity = '1';
+                        setTimeout(() => { statusSpan.style.opacity = '0'; }, 1200);
+                    }
+                } catch (e) {}
+            }, 300);
+        });
+    });
+</script>
+
+</body>
+</html>

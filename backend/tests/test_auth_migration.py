@@ -1,10 +1,8 @@
 import io
 import json
-import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 
 from job_dashboard.repository import JobRepository
 from job_dashboard.web import DashboardApp, make_handler
@@ -90,7 +88,7 @@ def test_repository_user_crud_and_migration():
         assert repo.get_generated_document("usr_test_1", "job_1", "resume")["content_text"] == "Custom resume text"
 
 
-def test_api_register_auto_migrates_default_user_data(tmp_path):
+def test_api_register_does_not_migrate_default_user_data(tmp_path):
     app = DashboardApp({}, [], tmp_path)
     repo = app.repository
 
@@ -111,9 +109,62 @@ def test_api_register_auto_migrates_default_user_data(tmp_path):
     res_data = parse_response(reg_handler)
     new_uid = res_data["user"]["id"]
 
-    # Verify default_user applications are migrated to new_uid
-    assert len(repo.get_user_applications("default_user")) == 0
-    new_apps = repo.get_user_applications(new_uid)
-    assert len(new_apps) == 1
-    assert new_apps[0]["job_id"] == "job_xyz"
-    assert new_apps[0]["status"] == "interviewing"
+    # A new account must not inherit ownerless legacy data during signup.
+    assert len(repo.get_user_applications("default_user")) == 1
+    assert repo.get_user_profile("default_user")["title"] == "Software Engineer"
+    assert repo.get_user_applications(new_uid) == []
+    assert repo.get_user_profile(new_uid) == {
+        "id": new_uid,
+        "name": "New User",
+        "email": "newuser@example.com",
+    }
+
+
+def test_google_signup_does_not_migrate_default_user_data(tmp_path):
+    app = DashboardApp({}, [], tmp_path)
+    repo = app.repository
+    repo.upsert_user_application(
+        "default_user", "legacy_job", {"status": "applied", "notes": "private"}
+    )
+    handler_cls = make_handler(app)
+    handler = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/google-login",
+        body={"email": "google@example.com", "name": "Google User", "google_id": "google-subject"},
+    )
+
+    handler.do_POST()
+
+    assert handler.send_response.call_args[0][0] == 200
+    new_uid = parse_response(handler)["user"]["id"]
+    assert len(repo.get_user_applications("default_user")) == 1
+    assert repo.get_user_applications(new_uid) == []
+    assert repo.get_user_profile(new_uid) == {
+        "id": new_uid,
+        "name": "Google User",
+        "email": "google@example.com",
+    }
+
+
+def test_google_signup_fails_closed_when_user_persistence_fails(tmp_path):
+    app = DashboardApp({}, [], tmp_path)
+    app.db = MagicMock()
+    app.db.get_connection.side_effect = RuntimeError("database unavailable")
+    handler_cls = make_handler(app)
+    handler = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/google-login",
+        body={"email": "google@example.com", "name": "Google User", "google_id": "failed-subject"},
+    )
+
+    handler.do_POST()
+
+    assert app.db.get_connection.called
+    assert handler.send_response.call_args[0][0] == 500
+    response = parse_response(handler)
+    assert response["success"] is False
+    assert response["error"] == "Unable to persist Google account."
+    assert "token" not in response
+    assert app.repository.get_user_profile("google_failed-subject") == {}

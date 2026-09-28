@@ -142,6 +142,6 @@ def test_decomposed_application_workflow_service(tmp_path):
     assert updated["status"] == "applied"
 
     # Verify event audit trail
-    events = workflow_service.get_application_events("job_test_1")
+    events = workflow_service.get_application_events("user_test_1", "job_test_1")
     assert len(events) >= 1
     assert events[0]["to_status"] == "applied"

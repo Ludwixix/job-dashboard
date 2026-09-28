@@ -2,6 +2,8 @@ import { parseISO, isValid, differenceInDays } from 'date-fns';
 import { cleanDescriptionText } from './dataService';
 import { getBackendApiBase } from './apiConfig';
 import { getActiveProfile } from './profileService';
+import { getAuthToken } from './authService';
+
 
 /**
  * Validates whether a job record is valid and belongs in the Application Tracker.
@@ -301,13 +303,15 @@ export const saveUserApplicationToBackend = async (job, userId) => {
   const apiBase = getBackendApiBase();
   const jobId = job.id || `${job.company}_${job.title}`;
 
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (targetUserId) headers['X-User-Id'] = targetUserId;
+
   try {
     const res = await fetch(`${apiBase}/api/applications`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': targetUserId
-      },
+      headers,
       body: JSON.stringify({
         job_id: jobId,
         company: job.company || '',
@@ -341,13 +345,15 @@ export const syncApplicationsToBackend = async (appsList, userId) => {
   }
   const apiBase = getBackendApiBase();
 
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (targetUserId) headers['X-User-Id'] = targetUserId;
+
   try {
     const res = await fetch(`${apiBase}/api/applications/sync`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': targetUserId
-      },
+      headers,
       body: JSON.stringify({
         applications: appsList.map(j => ({
           job_id: j.id || `${j.company}_${j.title}`,
@@ -380,9 +386,14 @@ export const fetchUserApplicationsFromBackend = async (userId) => {
   }
   const apiBase = getBackendApiBase();
 
+  const token = getAuthToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (targetUserId) headers['X-User-Id'] = targetUserId;
+
   try {
     const res = await fetch(`${apiBase}/api/applications?user_id=${encodeURIComponent(targetUserId)}`, {
-      headers: { 'X-User-Id': targetUserId }
+      headers
     });
     if (res.ok) {
       const data = await res.json();
@@ -404,12 +415,14 @@ export const scanGmailForApplicationUpdates = async ({ username, appPassword, jo
   }
   const apiBase = getBackendApiBase();
 
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (targetUserId) headers['X-User-Id'] = targetUserId;
+
   const res = await fetch(`${apiBase}/api/applications/scan-updates`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': targetUserId
-    },
+    headers,
     body: JSON.stringify({
       username,
       app_password: appPassword,

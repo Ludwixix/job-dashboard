@@ -48,6 +48,26 @@ class Settings:
         if self.seek_cache_path is None:
             self.seek_cache_path = self.data_dir / "seek_cache.json"
 
+        # Paid Apify fallback is opt-in and only used when native SEEK fails.
+        self.apify_api_token = os.getenv("JOB_DASHBOARD_APIFY_API_TOKEN") or os.getenv(
+            "APIFY_API_TOKEN"
+        )
+        self.apify_seek_enabled = self._get_bool(
+            "JOB_DASHBOARD_APIFY_SEEK_ENABLED", False
+        )
+        self.apify_seek_actor_id = os.getenv(
+            "JOB_DASHBOARD_APIFY_SEEK_ACTOR_ID", "automation-lab/seek-scraper"
+        ).strip()
+        self.apify_seek_max_results = min(
+            50, max(1, int(os.getenv("JOB_DASHBOARD_APIFY_SEEK_MAX_RESULTS", "20")))
+        )
+        self.apify_seek_timeout_secs = min(
+            60, max(1, int(os.getenv("JOB_DASHBOARD_APIFY_SEEK_TIMEOUT_SECS", "55")))
+        )
+        self.apify_seek_fetch_details = self._get_bool(
+            "JOB_DASHBOARD_APIFY_SEEK_FETCH_DETAILS", False
+        )
+
         # LinkedIn configuration
         self.linkedin_enabled = self._get_bool("JOB_DASHBOARD_LINKEDIN_ENABLED", True)
 

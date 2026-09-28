@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   saveProfile,
   fetchProfileFromBackend,
-  getActiveProfile,
-  DEFAULT_USER_PROFILE
+  getActiveProfile
 } from '../profileService';
+import { logoutUser, setSession } from '../authService';
 
 describe('Profile Persistence & LWW Conflict Reconciliation', () => {
   beforeEach(() => {
@@ -107,6 +107,37 @@ describe('Profile Persistence & LWW Conflict Reconciliation', () => {
     expect(result.title).toBe('Newest Title from Cloud');
     const active = getActiveProfile();
     expect(active.title).toBe('Newest Title from Cloud');
+  });
+
+  it('isolates cached profile state when switching accounts and logging out', () => {
+    setSession({ id: 'account-a', name: 'Account A', email: 'a@example.com' }, 'token-a');
+    saveProfile({
+      id: 'account-a',
+      name: 'Account A',
+      email: 'a@example.com',
+      title: 'Private Account A Role',
+      location: 'Account A Location'
+    }, { syncToBackend: false });
+
+    setSession({ id: 'account-b', name: 'Account B', email: 'b@example.com' }, 'token-b');
+
+    expect(localStorage.getItem('userBaseLocation')).toBeNull();
+    const accountBProfile = getActiveProfile();
+    expect(accountBProfile.id).toBe('account-b');
+    expect(accountBProfile.title).not.toBe('Private Account A Role');
+
+    const savedProfile = saveProfile({
+      id: 'account-a',
+      name: 'Account A',
+      title: 'Wrong Account Role'
+    }, { syncToBackend: false });
+    expect(savedProfile.id).toBe('account-b');
+    expect(getActiveProfile().id).toBe('account-b');
+
+    logoutUser();
+    const guestProfile = getActiveProfile();
+    expect(guestProfile.id).toBe('guest');
+    expect(guestProfile.title).not.toBe('Wrong Account Role');
   });
 });
 

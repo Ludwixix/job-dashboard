@@ -172,7 +172,7 @@ export const saveProfile = (updatedProfile, options = {}) => {
   const profile = {
     ...baseProfile,
     ...updatedProfile,
-    id: updatedProfile.id || sessionUserId || baseProfile.id || `user_${Date.now()}`,
+    id: sessionUserId || updatedProfile.id || baseProfile.id || `user_${Date.now()}`,
     updatedAt: updatedProfile.updatedAt || new Date().toISOString()
   };
 

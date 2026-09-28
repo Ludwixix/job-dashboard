@@ -543,6 +543,7 @@ class ScrapePipeline:
         completed_attempts = 0
         for idx, source in enumerate(self.sources):
             started_at = time.monotonic()
+            source_timeout = getattr(source, "source_timeout", self.source_timeout)
             if on_progress:
                 on_progress(
                     f"Scraping {source.name}...", int((idx / total_sources) * 100)
@@ -558,13 +559,13 @@ class ScrapePipeline:
                         min(89, 10 + int((completed_attempts / total_attempts) * 75)),
                     )
                 try:
-                    if self.source_timeout and self.source_timeout > 0:
+                    if source_timeout and source_timeout > 0:
                         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                         try:
                             future = executor.submit(
                                 lambda s, q: list(s.search(q)), source, query
                             )
-                            results = future.result(timeout=self.source_timeout)
+                            results = future.result(timeout=source_timeout)
                         finally:
                             executor.shutdown(wait=False, cancel_futures=True)
                     else:
@@ -585,12 +586,12 @@ class ScrapePipeline:
                             health["jobs"] += 1
                 except (concurrent.futures.TimeoutError, TimeoutError):
                     health["queries"] += 1
-                    health["last_error"] = f"Timeout after {self.source_timeout}s"
+                    health["last_error"] = f"Timeout after {source_timeout}s"
                     logger.warning(
-                        f"Source {source.name} timed out after {self.source_timeout}s for query '{query.term}'"
+                        f"Source {source.name} timed out after {source_timeout}s for query '{query.term}'"
                     )
                     self.errors.append(
-                        f"{source.name} / {query.term}: Timeout after {self.source_timeout}s"
+                        f"{source.name} / {query.term}: Timeout after {source_timeout}s"
                     )
                 except Exception as error:
                     health["queries"] += 1

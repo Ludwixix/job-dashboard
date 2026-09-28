@@ -36,17 +36,8 @@ logger = logging.getLogger(__name__)
 def _resolve_user_id(
     handler, query_params: dict[str, list[str]] | None = None
 ) -> str | None:
-    """Resolve user ID via bearer token, headers, or query params."""
-    uid = get_auth_user_id(handler)
-    if uid:
-        return uid
-    if query_params is None:
-        query_params = get_query_params(handler)
-    if query_params and "user_id" in query_params:
-        p = str(query_params["user_id"][0]).strip()
-        if p:
-            return p
-    return None
+    """Resolve user identity only from a verified bearer token."""
+    return get_auth_user_id(handler)
 
 
 # =====================================================================
@@ -528,36 +519,17 @@ def handle_telemetry_status(handler):
 
 @app_router.get("/api/settings/cookies")
 def handle_get_settings_cookies(handler):
-    """Retrieve stored provider session cookies."""
-    query_params = get_query_params(handler)
-    provider = query_params.get("provider", [""])[0]
-    if not provider:
-        handler.send_json(400, {"error": "Missing provider parameter"})
-        return
-    data = handler.app.repository.get_provider_cookies(provider)
-    handler.send_json(200, {"success": True, **data})
+    """Retrieve stored provider session cookies (Disabled)."""
+    handler.send_json(
+        410, {"success": False, "error": "Provider cookie management is disabled."}
+    )
 
 
 @app_router.post("/api/settings/cookies")
 def handle_post_settings_cookies(handler):
-    """Store or update provider session cookies and headers."""
-    body = get_json_body(handler)
-    provider = body.get("provider", "").lower()
-    if not provider:
-        handler.send_json(400, {"error": "Missing provider"})
-        return
-    handler.app.repository.set_provider_cookies(
-        provider=provider,
-        headers=body.get("headers"),
-        cookies=body.get("cookies"),
-    )
+    """Store or update provider session cookies and headers (Disabled)."""
     handler.send_json(
-        200,
-        {
-            "success": True,
-            "provider": provider,
-            "message": f"Successfully stored session cookies for {provider}",
-        },
+        410, {"success": False, "error": "Provider cookie management is disabled."}
     )
 
 
@@ -644,6 +616,15 @@ def handle_digest_dispatch(handler):
     min_score = int(body.get("min_score", 85))
     limit = int(body.get("limit", 5))
     webhook_url = body.get("webhook_url") or os.environ.get("SLACK_WEBHOOK_URL")
+    if body.get("webhook_url"):
+        handler.send_json(
+            410,
+            {
+                "success": False,
+                "error": "Arbitrary outbound webhook dispatch is disabled.",
+            },
+        )
+        return
 
     jobs = app.repository.list_jobs(match_score_min=min_score)
     digest_data = generate_morning_digest(jobs, min_score=min_score, limit=limit)

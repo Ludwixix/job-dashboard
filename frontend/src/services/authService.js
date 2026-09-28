@@ -9,6 +9,18 @@ import { getBackendApiBase } from './apiConfig';
 
 const LS_SESSION = 'job_dashboard_current_user_session';
 const LS_TOKEN = 'job_dashboard_auth_token';
+const PROFILE_CACHE_KEYS = [
+  'job_dashboard_profiles',
+  'job_dashboard_active_profile_id',
+  'candidate_profile',
+  'job_dashboard_candidate_profile',
+  'userBaseLocation',
+  'userName',
+  'userEmail',
+  'userPhone',
+  'userTargetSalary',
+  'userTargetTitles'
+];
 
 const getApiBase = () => getBackendApiBase();
 
@@ -30,6 +42,10 @@ export const getCurrentSession = () => {
  * Persists the user session to localStorage
  */
 export const setSession = (userData, token = null) => {
+  const previousUser = getCurrentSession();
+  if ((previousUser?.id || userData?.id) && previousUser?.id !== userData?.id) {
+    PROFILE_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));
+  }
   if (userData) {
     localStorage.setItem(LS_SESSION, JSON.stringify(userData));
     if (token) localStorage.setItem(LS_TOKEN, token);
@@ -403,6 +419,7 @@ export const loginWithDemoPersona = (presetId) => {
   };
 
   setSession(demoSession);
+  saveProfile(preset, { syncToBackend: false });
   setActiveProfileId(preset.id);
   return { session: demoSession, profile: preset };
 };
@@ -413,6 +430,7 @@ export const USER_STORAGE_KEYS = [
   'job_dashboard_token',
   'job_dashboard_current_user_session',
   'job_dashboard_google_auth_user',
+  'candidate_profile',
   'job_dashboard_candidate_profile',
   'job_dashboard_profiles',
   'job_dashboard_active_profile_id',

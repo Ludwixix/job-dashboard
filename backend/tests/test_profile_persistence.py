@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from job_dashboard.repository import JobRepository
-from job_dashboard.web import make_handler, DashboardApp
+from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
 
 @pytest.fixture
 def test_app_and_handler(tmp_path):
@@ -81,7 +81,11 @@ def test_auth_profile_persistence_lifecycle(test_app_and_handler):
     assert reg_handler.send_response.call_args[0][0] == 200
     reg_data = parse_response(reg_handler)
     assert reg_data["success"] is True
-    assert reg_data["profile"] is None
+    assert reg_data["profile"] == {
+        "id": reg_data["user"]["id"],
+        "name": "Jane Doe",
+        "email": "candidate@example.com",
+    }
     assert reg_data["has_profile"] is False
     token = reg_data["token"]
     user_id = reg_data["user"]["id"]
@@ -97,7 +101,7 @@ def test_auth_profile_persistence_lifecycle(test_app_and_handler):
     assert session_handler.send_response.call_args[0][0] == 200
     session_data = parse_response(session_handler)
     assert session_data["has_profile"] is False
-    assert session_data["profile"] is None
+    assert session_data["profile"] == reg_data["profile"]
 
     # 3. Upsert User Profile
     profile_payload = {
@@ -156,9 +160,17 @@ def test_gcs_backup_includes_profile_and_query_files():
     assert "jobs.sqlite3" in BACKUP_FILENAMES
 
 
-def test_profile_multi_sink_persistence(test_app_and_handler):
+def test_profile_persistence_is_account_scoped(test_app_and_handler):
     app, handler_cls = test_app_and_handler
-    user_id = "sam_ludwig"
+    reg_handler = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/register",
+        body={"email": "profile@example.com", "password": "SecurePassword123!", "name": "Profile User"},
+    )
+    reg_handler.do_POST()
+    token = parse_response(reg_handler)["token"]
+    user_id = parse_response(reg_handler)["user"]["id"]
 
     profile_data = {
         "id": user_id,
@@ -173,7 +185,7 @@ def test_profile_multi_sink_persistence(test_app_and_handler):
         "POST",
         "/api/profile",
         body=profile_data,
-        headers={"X-User-Id": user_id}
+        headers={"Authorization": f"Bearer {token}"}
     )
     handler.do_POST()
     assert handler.send_response.call_args[0][0] == 200
@@ -186,18 +198,13 @@ def test_profile_multi_sink_persistence(test_app_and_handler):
     assert persisted_db["title"] == "Principal Cloud Architect"
     assert "Terraform" in persisted_db["coreSkills"]
 
-    # Verify sink 2: in-memory dashboard profile
-    assert app.dashboard.profile["title"] == "Principal Cloud Architect"
-
-    # Verify sink 3: data_dir / job_profile.json file on disk
+    # Account-specific profile data must not become a shared process profile/file.
+    assert app.dashboard.profile == {}
     json_path = Path(app.data_dir) / "job_profile.json"
-    assert json_path.exists()
-    disk_profile = json.loads(json_path.read_text(encoding="utf-8"))
-    assert disk_profile["title"] == "Principal Cloud Architect"
-    assert disk_profile["name"] == "Sam Ludwig"
+    assert not json_path.exists()
 
 
-def test_get_profile_fallback_cascade(test_app_and_handler):
+def test_registered_user_profile_does_not_fallback_to_another_profile(test_app_and_handler):
     app, handler_cls = test_app_and_handler
 
     # Seed the database with an active profile
@@ -207,18 +214,36 @@ def test_get_profile_fallback_cascade(test_app_and_handler):
         "industry": "Cloud Infrastructure"
     })
 
-    # Query with a different user_id that doesn't exist yet
+    reg_handler = create_mock_handler(
+        handler_cls,
+        "POST",
+        "/api/register",
+        body={"email": "blank@example.com", "password": "SecurePassword123!", "name": "Blank User"},
+    )
+    reg_handler.do_POST()
+    reg_data = parse_response(reg_handler)
+    user_id = reg_data["user"]["id"]
+    with app.db.get_connection() as conn:
+        conn.execute("DELETE FROM user_profiles WHERE user_id = ?", (user_id,))
+        conn.commit()
+    app.dashboard.profile = {"name": "Dashboard Owner", "title": "Shared Title"}
+    (Path(app.data_dir) / "job_profile.json").write_text(
+        json.dumps({"name": "File Owner", "title": "File Title"}), encoding="utf-8"
+    )
+
     handler = create_mock_handler(
         handler_cls,
         "GET",
         "/api/profile",
-        headers={"X-User-Id": "new_unmatched_user"}
+        headers={"Authorization": f"Bearer {reg_data['token']}"}
     )
     handler.do_GET()
     assert handler.send_response.call_args[0][0] == 200
     res = parse_response(handler)
     assert res["success"] is True
-    # Falls back to latest database profile
-    assert res["profile"]["name"] == "Sam Ludwig"
-    assert res["profile"]["title"] == "Enterprise Cloud Engineer"
+    assert res["profile"] == {
+        "id": user_id,
+        "name": "Blank User",
+        "email": "blank@example.com",
+    }
 

@@ -32,17 +32,8 @@ logger = logging.getLogger(__name__)
 def _resolve_user_id(
     handler, query_params: dict[str, list[str]] | None = None
 ) -> str | None:
-    """Resolve user ID via bearer token, headers, or query params."""
-    uid = get_auth_user_id(handler)
-    if uid:
-        return uid
-    if query_params is None:
-        query_params = get_query_params(handler)
-    if query_params and "user_id" in query_params:
-        p = str(query_params["user_id"][0]).strip()
-        if p:
-            return p
-    return None
+    """Resolve user identity only from a verified bearer token."""
+    return get_auth_user_id(handler)
 
 
 def _fetch_seek_job_description(url_or_id: str) -> str:
@@ -429,18 +420,33 @@ def handle_post_applications(handler):
     handler.send_json(200, {"success": True, "application": app_rec})
 
 
+@app_router.get(r"^/api/applications/(?P<job_id>[^/]+)/events$")
+def handle_get_application_events(handler, job_id: str, **kwargs):
+    """Retrieve chronological application status event history."""
+    user_id = _resolve_user_id(handler)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
+    events = handler.app.repository.get_application_events(user_id, job_id)
+    handler.send_json(200, {"success": True, "events": events})
+
+
 @app_router.delete("/api/applications")
 def handle_delete_applications(handler):
     """Delete an application record."""
     body = get_json_body(handler)
     query_params = get_query_params(handler)
-    user_id = _resolve_user_id(handler, query_params) or "default_user"
+    user_id = _resolve_user_id(handler, query_params)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
     job_id = str(body.get("job_id") or query_params.get("job_id", [""])[0]).strip()
     if not job_id:
         handler.send_json(400, {"error": "Missing job_id"})
         return
 
-    handler.send_json(200, {"success": True, "deleted": True})
+    deleted = handler.app.repository.delete_user_application(user_id, job_id)
+    handler.send_json(200, {"success": True, "deleted": deleted})
 
 
 @app_router.post("/api/applications/sync")
@@ -737,7 +743,10 @@ def handle_get_contacts(handler):
     """List recruiter and network contacts."""
     app = handler.app
     query_params = get_query_params(handler)
-    user_id = _resolve_user_id(handler, query_params) or "default_user"
+    user_id = _resolve_user_id(handler, query_params)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
     if not app.network_crm.list_contacts(user_id=user_id):
         app.network_crm.seed_default_contacts(user_id=user_id)
 
@@ -763,7 +772,10 @@ def handle_get_contact(handler, contact_id: str, **kwargs):
     """Retrieve single recruiter contact."""
     app = handler.app
     query_params = get_query_params(handler)
-    user_id = _resolve_user_id(handler, query_params) or "default_user"
+    user_id = _resolve_user_id(handler, query_params)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
     contact = app.network_crm.get_contact(contact_id, user_id=user_id)
     if contact:
         handler.send_json(200, {"success": True, "contact": contact.to_dict()})
@@ -778,7 +790,10 @@ def handle_post_contact(handler):
     app = handler.app
     query_params = get_query_params(handler)
     payload = get_json_body(handler)
-    user_id = _resolve_user_id(handler, query_params) or "default_user"
+    user_id = _resolve_user_id(handler, query_params)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
     saved = app.network_crm.upsert_contact(payload, user_id=user_id)
     handler.send_json(200, {"success": True, "contact": saved.to_dict()})
 
@@ -787,7 +802,10 @@ def handle_post_contact(handler):
 def handle_delete_contact(handler, contact_id: str, **kwargs):
     """Delete recruiter contact."""
     query_params = get_query_params(handler)
-    user_id = _resolve_user_id(handler, query_params) or "default_user"
+    user_id = _resolve_user_id(handler, query_params)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
     deleted = handler.app.network_crm.delete_contact(contact_id, user_id=user_id)
     handler.send_json(200, {"success": True, "deleted": deleted})
 
@@ -801,7 +819,10 @@ def handle_post_delete_contact(handler, contact_id: str = "", **kwargs):
     if not contact_id:
         contact_id = payload.get("id") or payload.get("contact_id") or ""
     query_params = get_query_params(handler)
-    user_id = _resolve_user_id(handler, query_params) or "default_user"
+    user_id = _resolve_user_id(handler, query_params)
+    if not user_id:
+        handler.send_json(401, {"success": False, "error": "Authentication required."})
+        return
     deleted = handler.app.network_crm.delete_contact(contact_id, user_id=user_id)
     handler.send_json(200, {"success": True, "deleted": deleted})
 
@@ -1051,95 +1072,104 @@ def handle_reminders_dismiss(handler):
 
 
 # =====================================================================
-# 9. Smart Applications Management
+# 9. Smart Applications Management (Disabled Pending Migration)
 # =====================================================================
 
 
 @app_router.post("/api/smart-applications")
 def handle_smart_applications_list(handler):
-    """List smart applications matching status."""
-    query = get_query_params(handler)
-    status = query.get("status", [None])[0]
-    result = handler.app.get_smart_applications(status)
-    handler.send_json(200, {"applications": result})
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
+    )
 
 
 @app_router.post("/api/smart-applications/add")
 def handle_smart_applications_add(handler):
-    """Add a smart application entry."""
-    payload = get_json_body(handler)
-    result = handler.app.add_smart_application(
-        job_id=payload.get("job_id"),
-        job_title=payload.get("job_title"),
-        company=payload.get("company"),
-        application_type=payload.get("application_type", "direct"),
-        match_score=payload.get("match_score", 0.0),
-        application_url=payload.get("application_url"),
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
     )
-    handler.send_json(200, result)
 
 
 @app_router.post("/api/smart-applications/update-status")
 def handle_smart_applications_update_status(handler):
-    """Update smart application status."""
-    payload = get_json_body(handler)
-    result = handler.app.update_application_status(
-        application_id=payload.get("application_id"),
-        status=payload.get("status"),
-        notes=payload.get("notes"),
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
     )
-    handler.send_json(200, result)
 
 
 @app_router.post("/api/smart-applications/statistics")
 def handle_smart_applications_statistics(handler):
-    """Retrieve smart application statistics."""
-    result = handler.app.get_application_statistics()
-    handler.send_json(200, result)
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
+    )
 
 
 @app_router.post("/api/smart-applications/follow-ups/upcoming")
 def handle_smart_applications_upcoming_followups(handler):
-    """List upcoming follow-ups."""
-    query = get_query_params(handler)
-    days = int(query.get("days", [7])[0])
-    result = handler.app.get_upcoming_follow_ups(days)
-    handler.send_json(200, {"applications": result})
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
+    )
 
 
 @app_router.post("/api/smart-applications/follow-ups/overdue")
 def handle_smart_applications_overdue_followups(handler):
-    """List overdue follow-ups."""
-    result = handler.app.get_overdue_follow_ups()
-    handler.send_json(200, {"applications": result})
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
+    )
 
 
 @app_router.post("/api/smart-applications/set-follow-up")
 def handle_smart_applications_set_followup(handler):
-    """Set follow-up date on smart application."""
-    payload = get_json_body(handler)
-    result = handler.app.set_application_follow_up(
-        application_id=payload.get("application_id"),
-        days_from_now=payload.get("days_from_now", 7),
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
     )
-    handler.send_json(200, result)
 
 
 @app_router.post("/api/smart-applications/add-note")
 def handle_smart_applications_add_note(handler):
-    """Add note to smart application."""
-    payload = get_json_body(handler)
-    result = handler.app.add_application_note(
-        application_id=payload.get("application_id"),
-        note=payload.get("note"),
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
     )
-    handler.send_json(200, result)
 
 
 @app_router.post("/api/smart-applications/search")
 def handle_smart_applications_search(handler):
-    """Search smart applications."""
-    query = get_query_params(handler)
-    search_query = query.get("q", [""])[0]
-    result = handler.app.search_smart_applications(search_query)
-    handler.send_json(200, {"applications": result})
+    handler.send_json(
+        410,
+        {
+            "success": False,
+            "error": "This ownerless tracker is disabled pending user-scoped migration.",
+        },
+    )

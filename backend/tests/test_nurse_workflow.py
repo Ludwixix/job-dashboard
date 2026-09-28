@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from job_dashboard.repository import JobRepository
-from job_dashboard.web import make_handler, DashboardApp
+from job_dashboard.web import make_handler, DashboardApp, jwt, JWT_SECRET
 from job_dashboard.models import Job
 from job_dashboard.score import score_job
 
@@ -365,6 +365,7 @@ def test_nurse_onboarding_and_job_discovery_lifecycle(nurse_app_environment):
     # =========================================================================
     # Step 9: Verify Developer Onboarding updates search-criteria to tech terms
     # =========================================================================
+    dev_token = jwt.encode({"sub": "user_dev_001"}, JWT_SECRET, algorithm="HS256")
     dev_profile = {
         "id": "user_dev_001",
         "name": "David Dev",
@@ -376,13 +377,13 @@ def test_nurse_onboarding_and_job_discovery_lifecycle(nurse_app_environment):
         "locationPreference": "Melbourne, VIC"
     }
     dev_prof_handler = create_handler_request(
-        handler_cls, "POST", "/api/profile", body=dev_profile, headers={"X-User-Id": "user_dev_001"}
+        handler_cls, "POST", "/api/profile", body=dev_profile, headers={"Authorization": f"Bearer {dev_token}"}
     )
     dev_prof_handler.do_POST()
     assert dev_prof_handler.send_response.call_args[0][0] == 200
 
     dev_crit_handler = create_handler_request(
-        handler_cls, "GET", "/api/search-criteria", headers={"X-User-Id": "user_dev_001"}
+        handler_cls, "GET", "/api/search-criteria", headers={"Authorization": f"Bearer {dev_token}"}
     )
     dev_crit_handler.do_GET()
     assert dev_crit_handler.send_response.call_args[0][0] == 200

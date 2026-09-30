@@ -7,7 +7,7 @@ import { loginWithEmail, registerWithEmail, validatePasswordStrength, setSession
 import { loginWithGoogle } from '../services/googleAuthService';
 import { loginWithBrowserPasskey } from '../services/passkeyService';
 import { getBackendApiBase } from '../services/apiConfig';
-import { saveProfile, DEFAULT_USER_PROFILE } from '../services/profileService';
+import { saveProfile } from '../services/profileService';
 
 const SITE_PASSCODE = 'Scamper123';
 import { setSiteUnlocked } from '../utils/siteGateStorage';
@@ -174,7 +174,9 @@ export default function SiteGate({ onUnlock = () => {} }) {
         lastActiveAt: new Date().toISOString()
       };
       setSession(sessionUser, data.token);
-      saveProfile(data.profile || DEFAULT_USER_PROFILE);
+      if (data.profile) {
+        saveProfile(data.profile);
+      }
       onUnlock(sessionUser);
     } catch {
       // Local fallback in case network error occurs
@@ -191,7 +193,6 @@ export default function SiteGate({ onUnlock = () => {} }) {
           lastActiveAt: new Date().toISOString()
         };
         setSession(sessionUser, null);
-        saveProfile(DEFAULT_USER_PROFILE);
         onUnlock(sessionUser);
       } else {
         setError('Incorrect passcode. Access denied.');

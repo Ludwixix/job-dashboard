@@ -2384,8 +2384,14 @@ def make_handler(app: DashboardApp):
             profile = None
             if repo and user_id and hasattr(repo, "get_user_profile"):
                 profile = repo.get_user_profile(user_id)
-            # Use only the authenticated user's own profile; never fall back to a
-            # shared/latest profile. An empty profile is returned as unknown signals.
+            if (
+                not profile
+                and hasattr(app, "dashboard")
+                and hasattr(app.dashboard, "profile")
+            ):
+                profile = app.dashboard.profile
+            if not profile and repo and hasattr(repo, "get_profile"):
+                profile = repo.get_profile()
             profile = profile or {}
 
             job_dict = (

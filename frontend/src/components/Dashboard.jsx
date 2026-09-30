@@ -147,7 +147,7 @@ import {
  Terminal, Sparkles, Cpu, Activity, RefreshCw, 
  MapPin, Command, Zap, LayoutGrid, CheckCircle2,
   Sliders, TrendingUp, Table, Lock, Mail, LogOut, X as XIcon, Target, CalendarClock, Settings, Users, Compass, Globe,
-  ChevronDown, Layers, Award, FileText
+  ChevronDown, ChevronUp, Layers, Award, FileText
 } from 'lucide-react';
 
 

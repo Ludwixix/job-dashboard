@@ -185,6 +185,15 @@ class GmailScanner:
                 results.append((message, category, confidence))
         return results
 
+    def scan_job_alerts(self, min_score: int = 60) -> list[dict[str, Any]]:
+        """Scan inbox for multi-job alerts and parse them into structured job cards."""
+        parser = JobAlertParser()
+        jobs: list[dict[str, Any]] = []
+        for message in self.fetch_messages():
+            if parser.is_job_alert(message):
+                jobs.extend(parser.parse_alert_email(message, min_score=min_score))
+        return jobs
+
     def scan_updates_for_application(
         self, app_dict: dict[str, Any], days: int = 14
     ) -> dict[str, Any]:
@@ -510,6 +519,39 @@ class GmailApiScanner(GmailScanner):
             messages.append(self._from_api_payload(payload))
         return messages
 
+    def scan_job_alerts(self, min_score: int = 60) -> list[dict[str, Any]]:
+        """Read recent Gmail job alerts and suggestion digests via Gmail API."""
+        parser = JobAlertParser()
+        client, access_token = self._service()
+        headers = {"Authorization": f"Bearer {access_token}"}
+        query = urllib.parse.urlencode(
+            {
+                "q": f'newer_than:{self.days}d (subject:"job alert" OR subject:"jobs recommended" OR subject:"recommended for you" OR subject:"new jobs" OR subject:"jobs for you" OR subject:"jobs you may" OR from:seek OR from:linkedin OR from:indeed)',
+                "maxResults": 100,
+            }
+        )
+        request = urllib.request.Request(
+            f"https://gmail.googleapis.com/gmail/v1/users/me/messages?{query}",
+            headers=headers,
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response_data = json.loads(response.read())
+        messages = []
+        for item in response_data.get("messages", []):
+            req = urllib.request.Request(
+                f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{item['id']}?format=full",
+                headers=headers,
+            )
+            with urllib.request.urlopen(req, timeout=30) as res:
+                payload = json.loads(res.read())
+            messages.append(self._from_api_payload(payload))
+
+        jobs: list[dict[str, Any]] = []
+        for msg in messages:
+            if parser.is_job_alert(msg):
+                jobs.extend(parser.parse_alert_email(msg, min_score=min_score))
+        return jobs
+
     @classmethod
     def _from_api_payload(cls, payload):
         headers = {
@@ -549,3 +591,268 @@ class GmailApiScanner(GmailScanner):
             email_id=payload.get("id", ""),
             body_preview=cleaned_body[:4000],
         )
+
+
+class JobAlertParser:
+    """Parses multi-job alert emails from SEEK, LinkedIn, Indeed, and scores against target titles."""
+
+    TARGET_TITLES = [
+        "Senior Infrastructure Engineer",
+        "Senior Systems Administrator",
+        "Cloud Engineer",
+        "Infrastructure Engineer",
+        "Systems Administrator",
+        "M365 Engineer",
+        "Modern Workplace Engineer",
+        "IT Systems Engineer",
+        "Platform Engineer",
+        "DevOps Engineer",
+    ]
+
+    NOISE_PATTERNS = [
+        r"\b(level 1|l1|helpdesk|service desk analyst|service desk technician|desktop support technician|field technician|field service|eftpos|junior|intern|trainee|apprentice|sales|retail)\b",
+    ]
+
+    SENIOR_EXEMPTIONS = [
+        r"\b(senior|lead|principal|head|manager|specialist|architect)\b",
+    ]
+
+    ALERT_KEYWORDS = [
+        "job alert",
+        "jobs recommended",
+        "recommended for you",
+        "jobs you might",
+        "jobs you may",
+        "new jobs for",
+        "new jobs matching",
+        "top job picks",
+        "matches your profile",
+        "new jobs in",
+    ]
+
+    def is_job_alert(self, msg: EmailMessage) -> bool:
+        """Identify if an incoming message is a job alert or recommendation digest."""
+        sub = (msg.subject or "").lower()
+        from_addr = (msg.from_address or "").lower()
+        if any(kw in sub for kw in self.ALERT_KEYWORDS):
+            return True
+        if "seek" in from_addr and (
+            "alert" in sub or "jobs" in sub or "recommended" in sub
+        ):
+            return True
+        if "linkedin" in from_addr and (
+            "job" in sub or "alert" in sub or "opportunity" in sub
+        ):
+            return True
+        if "indeed" in from_addr and ("job" in sub or "alert" in sub):
+            return True
+        return False
+
+    def score_job_title(self, title: str) -> int:
+        """Score role title against Sam Ludwig's 8 target career archetypes and penalize noise."""
+        clean = (title or "").strip()
+        clean_lower = clean.lower()
+
+        # Check noise patterns (L1, helpdesk, technician)
+        is_noise = any(re.search(pat, clean_lower) for pat in self.NOISE_PATTERNS)
+        is_senior = any(re.search(pat, clean_lower) for pat in self.SENIOR_EXEMPTIONS)
+        if is_noise and not is_senior:
+            return 30
+
+        # Exact target title match
+        for target in self.TARGET_TITLES:
+            if target.lower() == clean_lower:
+                return 95
+
+        # Strong keyword matches
+        if "senior infrastructure" in clean_lower:
+            return 93
+        if "cloud engineer" in clean_lower or "cloud infrastructure" in clean_lower:
+            return 92
+        if (
+            "senior systems administrator" in clean_lower
+            or "senior sysadmin" in clean_lower
+        ):
+            return 90
+        if "infrastructure engineer" in clean_lower:
+            return 88
+        if (
+            "m365" in clean_lower
+            or "modern workplace" in clean_lower
+            or "microsoft 365" in clean_lower
+        ):
+            return 87
+        if "systems administrator" in clean_lower or "sysadmin" in clean_lower:
+            return 84
+        if "systems engineer" in clean_lower or "it systems engineer" in clean_lower:
+            return 82
+        if "devops" in clean_lower or "platform engineer" in clean_lower:
+            return 80
+        if "infrastructure" in clean_lower or "cloud" in clean_lower:
+            return 75
+        if "support engineer" in clean_lower and is_senior:
+            return 65
+
+        return 45
+
+    def parse_alert_email(
+        self, msg: EmailMessage, min_score: int = 60
+    ) -> list[dict[str, Any]]:
+        """Extract individual job cards from a job alert email digest and score them."""
+        text = msg.body_preview or msg.snippet or ""
+        jobs: list[dict[str, Any]] = []
+
+        url_pattern = re.compile(
+            r"(https?://(?:www\.)?(?:[a-z0-9.-]*seek\.com\.au/job/\d+|[a-z0-9.-]*linkedin\.com/(?:comm/)?jobs/view/\d+|[a-z0-9.-]*indeed\.com/(?:rc/clk|viewjob)[^\s\"<>]*))",
+            re.IGNORECASE,
+        )
+
+        matches = list(url_pattern.finditer(text))
+        ignored_lines = {
+            "view job",
+            "view job:",
+            "apply now",
+            "save job",
+            "see more jobs",
+            "view details",
+            "jobs recommended for you based on your activity:",
+            "jobs recommended for you",
+            "unsubscribe",
+            "manage alerts",
+            "privacy policy",
+            "terms of service",
+        }
+
+        last_end = 0
+        for match in matches:
+            url = match.group(1).rstrip(".,;)>")
+            start_pos = match.start()
+            chunk = text[last_end:start_pos]
+            last_end = match.end()
+
+            raw_lines = [
+                l.strip()
+                for l in chunk.splitlines()
+                if l.strip()
+                and l.strip().lower() not in ignored_lines
+                and not l.strip().lower().startswith("view job")
+            ]
+
+            # Filter out email header lines like "Sam, 3 new jobs for '...'"
+            clean_lines = []
+            for l in raw_lines:
+                if re.search(r"^\s*[\w\s]+,\s*\d+\s+new jobs", l, re.IGNORECASE):
+                    continue
+                if re.search(r"^\s*jobs recommended for you", l, re.IGNORECASE):
+                    continue
+                clean_lines.append(l)
+
+            if not clean_lines:
+                continue
+
+            title = clean_lines[0]
+            company = ""
+            location = "Melbourne VIC"
+            salary = ""
+
+            if len(clean_lines) > 1:
+                second = clean_lines[1]
+                if " - " in second:
+                    c, loc = second.split(" - ", 1)
+                    company = c.strip()
+                    location = loc.strip()
+                else:
+                    company = second
+
+            if len(clean_lines) > 2:
+                for rem in clean_lines[2:]:
+                    if any(s in rem for s in ["$", "k", "year", "annum"]):
+                        salary = rem
+                    elif not company:
+                        company = rem
+                    elif location == "Melbourne VIC" and any(
+                        state in rem.upper()
+                        for state in [
+                            "VIC",
+                            "NSW",
+                            "QLD",
+                            "WA",
+                            "SA",
+                            "TAS",
+                            "ACT",
+                            "AUSTRALIA",
+                        ]
+                    ):
+                        location = rem
+
+            provider = (
+                "SEEK"
+                if "seek.com" in url
+                else ("LinkedIn" if "linkedin.com" in url else "Indeed")
+            )
+            id_match = re.search(r"/(\d{6,12})", url)
+            job_id = id_match.group(1) if id_match else secrets.token_hex(6)
+
+            score = self.score_job_title(title)
+            if score >= min_score and title:
+                jobs.append(
+                    {
+                        "id": f"gmail-alert-{provider.lower()}-{job_id}",
+                        "title": title,
+                        "company": company or "Direct Employer",
+                        "location": location,
+                        "salary": salary,
+                        "url": url,
+                        "source": "Gmail Alert",
+                        "posted": msg.received_at[:10]
+                        if msg.received_at
+                        else datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                        "score": score,
+                        "status": "sourced",
+                        "description": f"Suggested via {provider} job alert ({msg.subject})",
+                        "tags": ["gmail", "alert", provider.lower()],
+                    }
+                )
+
+        # Fallback block parser if link regex was too restrictive or missing full URLs
+        if not jobs:
+            blocks = re.split(r"\n\s*\n", text)
+            for block in blocks:
+                block_lines = [l.strip() for l in block.splitlines() if l.strip()]
+                if not block_lines:
+                    continue
+                first_line = block_lines[0]
+                if re.search(
+                    r"^\s*[\w\s]+,\s*\d+\s+new jobs", first_line, re.IGNORECASE
+                ) or re.search(r"^\s*jobs recommended", first_line, re.IGNORECASE):
+                    if len(block_lines) > 1:
+                        first_line = block_lines[1]
+                    else:
+                        continue
+                score = self.score_job_title(first_line)
+                if score >= min_score:
+                    company = (
+                        block_lines[1]
+                        if len(block_lines) > 1 and block_lines[1] != first_line
+                        else "Direct Employer"
+                    )
+                    jobs.append(
+                        {
+                            "id": f"gmail-alert-digest-{secrets.token_hex(6)}",
+                            "title": first_line,
+                            "company": company,
+                            "location": "Melbourne VIC",
+                            "salary": "",
+                            "url": "",
+                            "source": "Gmail Alert",
+                            "posted": msg.received_at[:10]
+                            if msg.received_at
+                            else datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                            "score": score,
+                            "status": "sourced",
+                            "description": f"Suggested role from email: {msg.subject}",
+                            "tags": ["gmail", "alert"],
+                        }
+                    )
+
+        return jobs

@@ -173,6 +173,26 @@ def handle_career_mode_overview(handler):
         elif hasattr(app, "dashboard") and hasattr(app.dashboard, "jobs"):
             all_jobs = list(getattr(app.dashboard, "jobs", []))
 
+        # Count jobs posted today or scraped in past 24h (guarded against bulk DB seeding inflation)
+        total_jobs_count = len(all_jobs)
+        today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        posted_today_count = sum(
+            1
+            for j in all_jobs
+            if str(
+                (
+                    dict(j)
+                    if isinstance(j, dict)
+                    else (dict(j.__dict__) if hasattr(j, "__dict__") else {})
+                ).get("posted", "")
+            ).startswith(today_iso)
+        )
+        raw_new_today = int(hourly_data.get("added_past_24h", 0))
+        if total_jobs_count > 100 and raw_new_today >= total_jobs_count * 0.9:
+            new_today = posted_today_count
+        else:
+            new_today = max(raw_new_today, posted_today_count)
+
         # Compute archetype counts and match distribution
         archetype_counts = {t: 0 for t in CANONICAL_TARGET_TITLES}
         tier_top = 0
@@ -212,6 +232,21 @@ def handle_career_mode_overview(handler):
                     tier_strong += 1
                 elif score >= 55:
                     tier_good += 1
+
+        if (
+            "Senior M365 Engineer" in archetype_counts
+            and "Senior M365 Specialist" not in archetype_counts
+        ):
+            archetype_counts["Senior M365 Specialist"] = archetype_counts[
+                "Senior M365 Engineer"
+            ]
+        elif (
+            "Senior M365 Specialist" in archetype_counts
+            and "Senior M365 Engineer" not in archetype_counts
+        ):
+            archetype_counts["Senior M365 Engineer"] = archetype_counts[
+                "Senior M365 Specialist"
+            ]
 
         avg_score = (
             round(total_score_sum / max(1, scored_jobs_count), 1)
@@ -253,6 +288,8 @@ def handle_career_mode_overview(handler):
                 "new_today": new_today,
                 "feed_health": feed_health,
             },
+            "high_alignment_count": tier_top,
+            "archetypes": archetype_counts,
             "archetype_counts": archetype_counts,
             "target_archetypes": list(CANONICAL_TARGET_TITLES),
             "match_distribution": {

@@ -45,6 +45,11 @@ def test_jobs_router(client):
     assert "pageSize" in data
     assert data["pageSize"] == 10
 
+    res_source = client.get("/api/jobs?source=seek&pageSize=5")
+    assert res_source.status_code == 200
+    data_source = res_source.json()
+    assert "jobs" in data_source
+
 
 def test_search_criteria_router(client):
     res = client.get("/api/search-criteria")

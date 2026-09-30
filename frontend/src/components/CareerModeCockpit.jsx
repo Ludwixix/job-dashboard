@@ -98,12 +98,20 @@ export const CareerModeCockpit = ({ jobs = [], onUpdateStatus, onSelectJob }) =>
             }
 
             // Determine Archetype
-            let archetype = 'Senior Systems Engineer';
-            for (const a of CANONICAL_SAM_ARCHETYPES) {
-              if (title.includes(a.toLowerCase().split(' ')[0])) {
-                archetype = a;
-                break;
-              }
+            let archetype = job.archetype || job.role_archetype;
+            if (archetype === 'Senior M365 Engineer') {
+              archetype = 'Senior M365 Specialist';
+            }
+            if (!archetype) {
+              if (/m365|microsoft 365|office 365/i.test(title)) archetype = 'Senior M365 Specialist';
+              else if (/devops|automation|powershell/i.test(title)) archetype = 'Automation & DevOps Engineer';
+              else if (/endpoint|euc|intune|autopilot/i.test(title)) archetype = 'Endpoint / EUC Engineer';
+              else if (/sharepoint|modern workplace|workplace/i.test(title)) archetype = 'SharePoint & Modern Workplace Architect';
+              else if (/operations|tier 3|tier-3|l3|ops lead/i.test(title)) archetype = 'L3 Systems / Operations Lead';
+              else if (/cloud/i.test(title)) archetype = 'Cloud Infrastructure Specialist';
+              else if (/infrastructure/i.test(title)) archetype = 'Senior Infrastructure Engineer';
+              else if (/systems/i.test(title)) archetype = 'Senior Systems Engineer';
+              else archetype = 'Senior Infrastructure Engineer';
             }
 
             return {

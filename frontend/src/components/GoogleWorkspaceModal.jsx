@@ -12,7 +12,7 @@ import {
  loginWithGoogle 
 } from '../services/googleAuthService';
 import { createPersonalJobTrackerSheet, syncAllApplicationsToSheet } from '../services/googleSheetService';
-import { scanGmailForApplications } from '../services/gmailSyncService';
+import { scanGmailForApplications, scanGmailForJobAlerts } from '../services/gmailSyncService';
 import { getActiveProfile } from '../services/profileService';
 
 export const GoogleWorkspaceModal = ({ 
@@ -37,6 +37,7 @@ export const GoogleWorkspaceModal = ({
  // Gmail State
  const [isScanningGmail, setIsScanningGmail] = useState(false);
  const [gmailScanResults, setGmailScanResults] = useState([]);
+	const [gmailScanMode, setGmailScanMode] = useState('alerts'); // 'alerts' | 'applications'
  const [gmailError, setGmailError] = useState('');
  const [gmailSuccess, setGmailSuccess] = useState('');
 
@@ -180,19 +181,29 @@ export const GoogleWorkspaceModal = ({
  setGmailScanResults([]);
 
  try {
- const results = await scanGmailForApplications(currentUser.accessToken, 35, jobs || []);
- setGmailScanResults(results);
- if (results.length === 0) {
- setGmailSuccess('No new job application emails found in the recent inbox scan.');
- } else {
- const linkedCount = results.filter(r => r.isLinkedToScrapedAd).length;
- if (linkedCount > 0) {
- setGmailSuccess(`Found ${results.length} application emails (Matched & Linked ${linkedCount} directly to scraped job ads)!`);
- } else {
- setGmailSuccess(`Found and structured ${results.length} job application confirmations!`);
- }
- }
- } catch (err) {
+			if (gmailScanMode === 'alerts') {
+				const results = await scanGmailForJobAlerts(currentUser.accessToken, 35, 60);
+				setGmailScanResults(results);
+				if (results.length === 0) {
+					setGmailSuccess('No high-alignment job alerts found in recent emails. Noise roles (L1 helpdesk, field technician) were suppressed.');
+				} else {
+					setGmailSuccess(`Discovered ${results.length} suggested opportunities from SEEK, LinkedIn, and Indeed matching your target profiles!`);
+				}
+			} else {
+				const results = await scanGmailForApplications(currentUser.accessToken, 35, jobs || []);
+				setGmailScanResults(results);
+				if (results.length === 0) {
+					setGmailSuccess('No new job application emails found in the recent inbox scan.');
+				} else {
+					const linkedCount = results.filter(r => r.isLinkedToScrapedAd).length;
+					if (linkedCount > 0) {
+						setGmailSuccess(`Found ${results.length} application emails (Matched & Linked ${linkedCount} directly to scraped job ads)!`);
+					} else {
+						setGmailSuccess(`Found and structured ${results.length} job application confirmations!`);
+					}
+				}
+			}
+		} catch (err) {
  console.error('Gmail scan error:', err);
  setGmailError(err.message || 'Failed to scan Gmail inbox.');
  } finally {
@@ -399,15 +410,44 @@ export const GoogleWorkspaceModal = ({
  {/* TAB 2: GMAIL INBOX SCANNER */}
  {activeTab === 'gmail' && (
  <div className="space-y-5">
- <div className="p-5 rounded-sm bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900 border border-amber-500/40 space-y-2">
- <div className="text-amber-300 font-black flex items-center gap-2 text-sm">
- <Mail size={16} />
- GMAIL APPLICATION SCANNER
- </div>
- <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
- Scan your Gmail inbox for employer application receipts, candidate screening assessments, and interview invitations. Extracted jobs can be imported straight into your tracker.
- </p>
- </div>
+				<div className="p-5 rounded-sm bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900 border border-amber-500/40 space-y-3">
+					<div className="flex items-center justify-between">
+						<div className="text-amber-300 font-black flex items-center gap-2 text-sm">
+							<Mail size={16} />
+							GMAIL SCANNER & JOB ALERT INGESTION
+						</div>
+						<span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+							8 Target Titles Active
+						</span>
+					</div>
+					<p className="text-slate-300 text-[11px] leading-relaxed font-sans">
+						Scan your Gmail for multi-job alert recommendations (SEEK, LinkedIn, Indeed) or parse direct application receipts. Noise roles (L1 helpdesk, field technicians) are automatically filtered out.
+					</p>
+					<div className="flex rounded-sm bg-slate-950 p-1 border border-slate-800 gap-1 font-mono text-xs">
+						<button
+							type="button"
+							onClick={() => { setGmailScanMode('alerts'); setGmailScanResults([]); setGmailSuccess(''); }}
+							className={`flex-1 py-1.5 px-3 rounded-xs text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+								gmailScanMode === 'alerts'
+									? 'bg-amber-600 text-white shadow-xs'
+									: 'text-slate-400 hover:text-white'
+							}`}
+						>
+							<Sparkles size={13} /> 🎯 JOB ALERTS & SUGGESTIONS
+						</button>
+						<button
+							type="button"
+							onClick={() => { setGmailScanMode('applications'); setGmailScanResults([]); setGmailSuccess(''); }}
+							className={`flex-1 py-1.5 px-3 rounded-xs text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+								gmailScanMode === 'applications'
+									? 'bg-purple-600 text-white shadow-xs'
+									: 'text-slate-400 hover:text-white'
+							}`}
+						>
+							<Mail size={13} /> 📋 APPLICATION RECEIPTS
+						</button>
+					</div>
+				</div>
 
  <button
  onClick={handleScanGmail}
@@ -422,7 +462,7 @@ export const GoogleWorkspaceModal = ({
  ) : (
  <>
  <Mail size={15} className="text-amber-300" />
- <span>📥 SCAN MY GMAIL INBOX NOW</span>
+							<span>📥 {gmailScanMode === 'alerts' ? 'SCAN JOB ALERTS (SEEK / LINKEDIN / INDEED)' : 'SCAN APPLICATION RECEIPTS'}</span>
  </>
  )}
  </button>
@@ -467,7 +507,7 @@ export const GoogleWorkspaceModal = ({
  {app.company} — <span className="text-slate-300">{app.title}</span>
  </div>
  <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30">
- {app.status}
+									{app.score ? `${app.score}% FIT` : app.status}
  </span>
  </div>
  <div className="text-[10px] text-slate-400 truncate">

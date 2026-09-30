@@ -73,6 +73,7 @@ def handle_get_jobs(handler):
 
     search = query_params.get("search", [""])[0]
     industry = query_params.get("industry", [""])[0]
+    source = query_params.get("source", [""])[0]
     remote_param = query_params.get("remote", [None])[0]
     remote = None if remote_param is None else (remote_param.lower() in ("true", "1"))
     sort_by = query_params.get("sortBy", ["newest"])[0]
@@ -91,6 +92,7 @@ def handle_get_jobs(handler):
         industry=industry,
         remote=remote,
         sort_by=sort_by,
+        source=source,
     )
     handler.send_json(200, result)
 

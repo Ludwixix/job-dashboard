@@ -46,6 +46,7 @@ class SeekApiSource:
         max_results: int = 60,
         retries: int = 2,
         endpoint: str | None = None,
+        allow_web_redux: bool = False,
         allow_browser_fallback: bool = False,
         cache_path: str | Path | None = None,
         allow_cache_fallback: bool = False,
@@ -59,6 +60,7 @@ class SeekApiSource:
         self.max_results = max(1, max_results)
         self.retries = max(0, min(3, retries))
         self.endpoint = endpoint or self.endpoint
+        self.allow_web_redux = allow_web_redux
         self.allow_browser_fallback = allow_browser_fallback
         self.cache_path = Path(cache_path) if cache_path else None
         self.allow_cache_fallback = allow_cache_fallback
@@ -67,6 +69,16 @@ class SeekApiSource:
 
     def search(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         failures = []
+
+        # Tier 0: Redux web extraction (public HTML)
+        if self.allow_web_redux:
+            try:
+                records = list(self._search_web_redux(query))
+                if records:
+                    return iter(records)
+                failures.append("Redux web extraction returned no jobs")
+            except Exception as redux_error:
+                failures.append(f"Redux web: {redux_error}")
 
         # Tier 1: Chalice Search API
         try:
@@ -124,6 +136,82 @@ class SeekApiSource:
             detail = failures[0] if failures else "API unavailable"
             raise SeekUnavailableError(f"public API unavailable: {detail}")
         raise SeekUnavailableError("; ".join(failures) or "all fallbacks exhausted")
+
+    def _search_web_redux(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
+        from .indeed import _extract_balanced_json
+
+        slug = urllib.parse.quote(query.term.replace(" ", "-"))
+        loc = resolve_search_location(query)
+        if loc.lower() in (
+            "australia",
+            "all australia",
+            "remote",
+            "anywhere in australia",
+            "anywhere",
+        ):
+            location_slug = "Australia"
+        else:
+            location_slug = re.sub(r"[^a-zA-Z0-9]+", "-", loc.strip()).strip("-")
+
+        url = f"https://www.seek.com.au/{slug}-jobs/in-All-{location_slug}"
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml",
+                "Accept-Language": "en-AU,en;q=0.9",
+            },
+        )
+
+        opener = urllib.request.build_opener()
+        proxy_url = self.proxy_rotator.get_proxy()
+        if proxy_url:
+            opener.add_handler(
+                urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+            )
+
+        with opener.open(request, timeout=self.timeout) as response:
+            html = response.read().decode("utf-8")
+
+        match = re.search(r"window\.SEEK_REDUX_DATA\s*=\s*", html)
+        if not match:
+            return
+
+        json_str = _extract_balanced_json(html, match.end())
+        data = json.loads(json_str)
+
+        jobs = []
+        try:
+            jobs = data["results"]["results"]["jobs"]
+        except KeyError:
+            try:
+                jobs = data["results"]["jobCards"]
+            except KeyError:
+                if "results" in data and isinstance(data["results"], dict):
+                    for k, v in data["results"].items():
+                        if (
+                            isinstance(v, list)
+                            and v
+                            and "id" in v[0]
+                            and "title" in v[0]
+                        ):
+                            jobs = v
+                            break
+
+        for job in jobs:
+            yield {
+                "id": f"seek_{job.get('id', '')}",
+                "title": job.get("title", ""),
+                "company": job.get("advertiser", {}).get("description", ""),
+                "location": job.get("location", query.location or ""),
+                "description": clean_description(job.get("teaser", "")),
+                "url": f"https://www.seek.com.au/job/{job.get('id', '')}",
+                "source": "Seek",
+                "posted": canonical_posted_date(job.get("listingDate", "")),
+                "remote": "remote" in str(job.get("workType", "")).lower(),
+                "salary_bracket": parse_salary_bracket(job.get("salary", "")),
+                "tags": ["seek", "redux-web"],
+            }
 
     def _search_api(self, query: SearchQuery) -> Iterable[Mapping[str, Any]]:
         page = 0

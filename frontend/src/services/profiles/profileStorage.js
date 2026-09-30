@@ -42,17 +42,12 @@ export const getActiveProfile = () => {
           matched = parsedList.find(p => p.id === sessionUser.id || p.id === sessionUser.profileId || (p.email && sessionUser.email && p.email.toLowerCase() === sessionUser.email.toLowerCase()));
         }
         if (!matched && sessionUser && (sessionUser.name || sessionUser.email)) {
-          const isSam = sessionUser.id === 'sam_ludwig' ||
-            sessionUser.profileId === 'sam_ludwig' ||
-            sessionUser.email?.toLowerCase() === 'sam.ludwig@gmail.com' ||
-            sessionUser.name?.toLowerCase().includes('sam');
-          const baseTemplate = isSam ? DEFAULT_USER_PROFILE : CLEAN_CANDIDATE_PROFILE;
           const userProfile = {
-            ...baseTemplate,
-            id: sessionUser.id || sessionUser.profileId || (isSam ? 'sam_ludwig' : 'user_' + Date.now()),
-            name: sessionUser.name || baseTemplate.name,
-            email: sessionUser.email || baseTemplate.email,
-            industry: sessionUser.industry || baseTemplate.industry,
+            ...CLEAN_CANDIDATE_PROFILE,
+            id: sessionUser.id || sessionUser.profileId || 'user_' + Date.now(),
+            name: sessionUser.name || '',
+            email: sessionUser.email || '',
+            industry: sessionUser.industry || '',
             updatedAt: new Date().toISOString()
           };
           localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));
@@ -69,17 +64,12 @@ export const getActiveProfile = () => {
     }
 
     if (sessionUser && (sessionUser.name || sessionUser.email)) {
-      const isSam = sessionUser.id === 'sam_ludwig' ||
-        sessionUser.profileId === 'sam_ludwig' ||
-        sessionUser.email?.toLowerCase() === 'sam.ludwig@gmail.com' ||
-        sessionUser.name?.toLowerCase().includes('sam');
-      const baseTemplate = isSam ? DEFAULT_USER_PROFILE : CLEAN_CANDIDATE_PROFILE;
       const userProfile = {
-        ...baseTemplate,
-        id: sessionUser.id || sessionUser.profileId || (isSam ? 'sam_ludwig' : 'user_' + Date.now()),
-        name: sessionUser.name || baseTemplate.name,
-        email: sessionUser.email || baseTemplate.email,
-        industry: sessionUser.industry || baseTemplate.industry,
+        ...CLEAN_CANDIDATE_PROFILE,
+        id: sessionUser.id || sessionUser.profileId || 'user_' + Date.now(),
+        name: sessionUser.name || '',
+        email: sessionUser.email || '',
+        industry: sessionUser.industry || '',
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(STORAGE_KEY_CANDIDATE_PROFILE, JSON.stringify(userProfile));

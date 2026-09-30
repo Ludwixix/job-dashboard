@@ -38,6 +38,9 @@ class Settings:
         self.seek_pause_seconds = float(
             os.getenv("JOB_DASHBOARD_SEEK_PAUSE_SECONDS", "1.5")
         )
+        self.seek_web_redux_enabled = self._get_bool(
+            "JOB_DASHBOARD_SEEK_WEB_REDUX", True
+        )
         self.seek_browser_fallback = self._get_bool(
             "JOB_DASHBOARD_SEEK_BROWSER_FALLBACK", True
         )
@@ -78,8 +81,8 @@ class Settings:
         self.openrouter_api_key = os.getenv("JOB_DASHBOARD_OPENROUTER_API_KEY")
 
         # Adzuna configuration
-        self.adzuna_app_id = (
-            os.getenv("JOB_DASHBOARD_ADZUNA_APP_ID") or os.getenv("ADZUNA_APP_ID")
+        self.adzuna_app_id = os.getenv("JOB_DASHBOARD_ADZUNA_APP_ID") or os.getenv(
+            "ADZUNA_APP_ID"
         )
         self.adzuna_api_key = (
             os.getenv("JOB_DASHBOARD_ADZUNA_API_KEY")

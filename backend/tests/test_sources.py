@@ -36,15 +36,37 @@ class PartialSource:
         if query.term == "broken":
             raise RuntimeError("provider unavailable")
         today = datetime.now(timezone.utc).date().isoformat()
-        return [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": today}]
+        return [
+            {
+                "title": "Cloud Engineer",
+                "company": "Acme",
+                "url": "https://acme/jobs/1",
+                "posted": today,
+            }
+        ]
 
 
 def test_pipeline_filters_recent_and_deduplicates_sources():
     today = datetime.now(timezone.utc).date().isoformat()
     jobs = [
-        {"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": today},
-        {"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": today},
-        {"title": "Old Role", "company": "Acme", "url": "https://acme/jobs/2", "posted": "2020-01-01"},
+        {
+            "title": "Cloud Engineer",
+            "company": "Acme",
+            "url": "https://acme/jobs/1",
+            "posted": today,
+        },
+        {
+            "title": "Cloud Engineer",
+            "company": "Acme",
+            "url": "https://acme/jobs/1",
+            "posted": today,
+        },
+        {
+            "title": "Old Role",
+            "company": "Acme",
+            "url": "https://acme/jobs/2",
+            "posted": "2020-01-01",
+        },
     ]
     pipeline = ScrapePipeline([FakeSource(jobs)], days=14)
     result = pipeline.run([SearchQuery("cloud")])
@@ -80,14 +102,19 @@ def test_canonical_posted_date_freezes_relative_age_at_capture_time():
 def test_extract_balanced_json_handles_nested_strings_and_objects():
     source = 'window.data={"results":[{"title":"Role with } brace","meta":{"id":1}}]};'
     start = source.index("=") + 1
-    assert json.loads(_extract_balanced_json(source, start))["results"][0]["meta"]["id"] == 1
+    assert (
+        json.loads(_extract_balanced_json(source, start))["results"][0]["meta"]["id"]
+        == 1
+    )
 
 
 def test_indeed_structured_fallback_recovers_when_jobspy_returns_empty(monkeypatch):
     class EmptyResults:
         empty = True
 
-    monkeypatch.setattr("jobspy.scrape_jobs", lambda **kwargs: EmptyResults(), raising=False)
+    monkeypatch.setattr(
+        "jobspy.scrape_jobs", lambda **kwargs: EmptyResults(), raising=False
+    )
     html = (
         'window.mosaic.providerData["mosaic-provider-jobcards"]='
         '{"metaData":{"mosaicProviderJobCardsModel":{"results":['
@@ -97,12 +124,22 @@ def test_indeed_structured_fallback_recovers_when_jobspy_returns_empty(monkeypat
     )
 
     class Response:
-        def __enter__(self): return self
-        def __exit__(self, exc_type, exc, tb): return False
-        def read(self, size=-1): return html.encode()[:size]
+        def __enter__(self):
+            return self
 
-    monkeypatch.setattr("job_dashboard.sources.urllib.request.urlopen", lambda *args, **kwargs: Response())
-    records = list(IndeedJobSpySource(results_wanted=5).search(SearchQuery("support engineer")))
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, size=-1):
+            return html.encode()[:size]
+
+    monkeypatch.setattr(
+        "job_dashboard.sources.urllib.request.urlopen",
+        lambda *args, **kwargs: Response(),
+    )
+    records = list(
+        IndeedJobSpySource(results_wanted=5).search(SearchQuery("support engineer"))
+    )
 
     assert len(records) == 1
     assert records[0]["id"] == "indeed-abc123"
@@ -111,16 +148,37 @@ def test_indeed_structured_fallback_recovers_when_jobspy_returns_empty(monkeypat
 
 
 def test_dedupe_merges_tags():
-    result = deduplicate_jobs([
-        {"title": "Role", "company": "Co", "url": "https://x", "source": "Indeed", "tags": ["one"]},
-        {"title": "Role", "company": "Co", "url": "https://y", "source": "LinkedIn", "tags": ["two"]},
-    ])
+    result = deduplicate_jobs(
+        [
+            {
+                "title": "Role",
+                "company": "Co",
+                "url": "https://x",
+                "source": "Indeed",
+                "tags": ["one"],
+            },
+            {
+                "title": "Role",
+                "company": "Co",
+                "url": "https://y",
+                "source": "LinkedIn",
+                "tags": ["two"],
+            },
+        ]
+    )
     assert result[0]["source"] == "LinkedIn"
     assert result[0]["tags"] == ["one", "two"]
 
 
 def test_scrape_pipeline_tracks_source_health():
-    jobs = [{"title": "Cloud Engineer", "company": "Acme", "url": "https://acme/jobs/1", "posted": "2026-08-24"}]
+    jobs = [
+        {
+            "title": "Cloud Engineer",
+            "company": "Acme",
+            "url": "https://acme/jobs/1",
+            "posted": "2026-08-24",
+        }
+    ]
     pipeline = ScrapePipeline([FakeSource(jobs)], days=14)
     pipeline.run([SearchQuery("cloud")])
     assert pipeline.source_health["fake"]["jobs"] == 1
@@ -151,31 +209,80 @@ def test_scrape_pipeline_persists_source_health(tmp_path):
 
 def test_dedupe_preserves_indeed_jk_identity_params():
     """Indeed URLs differ only by the ?jk= job id; stripping it collapses every job into one."""
-    result = deduplicate_jobs([
-        {"title": f"Barista {i}", "company": f"Cafe {i}", "url": f"https://au.indeed.com/viewjob?jk={'abcdefgh'[:2]+str(i)+'000000'[:5]}", "source": "Indeed", "tags": [f"t{i}"]}
-        for i in range(3)
-    ])
+    result = deduplicate_jobs(
+        [
+            {
+                "title": f"Barista {i}",
+                "company": f"Cafe {i}",
+                "url": f"https://au.indeed.com/viewjob?jk={'abcdefgh'[:2] + str(i) + '000000'[:5]}",
+                "source": "Indeed",
+                "tags": [f"t{i}"],
+            }
+            for i in range(3)
+        ]
+    )
     assert len(result) == 3
 
 
 def test_dedupe_uses_location_when_titles_match():
-    result = deduplicate_jobs([
-        {"title": "Cloud Engineer", "company": "Acme", "location": "Melbourne", "url": "https://x", "source": "Seek", "tags": ["one"]},
-        {"title": "Cloud Engineer", "company": "Acme", "location": "Sydney", "url": "https://y", "source": "Indeed", "tags": ["two"]},
-    ])
+    result = deduplicate_jobs(
+        [
+            {
+                "title": "Cloud Engineer",
+                "company": "Acme",
+                "location": "Melbourne",
+                "url": "https://x",
+                "source": "Seek",
+                "tags": ["one"],
+            },
+            {
+                "title": "Cloud Engineer",
+                "company": "Acme",
+                "location": "Sydney",
+                "url": "https://y",
+                "source": "Indeed",
+                "tags": ["two"],
+            },
+        ]
+    )
     assert len(result) == 2
 
 
 def test_score_penalises_seniority_mismatch():
     profile = {"skills": {"azure": "advanced", "powershell": "advanced"}}
-    engineer = score_job(Job("1", "Azure Engineer", "Acme", description="Azure and PowerShell automation for cloud services"), profile)
-    manager = score_job(Job("1", "Head of Cloud Platform", "Acme", description="Azure strategy and platform leadership with PowerShell automation"), profile)
+    engineer = score_job(
+        Job(
+            "1",
+            "Azure Engineer",
+            "Acme",
+            description="Azure and PowerShell automation for cloud services",
+        ),
+        profile,
+    )
+    manager = score_job(
+        Job(
+            "1",
+            "Head of Cloud Platform",
+            "Acme",
+            description="Azure strategy and platform leadership with PowerShell automation",
+        ),
+        profile,
+    )
     assert engineer.score > manager.score + 15
 
 
 def test_score_explanation_is_derived_from_score_dimensions():
     profile = {"skills": {"azure": "advanced", "powershell": "advanced"}}
-    result = score_job(Job("1", "Azure Engineer", "Acme", location="Melbourne", description="Azure and PowerShell automation"), profile)
+    result = score_job(
+        Job(
+            "1",
+            "Azure Engineer",
+            "Acme",
+            location="Melbourne",
+            description="Azure and PowerShell automation",
+        ),
+        profile,
+    )
     explanation = explain_score(result)
     assert explanation["tier"] == result.fit
     assert explanation["score"] == result.score
@@ -186,9 +293,22 @@ def test_score_matches_non_it_profile_via_coreSkills_field():
     """The live product stores resume-derived skills under coreSkills (not the
     legacy 'skills' dict), and covers every industry, not just IT/Microsoft
     stacks. Scoring must read that field and match arbitrary candidate skills."""
-    nurse_profile = {"industry": "Healthcare & Medical", "coreSkills": ["Acute Care", "Emergency Triage", "Medication Administration"]}
-    nursing_job = Job("1", "Registered Nurse", "Melbourne Health", description="Acute care ward providing emergency triage and medication administration to patients.")
-    unrelated_job = Job("2", "Azure Cloud Engineer", "Acme", description="Azure and PowerShell automation for cloud services.")
+    nurse_profile = {
+        "industry": "Healthcare & Medical",
+        "coreSkills": ["Acute Care", "Emergency Triage", "Medication Administration"],
+    }
+    nursing_job = Job(
+        "1",
+        "Registered Nurse",
+        "Melbourne Health",
+        description="Acute care ward providing emergency triage and medication administration to patients.",
+    )
+    unrelated_job = Job(
+        "2",
+        "Azure Cloud Engineer",
+        "Acme",
+        description="Azure and PowerShell automation for cloud services.",
+    )
 
     nursing_result = score_job(nursing_job, nurse_profile)
     unrelated_result = score_job(unrelated_job, nurse_profile)
@@ -207,23 +327,30 @@ def test_adzuna_api_source_parses_results(monkeypatch):
             return False
 
         def read(self):
-            return json.dumps({
-                "results": [{
-                    "title": "Azure Engineer",
-                    "company": {"display_name": "Contoso"},
-                    "location": {"display_name": "Melbourne VIC, Australia"},
-                    "description": "<p>Azure and automation</p>",
-                    "redirect_url": "https://example.com/jobs/1",
-                    "created": "2026-08-20T00:00:00Z",
-                    "salary_is_predicted": 1,
-                    "salary_min": 110000,
-                    "salary_max": 130000,
-                }]
-            }).encode("utf-8")
+            return json.dumps(
+                {
+                    "results": [
+                        {
+                            "title": "Azure Engineer",
+                            "company": {"display_name": "Contoso"},
+                            "location": {"display_name": "Melbourne VIC, Australia"},
+                            "description": "<p>Azure and automation</p>",
+                            "redirect_url": "https://example.com/jobs/1",
+                            "created": "2026-08-20T00:00:00Z",
+                            "salary_is_predicted": 1,
+                            "salary_min": 110000,
+                            "salary_max": 130000,
+                        }
+                    ]
+                }
+            ).encode("utf-8")
 
     monkeypatch.setenv("ADZUNA_APP_ID", "demo-app")
     monkeypatch.setenv("ADZUNA_API_KEY", "demo-key")
-    monkeypatch.setattr("job_dashboard.sources.urllib.request.urlopen", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "job_dashboard.sources.urllib.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
 
     records = list(AdzunaApiSource().search(SearchQuery("azure")))
 
@@ -244,27 +371,32 @@ def test_remote_ok_api_source_filters_jobs(monkeypatch):
             return False
 
         def read(self):
-            return json.dumps([
-                {
-                    "position": "Azure Cloud Engineer",
-                    "company": "Fabrikam",
-                    "location": "Remote",
-                    "description": "Build Azure infrastructure",
-                    "url": "https://remoteok.com/1",
-                    "published_at": "2026-08-20T00:00:00Z",
-                    "salary": "$140k",
-                },
-                {
-                    "position": "Sales Executive",
-                    "company": "Acme",
-                    "location": "Sydney",
-                    "description": "Drive sales",
-                    "url": "https://remoteok.com/2",
-                    "published_at": "2026-08-20T00:00:00Z",
-                },
-            ]).encode("utf-8")
+            return json.dumps(
+                [
+                    {
+                        "position": "Azure Cloud Engineer",
+                        "company": "Fabrikam",
+                        "location": "Remote",
+                        "description": "Build Azure infrastructure",
+                        "url": "https://remoteok.com/1",
+                        "published_at": "2026-08-20T00:00:00Z",
+                        "salary": "$140k",
+                    },
+                    {
+                        "position": "Sales Executive",
+                        "company": "Acme",
+                        "location": "Sydney",
+                        "description": "Drive sales",
+                        "url": "https://remoteok.com/2",
+                        "published_at": "2026-08-20T00:00:00Z",
+                    },
+                ]
+            ).encode("utf-8")
 
-    monkeypatch.setattr("job_dashboard.sources.urllib.request.urlopen", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "job_dashboard.sources.urllib.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
 
     records = list(RemoteOkApiSource().search(SearchQuery("azure")))
 
@@ -290,11 +422,15 @@ def test_resolve_search_location_nationwide():
     assert resolve_search_location(wfh_q) == "Australia"
 
     # Query with "anywhere in australia"
-    aus_q = SearchQuery(term="Data Analyst anywhere in Australia", location="Melbourne, VIC")
+    aus_q = SearchQuery(
+        term="Data Analyst anywhere in Australia", location="Melbourne, VIC"
+    )
     assert resolve_search_location(aus_q) == "Australia"
 
     # Query with stream="remote"
-    rem_stream_q = SearchQuery(term="Full Stack Engineer", location="Melbourne, VIC", stream="remote")
+    rem_stream_q = SearchQuery(
+        term="Full Stack Engineer", location="Melbourne, VIC", stream="remote"
+    )
     assert resolve_search_location(rem_stream_q) == "Australia"
 
     # Explicit non-Melbourne city preserved if not remote
@@ -338,3 +474,95 @@ def test_score_awards_full_points_for_australia_and_remote():
     result_flag = score_job(job_remote_flag, profile)
     assert result_flag.dimensions["location_fit"] == 100
 
+
+def test_seek_redux_web_extraction_parses_embedded_json(monkeypatch):
+    from job_dashboard.sources.seek import SeekApiSource
+
+    mock_html = """
+    <html><body>
+    <script>
+    window.SEEK_REDUX_DATA = {"results": {"results": {"jobs": [
+        {
+            "id": "111",
+            "title": "Software Engineer",
+            "advertiser": {"description": "Tech Corp"},
+            "location": "Sydney",
+            "teaser": "Great job!",
+            "listingDate": "2026-08-20T00:00:00Z",
+            "workType": "Remote",
+            "salary": "$100,000"
+        },
+        {
+            "id": "222",
+            "title": "DevOps Engineer",
+            "advertiser": {"description": "Ops Co"},
+            "location": "Melbourne",
+            "teaser": "Deploy things.",
+            "listingDate": "2026-08-21T00:00:00Z",
+            "workType": "Full Time",
+            "salary": "$120,000"
+        }
+    ]}}};
+    </script>
+    </body></html>
+    """
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return mock_html.encode("utf-8")
+
+    monkeypatch.setattr(
+        "job_dashboard.sources.seek.urllib.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    monkeypatch.setattr(
+        "job_dashboard.sources.seek.urllib.request.build_opener",
+        lambda *args, **kwargs: monkeypatch,
+    )
+
+    class FakeOpener:
+        def add_handler(self, handler):
+            pass
+
+        def open(self, req, timeout=None):
+            return FakeResponse()
+
+    monkeypatch.setattr(
+        "job_dashboard.sources.seek.urllib.request.build_opener",
+        lambda *args, **kwargs: FakeOpener(),
+    )
+
+    source = SeekApiSource()
+    records = list(source._search_web_redux(SearchQuery("engineer")))
+
+    assert len(records) == 2
+    assert records[0]["id"] == "seek_111"
+    assert records[0]["title"] == "Software Engineer"
+    assert records[0]["company"] == "Tech Corp"
+    assert records[0]["location"] == "Sydney"
+    assert records[0]["description"] == "Great job!"
+    assert records[0]["url"] == "https://www.seek.com.au/job/111"
+    assert records[0]["source"] == "Seek"
+    assert records[0]["remote"] is True
+    assert records[0]["salary_bracket"].min_amount == 100000
+    assert "redux-web" in records[0]["tags"]
+    assert "seek" in records[0]["tags"]
+
+    assert records[1]["id"] == "seek_222"
+    assert records[1]["title"] == "DevOps Engineer"
+    assert records[1]["company"] == "Ops Co"
+    assert records[1]["location"] == "Melbourne"
+    assert records[1]["remote"] is False
+    assert records[1]["salary_bracket"].min_amount == 120000
+
+    # Also verify Tier 0 in search()
+    search_source = SeekApiSource(allow_web_redux=True)
+    search_records = list(search_source.search(SearchQuery("engineer")))
+    assert len(search_records) == 2
+    assert search_records[0]["id"] == "seek_111"

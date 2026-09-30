@@ -29,6 +29,7 @@ def build_sources(names: list[str]) -> list[JobSource]:
             max_results=settings.seek_max_results,
             pause_seconds=settings.seek_pause_seconds,
             endpoint=settings.seek_api_endpoint,
+            allow_web_redux=settings.seek_web_redux_enabled,
             allow_browser_fallback=settings.seek_browser_fallback
             and settings.stealth_browser_enabled,
             cache_path=settings.seek_cache_path,
@@ -77,9 +78,21 @@ def resolve_cli_queries(
         for q in cli_queries:
             term = str(q).strip()
             if term:
-                is_remote = any(k in term.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                is_remote = any(
+                    k in term.lower()
+                    for k in (
+                        "remote",
+                        "wfh",
+                        "work from home",
+                        "anywhere in australia",
+                    )
+                )
                 loc = "Australia" if is_remote else location
-                queries.append(SearchQuery(term=term, location=loc, stream=detect_query_stream(term)))
+                queries.append(
+                    SearchQuery(
+                        term=term, location=loc, stream=detect_query_stream(term)
+                    )
+                )
         if queries:
             return queries
 
@@ -96,20 +109,39 @@ def resolve_cli_queries(
             is_profile_remote = (
                 bool(data.get("remoteOnly"))
                 or "remote" in str(data.get("workArrangements") or "").lower()
-                or "remote" in str(data.get("preferences", {}).get("work_arrangement") or "").lower()
+                or "remote"
+                in str(
+                    data.get("preferences", {}).get("work_arrangement") or ""
+                ).lower()
             )
-            prof_loc = str(
-                data.get("location")
-                or data.get("profile", {}).get("personal", {}).get("location", {}).get("city")
+            prof_loc = (
+                str(
+                    data.get("location")
+                    or data.get("profile", {})
+                    .get("personal", {})
+                    .get("location", {})
+                    .get("city")
+                    or location
+                ).strip()
                 or location
-            ).strip() or location
+            )
             queries = []
             for title in target_titles:
                 t = str(title).strip()
                 if t:
-                    is_remote = is_profile_remote or any(k in t.lower() for k in ("remote", "wfh", "work from home", "anywhere in australia"))
+                    is_remote = is_profile_remote or any(
+                        k in t.lower()
+                        for k in (
+                            "remote",
+                            "wfh",
+                            "work from home",
+                            "anywhere in australia",
+                        )
+                    )
                     loc = "Australia" if is_remote else prof_loc
-                    queries.append(SearchQuery(term=t, location=loc, stream=detect_query_stream(t)))
+                    queries.append(
+                        SearchQuery(term=t, location=loc, stream=detect_query_stream(t))
+                    )
             if queries:
                 return queries
         except Exception:
@@ -129,22 +161,46 @@ def resolve_cli_queries(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Collect and normalize jobs from supported sources")
+    parser = argparse.ArgumentParser(
+        description="Collect and normalize jobs from supported sources"
+    )
     parser.add_argument(
         "--source",
         action="append",
         choices=["indeed", "seek", "linkedin", "adzuna", "remoteok"],
         dest="sources",
     )
-    parser.add_argument("-q", "--query", action="append", dest="queries", help="Target search term/title to scrape (repeatable)")
-    parser.add_argument("-l", "--location", type=str, default="Melbourne, VIC", help="Location filter (default: 'Melbourne, VIC')")
-    parser.add_argument("--profile-json", type=Path, default=None, help="Path to profile JSON to extract targetTitles and location")
+    parser.add_argument(
+        "-q",
+        "--query",
+        action="append",
+        dest="queries",
+        help="Target search term/title to scrape (repeatable)",
+    )
+    parser.add_argument(
+        "-l",
+        "--location",
+        type=str,
+        default="Melbourne, VIC",
+        help="Location filter (default: 'Melbourne, VIC')",
+    )
+    parser.add_argument(
+        "--profile-json",
+        type=Path,
+        default=None,
+        help="Path to profile JSON to extract targetTitles and location",
+    )
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--output", type=Path, default=Path("jobs.json"))
     parser.add_argument("--seek-browser-fallback", action="store_true")
     parser.add_argument("--seek-cache-path", type=Path)
     parser.add_argument("--seek-cache-fallback", action="store_true")
-    parser.add_argument("--proxy", type=str, default=None, help="Proxy URL (http://user:pass@host:port or socks5://...)")
+    parser.add_argument(
+        "--proxy",
+        type=str,
+        default=None,
+        help="Proxy URL (http://user:pass@host:port or socks5://...)",
+    )
     args = parser.parse_args()
 
     source_names = args.sources or ["indeed", "seek", "linkedin", "adzuna", "remoteok"]
@@ -152,6 +208,7 @@ def main() -> int:
     for source in sources:
         if hasattr(source, "proxy_rotator") and args.proxy:
             from .sources.proxy import ProxyRotator
+
             source.proxy_rotator = ProxyRotator([args.proxy])
         seek_source = (
             source.native_source
@@ -162,7 +219,7 @@ def main() -> int:
             seek_source.allow_browser_fallback = args.seek_browser_fallback
             seek_source.cache_path = args.seek_cache_path
             seek_source.allow_cache_fallback = args.seek_cache_fallback
-    
+
     target_queries = resolve_cli_queries(
         cli_queries=args.queries,
         location=args.location,
@@ -175,7 +232,9 @@ def main() -> int:
         "total": len(jobs),
         "jobs": jobs,
     }
-    args.output.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"Collected {len(jobs)} jobs from {', '.join(source_names)} -> {args.output}")
     return 0
 

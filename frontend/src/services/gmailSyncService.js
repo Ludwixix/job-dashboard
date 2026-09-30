@@ -535,3 +535,240 @@ export const scanAndSyncGmailApplications = async (accessToken, userProfile = nu
   };
 };
 
+/**
+ * Scores a job title against target roles and penalizes noise (L1/helpdesk/field service)
+ */
+export const scoreJobTitleForAlert = (title = '') => {
+  const clean = (title || '').trim();
+  const lower = clean.toLowerCase();
+
+  const noiseRegex = /\b(level 1|l1|helpdesk|service desk analyst|service desk technician|desktop support technician|field technician|field service|eftpos|junior|intern|trainee|apprentice|sales|retail)\b/i;
+  const seniorRegex = /\b(senior|lead|principal|head|manager|specialist|architect)\b/i;
+
+  if (noiseRegex.test(lower) && !seniorRegex.test(lower)) {
+    return 30;
+  }
+
+  // Exact target title matches
+  const targetTitles = [
+    'senior infrastructure engineer',
+    'senior systems administrator',
+    'cloud engineer',
+    'infrastructure engineer',
+    'systems administrator',
+    'm365 engineer',
+    'modern workplace engineer',
+    'it systems engineer',
+    'platform engineer',
+    'devops engineer'
+  ];
+
+  for (const t of targetTitles) {
+    if (lower === t) return 95;
+  }
+
+  if (lower.includes('senior infrastructure')) return 93;
+  if (lower.includes('cloud engineer') || lower.includes('cloud infrastructure') || lower.includes('cloud systems engineer')) return 92;
+  if (lower.includes('senior systems administrator') || lower.includes('senior sysadmin')) return 90;
+  if (lower.includes('infrastructure engineer')) return 88;
+  if (lower.includes('m365') || lower.includes('modern workplace') || lower.includes('microsoft 365')) return 87;
+  if (lower.includes('systems administrator') || lower.includes('sysadmin')) return 84;
+  if (lower.includes('systems engineer') || lower.includes('it systems engineer')) return 82;
+  if (lower.includes('devops') || lower.includes('platform engineer')) return 80;
+  if (lower.includes('infrastructure') || lower.includes('cloud')) return 75;
+  if (lower.includes('support engineer') && seniorRegex.test(lower)) return 65;
+
+  return 45;
+};
+
+/**
+ * Parses multi-job alert emails from SEEK, LinkedIn, Indeed into structured job cards
+ */
+export const parseJobAlertEmail = (fromHeader = '', subject = '', bodyText = '', snippet = '', minScore = 60) => {
+  const text = `${snippet} \n ${bodyText}`.trim();
+  if (!text) return [];
+
+  const jobs = [];
+  const urlPattern = /(https?:\/\/(?:www\.)?(?:[a-z0-9.-]*seek\.com\.au\/job\/\d+|[a-z0-9.-]*linkedin\.com\/(?:comm\/)?jobs\/view\/\d+|[a-z0-9.-]*indeed\.com\/(?:rc\/clk|viewjob)[^\s"<>]*))/gi;
+
+  const matches = [...text.matchAll(urlPattern)];
+  const ignoredLines = new Set([
+    'view job', 'view job:', 'apply now', 'save job', 'see more jobs', 'view details',
+    'jobs recommended for you based on your activity:', 'jobs recommended for you',
+    'unsubscribe', 'manage alerts', 'privacy policy', 'terms of service'
+  ]);
+
+  let lastEnd = 0;
+  for (const match of matches) {
+    const url = match[1].replace(/[.,;)>]+$/, '');
+    const startPos = match.index;
+    const chunk = text.slice(lastEnd, startPos);
+    lastEnd = startPos + match[0].length;
+
+    const rawLines = chunk
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !ignoredLines.has(l.toLowerCase()) && !l.toLowerCase().startsWith('view job'));
+
+    const cleanLines = rawLines.filter(l => {
+      if (/^\s*[\w\s]+,\s*\d+\s+new jobs/i.test(l)) return false;
+      if (/^\s*jobs recommended/i.test(l)) return false;
+      return true;
+    });
+
+    if (cleanLines.length === 0) continue;
+
+    const title = cleanLines[0];
+    let company = '';
+    let location = 'Melbourne VIC';
+    let salary = '';
+
+    if (cleanLines.length > 1) {
+      const second = cleanLines[1];
+      if (second.includes(' - ')) {
+        const parts = second.split(' - ');
+        company = parts[0].trim();
+        location = parts[1].trim();
+      } else {
+        company = second;
+      }
+    }
+
+    if (cleanLines.length > 2) {
+      for (const rem of cleanLines.slice(2)) {
+        if (/[$k]|year|annum/i.test(rem)) {
+          salary = rem;
+        } else if (!company) {
+          company = rem;
+        } else if (location === 'Melbourne VIC' && /\b(VIC|NSW|QLD|WA|SA|TAS|ACT|AUSTRALIA)\b/i.test(rem)) {
+          location = rem;
+        }
+      }
+    }
+
+    const provider = url.includes('seek.com') ? 'SEEK' : (url.includes('linkedin.com') ? 'LinkedIn' : 'Indeed');
+    const idMatch = url.match(/\/(\d{6,12})/);
+    const jobId = idMatch ? idMatch[1] : Math.random().toString(36).substring(2, 9);
+
+    const score = scoreJobTitleForAlert(title);
+    if (score >= minScore && title) {
+      jobs.push({
+        id: `gmail-alert-${provider.toLowerCase()}-${jobId}`,
+        title,
+        company: company || 'Direct Employer',
+        location,
+        salary,
+        url,
+        source: 'Gmail Alert',
+        posted: new Date().toISOString().slice(0, 10),
+        score,
+        status: 'sourced',
+        description: `Suggested via ${provider} job alert (${subject})`,
+        tags: ['gmail', 'alert', provider.toLowerCase()]
+      });
+    }
+  }
+
+  // Fallback block parser
+  if (jobs.length === 0) {
+    const blocks = text.split(/\n\s*\n/);
+    for (const block of blocks) {
+      const bLines = block.split('\n').map(l => l.trim()).filter(Boolean);
+      if (bLines.length === 0) continue;
+      let firstLine = bLines[0];
+      if (/^\s*[\w\s]+,\s*\d+\s+new jobs/i.test(firstLine) || /^\s*jobs recommended/i.test(firstLine)) {
+        if (bLines.length > 1) {
+          firstLine = bLines[1];
+        } else {
+          continue;
+        }
+      }
+      const score = scoreJobTitleForAlert(firstLine);
+      if (score >= minScore) {
+        const company = bLines.length > 1 && bLines[1] !== firstLine ? bLines[1] : 'Direct Employer';
+        jobs.push({
+          id: `gmail-alert-digest-${Math.random().toString(36).substring(2, 9)}`,
+          title: firstLine,
+          company,
+          location: 'Melbourne VIC',
+          salary: '',
+          url: '',
+          source: 'Gmail Alert',
+          posted: new Date().toISOString().slice(0, 10),
+          score,
+          status: 'sourced',
+          description: `Suggested role from email: ${subject}`,
+          tags: ['gmail', 'alert']
+        });
+      }
+    }
+  }
+
+  return jobs;
+};
+
+/**
+ * Scans user's Gmail specifically for multi-job alerts and recommended opportunities
+ */
+export const scanGmailForJobAlerts = async (accessToken, maxResults = 30, minScore = 60) => {
+  if (!accessToken) {
+    throw new Error('Google OAuth Access Token is required to scan Gmail.');
+  }
+
+  const query = 'subject:("job alert" OR "jobs recommended" OR "jobs for you" OR "new jobs" OR "jobs you may be interested in" OR "new jobs matching" OR "top job picks")';
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
+
+  const listRes = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  if (!listRes.ok) {
+    const err = await listRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Gmail API query failed: ${listRes.statusText}`);
+  }
+
+  const listData = await listRes.json();
+  const messages = listData.messages || [];
+
+  if (messages.length === 0) {
+    return [];
+  }
+
+  const allAlertJobs = [];
+  for (const m of messages.slice(0, maxResults)) {
+    try {
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!msgRes.ok) continue;
+      const msgData = await msgRes.json();
+
+      const headers = msgData.payload?.headers || [];
+      const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
+      const from = headers.find(h => h.name.toLowerCase() === 'from')?.value || '';
+      const bodyText = extractBodyText(msgData.payload);
+      const snippet = msgData.snippet || '';
+
+      const parsed = parseJobAlertEmail(from, subject, bodyText, snippet, minScore);
+      allAlertJobs.push(...parsed);
+    } catch (e) {
+      console.warn('Error parsing alert message:', e);
+    }
+  }
+
+  // Deduplicate by URL or title + company
+  const seen = new Set();
+  const uniqueJobs = [];
+  for (const j of allAlertJobs) {
+    const key = j.url || `${j.company.toLowerCase()}_${j.title.toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueJobs.push(j);
+    }
+  }
+
+  return uniqueJobs.sort((a, b) => (b.score || 0) - (a.score || 0));
+};
+
+

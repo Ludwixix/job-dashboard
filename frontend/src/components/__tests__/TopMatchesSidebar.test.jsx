@@ -110,4 +110,35 @@ describe('TopMatchesSidebar Component', () => {
     const whiteElements = container.querySelectorAll('.bg-white');
     expect(whiteElements.length).toBe(0);
   });
+
+  it('excludes already applied jobs from Top 10 Matches and sidebar widgets', () => {
+    localStorage.setItem('tracked_applications', JSON.stringify([
+      { id: 'job-1', company: 'Enterprise Corp', title: 'Senior Systems Administrator' }
+    ]));
+
+    const jobsWithApplied = [
+      ...mockJobs,
+      {
+        id: 'job-5',
+        title: 'Lead Cloud Architect',
+        company: 'Cloud Corp',
+        score: 99,
+        status: 'Applied / In Review',
+        date: new Date().toISOString()
+      }
+    ];
+
+    render(
+      <TopMatchesSidebar 
+        jobs={jobsWithApplied}
+        onSelectJob={vi.fn()}
+        onOpenGenerator={vi.fn()}
+      />
+    );
+
+    // Neither job-1 (tracked in localStorage) nor job-5 (status: Applied) should appear
+    expect(screen.queryByText(/Lead Cloud Architect/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Senior Systems Administrator/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Autonomous Drone Flight Systems Engineer/i).length).toBeGreaterThan(0);
+  });
 });

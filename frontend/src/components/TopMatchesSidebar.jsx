@@ -231,21 +231,81 @@ export const TopMatchesSidebar = ({
   const [showMostLikely, setShowMostLikely] = useState(false);
   const [wildCardIndex, setWildCardIndex] = useState(0);
 
-  // Available Active Jobs Pool (Excluding only already applied / closed / rejected records)
+  // Available Active Jobs Pool (Excluding already applied, tracked, progressed, or closed records)
   const unsubmittedJobs = useMemo(() => {
     if (!jobs || jobs.length === 0) return [];
+
+    const appliedIds = new Set();
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const tracked = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+        if (Array.isArray(tracked)) {
+          tracked.forEach(a => {
+            if (a.id) appliedIds.add(String(a.id));
+            if (a.job_id) appliedIds.add(String(a.job_id));
+            if (a.company && a.title) {
+              appliedIds.add(`${String(a.company).toLowerCase().trim()}_${String(a.title).toLowerCase().trim()}`);
+            }
+          });
+        }
+      } catch {}
+      try {
+        const localApps = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+        Object.keys(localApps).forEach(id => appliedIds.add(String(id)));
+        Object.values(localApps).forEach(a => {
+          if (a?.company && a?.title) {
+            appliedIds.add(`${String(a.company).toLowerCase().trim()}_${String(a.title).toLowerCase().trim()}`);
+          }
+        });
+      } catch {}
+    }
+
+    const APPLIED_STATUS_PATTERNS = [
+      'applied',
+      'submit',
+      'interview',
+      'offer',
+      'review',
+      'progress',
+      'accepted',
+      'hired',
+      'unsuccessful',
+      'rejected',
+      'closed',
+      'expired',
+      'dismissed',
+      'withdrawn',
+      'confirmation',
+      'verification',
+      'action required',
+      'phone screen',
+      'assessment',
+      'package prepared',
+      'to submit',
+    ];
+
     return jobs.filter(job => {
-      const s = (job.status || 'sourced').toLowerCase();
-      return !s.includes('applied') &&
-        !s.includes('confirmation') &&
-        !s.includes('interview') &&
-        !s.includes('under review') &&
-        !s.includes('action required') &&
-        !s.includes('verification') &&
-        !s.includes('unsuccessful') &&
-        !s.includes('rejected') &&
-        !s.includes('closed') &&
-        !s.includes('expired');
+      if (!job) return false;
+      if (job.isApplied === true || job.is_applied === true) return false;
+      if (Boolean(job.appliedDate || job.applied_at || job.applied_date)) return false;
+      if (job.isRejected || job.is_rejected) return false;
+
+      const s = String(job.status || 'sourced').toLowerCase();
+      const stage = String(job.stage || '').toLowerCase();
+
+      if (APPLIED_STATUS_PATTERNS.some(pat => s.includes(pat) || stage.includes(pat))) {
+        return false;
+      }
+
+      const strId = String(job.id || '');
+      const strJobId = String(job.job_id || '');
+      const key = `${String(job.company || '').toLowerCase().trim()}_${String(job.title || '').toLowerCase().trim()}`;
+
+      if (appliedIds.has(strId) || (strJobId && appliedIds.has(strJobId)) || appliedIds.has(key)) {
+        return false;
+      }
+
+      return true;
     });
   }, [jobs]);
 

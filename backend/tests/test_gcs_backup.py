@@ -43,7 +43,9 @@ class FakeClient:
         return FakeBucket(self.objects)
 
 
-def test_gcs_backup_restores_health_database_even_when_jobs_db_exists(tmp_path, monkeypatch):
+def test_gcs_backup_restores_health_database_even_when_jobs_db_exists(
+    tmp_path, monkeypatch
+):
     objects = {"health.sqlite3": b"health-db", "jobs.sqlite3": b"jobs-db"}
     monkeypatch.setattr(gcs_backup, "_get_client", lambda: FakeClient(objects))
     (tmp_path / "jobs.sqlite3").write_bytes(b"baked-in-jobs")
@@ -76,3 +78,31 @@ def test_gcs_backup_force_restores_when_flag_set(tmp_path, monkeypatch):
     assert restored == 2
     assert (tmp_path / "jobs.sqlite3").read_bytes() == b"cloud-persistent-jobs"
     assert (tmp_path / "health.sqlite3").read_bytes() == b"health-db"
+
+
+def test_gcs_backup_coherent_sqlite_wal_snapshot(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = tmp_path / "jobs.sqlite3"
+    with sqlite3.connect(str(db_path)) as con:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("CREATE TABLE test_items (id INTEGER PRIMARY KEY, name TEXT)")
+        con.execute("INSERT INTO test_items (name) VALUES ('job_alpha')")
+        con.commit()
+
+    objects = {}
+    monkeypatch.setattr(gcs_backup, "_get_client", lambda: FakeClient(objects))
+
+    uploaded = gcs_backup.backup_to_gcs(
+        "test-bucket", tmp_path, filenames=["jobs.sqlite3"]
+    )
+    assert uploaded == 1
+    assert "jobs.sqlite3" in objects
+
+    # Verify uploaded bytes are a valid standalone SQLite database containing the table and data
+    restored_db = tmp_path / "restored.sqlite3"
+    restored_db.write_bytes(objects["jobs.sqlite3"])
+    with sqlite3.connect(str(restored_db)) as con:
+        row = con.execute("SELECT name FROM test_items WHERE id = 1").fetchone()
+        assert row is not None
+        assert row[0] == "job_alpha"

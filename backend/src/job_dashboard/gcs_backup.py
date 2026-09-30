@@ -18,6 +18,7 @@ more than one process at a time.
 from __future__ import annotations
 
 from pathlib import Path
+import tempfile
 
 from .logging import get_logger
 
@@ -94,6 +95,34 @@ def restore_from_gcs(
     return restored
 
 
+def _snapshot_sqlite_if_valid(source_path: Path, temp_dir: Path) -> Path:
+    """If source_path is a valid SQLite file, creates an atomic coherent snapshot using SQLite online backup API."""
+    import sqlite3
+
+    if not source_path.name.endswith(".sqlite3") or not source_path.exists():
+        return source_path
+
+    snapshot_path = temp_dir / source_path.name
+    try:
+        # Checkpoint WAL first to flush committed transactions
+        try:
+            with sqlite3.connect(str(source_path), timeout=5.0) as con:
+                con.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        except Exception:
+            pass
+
+        src_uri = f"file:{source_path.resolve()}?mode=ro"
+        with sqlite3.connect(src_uri, uri=True, timeout=5.0) as src_con:
+            with sqlite3.connect(str(snapshot_path)) as dst_con:
+                src_con.backup(dst_con)
+        return snapshot_path
+    except Exception as err:
+        logger.debug(
+            f"Direct file fallback used for {source_path.name} (not SQLite or busy): {err}"
+        )
+        return source_path
+
+
 def backup_to_gcs(
     bucket_name: str | None,
     data_dir: Path,
@@ -110,29 +139,32 @@ def backup_to_gcs(
     uploaded = 0
     try:
         bucket = client.bucket(bucket_name)
-        for filename in target_files:
-            local_path = data_dir / filename
-            if local_path.exists():
-                blob = bucket.blob(filename)
-                # Reload metadata to obtain current generation for optimistic concurrency
-                generation_match = None
-                try:
-                    blob.reload()
-                    generation_match = blob.generation
-                except Exception:
-                    # Blob doesn't exist yet; condition on non-existence (generation 0)
-                    generation_match = 0
+        with tempfile.TemporaryDirectory() as temp_dir_str:
+            temp_dir = Path(temp_dir_str)
+            for filename in target_files:
+                local_path = data_dir / filename
+                if local_path.exists():
+                    upload_path = _snapshot_sqlite_if_valid(local_path, temp_dir)
+                    blob = bucket.blob(filename)
+                    # Reload metadata to obtain current generation for optimistic concurrency
+                    generation_match = None
+                    try:
+                        blob.reload()
+                        generation_match = blob.generation
+                    except Exception:
+                        # Blob doesn't exist yet; condition on non-existence (generation 0)
+                        generation_match = 0
 
-                try:
-                    blob.upload_from_filename(
-                        str(local_path),
-                        if_generation_match=generation_match,
-                    )
-                    uploaded += 1
-                except Exception as upload_err:
-                    logger.warning(
-                        f"GCS backup precondition failed for {filename} (concurrent writer detected): {upload_err}"
-                    )
+                    try:
+                        blob.upload_from_filename(
+                            str(upload_path),
+                            if_generation_match=generation_match,
+                        )
+                        uploaded += 1
+                    except Exception as upload_err:
+                        logger.warning(
+                            f"GCS backup precondition failed for {filename} (concurrent writer detected): {upload_err}"
+                        )
         if uploaded:
             logger.info(f"Backed up {uploaded} data file(s) to gs://{bucket_name}")
     except Exception as error:
@@ -222,16 +254,19 @@ def create_backup_snapshot(
     if client is not None:
         try:
             bucket = client.bucket(bucket_name)
-            for fname in (
-                "jobs.sqlite3",
-                "job_profile.json",
-                "smart_applications.json",
-            ):
-                local_file = data_dir / fname
-                if local_file.exists():
-                    snapshot_blob = bucket.blob(f"snapshots/{snapshot_id}/{fname}")
-                    snapshot_blob.upload_from_filename(str(local_file))
-                    snapshot_uploaded += 1
+            with tempfile.TemporaryDirectory() as temp_dir_str:
+                temp_dir = Path(temp_dir_str)
+                for fname in (
+                    "jobs.sqlite3",
+                    "job_profile.json",
+                    "smart_applications.json",
+                ):
+                    local_file = data_dir / fname
+                    if local_file.exists():
+                        upload_file = _snapshot_sqlite_if_valid(local_file, temp_dir)
+                        snapshot_blob = bucket.blob(f"snapshots/{snapshot_id}/{fname}")
+                        snapshot_blob.upload_from_filename(str(upload_file))
+                        snapshot_uploaded += 1
         except Exception as snap_err:
             logger.warning(f"Versioned snapshot copy failed: {snap_err}")
 

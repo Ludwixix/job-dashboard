@@ -77,11 +77,15 @@ class AdzunaApiSource:
         headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0"}
         try:
             if client:
-                response = await client.get(self.endpoint, params=params, headers=headers, timeout=self.timeout)
+                response = await client.get(
+                    self.endpoint, params=params, headers=headers, timeout=self.timeout
+                )
                 payload = response.json()
             else:
                 async with httpx.AsyncClient(timeout=self.timeout) as local_client:
-                    response = await local_client.get(self.endpoint, params=params, headers=headers)
+                    response = await local_client.get(
+                        self.endpoint, params=params, headers=headers
+                    )
                     payload = response.json()
 
             results = []
@@ -128,8 +132,14 @@ def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
 
     # Parse structured salary bracket
     raw_salary_text = str(job.get("salary") or "").strip()
-    if not raw_salary_text and (job.get("salary_min") is not None or job.get("salary_max") is not None):
-        raw_salary_text = " - ".join(str(value) for value in (job.get("salary_min"), job.get("salary_max")) if value is not None)
+    if not raw_salary_text and (
+        job.get("salary_min") is not None or job.get("salary_max") is not None
+    ):
+        raw_salary_text = " - ".join(
+            str(value)
+            for value in (job.get("salary_min"), job.get("salary_max"))
+            if value is not None
+        )
 
     salary_bracket = parse_salary_bracket(
         salary_text=raw_salary_text or None,
@@ -142,9 +152,16 @@ def _adzuna_record(job: Mapping[str, Any], query: SearchQuery) -> JobRecord:
 
     work_mode = "remote" if remote_value else "onsite"
 
+    raw_id = str(job.get("id") or "").strip()
+    adzuna_id = (
+        f"adzuna-{raw_id}"
+        if raw_id and not raw_id.startswith("adzuna-")
+        else (raw_id or url or title)
+    )
+
     return JobRecord(
-        id=str(job.get("id") or url or title),
-        provider_job_id=str(job.get("id") or url or title),
+        id=adzuna_id,
+        provider_job_id=raw_id or url or title,
         provider="adzuna",
         title=title,
         company=company_name,

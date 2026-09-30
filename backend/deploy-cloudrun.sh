@@ -118,6 +118,21 @@ if [ -n "$ROUTER_KEY" ]; then
     ENV_VARS="${ENV_VARS},JOB_DASHBOARD_OPENROUTER_API_KEY=${ROUTER_KEY}"
 fi
 
+# Safely configure Adzuna API credentials if available
+ADZUNA_ID="${JOB_DASHBOARD_ADZUNA_APP_ID:-${ADZUNA_APP_ID:-}}"
+ADZUNA_KEY="${JOB_DASHBOARD_ADZUNA_API_KEY:-${ADZUNA_API_KEY:-${ADZUNA_APP_KEY:-}}}"
+if [ -z "$ADZUNA_ID" ] || [ -z "$ADZUNA_KEY" ]; then
+    EXISTING_ADZUNA=$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format=json 2>/dev/null | python3 -c "import sys, json; data=json.load(sys.stdin); envs={e['name']: e.get('value','') for e in data.get('spec',{}).get('template',{}).get('spec',{}).get('containers',[])[0].get('env',[])}; print(envs.get('JOB_DASHBOARD_ADZUNA_APP_ID',''), envs.get('JOB_DASHBOARD_ADZUNA_API_KEY',''))" 2>/dev/null || true)
+    read -r ex_id ex_key <<< "$EXISTING_ADZUNA"
+    [ -z "$ADZUNA_ID" ] && ADZUNA_ID="$ex_id"
+    [ -z "$ADZUNA_KEY" ] && ADZUNA_KEY="$ex_key"
+fi
+if [ -n "$ADZUNA_ID" ] && [ -n "$ADZUNA_KEY" ]; then
+    ENV_VARS="${ENV_VARS},JOB_DASHBOARD_ADZUNA_APP_ID=${ADZUNA_ID},JOB_DASHBOARD_ADZUNA_API_KEY=${ADZUNA_KEY}"
+    echo "✓ Configured Adzuna API credentials for live job aggregation"
+fi
+
+
 gcloud run deploy "${SERVICE_NAME}" \
     --image "${IMAGE}" \
     --region "${REGION}" \

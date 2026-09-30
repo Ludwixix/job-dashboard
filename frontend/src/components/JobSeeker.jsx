@@ -326,35 +326,33 @@ export const JobSeeker = ({
  return getProfileAutoRoles(currentProfile, customRoles);
  }, [currentProfile, customRoles]);
 
- // Refined default: on page load/refresh, load user's saved selection if valid;
- // otherwise default to all roles active ([]) so the complete job catalog is visible.
- // Profile-targeted roles can be engaged anytime via the "PROFILE TARGET" button.
+ // Profile-targeted default: on page load/refresh, load user's saved selection if valid;
+ // otherwise default to profile auto roles matching candidate experience.
  const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
  const saved = loadSavedRoleSelections(currentProfile?.id);
- const auto = getProfileAutoRoles(currentProfile, getCustomRoles(currentProfile?.id));
+ const autoRoles = getProfileAutoRoles(currentProfile, customRoles).map(r => typeof r === 'string' ? r : r?.id);
  if (saved && Array.isArray(saved) && saved.length > 0) {
- // Check for legacy 3-role default trap and migrate to full profile auto-roles
  if (saved.length === 3 && saved.includes('cloud_infra') && saved.includes('sysadmin') && saved.includes('it_support')) {
- return auto && auto.length > 0 ? auto : [];
+ return autoRoles;
  }
  return saved;
  }
- return auto && auto.length > 0 ? auto : [];
+ return autoRoles;
  });
 
- // When active profile switches, restore saved preference or default to profile-targeted roles
+ // When active profile switches, restore saved preference or default to profile auto roles
  useEffect(() => {
  if (currentProfile) {
+ const autoRoles = getProfileAutoRoles(currentProfile, customRoles).map(r => typeof r === 'string' ? r : r?.id);
  const saved = loadSavedRoleSelections(currentProfile.id);
- const auto = getProfileAutoRoles(currentProfile, customRoles);
  if (saved && Array.isArray(saved) && saved.length > 0) {
  if (saved.length === 3 && saved.includes('cloud_infra') && saved.includes('sysadmin') && saved.includes('it_support')) {
- setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
+ setSelectedRoleIds(autoRoles);
  } else {
  setSelectedRoleIds(saved);
  }
  } else {
- setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
+ setSelectedRoleIds(autoRoles);
  }
  }
  }, [currentProfile?.id]);

@@ -505,6 +505,27 @@ def handle_passcode_login(handler):
     user_profile = (
         app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
     )
+    if not user_profile and hasattr(app, "repository"):
+        user_profile = app.repository.get_user_profile(email) or {}
+
+    if not _is_valid_profile(user_profile):
+        candidate_paths = [
+            Path(getattr(app, "data_dir", ".")) / "job_profile.json",
+            Path(__file__).resolve().parent.parent / "data" / "job_profile.json",
+            Path(__file__).resolve().parent.parent.parent.parent / "job_profile.json",
+        ]
+        for cp in candidate_paths:
+            if cp.is_file():
+                try:
+                    loaded = json.loads(cp.read_text(encoding="utf-8"))
+                    if loaded and loaded.get("name"):
+                        user_profile = loaded
+                        if hasattr(app, "repository"):
+                            app.repository.save_user_profile(user_id, user_profile)
+                        break
+                except Exception:
+                    pass
+
     has_profile = _is_valid_profile(user_profile)
     handler.send_json(
         200,

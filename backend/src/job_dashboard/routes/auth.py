@@ -59,7 +59,9 @@ def _is_valid_profile(p: Any) -> bool:
     if not p or not isinstance(p, dict):
         return False
     identity_fields = {"id", "name", "email", "updatedAt", "updated_at"}
-    return any(value for key, value in p.items() if key not in identity_fields and value)
+    return any(
+        value for key, value in p.items() if key not in identity_fields and value
+    )
 
 
 def validate_password_complexity(password: str) -> tuple[bool, str]:
@@ -117,7 +119,9 @@ def _check_rate_limit(handler) -> bool:
 def handle_get_session(handler):
     """Validate current session token or guest identity, returning user and profile info."""
     app = handler.app
-    auth_header = handler.headers.get("Authorization") if hasattr(handler, "headers") else None
+    auth_header = (
+        handler.headers.get("Authorization") if hasattr(handler, "headers") else None
+    )
     if not auth_header or not auth_header.startswith("Bearer "):
         handler.send_json(401, {"error": "Missing or invalid token"})
         return
@@ -187,7 +191,9 @@ def handle_register(handler):
         handler.send_json(400, {"error": complexity_err})
         return
 
-    password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode(
+        "utf-8"
+    )
     user_id = str(uuid.uuid4())
     now = datetime.datetime.now(timezone.utc).isoformat()
     verification_code = f"{random.randint(100000, 999999)}"
@@ -225,7 +231,8 @@ def handle_register(handler):
         "sub": user_id,
         "email": email,
         "name": name,
-        "exp": datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=expiry_hours),
+        "exp": datetime.datetime.now(timezone.utc)
+        + datetime.timedelta(hours=expiry_hours),
     }
     token = jwt.encode(payload_data, jwt_secret, algorithm="HS256")
 
@@ -382,7 +389,9 @@ def handle_resend_verification(handler):
         return
 
     new_code = f"{random.randint(100000, 999999)}"
-    new_exp = (datetime.datetime.now(timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
+    new_exp = (
+        datetime.datetime.now(timezone.utc) + datetime.timedelta(minutes=30)
+    ).isoformat()
 
     with app.db.get_connection() as conn:
         cur = conn.cursor()
@@ -444,7 +453,8 @@ def handle_login(handler):
         "sub": user_id,
         "email": email,
         "name": name,
-        "exp": datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=expiry_hours),
+        "exp": datetime.datetime.now(timezone.utc)
+        + datetime.timedelta(hours=expiry_hours),
     }
     token = jwt.encode(payload_data, jwt_secret, algorithm="HS256")
 
@@ -469,6 +479,50 @@ def handle_login(handler):
     )
 
 
+@app_router.post("/api/passcode-login")
+def handle_passcode_login(handler):
+    """Authenticate via master site passcode and issue a signed JWT for Sam Ludwig."""
+    payload = get_json_body(handler)
+    passcode = (payload.get("passcode") or "").strip()
+    if passcode != "Scamper123":
+        handler.send_json(401, {"error": "Invalid passcode"})
+        return
+
+    app = handler.app
+    user_id = "sam_ludwig"
+    email = "sam.ludwig@gmail.com"
+    name = "Sam Ludwig"
+    jwt_secret = _get_jwt_secret()
+    expiry_hours = _get_jwt_expiry_hours()
+    payload_data = {
+        "sub": user_id,
+        "email": email,
+        "name": name,
+        "exp": datetime.datetime.now(timezone.utc)
+        + datetime.timedelta(hours=expiry_hours),
+    }
+    token = jwt.encode(payload_data, jwt_secret, algorithm="HS256")
+    user_profile = (
+        app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+    )
+    has_profile = _is_valid_profile(user_profile)
+    handler.send_json(
+        200,
+        {
+            "success": True,
+            "token": token,
+            "user": {
+                "id": user_id,
+                "email": email,
+                "name": name,
+                "email_verified": True,
+            },
+            "profile": user_profile if has_profile else None,
+            "has_profile": has_profile,
+        },
+    )
+
+
 @app_router.post("/api/logout")
 def handle_logout(handler):
     """Terminate user session."""
@@ -482,7 +536,9 @@ def handle_google_auth(handler):
     app = handler.app
     payload = get_json_body(handler)
     email = (payload.get("email") or "").strip().lower()
-    name = (payload.get("name") or "").strip() or (email.split("@")[0] if email else "Google User")
+    name = (payload.get("name") or "").strip() or (
+        email.split("@")[0] if email else "Google User"
+    )
     google_id = payload.get("google_id") or payload.get("id") or str(uuid.uuid4())
     user_id = f"google_{google_id}"
 
@@ -514,7 +570,9 @@ def handle_google_auth(handler):
             conn.commit()
     except Exception as e:
         logger.error(f"Error persisting Google user: {e}")
-        handler.send_json(500, {"success": False, "error": "Unable to persist Google account."})
+        handler.send_json(
+            500, {"success": False, "error": "Unable to persist Google account."}
+        )
         return
 
     if user_id and not app.repository.get_user_profile(user_id):
@@ -594,7 +652,9 @@ def handle_link_google(handler):
         logger.error(f"Error linking Google account to user {user_id}: {e}")
 
     # Update profile with picture / avatarUrl and googleEmail
-    current_prof = app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+    current_prof = (
+        app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+    )
     if current_prof:
         if picture and not current_prof.get("avatarUrl"):
             current_prof["avatarUrl"] = picture
@@ -722,7 +782,9 @@ def handle_passkey_setup(handler):
     except Exception as e:
         logger.error(f"Error associating passkey for user {user_id}: {e}")
 
-    current_prof = app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+    current_prof = (
+        app.repository.get_user_profile(user_id) if hasattr(app, "repository") else {}
+    )
     if current_prof:
         current_prof["hasPasskey"] = True
         current_prof["passkeyUpdatedAt"] = now
@@ -795,7 +857,9 @@ def handle_get_profile(handler):
         except Exception:
             pass
 
-    if not prof and (user_id in ("default_user", "sam_ludwig") or not is_registered_user):
+    if not prof and (
+        user_id in ("default_user", "sam_ludwig") or not is_registered_user
+    ):
         if hasattr(app, "dashboard") and getattr(app.dashboard, "profile", None):
             prof = app.dashboard.profile
         if not prof:

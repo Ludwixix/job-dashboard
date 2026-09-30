@@ -64,7 +64,27 @@ const getJobSubStream = (job) => {
  const stream = (job.stream || '').toLowerCase();
  const industry = (job.industry || '').toLowerCase();
 
- // 1. Healthcare & Medical
+ // 1. Technology, Software, Systems & Cloud (PRIORITY: Catches tech roles across private and public sectors)
+ const isCoreItStream = stream === 'core-it' || stream === 'tech' || industry.includes('tech') || industry.includes('information technology');
+ const roleCategory = classifyJobRole(job)?.category;
+ const isTechArchetype = roleCategory === 'Technology & IT';
+ const hasTechTitle = (
+  title.includes('cloud') || title.includes('azure') || title.includes('devops') || 
+  title.includes('aws') || title.includes('software') || title.includes('developer') || 
+  title.includes('react') || title.includes('frontend') || title.includes('backend') ||
+  title.includes('full stack') || title.includes('python') || title.includes('cyber') || 
+  title.includes('infosec') || title.includes('data engineer') || title.includes('data analyst') ||
+  title.includes('data scientist') || title.includes('systems') || title.includes('m365') || 
+  title.includes('it support') || title.includes('service desk') || title.includes('desktop support') ||
+  title.includes('help desk') || title.includes('sysadmin') || title.includes('network') ||
+  title.includes('solutions architect') || title.includes('infrastructure') || title.includes('programmer')
+ );
+
+ if (isCoreItStream || isTechArchetype || hasTechTitle) {
+  return 'Tech & Software';
+ }
+
+ // 2. Healthcare & Medical
  if (
  industry.includes('health') || stream.includes('health') || 
  title.includes('nurse') || title.includes('clinical') || title.includes('medical') || 
@@ -74,7 +94,7 @@ const getJobSubStream = (job) => {
  return 'Healthcare & Medical';
  }
 
- // 2. Finance, Accounting & Banking
+ // 3. Finance, Accounting & Banking
  if (
  industry.includes('finance') || industry.includes('account') || stream.includes('finance') || 
  title.includes('accountant') || title.includes('financial') || title.includes('fp&a') || 
@@ -84,7 +104,7 @@ const getJobSubStream = (job) => {
  return 'Finance & Accounting';
  }
 
- // 3. Sales, Marketing & Growth
+ // 4. Sales, Marketing & Growth
  if (
  industry.includes('marketing') || industry.includes('sales') || stream.includes('marketing') || 
  title.includes('marketing') || title.includes('growth') || title.includes('seo') || 
@@ -94,7 +114,7 @@ const getJobSubStream = (job) => {
  return 'Marketing & Sales';
  }
 
- // 4. Construction, Engineering & Trades
+ // 5. Construction, Engineering & Trades
  if (
  industry.includes('construction') || stream.includes('construction') || 
  title.includes('construction') || title.includes('site manager') || title.includes('site engineer') || 
@@ -104,7 +124,7 @@ const getJobSubStream = (job) => {
  return 'Construction & Trades';
  }
 
- // 5. Human Resources & People
+ // 6. Human Resources & People
  if (
  industry.includes('hr') || industry.includes('people') || stream.includes('hr') || 
  title.includes('hr') || title.includes('talent') || title.includes('recruitment') || 
@@ -113,7 +133,7 @@ const getJobSubStream = (job) => {
  return 'HR & Operations';
  }
 
- // 6. Legal, Governance & Compliance
+ // 7. Legal, Governance & Compliance
  if (
  industry.includes('legal') || stream.includes('legal') || 
  title.includes('legal') || title.includes('counsel') || title.includes('lawyer') || 
@@ -122,22 +142,13 @@ const getJobSubStream = (job) => {
  return 'Legal & Governance';
  }
 
- // 7. Education & Academic
+ // 8. Education & Academic
  if (
  industry.includes('education') || stream.includes('education') || 
  title.includes('education') || title.includes('teacher') || title.includes('curriculum') || 
  title.includes('academic') || title.includes('learning & development')
  ) {
  return 'Education & Training';
- }
-
- // 8. Field Tech, Outdoor, Labour & Physical Work
- if (
- title.includes('technician') || title.includes('field') || title.includes('labour') || title.includes('labourer') ||
- title.includes('outdoor') || title.includes('cabling') || title.includes('physical') || title.includes('depot') ||
- title.includes('warehouse') || title.includes('assembler') || title.includes('maintenance') || title.includes('driver') || title.includes('storeperson')
- ) {
- return 'Field Tech & Labour';
  }
 
  // 9. Government, Council & Public Sector
@@ -149,14 +160,13 @@ const getJobSubStream = (job) => {
  return 'Gov & Public Sector';
  }
 
- // 10. Technology, Software & Cloud
+ // 10. Field Tech, Outdoor, Labour & Physical Work
  if (
- title.includes('cloud') || title.includes('azure') || title.includes('devops') || 
- title.includes('aws') || title.includes('software') || title.includes('developer') || 
- title.includes('react') || title.includes('engineer') || title.includes('cyber') || 
- title.includes('data') || title.includes('systems') || title.includes('m365') || title.includes('it support')
+ title.includes('technician') || title.includes('field') || title.includes('labour') || title.includes('labourer') ||
+ title.includes('outdoor') || title.includes('cabling') || title.includes('physical') || title.includes('depot') ||
+ title.includes('warehouse') || title.includes('assembler') || title.includes('maintenance') || title.includes('driver') || title.includes('storeperson')
  ) {
- return 'Tech & Software';
+ return 'Field Tech & Labour';
  }
 
  return 'General & Professional';
@@ -316,25 +326,34 @@ export const JobSeeker = ({
  return getProfileAutoRoles(currentProfile, customRoles);
  }, [currentProfile, customRoles]);
 
- // Refined default: on page load/refresh, load user's saved selection or
- // default to profile-targeted roles instead of showing everything.
+ // Refined default: on page load/refresh, load user's saved selection if valid;
+ // otherwise default to all roles active ([]) so the complete job catalog is visible.
+ // Profile-targeted roles can be engaged anytime via the "PROFILE TARGET" button.
  const [selectedRoleIds, setSelectedRoleIds] = useState(() => {
  const saved = loadSavedRoleSelections(currentProfile?.id);
+ const auto = getProfileAutoRoles(currentProfile, getCustomRoles(currentProfile?.id));
  if (saved && Array.isArray(saved) && saved.length > 0) {
+ // Check for legacy 3-role default trap and migrate to full profile auto-roles
+ if (saved.length === 3 && saved.includes('cloud_infra') && saved.includes('sysadmin') && saved.includes('it_support')) {
+ return auto && auto.length > 0 ? auto : [];
+ }
  return saved;
  }
- const auto = getProfileAutoRoles(currentProfile, getCustomRoles(currentProfile?.id));
  return auto && auto.length > 0 ? auto : [];
  });
 
- // When active profile switches, restore profile-targeted roles or saved preference
+ // When active profile switches, restore saved preference or default to profile-targeted roles
  useEffect(() => {
  if (currentProfile) {
  const saved = loadSavedRoleSelections(currentProfile.id);
- if (saved && Array.isArray(saved) && saved.length > 0) {
- setSelectedRoleIds(saved);
- } else {
  const auto = getProfileAutoRoles(currentProfile, customRoles);
+ if (saved && Array.isArray(saved) && saved.length > 0) {
+ if (saved.length === 3 && saved.includes('cloud_infra') && saved.includes('sysadmin') && saved.includes('it_support')) {
+ setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
+ } else {
+ setSelectedRoleIds(saved);
+ }
+ } else {
  setSelectedRoleIds(auto && auto.length > 0 ? auto : []);
  }
  }
@@ -533,7 +552,7 @@ export const JobSeeker = ({
   const seekerJobs = useMemo(() => {
     const q = (deferredSearch || '').toLowerCase().trim();
     const candLoc = currentProfile?.location || baseLocation;
-    const isFilteredRoles = roleArchetypeCounts.length > 0 && selectedRoleIds.length < roleArchetypeCounts.length;
+    const isFilteredRoles = roleArchetypeCounts.length > 0 && selectedRoleIds.length > 0 && selectedRoleIds.length < roleArchetypeCounts.length;
 
     const filtered = enrichedPool.filter(job => {
       // 1. Text Search Filter (Fast exit if search term present and not matched)
@@ -613,7 +632,6 @@ export const JobSeeker = ({
 
       // 10. Multi-Role Archetype Filter
       if (isFilteredRoles) {
-        if (selectedRoleIds.length === 0) return false;
         const jobRole = classifyJobRole(job, customRoles);
         if (!selectedRoleIds.includes(jobRole.id)) return false;
       }

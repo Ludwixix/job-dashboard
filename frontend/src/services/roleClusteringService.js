@@ -235,12 +235,37 @@ export const removeCustomRole = (profileId, roleId) => {
 // ─── Classification & Archetype Counting ─────────────────────────────────────
 
 /**
- * Classifies a job title into a primary role archetype (checking custom roles first, then canonical)
+ * Classifies a job into a primary role archetype (checking custom roles first, then canonical).
+ * Executes two-pass matching:
+ * Pass 1: Strict title-first matching to prevent description buzzwords from corrupting the classification.
+ * Pass 2: Fallback to stream, notes, and description if the title is ambiguous.
  */
 export const classifyJobRole = (job, customRoles = []) => {
-  const text = `${job.title || ''} ${job.stream || ''} ${job.notes || ''} ${job.description || ''}`.toLowerCase();
+  const title = (job?.title || '').toLowerCase();
 
-  // Check custom user roles first
+  // ── PASS 1: Job Title Match (Highest Precision) ──────────────────────────
+  if (title) {
+    // Check custom user roles on title
+    if (Array.isArray(customRoles) && customRoles.length > 0) {
+      for (const role of customRoles) {
+        if (role.keywords && role.keywords.some(k => title.includes(k.toLowerCase()))) {
+          return role;
+        }
+      }
+    }
+
+    // Check canonical roles on title
+    for (const role of ROLE_ARCHETYPES) {
+      if (role.keywords.some(k => title.includes(k))) {
+        return role;
+      }
+    }
+  }
+
+  // ── PASS 2: Broader Context Fallback (Stream, Notes, Description) ─────────
+  const text = `${job?.title || ''} ${job?.stream || ''} ${job?.notes || ''} ${job?.description || ''}`.toLowerCase();
+
+  // Check custom user roles on full text
   if (Array.isArray(customRoles) && customRoles.length > 0) {
     for (const role of customRoles) {
       if (role.keywords && role.keywords.some(k => text.includes(k.toLowerCase()))) {
@@ -249,7 +274,7 @@ export const classifyJobRole = (job, customRoles = []) => {
     }
   }
 
-  // Check canonical roles
+  // Check canonical roles on full text
   for (const role of ROLE_ARCHETYPES) {
     if (role.keywords.some(k => text.includes(k))) {
       return role;
@@ -267,7 +292,8 @@ export const classifyJobRole = (job, customRoles = []) => {
  * Returns role recommendations automatically tailored to the candidate's profile
  */
 export const getProfileAutoRoles = (profile, customRoles = []) => {
-  if (!profile) return ['cloud_infra', 'sysadmin', 'it_support'];
+  const allTechRoleIds = ROLE_ARCHETYPES.filter(r => r.category === 'Technology & IT').map(r => r.id);
+  if (!profile) return allTechRoleIds;
 
   const targetTitles = (profile.targetTitles || []).map(t => t.toLowerCase());
   const skills = (profile.coreSkills || []).map(s => s.toLowerCase());
@@ -299,7 +325,14 @@ export const getProfileAutoRoles = (profile, customRoles = []) => {
       matchesIndustry = role.category === 'Growth & Marketing';
     } else if (industry.includes('hr') || industry.includes('people')) {
       matchesIndustry = role.id === 'hr_talent';
-    } else if (industry.includes('tech') || industry.includes('it')) {
+    } else if (
+      industry.includes('tech') || 
+      industry.includes('it') || 
+      industry.includes('software') || 
+      industry.includes('cloud') || 
+      industry.includes('computer') ||
+      industry.includes('information')
+    ) {
       matchesIndustry = role.category === 'Technology & IT';
     }
 
@@ -317,9 +350,7 @@ export const getProfileAutoRoles = (profile, customRoles = []) => {
       recommendedIds.add('accounting_tax');
       recommendedIds.add('fpa_analysis');
     } else {
-      recommendedIds.add('cloud_infra');
-      recommendedIds.add('sysadmin');
-      recommendedIds.add('it_support');
+      allTechRoleIds.forEach(id => recommendedIds.add(id));
     }
   }
 

@@ -3,9 +3,11 @@ import {
   Lock, ArrowRight, ShieldCheck, AlertCircle, 
   User, Mail, Key, Loader2, LogIn, UserPlus, Fingerprint, CheckCircle2 
 } from 'lucide-react';
-import { loginWithEmail, registerWithEmail, validatePasswordStrength } from '../services/authService';
+import { loginWithEmail, registerWithEmail, validatePasswordStrength, setSession } from '../services/authService';
 import { loginWithGoogle } from '../services/googleAuthService';
 import { loginWithBrowserPasskey } from '../services/passkeyService';
+import { getBackendApiBase } from '../services/apiConfig';
+import { saveProfile } from '../services/profileService';
 
 const SITE_PASSCODE = 'Scamper123';
 import { setSiteUnlocked } from '../utils/siteGateStorage';
@@ -136,7 +138,7 @@ export default function SiteGate({ onUnlock = () => {} }) {
   };
 
   // Administrative Passcode Fallback
-  const handlePasscodeSubmit = (e) => {
+  const handlePasscodeSubmit = async (e) => {
     e.preventDefault();
     setError('');
     const input = passcode.trim();
@@ -146,7 +148,38 @@ export default function SiteGate({ onUnlock = () => {} }) {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const apiBase = getBackendApiBase();
+      const res = await fetch(`${apiBase}/api/passcode-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: input })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || 'Incorrect passcode. Access denied.');
+        setIsLoading(false);
+        return;
+      }
+
+      setSiteUnlocked(true);
+      const sessionUser = {
+        id: data.user?.id || 'sam_ludwig',
+        profileId: data.user?.id || 'sam_ludwig',
+        name: data.user?.name || 'Sam Ludwig',
+        email: data.user?.email || 'sam.ludwig@gmail.com',
+        authProvider: 'passcode',
+        onboardingCompleted: true,
+        site_unlocked: true,
+        lastActiveAt: new Date().toISOString()
+      };
+      setSession(sessionUser, data.token);
+      if (data.profile) {
+        saveProfile(data.profile);
+      }
+      onUnlock(sessionUser);
+    } catch {
+      // Local fallback in case network error occurs
       if (input === SITE_PASSCODE) {
         setSiteUnlocked(true);
         const sessionUser = {
@@ -159,13 +192,14 @@ export default function SiteGate({ onUnlock = () => {} }) {
           site_unlocked: true,
           lastActiveAt: new Date().toISOString()
         };
-        localStorage.setItem('job_dashboard_current_user_session', JSON.stringify(sessionUser));
+        setSession(sessionUser, null);
         onUnlock(sessionUser);
       } else {
         setError('Incorrect passcode. Access denied.');
-        setIsLoading(false);
       }
-    }, 250);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

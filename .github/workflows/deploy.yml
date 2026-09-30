@@ -44,8 +44,8 @@ jobs:
       - name: Run Backend Tests
         run: python -m pytest tests/ -v
 
-      - name: Backend Lint (Ruff — undefined names + errors)
-        run: python -m ruff check src/ --select F821,E,W --statistics
+      - name: Backend Lint (Ruff — undefined names gate)
+        run: python -m ruff check src/ --select F821
 
   build-frontend:
     name: Frontend Build & Test

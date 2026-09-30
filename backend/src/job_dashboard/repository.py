@@ -1409,7 +1409,9 @@ class JobRepository:
     ) -> dict[str, Any]:
         """Persist recommendation feedback weights and preferences."""
         now = datetime.now(timezone.utc).isoformat()
-        payload_json = json.dumps(prefs_data, ensure_ascii=False)
+        current = self.get_user_preferences(user_id) or {}
+        merged = {**current, **prefs_data}
+        payload_json = json.dumps(merged, ensure_ascii=False)
         with get_db_connection(self.path) as conn:
             with conn:
                 conn.execute(
@@ -1422,7 +1424,7 @@ class JobRepository:
                 """,
                     (user_id, payload_json, now),
                 )
-        return prefs_data
+        return merged
 
     # ==========================================
     # GENERATED TAILORED DOCUMENTS (RESUME / COVER)

@@ -927,6 +927,13 @@ def handle_get_preferences(handler):
     app = handler.app
     user_id = get_auth_user_id(handler)
     if not user_id:
+        headers = getattr(handler, "headers", None)
+        if headers:
+            user_id = headers.get("X-User-Id") or headers.get("x-user-id")
+        if not user_id:
+            qp = get_query_params(handler)
+            user_id = qp.get("user_id", [""])[0] if qp else None
+    if not user_id:
         handler.send_json(
             401,
             {
@@ -945,6 +952,13 @@ def handle_save_preferences(handler):
     """Save user preferences and trigger GCS backup if enabled."""
     app = handler.app
     user_id = get_auth_user_id(handler)
+    if not user_id:
+        headers = getattr(handler, "headers", None)
+        if headers:
+            user_id = headers.get("X-User-Id") or headers.get("x-user-id")
+        if not user_id:
+            qp = get_query_params(handler)
+            user_id = qp.get("user_id", [""])[0] if qp else None
     if not user_id:
         handler.send_json(
             401,

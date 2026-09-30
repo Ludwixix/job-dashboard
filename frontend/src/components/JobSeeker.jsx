@@ -47,6 +47,11 @@ import {
 } from '../services/roleClusteringService';
 import { getCommuteDetails } from '../services/commuteService';
 import { recordJobInteraction, generateSmartJobSuggestions } from '../services/profileLearningEngine';
+import { 
+  DEFAULT_VIEW_SETTINGS, 
+  getViewSettings, 
+  saveViewSettings 
+} from '../services/viewSettingsService';
 
 import { EmptyState } from './ui/EmptyState';
 import { cleanDescriptionText } from '../services/dataService';
@@ -193,8 +198,8 @@ export const JobSeeker = ({
  const [search, setSearch] = useState('');
  const deferredSearch = useDeferredValue(search);
  const isSearchPending = search !== deferredSearch;
- const [sourceFilter, setSourceFilter] = useState('All');
- const [activeStreamTab, setActiveStreamTab] = useState('All');
+ const [sourceFilter, setSourceFilter] = useState(() => getViewSettings().sourceFilter);
+ const [activeStreamTab, setActiveStreamTab] = useState(() => getViewSettings().activeStreamTab);
  const [starredJobIds, setStarredJobIds] = useState(() => {
  const saved = localStorage.getItem('starred_jobs');
  return saved ? JSON.parse(saved) : [];
@@ -217,21 +222,75 @@ export const JobSeeker = ({
  }
  }
  };
- const [docsReadyFilter, setDocsReadyFilter] = useState(false);
- const [minSalaryFilter, setMinSalaryFilter] = useState('All');
- const [minScoreFilter, setMinScoreFilter] = useState('All');
- const [workModeFilter, setWorkModeFilter] = useState('All');
- const [maxDistanceFilter, setMaxDistanceFilter] = useState('All');
- const [maxAgeFilter, setMaxAgeFilter] = useState('13days');
- const [sortBy, setSortBy] = useState('score'); // DEFAULT: HIGHEST PROFILE MATCH SCORE FIRST
- const [sortDirection, setSortDirection] = useState('desc');
- const [showSidebar, setShowSidebar] = useState(true);
+ const [docsReadyFilter, setDocsReadyFilter] = useState(() => Boolean(getViewSettings().docsReadyFilter));
+ const [minSalaryFilter, setMinSalaryFilter] = useState(() => getViewSettings().minSalaryFilter);
+ const [minScoreFilter, setMinScoreFilter] = useState(() => getViewSettings().minScoreFilter);
+ const [workModeFilter, setWorkModeFilter] = useState(() => getViewSettings().workModeFilter);
+ const [maxDistanceFilter, setMaxDistanceFilter] = useState(() => getViewSettings().maxDistanceFilter);
+ const [maxAgeFilter, setMaxAgeFilter] = useState(() => getViewSettings().maxAgeFilter);
+ const [sortBy, setSortBy] = useState(() => getViewSettings().sortBy || 'date'); // DEFAULT: MOST RECENT (NEWEST FIRST)
+ const [sortDirection, setSortDirection] = useState(() => getViewSettings().sortDirection || 'desc');
+ const [showSidebar, setShowSidebar] = useState(() => getViewSettings().showSidebar !== false);
 
 
  // Interactive Pagination & Batch Loading State
  const [currentPage, setCurrentPage] = useState(1);
- const [pageSize, setPageSize] = useState(48); // 24, 48, 96, 'All'
+ const [pageSize, setPageSize] = useState(() => getViewSettings().pageSize || 48); // 24, 48, 96, 'All'
  const gridTopRef = useRef(null);
+
+ // Synchronize and persist any view setting change immediately (localStorage + remote SQLite preferences)
+ useEffect(() => {
+ saveViewSettings({
+ sortBy,
+ sortDirection,
+ pageSize,
+ sourceFilter,
+ activeStreamTab,
+ docsReadyFilter,
+ minSalaryFilter,
+ minScoreFilter,
+ workModeFilter,
+ maxDistanceFilter,
+ maxAgeFilter,
+ showSidebar,
+ });
+ }, [
+ sortBy,
+ sortDirection,
+ pageSize,
+ sourceFilter,
+ activeStreamTab,
+ docsReadyFilter,
+ minSalaryFilter,
+ minScoreFilter,
+ workModeFilter,
+ maxDistanceFilter,
+ maxAgeFilter,
+ showSidebar,
+ ]);
+
+ // Reactive listener for settings hydration from cross-device/browser sync
+ useEffect(() => {
+ const handleRemoteSettings = (e) => {
+ if (e.detail) {
+ const s = e.detail;
+ if (s.sortBy) setSortBy(s.sortBy);
+ if (s.sortDirection) setSortDirection(s.sortDirection);
+ if (s.pageSize) setPageSize(s.pageSize);
+ if (s.sourceFilter) setSourceFilter(s.sourceFilter);
+ if (s.activeStreamTab) setActiveStreamTab(s.activeStreamTab);
+ if (typeof s.docsReadyFilter !== 'undefined') setDocsReadyFilter(Boolean(s.docsReadyFilter));
+ if (s.minSalaryFilter) setMinSalaryFilter(s.minSalaryFilter);
+ if (s.minScoreFilter) setMinScoreFilter(s.minScoreFilter);
+ if (s.workModeFilter) setWorkModeFilter(s.workModeFilter);
+ if (s.maxDistanceFilter) setMaxDistanceFilter(s.maxDistanceFilter);
+ if (s.maxAgeFilter) setMaxAgeFilter(s.maxAgeFilter);
+ if (typeof s.showSidebar !== 'undefined') setShowSidebar(Boolean(s.showSidebar));
+ }
+ };
+ window.addEventListener('job-view-settings-changed', handleRemoteSettings);
+ return () => window.removeEventListener('job-view-settings-changed', handleRemoteSettings);
+ }, []);
 
  const [selectedForGenerator, setSelectedForGenerator] = useState(null);
  const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
@@ -637,9 +696,13 @@ export const JobSeeker = ({
       return true;
     });
 
-    // Sorting logic (Defaults to Profile Match Score High -> Low + Most Recent Date Tiebreaker)
+    // Sorting logic (Defaults to Most Recent Date Newest -> Oldest + Score Tiebreaker)
     return filtered.sort((a, b) => {
-      if (sortBy === 'score' || !sortBy) {
+      if (sortBy === 'date' || !sortBy) {
+        const dateComp = compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
+        if (dateComp !== 0) return dateComp;
+        return (b.score || 0) - (a.score || 0);
+      } else if (sortBy === 'score') {
         const scoreDiff = (sortDirection === 'asc' ? 1 : -1) * ((b.score || 0) - (a.score || 0));
         if (scoreDiff !== 0) return scoreDiff;
         return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
@@ -656,8 +719,6 @@ export const JobSeeker = ({
         if (dateComp !== 0) return dateComp;
         
         return scoreB - scoreA;
-      } else if (sortBy === 'date') {
-        return compareJobPostedDates(a.date || a.posted, b.date || b.posted, sortDirection);
       } else if (sortBy === 'company') {
         return (a.company || '').localeCompare(b.company || '');
       }
@@ -748,19 +809,22 @@ export const JobSeeker = ({
 
  const resetAllFilters = () => {
  setSearch('');
- setSourceFilter('All');
- setActiveStreamTab('All');
- setDocsReadyFilter(false);
- setMinSalaryFilter('All');
- setMinScoreFilter('All');
- setWorkModeFilter('All');
- setMaxDistanceFilter('All');
- setMaxAgeFilter('13days');
- setSortBy('score');
+ setSourceFilter(DEFAULT_VIEW_SETTINGS.sourceFilter);
+ setActiveStreamTab(DEFAULT_VIEW_SETTINGS.activeStreamTab);
+ setDocsReadyFilter(DEFAULT_VIEW_SETTINGS.docsReadyFilter);
+ setMinSalaryFilter(DEFAULT_VIEW_SETTINGS.minSalaryFilter);
+ setMinScoreFilter(DEFAULT_VIEW_SETTINGS.minScoreFilter);
+ setWorkModeFilter(DEFAULT_VIEW_SETTINGS.workModeFilter);
+ setMaxDistanceFilter(DEFAULT_VIEW_SETTINGS.maxDistanceFilter);
+ setMaxAgeFilter(DEFAULT_VIEW_SETTINGS.maxAgeFilter);
+ setSortBy(DEFAULT_VIEW_SETTINGS.sortBy);
+ setSortDirection(DEFAULT_VIEW_SETTINGS.sortDirection);
+ setPageSize(DEFAULT_VIEW_SETTINGS.pageSize);
+ saveViewSettings(DEFAULT_VIEW_SETTINGS);
  setCurrentPage(1);
  };
 
- const isFiltered = search !== '' || sourceFilter !== 'All' || activeStreamTab !== 'All' || docsReadyFilter || minSalaryFilter !== 'All' || minScoreFilter !== 'All' || workModeFilter !== 'All' || maxDistanceFilter !== 'All' || maxAgeFilter !== '13days' || sortBy !== 'score' || sortDirection !== 'desc';
+ const isFiltered = search !== '' || sourceFilter !== DEFAULT_VIEW_SETTINGS.sourceFilter || activeStreamTab !== DEFAULT_VIEW_SETTINGS.activeStreamTab || docsReadyFilter !== DEFAULT_VIEW_SETTINGS.docsReadyFilter || minSalaryFilter !== DEFAULT_VIEW_SETTINGS.minSalaryFilter || minScoreFilter !== DEFAULT_VIEW_SETTINGS.minScoreFilter || workModeFilter !== DEFAULT_VIEW_SETTINGS.workModeFilter || maxDistanceFilter !== DEFAULT_VIEW_SETTINGS.maxDistanceFilter || maxAgeFilter !== DEFAULT_VIEW_SETTINGS.maxAgeFilter || sortBy !== DEFAULT_VIEW_SETTINGS.sortBy || sortDirection !== DEFAULT_VIEW_SETTINGS.sortDirection;
 
  const handleRunScraper = async () => {
  if (typeof onTriggerScrape === 'function') {
@@ -1159,8 +1223,8 @@ export const JobSeeker = ({
  value={sortBy}
  onChange={(e) => setSortBy(e.target.value)}
  >
- <option className="bg-slate-900 text-slate-200" value="score">⭐ MATCH RELEVANCE (DEFAULT)</option>
- <option className="bg-slate-900 text-slate-200" value="date">MOST RECENT (NEWEST FIRST)</option>
+ <option className="bg-slate-900 text-slate-200" value="date">⚡ MOST RECENT (NEWEST FIRST) (DEFAULT)</option>
+ <option className="bg-slate-900 text-slate-200" value="score">⭐ MATCH RELEVANCE</option>
  <option className="bg-slate-900 text-slate-200" value="best_and_newest">MATCH TIER + RECENT</option>
  <option className="bg-slate-900 text-slate-200" value="company">COMPANY (A-Z)</option>
  </select>

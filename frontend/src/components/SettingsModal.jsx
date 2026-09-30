@@ -20,6 +20,7 @@ import {
  getWorkforceSettings, 
  saveWorkforceSettings 
 } from '../services/workforceAustraliaService';
+import { getUserPreferences, savePreferencesToBackend } from '../services/scoringEngine';
 
 export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  const [activeTab, setActiveTab] = useState(initialTab);
@@ -205,6 +206,32 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  detail: { enabled: workforceEnabled }
  }));
  }
+
+ // Non-blocking sync to backend preferences
+ try {
+ const activeUserId = getProfiles()[0]?.id;
+ if (activeUserId) {
+ const existingPrefs = getUserPreferences();
+ savePreferencesToBackend(
+ {
+ ...existingPrefs,
+ platform_settings: {
+ pref_au_english: auEnglish,
+ job_dashboard_base_location: defaultLocation.trim(),
+ pref_match_threshold: matchThreshold,
+ workforce_settings: {
+ enabled: workforceEnabled,
+ pointsTarget: workforceTarget,
+ cycleStartDay: workforceCycleDay,
+ jobseekerId: workforceJsid,
+ providerName: workforceProvider,
+ },
+ },
+ },
+ activeUserId
+ ).catch(() => {});
+ }
+ } catch {}
 
 
  setSaveSuccess(true);

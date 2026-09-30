@@ -174,14 +174,17 @@ export const savePreferencesToBackend = async (prefs, userId) => {
     throw new Error('Authentication required: valid userId or active profile is required to save preferences.');
   }
   const apiBase = getBackendApiBase();
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('job_dashboard_auth_token') || localStorage.getItem('job_dashboard_token')) : null;
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-User-Id': targetUserId
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
     const res = await fetch(`${apiBase}/api/preferences`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': targetUserId
-      },
+      headers,
       body: JSON.stringify(prefs)
     });
     if (res.ok) {
@@ -204,15 +207,28 @@ export const fetchPreferencesFromBackend = async (userId) => {
     return getUserPreferences();
   }
   const apiBase = getBackendApiBase();
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('job_dashboard_auth_token') || localStorage.getItem('job_dashboard_token')) : null;
+  const headers = { 'X-User-Id': targetUserId };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
     const res = await fetch(`${apiBase}/api/preferences?user_id=${encodeURIComponent(targetUserId)}`, {
-      headers: { 'X-User-Id': targetUserId }
+      headers
     });
     if (res.ok) {
       const data = await res.json();
       if (data && data.preferences && Object.keys(data.preferences).length > 0) {
         saveUserPreferences(data.preferences);
+        try {
+          if (data.preferences.view_settings) {
+            const { applyRemoteViewSettings } = await import('./viewSettingsService');
+            applyRemoteViewSettings(data.preferences.view_settings);
+          }
+          if (data.preferences.platform_settings) {
+            const { applyRemotePlatformSettings } = await import('./viewSettingsService');
+            applyRemotePlatformSettings(data.preferences.platform_settings);
+          }
+        } catch {}
         return data.preferences;
       }
     }

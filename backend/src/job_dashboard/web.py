@@ -1457,8 +1457,84 @@ class DashboardApp:
         )
         return any(value and is_recent({"posted": value}, days=days) for value in dates)
 
+    def get_sources_for_scrape(self, user_id: str | None = None) -> list[Any]:
+        """Return active job sources, substituting Apify scrapers where enabled."""
+        apify_settings = None
+        if user_id and getattr(self, "repository", None):
+            try:
+                prefs = self.repository.get_user_preferences(user_id) or {}
+                apify_settings = prefs.get("apify_settings")
+            except Exception:
+                pass
+        if not apify_settings and getattr(self, "repository", None):
+            try:
+                prefs = self.repository.get_user_preferences("default_user") or {}
+                apify_settings = prefs.get("apify_settings")
+            except Exception:
+                pass
+
+        token = (
+            (apify_settings.get("api_token") if apify_settings else None)
+            or os.getenv("APIFY_API_TOKEN")
+            or os.getenv("JOB_DASHBOARD_APIFY_API_TOKEN")
+        )
+        platforms = (apify_settings.get("platforms") if apify_settings else {}) or {}
+
+        from .sources.apify_platform import ApifyPlatformSource, DEFAULT_APIFY_ACTORS
+
+        resolved = []
+        covered_platforms = set()
+        for src in self.sources:
+            src_name = getattr(src, "name", "").lower()
+            covered_platforms.add(src_name)
+            plat_cfg = platforms.get(src_name, {})
+            is_enabled = plat_cfg.get("enabled", False)
+
+            if is_enabled and token:
+                actor_id = plat_cfg.get("actor_id") or DEFAULT_APIFY_ACTORS.get(
+                    src_name
+                )
+                max_results = plat_cfg.get("max_results", 20)
+                mode = plat_cfg.get("mode", "primary")
+                resolved.append(
+                    ApifyPlatformSource(
+                        platform=src_name,
+                        api_token=token,
+                        actor_id=actor_id,
+                        max_results=max_results,
+                        mode=mode,
+                        native_source=src,
+                    )
+                )
+            else:
+                resolved.append(src)
+
+        # If any platform is enabled in Apify settings but not present in self.sources
+        for plat_name, plat_cfg in platforms.items():
+            if plat_name not in covered_platforms and plat_cfg.get("enabled") and token:
+                actor_id = plat_cfg.get("actor_id") or DEFAULT_APIFY_ACTORS.get(
+                    plat_name
+                )
+                max_results = plat_cfg.get("max_results", 20)
+                resolved.append(
+                    ApifyPlatformSource(
+                        platform=plat_name,
+                        api_token=token,
+                        actor_id=actor_id,
+                        max_results=max_results,
+                        mode="primary",
+                    )
+                )
+
+        return resolved if resolved else list(self.sources)
+
     def refresh(
-        self, queries, force: bool = False, ttl_hours: float = 12.0, on_progress=None
+        self,
+        queries,
+        force: bool = False,
+        ttl_hours: float = 12.0,
+        on_progress=None,
+        user_id: str | None = None,
     ):
         self.db_ready_event.wait(timeout=5.0)
         with self.lock:
@@ -1631,8 +1707,9 @@ class DashboardApp:
                         f"Scanning {len(queries_to_scrape)} live employment gateway queries...",
                         10,
                     )
+                active_sources = self.get_sources_for_scrape(user_id=user_id)
                 pipeline = ScrapePipeline(
-                    self.sources, days=14, health_check=self.health_check
+                    active_sources, days=14, health_check=self.health_check
                 )
                 fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
                 pipeline_errors = pipeline.errors

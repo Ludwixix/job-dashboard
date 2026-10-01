@@ -197,6 +197,86 @@ class JobRepository:
                 except sqlite3.OperationalError:
                     pass
 
+            # Ensure M1 telemetry and achievement tables exist on existing legacy databases
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS user_learning_telemetry (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        interaction_type TEXT NOT NULL DEFAULT '',
+                        signal_weight REAL NOT NULL,
+                        job_id TEXT DEFAULT '',
+                        job_title TEXT DEFAULT '',
+                        company TEXT DEFAULT '',
+                        skills_json TEXT NOT NULL DEFAULT '[]',
+                        job_snapshot_json TEXT NOT NULL DEFAULT '{}',
+                        metadata_json TEXT NOT NULL DEFAULT '{}',
+                        occurred_at TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_telemetry_user ON user_learning_telemetry(user_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_telemetry_user_time ON user_learning_telemetry(user_id, occurred_at DESC, created_at DESC)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_telemetry_job ON user_learning_telemetry(job_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_telemetry_type ON user_learning_telemetry(event_type)"
+                )
+
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS user_achievements (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        achievement_id TEXT NOT NULL,
+                        unlocked INTEGER NOT NULL DEFAULT 0,
+                        progress_value REAL NOT NULL DEFAULT 0.0,
+                        target_value REAL NOT NULL DEFAULT 1.0,
+                        progress REAL NOT NULL DEFAULT 0.0,
+                        target REAL NOT NULL DEFAULT 1.0,
+                        unlocked_at TEXT,
+                        metadata_json TEXT NOT NULL DEFAULT '{}',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        UNIQUE(user_id, achievement_id)
+                    )
+                """)
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_achievements_user ON user_achievements(user_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_achievements_user_ach ON user_achievements(user_id, achievement_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_achievements_unlocked ON user_achievements(user_id, unlocked, unlocked_at DESC)"
+                )
+
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS user_gamification (
+                        user_id TEXT PRIMARY KEY,
+                        total_xp INTEGER NOT NULL DEFAULT 0,
+                        current_level INTEGER NOT NULL DEFAULT 1,
+                        current_streak_days INTEGER NOT NULL DEFAULT 0,
+                        longest_streak_days INTEGER NOT NULL DEFAULT 0,
+                        last_applied_date_melbourne TEXT DEFAULT '',
+                        discovered_jobs_count INTEGER NOT NULL DEFAULT 0,
+                        sound_enabled INTEGER NOT NULL DEFAULT 1,
+                        visual_effects_enabled INTEGER NOT NULL DEFAULT 1,
+                        history_json TEXT NOT NULL DEFAULT '[]',
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_user_gamification_user ON user_gamification(user_id)"
+                )
+            except sqlite3.OperationalError as schema_err:
+                logger.debug(f"Telemetry schema initialization notice: {schema_err}")
+
             default_flags = [
                 (
                     "automated_gmail_sync",
@@ -1097,6 +1177,44 @@ class JobRepository:
                 """,
                     (job_id, status, now),
                 )
+
+        # Multi-signal telemetry auto-recording for application progression
+        try:
+            status_lower = status.lower()
+            event_type = None
+            if status_lower in ("applied", "submitted", "application_sent"):
+                event_type = "applied"
+            elif status_lower in (
+                "interviewing",
+                "interview_scheduled",
+                "stage_progression",
+            ):
+                event_type = "interview_scheduled"
+            elif status_lower in ("rejected", "dismissed", "demoted"):
+                event_type = "rejected"
+            elif status_lower in ("starred", "saved", "promoted"):
+                event_type = "starred"
+
+            if event_type:
+                job_rec = data.get("job_data") or data
+                self.insert_telemetry_event(
+                    {
+                        "user_id": user_id,
+                        "event_type": event_type,
+                        "job_id": job_id,
+                        "job_title": job_rec.get("title") or "",
+                        "company": job_rec.get("company") or "",
+                        "skills": job_rec.get("skills") or [],
+                        "job_snapshot": job_rec if isinstance(job_rec, dict) else {},
+                        "metadata": {
+                            "source": "application_status_update",
+                            "status": status,
+                        },
+                        "occurred_at": now,
+                    }
+                )
+        except Exception as tel_err:  # noqa: BLE001
+            logger.debug(f"Telemetry auto-logging notice: {tel_err}")
 
         return {
             "id": app_id,
@@ -2320,3 +2438,345 @@ class JobRepository:
             )
             row = cursor.fetchone()
             return int(row[0]) if row else 0
+
+    # ==========================================
+    # MULTI-SIGNAL TELEMETRY & ACHIEVEMENTS
+    # ==========================================
+
+    def insert_telemetry_event(self, event_data: dict[str, Any]) -> int:
+        """Insert an immutable interaction telemetry event with weighted signal."""
+        now = datetime.now(timezone.utc).isoformat()
+        user_id = str(event_data.get("user_id") or "sam_ludwig").strip()
+        event_type = str(
+            event_data.get("event_type")
+            or event_data.get("interaction_type")
+            or "viewed"
+        ).strip()
+
+        # Calculate or use provided weight
+        weight = event_data.get("signal_weight")
+        if weight is None:
+            from .telemetry import get_signal_weight
+
+            weight = get_signal_weight(event_type)
+        else:
+            weight = float(weight)
+
+        job_id = str(event_data.get("job_id") or "").strip()
+        snapshot_raw = event_data.get("job_snapshot") or event_data.get("job")
+        snapshot = snapshot_raw if isinstance(snapshot_raw, dict) else {}
+        job_title = str(
+            event_data.get("job_title") or snapshot.get("title") or ""
+        ).strip()
+        company = str(
+            event_data.get("company") or snapshot.get("company") or ""
+        ).strip()
+
+        skills = event_data.get("skills") or snapshot.get("skills") or []
+        skills_json = (
+            json.dumps(skills, ensure_ascii=False, default=str)
+            if isinstance(skills, list)
+            else "[]"
+        )
+        job_snapshot_json = (
+            json.dumps(snapshot, ensure_ascii=False, default=str)
+            if isinstance(snapshot, dict)
+            else "{}"
+        )
+        metadata = event_data.get("metadata") or {}
+        metadata_json = (
+            json.dumps(metadata, ensure_ascii=False, default=str)
+            if isinstance(metadata, dict)
+            else "{}"
+        )
+
+        occurred_at = str(
+            event_data.get("occurred_at") or event_data.get("created_at") or now
+        ).strip()
+        created_at = str(event_data.get("created_at") or now).strip()
+
+        with get_db_connection(self.path) as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO user_learning_telemetry (
+                    user_id, event_type, interaction_type, signal_weight,
+                    job_id, job_title, company, skills_json,
+                    job_snapshot_json, metadata_json, occurred_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    event_type,
+                    event_type,
+                    weight,
+                    job_id,
+                    job_title,
+                    company,
+                    skills_json,
+                    job_snapshot_json,
+                    metadata_json,
+                    occurred_at,
+                    created_at,
+                ),
+            )
+            event_id = cursor.lastrowid
+            conn.commit()
+            return int(event_id)
+
+    def batch_insert_telemetry(self, events: list[dict[str, Any]]) -> list[int]:
+        """Batch insert telemetry events in a single operation."""
+        ids: list[int] = []
+        for e in events:
+            ids.append(self.insert_telemetry_event(e))
+        return ids
+
+    def get_telemetry_events(
+        self,
+        user_id: str,
+        limit: int = 100,
+        since: str | None = None,
+        event_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch telemetry events for user with optional filters."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            sql = "SELECT * FROM user_learning_telemetry WHERE (user_id = ? OR LOWER(user_id) = LOWER(?))"
+            params: list[Any] = [user_id, user_id]
+
+            if since:
+                sql += " AND occurred_at >= ?"
+                params.append(since)
+            if event_type:
+                sql += " AND (event_type = ? OR interaction_type = ?)"
+                params.extend([event_type, event_type])
+
+            sql += " ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+
+            rows = conn.execute(sql, params).fetchall()
+            results: list[dict[str, Any]] = []
+            for r in rows:
+                item = dict(r)
+                try:
+                    item["skills"] = json.loads(item.get("skills_json") or "[]")
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    item["skills"] = []
+                try:
+                    item["job_snapshot"] = json.loads(
+                        item.get("job_snapshot_json") or "{}"
+                    )
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    item["job_snapshot"] = {}
+                try:
+                    item["metadata"] = json.loads(item.get("metadata_json") or "{}")
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    item["metadata"] = {}
+                results.append(item)
+            return results
+
+    def get_user_achievements(self, user_id: str) -> list[dict[str, Any]]:
+        """Fetch all achievement records for a user."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM user_achievements WHERE user_id = ? OR LOWER(user_id) = LOWER(?) ORDER BY achievement_id ASC",
+                (user_id, user_id),
+            ).fetchall()
+            results: list[dict[str, Any]] = []
+            for r in rows:
+                item = dict(r)
+                try:
+                    item["metadata"] = json.loads(item.get("metadata_json") or "{}")
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    item["metadata"] = {}
+                results.append(item)
+            return results
+
+    def upsert_user_achievement(
+        self,
+        user_id: str,
+        achievement_id: str,
+        progress: float,
+        target: float = 1.0,
+        unlocked: bool | int = False,
+        unlocked_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Upsert a single user achievement progress and unlock status."""
+        now = datetime.now(timezone.utc).isoformat()
+        unlocked_int = 1 if unlocked else 0
+        meta_json = json.dumps(metadata or {}, ensure_ascii=False, default=str)
+
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO user_achievements (
+                        user_id, achievement_id, unlocked, progress_value, target_value,
+                        progress, target, unlocked_at, metadata_json, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, achievement_id) DO UPDATE SET
+                        unlocked = excluded.unlocked,
+                        progress_value = excluded.progress_value,
+                        target_value = excluded.target_value,
+                        progress = excluded.progress,
+                        target = excluded.target,
+                        unlocked_at = CASE WHEN excluded.unlocked_at IS NOT NULL THEN excluded.unlocked_at ELSE user_achievements.unlocked_at END,
+                        metadata_json = CASE WHEN excluded.metadata_json != '{}' THEN excluded.metadata_json ELSE user_achievements.metadata_json END,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        user_id,
+                        achievement_id,
+                        unlocked_int,
+                        progress,
+                        target,
+                        progress,
+                        target,
+                        unlocked_at,
+                        meta_json,
+                        now,
+                        now,
+                    ),
+                )
+            row = conn.execute(
+                "SELECT * FROM user_achievements WHERE user_id = ? AND achievement_id = ?",
+                (user_id, achievement_id),
+            ).fetchone()
+            if row:
+                res = dict(row)
+                try:
+                    res["metadata"] = json.loads(res.get("metadata_json") or "{}")
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    res["metadata"] = {}
+                return res
+            return {
+                "user_id": user_id,
+                "achievement_id": achievement_id,
+                "unlocked": unlocked_int,
+                "progress": progress,
+                "target": target,
+                "unlocked_at": unlocked_at,
+            }
+
+    def batch_upsert_achievements(
+        self, user_id: str, achievements: list[dict[str, Any]]
+    ) -> int:
+        """Batch upsert achievements for a user."""
+        count = 0
+        for ach in achievements:
+            self.upsert_user_achievement(
+                user_id=user_id,
+                achievement_id=ach["achievement_id"],
+                progress=float(ach.get("progress", ach.get("progress_value", 0.0))),
+                target=float(ach.get("target", ach.get("target_value", 1.0))),
+                unlocked=bool(ach.get("unlocked", False)),
+                unlocked_at=ach.get("unlocked_at"),
+                metadata=ach.get("metadata"),
+            )
+            count += 1
+        return count
+
+    def get_user_gamification(self, user_id: str) -> dict[str, Any] | None:
+        """Fetch core gamification and progression state for a user."""
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM user_gamification WHERE user_id = ? OR LOWER(user_id) = LOWER(?)",
+                (user_id, user_id),
+            ).fetchone()
+            if not row:
+                return None
+            res = dict(row)
+            try:
+                res["history"] = json.loads(res.get("history_json") or "[]")
+            except (ValueError, TypeError, json.JSONDecodeError):
+                res["history"] = []
+            return res
+
+    def upsert_user_gamification(
+        self,
+        user_id: str,
+        total_xp: int = 0,
+        current_level: int = 1,
+        current_streak: int = 0,
+        longest_streak: int = 0,
+        last_applied_date_melbourne: str = "",
+        discovered_jobs_count: int = 0,
+        sound_enabled: bool | int = 1,
+        visual_effects_enabled: bool | int = 1,
+        history: list[dict[str, Any]] | str | None = None,
+    ) -> dict[str, Any]:
+        """Upsert core gamification record for a user."""
+        now = datetime.now(timezone.utc).isoformat()
+        sound_int = 1 if sound_enabled else 0
+        vfx_int = 1 if visual_effects_enabled else 0
+        if isinstance(history, list):
+            hist_json = json.dumps(history, ensure_ascii=False, default=str)
+        elif isinstance(history, str):
+            hist_json = history
+        else:
+            hist_json = "[]"
+
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO user_gamification (
+                        user_id, total_xp, current_level, current_streak_days, longest_streak_days,
+                        last_applied_date_melbourne, discovered_jobs_count, sound_enabled,
+                        visual_effects_enabled, history_json, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        total_xp = excluded.total_xp,
+                        current_level = excluded.current_level,
+                        current_streak_days = excluded.current_streak_days,
+                        longest_streak_days = MAX(user_gamification.longest_streak_days, excluded.longest_streak_days),
+                        last_applied_date_melbourne = CASE WHEN excluded.last_applied_date_melbourne != '' THEN excluded.last_applied_date_melbourne ELSE user_gamification.last_applied_date_melbourne END,
+                        discovered_jobs_count = CASE WHEN excluded.discovered_jobs_count > 0 THEN excluded.discovered_jobs_count ELSE user_gamification.discovered_jobs_count END,
+                        sound_enabled = excluded.sound_enabled,
+                        visual_effects_enabled = excluded.visual_effects_enabled,
+                        history_json = CASE WHEN excluded.history_json != '[]' THEN excluded.history_json ELSE user_gamification.history_json END,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        user_id,
+                        int(total_xp),
+                        int(current_level),
+                        int(current_streak),
+                        int(longest_streak),
+                        last_applied_date_melbourne,
+                        int(discovered_jobs_count),
+                        sound_int,
+                        vfx_int,
+                        hist_json,
+                        now,
+                    ),
+                )
+            row = conn.execute(
+                "SELECT * FROM user_gamification WHERE user_id = ?", (user_id,)
+            ).fetchone()
+            if row:
+                res = dict(row)
+                try:
+                    res["history"] = json.loads(res.get("history_json") or "[]")
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    res["history"] = []
+                return res
+            return {
+                "user_id": user_id,
+                "total_xp": total_xp,
+                "current_level": current_level,
+                "current_streak_days": current_streak,
+                "longest_streak_days": longest_streak,
+            }
+
+    def recalculate_user_gamification(
+        self, user_id: str, profile: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Audit all applications and telemetry to recalculate user gamification and persist."""
+        from .gamification import recalculate_user_gamification as _recalc
+
+        return _recalc(user_id=user_id, repository=self, profile=profile)

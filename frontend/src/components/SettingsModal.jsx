@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
  X, Settings, Cpu, KeyRound, Check, CheckCircle2, AlertCircle, 
  ExternalLink, RefreshCw, Eye, EyeOff, ShieldCheck, Sparkles, 
- Sliders, Server, Zap, Compass, MapPin, Info, Search, Plus, Trash2, RotateCcw
+ Sliders, Server, Zap, Compass, MapPin, Info, Search, Plus, Trash2, RotateCcw,
+ Bot, Globe, Layers, Shield
 } from 'lucide-react';
 import { 
  PROVIDERS, 
@@ -21,6 +22,13 @@ import {
  saveWorkforceSettings 
 } from '../services/workforceAustraliaService';
 import { getUserPreferences, savePreferencesToBackend } from '../services/scoringEngine';
+import {
+  getScraperSettings,
+  saveScraperSettings,
+  testApifyToken,
+  fetchBackendScraperConfig,
+  DEFAULT_APIFY_ACTORS,
+} from '../services/scraperSettingsService';
 
 export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  const [activeTab, setActiveTab] = useState(initialTab);
@@ -69,6 +77,12 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  const [newQueryLocation, setNewQueryLocation] = useState('');
  const [isRegenerating, setIsRegenerating] = useState(false);
 
+ // Scraper & Apify platform state
+ const [scraperSettings, setScraperSettings] = useState(() => getScraperSettings());
+ const [showApifyToken, setShowApifyToken] = useState(false);
+ const [isTestingApify, setIsTestingApify] = useState(false);
+ const [apifyTestResult, setApifyTestResult] = useState(null);
+
   // Synchronize state from storage whenever modal opens
   useEffect(() => {
     let isMounted = true;
@@ -103,6 +117,21 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
       setWorkforceCycleDay(wf.cycleStartDay);
       setWorkforceJsid(wf.jobseekerId);
       setWorkforceProvider(wf.providerName);
+
+      setScraperSettings(getScraperSettings());
+      setApifyTestResult(null);
+      fetchBackendScraperConfig().then((cloudCfg) => {
+        if (isMounted && cloudCfg) {
+          setScraperSettings((prev) => ({
+            ...cloudCfg,
+            api_token: prev.api_token || cloudCfg.api_token || '',
+            platforms: {
+              ...(cloudCfg.platforms || {}),
+              ...(prev.platforms || {}),
+            },
+          }));
+        }
+      });
 
       setTestResult(null);
       setSaveSuccess(false);
@@ -179,7 +208,40 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  setTestResult(res);
  };
 
- const handleSave = () => {
+ const handleTestApifyConnection = async () => {
+   setIsTestingApify(true);
+   setApifyTestResult(null);
+   try {
+     const res = await testApifyToken(scraperSettings.api_token);
+     setApifyTestResult(res);
+   } catch (err) {
+     setApifyTestResult({ success: false, error: err.message || 'Connection failed' });
+   } finally {
+     setIsTestingApify(false);
+   }
+ };
+
+ const handleUpdatePlatformSetting = (platform, field, value) => {
+   setScraperSettings((prev) => ({
+     ...prev,
+     platforms: {
+       ...prev.platforms,
+       [platform]: {
+         ...(prev.platforms?.[platform] || {}),
+         [field]: value,
+       },
+     },
+   }));
+ };
+
+ const handleResetActorId = (platform) => {
+   const defaultActor = DEFAULT_APIFY_ACTORS[platform];
+   if (defaultActor) {
+     handleUpdatePlatformSetting(platform, 'actor_id', defaultActor);
+   }
+ };
+
+ const handleSave = async () => {
  const modelToSave = isCustomModel ? customModelInput.trim() : selectedModel;
 
  saveLlmConfig({
@@ -233,6 +295,11 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  }
  } catch {}
 
+ try {
+   await saveScraperSettings(scraperSettings);
+ } catch (err) {
+   console.warn('Failed to save scraper settings:', err);
+ }
 
  setSaveSuccess(true);
  setTimeout(() => {
@@ -445,6 +512,17 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
   >
   <Search size={14} className="text-amber-400" />
   <span className="hidden sm:inline">3. </span>SEARCH QUERIES
+  </button>
+  <button
+  onClick={() => setActiveTab('scrapers')}
+  className={`py-2.5 sm:py-3 px-2 sm:px-1 flex items-center gap-1.5 sm:gap-2 border-b-2 font-bold transition-colors cursor-pointer min-h-[44px] shrink-0 touch-target-44 ${
+  activeTab === 'scrapers' 
+  ? 'border-purple-400 text-purple-300' 
+  : 'border-transparent text-slate-400 hover:text-slate-200'
+  }`}
+  >
+  <Bot size={14} className="text-purple-400" />
+  <span className="hidden sm:inline">4. </span>SCRAPERS &amp; APIFY
   </button>
   </div>
 
@@ -1148,6 +1226,298 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  </p>
  </div>
 
+ </div>
+ )}
+
+ {/* ── Scrapers & Apify Tab ─────────────────────────────────── */}
+ {activeTab === 'scrapers' && (
+ <div className="space-y-6">
+ {/* Header info banner */}
+ <div className="p-4 sm:p-5 rounded-sm bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-slate-900 border border-purple-500/30 backdrop-blur-sm">
+ <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+ <div className="flex items-start gap-3">
+ <div className="w-10 h-10 rounded-sm bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0">
+ <Bot size={20} />
+ </div>
+ <div>
+ <div className="flex items-center gap-2">
+ <h3 className="text-sm font-black text-white">Multi-Platform Scrapers &amp; Apify</h3>
+ <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-purple-500/20 text-purple-300 border border-purple-500/30">
+ CLOUD RESILIENCE
+ </span>
+ </div>
+ <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+ Enable Apify actors to bypass portal bot-detection, Cloudflare challenges, and IP rate limits. Configure execution as Primary (Apify first) or Fallback (Native first).
+ </p>
+ </div>
+ </div>
+
+ <a
+ href="https://console.apify.com/account/integrations"
+ target="_blank"
+ rel="noopener noreferrer"
+ className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-all shrink-0 cursor-pointer"
+ >
+ <span>Apify Console</span>
+ <ExternalLink size={12} />
+ </a>
+ </div>
+ </div>
+
+ {/* Apify API Token Configuration Card */}
+ <div className="p-4 sm:p-5 rounded-sm bg-slate-950/60 border border-slate-800 space-y-4">
+ <div className="flex items-center justify-between">
+ <label className="text-xs font-mono font-bold text-slate-200 flex items-center gap-2">
+ <KeyRound size={14} className="text-purple-400" />
+ Global Apify API Token
+ </label>
+ <span className="text-[11px] text-slate-400 font-mono">
+ Shared across enabled platform actors
+ </span>
+ </div>
+
+ <div className="flex flex-col sm:flex-row gap-2">
+ <div className="relative flex-1">
+ <input
+ type={showApifyToken ? 'text' : 'password'}
+ value={scraperSettings.api_token || ''}
+ onChange={(e) => setScraperSettings(prev => ({ ...prev, api_token: e.target.value }))}
+ placeholder="apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-3 py-2 pr-10 text-white font-mono text-xs focus:outline-none focus:border-purple-500"
+ />
+ <button
+ type="button"
+ onClick={() => setShowApifyToken(!showApifyToken)}
+ className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-1"
+ title={showApifyToken ? 'Hide token' : 'Show token'}
+ >
+ {showApifyToken ? <EyeOff size={14} /> : <Eye size={14} />}
+ </button>
+ </div>
+
+ <button
+ type="button"
+ onClick={handleTestApifyConnection}
+ disabled={isTestingApify || !scraperSettings.api_token}
+ className="px-4 py-2 rounded-sm bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+ >
+ {isTestingApify ? (
+ <>
+ <RefreshCw size={13} className="animate-spin" />
+ <span>Verifying...</span>
+ </>
+ ) : (
+ <>
+ <Zap size={13} />
+ <span>Test Connection</span>
+ </>
+ )}
+ </button>
+ </div>
+
+ {/* Token verification feedback */}
+ {apifyTestResult && (
+ <div className={`p-3 rounded-sm border text-xs font-mono flex items-start gap-2 ${
+ apifyTestResult.success
+ ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+ : 'bg-red-950/40 border-red-500/40 text-red-300'
+ }`}>
+ {apifyTestResult.success ? (
+ <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+ ) : (
+ <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+ )}
+ <div>
+ {apifyTestResult.success ? (
+ <div>
+ <span className="font-bold">Token verified successfully!</span>
+ <div className="text-[11px] text-emerald-400/80 mt-0.5">
+ Account: {apifyTestResult.username} • Plan: {apifyTestResult.plan}
+ </div>
+ </div>
+ ) : (
+ <div>
+ <span className="font-bold">Verification failed:</span> {apifyTestResult.error}
+ </div>
+ )}
+ </div>
+ </div>
+ )}
+ </div>
+
+ {/* Platform Matrix Header */}
+ <div>
+ <h4 className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+ <Layers size={14} className="text-purple-400" />
+ Platform Scraping Strategies
+ </h4>
+ <p className="text-[11px] text-slate-400 mt-1">
+ Customize scraping behavior per portal. Seek is preconfigured with Apify primary mode to prevent Cloudflare blockage.
+ </p>
+ </div>
+
+ {/* Platform Cards Grid */}
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+ {[
+ {
+ key: 'seek',
+ name: 'SEEK Australia',
+ badge: 'Primary Portal',
+ badgeColor: 'border-pink-500/30 bg-pink-500/20 text-pink-300',
+ desc: 'Australia’s largest employment board. Cloudflare protected; Apify recommended.',
+ defaultActor: DEFAULT_APIFY_ACTORS.seek,
+ },
+ {
+ key: 'indeed',
+ name: 'Indeed Australia',
+ badge: 'Aggregator',
+ badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-300',
+ desc: 'Global job search engine with extensive Australian tech & operations roles.',
+ defaultActor: DEFAULT_APIFY_ACTORS.indeed,
+ },
+ {
+ key: 'linkedin',
+ name: 'LinkedIn Jobs',
+ badge: 'Professional Network',
+ badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-300',
+ desc: 'Direct corporate listings, executive roles, and tech industry openings.',
+ defaultActor: DEFAULT_APIFY_ACTORS.linkedin,
+ },
+ {
+ key: 'adzuna',
+ name: 'Adzuna Australia',
+ badge: 'Public & Private',
+ badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-300',
+ desc: 'Comprehensive multi-source aggregator covering public sector & enterprise.',
+ defaultActor: DEFAULT_APIFY_ACTORS.adzuna,
+ },
+ ].map((p) => {
+ const platConfig = scraperSettings.platforms?.[p.key] || {
+ enabled: false,
+ mode: 'fallback',
+ actor_id: p.defaultActor,
+ max_results: 20,
+ };
+ const isEnabled = Boolean(platConfig.enabled);
+
+ return (
+ <div
+ key={p.key}
+ className={`p-4 rounded-sm border transition-all ${
+ isEnabled
+ ? 'bg-slate-950/80 border-purple-500/40 shadow-sm shadow-purple-950/20'
+ : 'bg-slate-950/40 border-slate-800'
+ }`}
+ >
+ {/* Header + Toggle */}
+ <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-800/80">
+ <div>
+ <div className="flex items-center gap-2">
+ <span className="font-bold text-white text-xs">{p.name}</span>
+ <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${p.badgeColor}`}>
+ {p.badge}
+ </span>
+ </div>
+ <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{p.desc}</p>
+ </div>
+
+ <input
+ type="checkbox"
+ checked={isEnabled}
+ onChange={(e) => handleUpdatePlatformSetting(p.key, 'enabled', e.target.checked)}
+ className="w-5 h-5 accent-purple-500 rounded cursor-pointer shrink-0"
+ title={`Enable Apify for ${p.name}`}
+ />
+ </div>
+
+ {/* Config fields when enabled */}
+ {isEnabled ? (
+ <div className="pt-3 space-y-3 font-mono text-xs">
+ {/* Mode Selector */}
+ <div>
+ <label className="text-[11px] text-slate-300 font-bold block mb-1.5">
+ Execution Mode
+ </label>
+ <div className="grid grid-cols-2 gap-2">
+ <button
+ type="button"
+ onClick={() => handleUpdatePlatformSetting(p.key, 'mode', 'primary')}
+ className={`py-1.5 px-2 rounded-sm border text-[11px] font-bold text-center transition-all cursor-pointer ${
+ platConfig.mode === 'primary'
+ ? 'bg-purple-600/30 border-purple-500 text-purple-200'
+ : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+ }`}
+ >
+ ⚡ Primary (Apify)
+ </button>
+ <button
+ type="button"
+ onClick={() => handleUpdatePlatformSetting(p.key, 'mode', 'fallback')}
+ className={`py-1.5 px-2 rounded-sm border text-[11px] font-bold text-center transition-all cursor-pointer ${
+ platConfig.mode === 'fallback'
+ ? 'bg-teal-600/30 border-teal-500 text-teal-200'
+ : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+ }`}
+ >
+ 🛡️ Fallback Mode
+ </button>
+ </div>
+ <span className="text-[10px] text-slate-400 mt-1 block font-sans">
+ {platConfig.mode === 'primary'
+ ? 'Always route queries through Apify actor directly.'
+ : 'Attempt native scraping first; switch to Apify upon failure or rate limit.'}
+ </span>
+ </div>
+
+ {/* Actor ID Input with Reset */}
+ <div>
+ <div className="flex items-center justify-between mb-1">
+ <label className="text-[11px] text-slate-300 font-bold">
+ Apify Actor ID / Slug
+ </label>
+ {platConfig.actor_id !== p.defaultActor && (
+ <button
+ type="button"
+ onClick={() => handleResetActorId(p.key)}
+ className="text-[10px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+ >
+ <RotateCcw size={10} /> Reset Default
+ </button>
+ )}
+ </div>
+ <input
+ type="text"
+ value={platConfig.actor_id || ''}
+ onChange={(e) => handleUpdatePlatformSetting(p.key, 'actor_id', e.target.value)}
+ placeholder={p.defaultActor}
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-purple-500"
+ />
+ </div>
+
+ {/* Max Results */}
+ <div>
+ <label className="text-[11px] text-slate-300 font-bold block mb-1">
+ Max Results Per Query
+ </label>
+ <input
+ type="number"
+ min="5"
+ max="50"
+ value={platConfig.max_results || 20}
+ onChange={(e) => handleUpdatePlatformSetting(p.key, 'max_results', Math.max(5, Math.min(50, parseInt(e.target.value || '20', 10))))}
+ className="w-full bg-slate-900 border border-slate-700 rounded-sm px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-purple-500"
+ />
+ </div>
+ </div>
+ ) : (
+ <div className="pt-2 text-[10px] text-slate-500 font-mono">
+ Native scraping adapter active (Apify disabled).
+ </div>
+ )}
+ </div>
+ );
+ })}
+ </div>
  </div>
  )}
  </div>

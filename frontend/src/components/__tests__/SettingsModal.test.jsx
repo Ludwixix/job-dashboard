@@ -134,4 +134,65 @@ describe('SettingsModal Component', () => {
     const select = screen.getByLabelText(/Select OpenRouter Model/i);
     expect(select).toBeInTheDocument();
   });
+
+  it('renders Scrapers & Apify tab and allows configuring platforms and testing token', async () => {
+    // Mock fetch for scrapers config and test
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/api/scrapers/apify/test')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            username: 'apify_aussie_dev',
+            plan: 'Scale Plan'
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ success: true })
+      };
+    }));
+
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Click Scrapers & Apify tab
+    const scrapersTab = screen.getByText(/SCRAPERS & APIFY/i);
+    fireEvent.click(scrapersTab);
+
+    // Verify header and platform cards
+    expect(screen.getByText(/Multi-Platform Scrapers & Apify/i)).toBeInTheDocument();
+    expect(screen.getByText('SEEK Australia')).toBeInTheDocument();
+    expect(screen.getByText('Indeed Australia')).toBeInTheDocument();
+    expect(screen.getByText('LinkedIn Jobs')).toBeInTheDocument();
+    expect(screen.getByText('Adzuna Australia')).toBeInTheDocument();
+
+    // Input Apify token
+    const tokenInput = screen.getByPlaceholderText(/apify_api_/i);
+    fireEvent.change(tokenInput, { target: { value: 'apify_test_token_secret' } });
+
+    // Click test connection
+    const testBtn = screen.getByRole('button', { name: /Test Connection/i });
+    fireEvent.click(testBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Token verified successfully!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Account: apify_aussie_dev/i)).toBeInTheDocument();
+    });
+
+    // Toggle Indeed scraper
+    const indeedCheckbox = screen.getByTitle(/Enable Apify for Indeed Australia/i);
+    fireEvent.click(indeedCheckbox);
+
+    // Click Save Settings button
+    const saveBtn = screen.getByText(/SAVE SETTINGS/i);
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('job_dashboard_apify_settings') || '{}');
+      expect(stored.api_token).toBe('apify_test_token_secret');
+      expect(stored.platforms?.indeed?.enabled).toBe(true);
+    });
+  });
 });

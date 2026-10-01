@@ -1,4 +1,5 @@
 """Multi-provider job scraping adapters, deduplication, and ingestion pipeline."""
+
 from __future__ import annotations
 
 import sys
@@ -11,6 +12,13 @@ sys.modules["job_dashboard.sources.urllib.request"] = urllib.request
 sys.modules["job_dashboard.sources.urllib.parse"] = urllib.parse
 
 from .adzuna import AdzunaApiSource, _adzuna_record
+from .apify_platform import (
+    DEFAULT_APIFY_ACTORS,
+    ApifyPlatformSource,
+    build_apify_run_input,
+    normalize_apify_job_record,
+    test_apify_token,
+)
 from .apify_seek import ApifySeekFallbackSource, configure_apify_seek_fallback
 from .base import (
     JobSource,
@@ -36,9 +44,24 @@ from .dedup import (
 )
 from .indeed import IndeedJobSpySource, _extract_balanced_json, _indeed_record
 from .linkedin import LinkedInBrowserSource, _linkedin_description
-from .proxy import ProxyInfo, ProxyRotator, get_configured_proxies, parse_proxy, sanitize_proxy_url
-from .browser import BotBlockedError, create_stealth_browser, is_challenge_page, wait_for_challenge_clearance
-from .portal_crawler import enrich_job_description, fetch_portal_description, is_ats_portal_url
+from .proxy import (
+    ProxyInfo,
+    ProxyRotator,
+    get_configured_proxies,
+    parse_proxy,
+    sanitize_proxy_url,
+)
+from .browser import (
+    BotBlockedError,
+    create_stealth_browser,
+    is_challenge_page,
+    wait_for_challenge_clearance,
+)
+from .portal_crawler import (
+    enrich_job_description,
+    fetch_portal_description,
+    is_ats_portal_url,
+)
 from .remoteok import RemoteOkApiSource, _remoteok_record
 from .seek import (
     SeekApiSource,
@@ -74,6 +97,11 @@ __all__ = [
     "deduplicate_jobs",
     "IndeedJobSpySource",
     "AdzunaApiSource",
+    "ApifyPlatformSource",
+    "DEFAULT_APIFY_ACTORS",
+    "build_apify_run_input",
+    "normalize_apify_job_record",
+    "test_apify_token",
     "ApifySeekFallbackSource",
     "configure_apify_seek_fallback",
     "RemoteOkApiSource",

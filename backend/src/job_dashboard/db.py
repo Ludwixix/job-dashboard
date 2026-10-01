@@ -243,6 +243,45 @@ CREATE TABLE IF NOT EXISTS user_token_ledger (
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_token_ledger_user ON user_token_ledger(user_id);
+
+CREATE TABLE IF NOT EXISTS user_learning_telemetry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    interaction_type TEXT NOT NULL DEFAULT '',
+    signal_weight REAL NOT NULL,
+    job_id TEXT DEFAULT '',
+    job_title TEXT DEFAULT '',
+    company TEXT DEFAULT '',
+    skills_json TEXT NOT NULL DEFAULT '[]',
+    job_snapshot_json TEXT NOT NULL DEFAULT '{}',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    occurred_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_telemetry_user ON user_learning_telemetry(user_id);
+CREATE INDEX IF NOT EXISTS idx_telemetry_user_time ON user_learning_telemetry(user_id, occurred_at DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_telemetry_job ON user_learning_telemetry(job_id);
+CREATE INDEX IF NOT EXISTS idx_telemetry_type ON user_learning_telemetry(event_type);
+
+CREATE TABLE IF NOT EXISTS user_achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    achievement_id TEXT NOT NULL,
+    unlocked INTEGER NOT NULL DEFAULT 0,
+    progress_value REAL NOT NULL DEFAULT 0.0,
+    target_value REAL NOT NULL DEFAULT 1.0,
+    progress REAL NOT NULL DEFAULT 0.0,
+    target REAL NOT NULL DEFAULT 1.0,
+    unlocked_at TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(user_id, achievement_id)
+);
+CREATE INDEX IF NOT EXISTS idx_achievements_user ON user_achievements(user_id);
+CREATE INDEX IF NOT EXISTS idx_achievements_user_ach ON user_achievements(user_id, achievement_id);
+CREATE INDEX IF NOT EXISTS idx_achievements_unlocked ON user_achievements(user_id, unlocked, unlocked_at DESC);
 """
 
 

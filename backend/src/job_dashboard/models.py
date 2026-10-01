@@ -16,7 +16,7 @@ class SalaryBracket(BaseModel):
 class JobRecord(BaseModel):
     id: Optional[str] = None
     provider_job_id: str
-    provider: Literal["seek", "indeed", "adzuna", "remoteok", "manual"]
+    provider: Literal["seek", "indeed", "adzuna", "remoteok", "linkedin", "manual"]
     title: str
     company: str
     location: str
@@ -37,10 +37,13 @@ class JobRecord(BaseModel):
             "indeed": "Indeed",
             "adzuna": "Adzuna",
             "remoteok": "RemoteOK",
+            "linkedin": "LinkedIn",
             "manual": "Manual",
         }
         is_remote_detected = (
-            self.remote if self.remote is not None else (
+            self.remote
+            if self.remote is not None
+            else (
                 self.work_mode in ("remote", "hybrid")
                 or "remote" in f"{self.title} {self.location}".lower()
                 or "wfh" in f"{self.title} {self.location}".lower()
@@ -56,13 +59,17 @@ class JobRecord(BaseModel):
             "source": source_map.get(self.provider, self.provider),
             "url": self.url,
             "remote": bool(is_remote_detected),
-            "salary": self.salary.raw_text if self.salary and self.salary.raw_text else "",
+            "salary": self.salary.raw_text
+            if self.salary and self.salary.raw_text
+            else "",
             "salary_min": self.salary.min_amount if self.salary else None,
             "salary_max": self.salary.max_amount if self.salary else None,
             "salary_bracket": self.salary.model_dump() if self.salary else None,
             "salary_estimated": self.salary.estimated if self.salary else False,
             "key_requirements": self.key_requirements,
-            "tags": list(self.key_requirements) + [self.provider] + (["remote"] if is_remote_detected else []),
+            "tags": list(self.key_requirements)
+            + [self.provider]
+            + (["remote"] if is_remote_detected else []),
             "application_route": self.url,
             "posted": self.posted or self.scraped_at.isoformat(),
         }
@@ -89,8 +96,6 @@ class JobRecord(BaseModel):
         return self.to_dict().items()
 
 
-
-
 @dataclass(frozen=True)
 class Job:
     id: str
@@ -107,7 +112,16 @@ class Job:
     posted: str = ""
 
     def text(self) -> str:
-        return " ".join((self.title, self.company, self.location, self.description, self.why, *self.tags))
+        return " ".join(
+            (
+                self.title,
+                self.company,
+                self.location,
+                self.description,
+                self.why,
+                *self.tags,
+            )
+        )
 
 
 @dataclass(frozen=True)

@@ -266,6 +266,49 @@ def handle_career_mode_overview(handler):
             "high_alignment_jobs": tier_top,
         }
 
+        # Gamification state
+        gamification_data = {}
+        try:
+            from ..gamification import compute_xp_progress
+
+            if repo and hasattr(repo, "get_user_gamification"):
+                gam_record = repo.get_user_gamification(user_id or "sam_ludwig")
+                if gam_record:
+                    total_xp = int(gam_record.get("total_xp", 0))
+                    xp_prog = compute_xp_progress(total_xp)
+                    achievements = (
+                        repo.get_user_achievements(user_id or "sam_ludwig")
+                        if hasattr(repo, "get_user_achievements")
+                        else []
+                    )
+                    gamification_data = {
+                        "xp": xp_prog,
+                        "streak": {
+                            "current_streak": gam_record.get("current_streak_days", 0),
+                            "max_streak": gam_record.get("longest_streak_days", 0),
+                            "last_applied_date": gam_record.get(
+                                "last_applied_date_melbourne", ""
+                            ),
+                        },
+                        "total_xp": total_xp,
+                        "level": xp_prog["level"],
+                        "achievements": achievements,
+                    }
+            if not gamification_data:
+                gamification_data = {
+                    "xp": compute_xp_progress(0),
+                    "streak": {
+                        "current_streak": 0,
+                        "max_streak": 0,
+                        "last_applied_date": "",
+                    },
+                    "total_xp": 0,
+                    "level": 1,
+                    "achievements": [],
+                }
+        except Exception as gam_err:  # noqa: BLE001
+            logger.debug(f"Gamification HUD extraction notice: {gam_err}")
+
         response = {
             "success": True,
             "profile": profile_snapshot,
@@ -299,6 +342,7 @@ def handle_career_mode_overview(handler):
                 "knocked_out": knocked_out_count,
                 "average_score": avg_score,
             },
+            "gamification": gamification_data,
         }
         handler.send_json(200, response)
 
@@ -737,8 +781,541 @@ def handle_career_mode_application_studio(handler):
                 "markdown_text": ats_res.get("markdown_text", ""),
             }
 
+        # Multi-signal telemetry auto-recording for document generation
+        if hasattr(app, "repository") and app.repository:
+            try:
+                app.repository.insert_telemetry_event(
+                    {
+                        "user_id": user_id,
+                        "event_type": "package_prepared",
+                        "job_id": job_id,
+                        "job_title": job_title,
+                        "company": job_dict.get("company") or "",
+                        "skills": matched if "matched" in locals() else [],
+                        "job_snapshot": job_dict,
+                        "metadata": {
+                            "source": "application_studio",
+                            "generated_assets": list(response_payload.keys()),
+                        },
+                    }
+                )
+            except Exception as tel_err:  # noqa: BLE001
+                logger.debug(
+                    f"Telemetry logging notice in application-studio: {tel_err}"
+                )
+
         handler.send_json(200, response_payload)
 
     except Exception as e:
         logger.exception("POST /api/career-mode/application-studio failed")
+        handler.send_json(500, {"success": False, "error": str(e)})
+
+
+# ==============================================================================
+# 5. Multi-Signal Telemetry & Pattern Mining Routes
+# ==============================================================================
+
+
+@app_router.post("/api/telemetry/events")
+@app_router.post("/api/telemetry/event")
+def handle_post_telemetry_events(handler):
+    """Ingest one or more weighted interaction telemetry events."""
+    app = handler.app
+    user_id = get_auth_user_id(handler) or "sam_ludwig"
+
+    try:
+        body = get_json_body(handler)
+        if not body or not isinstance(body, dict):
+            handler.send_json(
+                400,
+                {
+                    "success": False,
+                    "error": "Empty or invalid telemetry payload. JSON object expected.",
+                },
+            )
+            return
+
+        repo = getattr(app, "repository", None)
+        if not repo:
+            handler.send_json(
+                500, {"success": False, "error": "Database repository unavailable"}
+            )
+            return
+
+        raw_events: list[dict[str, Any]] = []
+        if "events" in body and isinstance(body["events"], list):
+            for e in body["events"]:
+                if isinstance(e, dict) and e:
+                    raw_events.append(dict(e))
+        else:
+            payload_keys = [k for k in body if k != "user_id"]
+            if payload_keys:
+                raw_events.append(dict(body))
+
+        valid_events: list[dict[str, Any]] = []
+        for ev in raw_events:
+            has_event_indicator = bool(
+                ev.get("event_type")
+                or ev.get("interaction_type")
+                or ev.get("job_id")
+                or ev.get("job")
+                or ev.get("job_snapshot")
+            )
+            if has_event_indicator:
+                ev_copy = dict(ev)
+                if not ev_copy.get("user_id"):
+                    ev_copy["user_id"] = user_id
+                valid_events.append(ev_copy)
+
+        if not valid_events:
+            handler.send_json(
+                400,
+                {
+                    "success": False,
+                    "error": "No valid telemetry events provided. Each event must include an event_type or job details.",
+                },
+            )
+            return
+
+        inserted_ids = repo.batch_insert_telemetry(valid_events)
+        first_id = inserted_ids[0] if inserted_ids else None
+
+        handler.send_json(
+            200,
+            {
+                "success": True,
+                "status": "recorded",
+                "event_id": first_id,
+                "event_ids": inserted_ids,
+                "ingested_count": len(inserted_ids),
+            },
+        )
+    except Exception as e:
+        logger.exception("POST /api/telemetry/events failed")
+        handler.send_json(500, {"success": False, "error": str(e)})
+
+
+@app_router.get("/api/learning/patterns")
+def handle_get_learning_patterns(handler):
+    """Retrieve 4-dimension mined patterns and skill graduation progress."""
+    app = handler.app
+    query_params = get_query_params(handler)
+    user_id = (
+        get_auth_user_id(handler)
+        or (query_params.get("user_id", [""])[0] or None)
+        or "sam_ludwig"
+    )
+
+    try:
+        repo = getattr(app, "repository", None)
+        if not repo:
+            handler.send_json(
+                500, {"success": False, "error": "Database repository unavailable"}
+            )
+            return
+
+        from ..telemetry import mine_career_patterns
+
+        # Fetch recorded telemetry events for user
+        events = repo.get_telemetry_events(user_id, limit=500)
+        patterns = mine_career_patterns(events)
+
+        clusters = patterns.get("industry_clusters", [])
+        salary_info = (
+            patterns.get("salary_anchoring")
+            or patterns.get("remuneration_anchoring")
+            or {}
+        )
+        salary_anchor = float(
+            salary_info.get("recommended_floor")
+            or salary_info.get("recommended_min")
+            or salary_info.get("mean_annual")
+            or salary_info.get("weighted_mean")
+            or salary_info.get("recommended_preferred")
+            or 155000.0
+        )
+        industries = {
+            c["sector"]: c.get("affinity_pct", c.get("weight", 0.0))
+            for c in clusters
+            if isinstance(c, dict) and "sector" in c
+        }
+
+        handler.send_json(
+            200,
+            {
+                "success": True,
+                "user_id": user_id,
+                "total_events_analyzed": len(events),
+                "skills": patterns.get("skills", []),
+                "seniority": patterns.get("seniority", {}),
+                "industry_clusters": clusters,
+                "industries": industries,
+                "salary_anchoring": salary_info,
+                "remuneration_anchoring": salary_info,
+                "salary_anchor": salary_anchor,
+            },
+        )
+    except Exception as e:
+        logger.exception("GET /api/learning/patterns failed")
+        handler.send_json(500, {"success": False, "error": str(e)})
+
+
+# ==============================================================================
+# 3. Gamification, XP Progression & Badges Routes
+# ==============================================================================
+
+
+@app_router.get("/api/career-mode/gamification")
+def handle_get_gamification(handler):
+    """Retrieve full gamification snapshot: XP level progress, streak, and 16 badges."""
+    app = handler.app
+    query_params = get_query_params(handler)
+    user_id = (
+        get_auth_user_id(handler)
+        or (query_params.get("user_id", [""])[0] or None)
+        or "sam_ludwig"
+    )
+    should_recalc = query_params.get("recalculate", ["0"])[0].lower() in ("1", "true")
+
+    try:
+        repo = getattr(app, "repository", None)
+        profile = _get_sam_profile(app, user_id)
+
+        from ..gamification import (
+            compute_xp_progress,
+            evaluate_badges,
+            recalculate_user_gamification,
+        )
+
+        if repo and should_recalc:
+            snapshot = recalculate_user_gamification(
+                user_id=user_id, repository=repo, profile=profile
+            )
+            handler.send_json(200, {"success": True, **snapshot})
+            return
+
+        gam_record = (
+            repo.get_user_gamification(user_id)
+            if repo and hasattr(repo, "get_user_gamification")
+            else None
+        )
+
+        if not gam_record:
+            if repo:
+                snapshot = recalculate_user_gamification(
+                    user_id=user_id, repository=repo, profile=profile
+                )
+                handler.send_json(200, {"success": True, **snapshot})
+                return
+            snapshot = {
+                "user_id": user_id,
+                "xp": compute_xp_progress(0),
+                "streak": {
+                    "current_streak": 0,
+                    "max_streak": 0,
+                    "is_active_today": False,
+                    "applied_dates": [],
+                },
+                "badges": evaluate_badges({}),
+                "unlocked_count": 0,
+                "total_badges": 16,
+            }
+            handler.send_json(200, {"success": True, **snapshot})
+            return
+
+        total_xp = int(gam_record.get("total_xp", 0))
+        xp_progress = compute_xp_progress(total_xp)
+        achievements = (
+            repo.get_user_achievements(user_id)
+            if repo and hasattr(repo, "get_user_achievements")
+            else []
+        )
+
+        # Merge DB achievements with evaluation
+        stats = {
+            "current_streak": gam_record.get("current_streak_days", 0),
+            "max_streak": gam_record.get("longest_streak_days", 0),
+        }
+        for a in achievements:
+            stats[a.get("achievement_id")] = a.get(
+                "progress", a.get("progress_value", 0)
+            )
+
+        badges = evaluate_badges(stats)
+        # Update unlock status from DB records
+        ach_map = {a["achievement_id"]: a for a in achievements}
+        for b in badges:
+            if b["id"] in ach_map:
+                record = ach_map[b["id"]]
+                if record.get("unlocked"):
+                    b["unlocked"] = True
+                    b["unlocked_at"] = record.get("unlocked_at") or b["unlocked_at"]
+                    b["progress"] = b["target"]
+                    b["progress_value"] = float(b["target"])
+                    b["progress_pct"] = 100.0
+
+        unlocked_count = sum(1 for b in badges if b["unlocked"])
+
+        streak_info = {
+            "current_streak": gam_record.get("current_streak_days", 0),
+            "max_streak": gam_record.get("longest_streak_days", 0),
+            "is_active_today": False,
+            "last_applied_date": gam_record.get("last_applied_date_melbourne", ""),
+        }
+
+        handler.send_json(
+            200,
+            {
+                "success": True,
+                "user_id": user_id,
+                "xp": xp_progress,
+                "streak": streak_info,
+                "badges": badges,
+                "unlocked_count": unlocked_count,
+                "total_badges": len(badges),
+                "sound_enabled": bool(gam_record.get("sound_enabled", 1)),
+                "visual_effects_enabled": bool(
+                    gam_record.get("visual_effects_enabled", 1)
+                ),
+            },
+        )
+    except Exception as e:
+        logger.exception("GET /api/career-mode/gamification failed")
+        handler.send_json(500, {"success": False, "error": str(e)})
+
+
+@app_router.post("/api/career-mode/gamification/action")
+def handle_post_gamification_action(handler):
+    """Record an action, award XP with idempotency, check milestone badges, and sync state."""
+    app = handler.app
+    body = get_json_body(handler) or {}
+    user_id = get_auth_user_id(handler) or body.get("user_id") or "sam_ludwig"
+
+    action_type = (
+        str(body.get("action_type") or body.get("actionType") or "").strip().upper()
+    )
+    metadata = body.get("metadata") or {}
+    if "job_id" in body and "job_id" not in metadata:
+        metadata["job_id"] = body["job_id"]
+    if "job" in body and "job" not in metadata:
+        metadata["job"] = body["job"]
+
+    try:
+        repo = getattr(app, "repository", None)
+        profile = _get_sam_profile(app, user_id)
+
+        from ..gamification import (
+            ACTION_XP,
+            compute_melbourne_streak,
+            compute_xp_progress,
+            evaluate_action_xp,
+            evaluate_badges,
+            recalculate_user_gamification,
+        )
+
+        gam_record = (
+            repo.get_user_gamification(user_id)
+            if repo and hasattr(repo, "get_user_gamification")
+            else None
+        )
+        if not gam_record and repo:
+            recalculate_user_gamification(
+                user_id=user_id, repository=repo, profile=profile
+            )
+            gam_record = repo.get_user_gamification(user_id)
+
+        history = gam_record.get("history", []) if gam_record else []
+        total_xp = int(gam_record.get("total_xp", 0)) if gam_record else 0
+
+        # Evaluate action XP with anti-exploit idempotency
+        xp_awarded, is_awarded, rationale = evaluate_action_xp(
+            action_type=action_type,
+            metadata=metadata,
+            action_history=history,
+        )
+
+        prev_level_info = compute_xp_progress(total_xp)
+
+        if is_awarded:
+            total_xp += xp_awarded
+            history.append(
+                {
+                    "action_type": action_type,
+                    "xp": xp_awarded,
+                    "job_id": metadata.get("job_id"),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+        # Check streak if action was application submission
+        applied_at = (
+            metadata.get("applied_at") or datetime.now(timezone.utc).isoformat()
+        )
+        current_streak = gam_record.get("current_streak_days", 0) if gam_record else 0
+        longest_streak = gam_record.get("longest_streak_days", 0) if gam_record else 0
+        last_applied_date = (
+            gam_record.get("last_applied_date_melbourne", "") if gam_record else ""
+        )
+
+        if action_type == "SUBMIT_APPLICATION":
+            app_dates = [applied_at]
+            if last_applied_date:
+                app_dates.append(last_applied_date)
+            # Fetch previous applications from repo
+            if repo and hasattr(repo, "list_applications"):
+                for a in repo.list_applications(user_id=user_id):
+                    a_dt = a.get("applied_at") or a.get("created_at")
+                    if a_dt:
+                        app_dates.append(a_dt)
+            streak_res = compute_melbourne_streak(app_dates)
+            current_streak = streak_res["current_streak"]
+            longest_streak = max(longest_streak, streak_res["max_streak"])
+            if streak_res["applied_dates"]:
+                last_applied_date = streak_res["applied_dates"][-1]
+
+        # Evaluate badges
+        existing_achievements = (
+            repo.get_user_achievements(user_id)
+            if repo and hasattr(repo, "get_user_achievements")
+            else []
+        )
+        prev_unlocked = {
+            a["achievement_id"] for a in existing_achievements if a.get("unlocked")
+        }
+
+        # Gather stats
+        stats = {
+            "current_streak": current_streak,
+            "max_streak": longest_streak,
+            "total_applications": len(
+                [h for h in history if h.get("action_type") == "SUBMIT_APPLICATION"]
+            ),
+        }
+        # Populate counts from existing achievements or history
+        for a in existing_achievements:
+            stats[a.get("achievement_id")] = a.get(
+                "progress", a.get("progress_value", 0)
+            )
+
+        if action_type == "SUBMIT_APPLICATION":
+            stats["total_applications"] = max(
+                stats["total_applications"], len(existing_achievements) + 1
+            )
+
+        badges = evaluate_badges(stats)
+        newly_unlocked = []
+
+        for b in badges:
+            b_id = b["id"]
+            if b_id in prev_unlocked:
+                b["unlocked"] = True
+                b["progress"] = b["target"]
+            elif b["unlocked"] and b_id not in prev_unlocked:
+                newly_unlocked.append(b)
+                # Award bonus achievement XP (+50 XP)
+                total_xp += ACTION_XP["ACHIEVEMENT_UNLOCKED"]
+
+        new_level_info = compute_xp_progress(total_xp)
+        leveled_up = new_level_info["level"] > prev_level_info["level"]
+
+        # Persist to database
+        if repo and hasattr(repo, "upsert_user_gamification"):
+            repo.upsert_user_gamification(
+                user_id=user_id,
+                total_xp=total_xp,
+                current_level=new_level_info["level"],
+                current_streak=current_streak,
+                longest_streak=longest_streak,
+                last_applied_date_melbourne=last_applied_date,
+                history=history[-50:],  # keep last 50 events
+            )
+
+        if repo and hasattr(repo, "batch_upsert_achievements"):
+            repo.batch_upsert_achievements(user_id, badges)
+
+        handler.send_json(
+            200,
+            {
+                "success": True,
+                "awarded": is_awarded,
+                "xp_awarded": xp_awarded,
+                "rationale": rationale,
+                "leveled_up": leveled_up,
+                "previous_level": prev_level_info,
+                "xp": new_level_info,
+                "streak": {
+                    "current_streak": current_streak,
+                    "max_streak": longest_streak,
+                    "last_applied_date": last_applied_date,
+                },
+                "badges": badges,
+                "newly_unlocked": newly_unlocked,
+            },
+        )
+    except Exception as e:
+        logger.exception("POST /api/career-mode/gamification/action failed")
+        handler.send_json(500, {"success": False, "error": str(e)})
+
+
+@app_router.post("/api/career-mode/gamification/recalculate")
+def handle_post_gamification_recalculate(handler):
+    """Trigger full historical audit and recalculation of XP, streak, and badges."""
+    app = handler.app
+    body = get_json_body(handler) or {}
+    user_id = get_auth_user_id(handler) or body.get("user_id") or "sam_ludwig"
+
+    try:
+        repo = getattr(app, "repository", None)
+        profile = _get_sam_profile(app, user_id)
+
+        from ..gamification import recalculate_user_gamification
+
+        snapshot = recalculate_user_gamification(
+            user_id=user_id,
+            repository=repo,
+            profile=profile,
+        )
+        handler.send_json(200, {"success": True, **snapshot})
+    except Exception as e:
+        logger.exception("POST /api/career-mode/gamification/recalculate failed")
+        handler.send_json(500, {"success": False, "error": str(e)})
+
+
+@app_router.post("/api/career-mode/gamification/preferences")
+def handle_post_gamification_preferences(handler):
+    """Update sound and visual micro-interaction preferences."""
+    app = handler.app
+    body = get_json_body(handler) or {}
+    user_id = get_auth_user_id(handler) or body.get("user_id") or "sam_ludwig"
+
+    sound_enabled = bool(body.get("sound_enabled", True))
+    visual_effects_enabled = bool(body.get("visual_effects_enabled", True))
+
+    try:
+        repo = getattr(app, "repository", None)
+        if repo and hasattr(repo, "upsert_user_gamification"):
+            gam_record = repo.get_user_gamification(user_id) or {}
+            repo.upsert_user_gamification(
+                user_id=user_id,
+                total_xp=gam_record.get("total_xp", 0),
+                current_level=gam_record.get("current_level", 1),
+                current_streak=gam_record.get("current_streak_days", 0),
+                longest_streak=gam_record.get("longest_streak_days", 0),
+                last_applied_date_melbourne=gam_record.get(
+                    "last_applied_date_melbourne", ""
+                ),
+                sound_enabled=sound_enabled,
+                visual_effects_enabled=visual_effects_enabled,
+            )
+
+        handler.send_json(
+            200,
+            {
+                "success": True,
+                "sound_enabled": sound_enabled,
+                "visual_effects_enabled": visual_effects_enabled,
+            },
+        )
+    except Exception as e:
+        logger.exception("POST /api/career-mode/gamification/preferences failed")
         handler.send_json(500, {"success": False, "error": str(e)})

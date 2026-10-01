@@ -139,8 +139,9 @@ def handle_scrape_refresh(handler):
         return
 
     try:
+        user_id = _resolve_user_id(handler)
         jobs, errors, cache_stats = app.refresh(
-            queries, force=force, ttl_hours=ttl_hours
+            queries, force=force, ttl_hours=ttl_hours, user_id=user_id
         )
     except Exception as refresh_err:
         logger.warning(
@@ -691,3 +692,153 @@ def handle_backup_snapshot(handler):
 def handle_openapi_spec(handler):
     """Generate OpenAPI 3.0 specification for all backend REST endpoints."""
     handler.send_json(200, generate_openapi_spec())
+
+
+# =====================================================================
+# 7. Scrapers & Apify Configuration Endpoints
+# =====================================================================
+
+
+@app_router.post("/api/scrapers/apify/test")
+def handle_test_apify_connection(handler):
+    """Test an Apify API token against the Apify User Profile API."""
+    body = get_json_body(handler)
+    token = str(body.get("api_token") or body.get("token") or "").strip()
+    if not token:
+        app = handler.app
+        user_id = _resolve_user_id(handler) or "default_user"
+        prefs = (
+            app.repository.get_user_preferences(user_id)
+            if getattr(app, "repository", None)
+            else {}
+        ) or {}
+        apify_settings = prefs.get("apify_settings", {})
+        token = (
+            apify_settings.get("api_token")
+            or os.getenv("APIFY_API_TOKEN")
+            or os.getenv("JOB_DASHBOARD_APIFY_API_TOKEN")
+            or ""
+        )
+
+    from ..sources.apify_platform import test_apify_token
+
+    res = test_apify_token(token)
+    status_code = 200 if res.get("success") else 400
+    handler.send_json(status_code, res)
+
+
+@app_router.get("/api/scrapers/config")
+def handle_get_scrapers_config(handler):
+    """Retrieve scraper and Apify settings for the active user."""
+    app = handler.app
+    user_id = _resolve_user_id(handler) or "default_user"
+    prefs = (
+        app.repository.get_user_preferences(user_id)
+        if getattr(app, "repository", None)
+        else {}
+    ) or {}
+    apify_settings = prefs.get("apify_settings", {})
+
+    from ..sources.apify_platform import DEFAULT_APIFY_ACTORS
+
+    env_token = (
+        os.getenv("APIFY_API_TOKEN") or os.getenv("JOB_DASHBOARD_APIFY_API_TOKEN") or ""
+    )
+    current_token = apify_settings.get("api_token") or env_token
+
+    masked_token = ""
+    if current_token:
+        if len(current_token) > 8:
+            masked_token = f"{current_token[:4]}...{current_token[-4:]}"
+        else:
+            masked_token = "********"
+
+    platforms = apify_settings.get("platforms", {})
+    default_platforms = {
+        "seek": {
+            "enabled": platforms.get("seek", {}).get("enabled", True),
+            "mode": platforms.get("seek", {}).get("mode", "primary"),
+            "actor_id": platforms.get("seek", {}).get(
+                "actor_id", DEFAULT_APIFY_ACTORS["seek"]
+            ),
+            "max_results": platforms.get("seek", {}).get("max_results", 20),
+        },
+        "indeed": {
+            "enabled": platforms.get("indeed", {}).get("enabled", False),
+            "mode": platforms.get("indeed", {}).get("mode", "fallback"),
+            "actor_id": platforms.get("indeed", {}).get(
+                "actor_id", DEFAULT_APIFY_ACTORS["indeed"]
+            ),
+            "max_results": platforms.get("indeed", {}).get("max_results", 20),
+        },
+        "linkedin": {
+            "enabled": platforms.get("linkedin", {}).get("enabled", False),
+            "mode": platforms.get("linkedin", {}).get("mode", "fallback"),
+            "actor_id": platforms.get("linkedin", {}).get(
+                "actor_id", DEFAULT_APIFY_ACTORS["linkedin"]
+            ),
+            "max_results": platforms.get("linkedin", {}).get("max_results", 20),
+        },
+        "adzuna": {
+            "enabled": platforms.get("adzuna", {}).get("enabled", False),
+            "mode": platforms.get("adzuna", {}).get("mode", "fallback"),
+            "actor_id": platforms.get("adzuna", {}).get(
+                "actor_id", DEFAULT_APIFY_ACTORS["adzuna"]
+            ),
+            "max_results": platforms.get("adzuna", {}).get("max_results", 20),
+        },
+    }
+
+    handler.send_json(
+        200,
+        {
+            "success": True,
+            "has_token": bool(current_token),
+            "masked_token": masked_token,
+            "platforms": default_platforms,
+        },
+    )
+
+
+@app_router.post("/api/scrapers/config")
+def handle_save_scrapers_config(handler):
+    """Save updated Apify and scraper configuration into user preferences."""
+    app = handler.app
+    body = get_json_body(handler)
+    user_id = _resolve_user_id(handler) or "default_user"
+
+    new_token = body.get("api_token")
+    platforms = body.get("platforms", {})
+
+    current_prefs = (
+        app.repository.get_user_preferences(user_id)
+        if getattr(app, "repository", None)
+        else {}
+    ) or {}
+    existing_apify = current_prefs.get("apify_settings", {})
+
+    # Determine token: only update if new token is not masked placeholder
+    token_str = str(new_token or "").strip()
+    if token_str and not token_str.startswith("****") and "..." not in token_str:
+        final_token = token_str
+    else:
+        final_token = existing_apify.get("api_token", "")
+
+    updated_apify = {
+        "api_token": final_token,
+        "platforms": platforms if platforms else existing_apify.get("platforms", {}),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    current_prefs["apify_settings"] = updated_apify
+    if getattr(app, "repository", None):
+        app.repository.upsert_user_preferences(user_id, current_prefs)
+
+    handler.send_json(
+        200,
+        {
+            "success": True,
+            "message": "Scraper configuration saved successfully.",
+            "has_token": bool(final_token),
+        },
+    )

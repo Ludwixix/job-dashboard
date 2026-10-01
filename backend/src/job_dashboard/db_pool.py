@@ -73,6 +73,7 @@ class ConnectionPool:
                 conn.execute("PRAGMA journal_mode=WAL;")
                 conn.execute("PRAGMA busy_timeout=5000;")
                 conn.execute("PRAGMA synchronous=NORMAL;")
+                conn.execute("PRAGMA foreign_keys=ON;")
             except sqlite3.Error:
                 pass
             self._stats["connections_created"] += 1

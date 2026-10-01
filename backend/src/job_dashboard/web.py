@@ -2500,6 +2500,23 @@ def make_handler(app: DashboardApp):
                     mimetypes.guess_type(target_asset.name)[0] or "text/plain",
                 )
                 self.send_header("Content-Length", str(len(data)))
+                if "/assets/" in path or target_asset.name.endswith(
+                    (".woff2", ".woff", ".ttf")
+                ):
+                    self.send_header(
+                        "Cache-Control", "public, max-age=31536000, immutable"
+                    )
+                elif target_asset.name in (
+                    "sw.js",
+                    "manifest.json",
+                    "index.html",
+                    "favicon.svg",
+                ):
+                    self.send_header(
+                        "Cache-Control", "no-cache, no-store, must-revalidate"
+                    )
+                    self.send_header("Pragma", "no-cache")
+                    self.send_header("Expires", "0")
                 self._send_cors_headers()
                 self.end_headers()
                 self.wfile.write(data)
@@ -2516,6 +2533,11 @@ def make_handler(app: DashboardApp):
                     self.send_response(200)
                     self.send_header("Content-Type", "text/html; charset=utf-8")
                     self.send_header("Content-Length", str(len(data)))
+                    self.send_header(
+                        "Cache-Control", "no-cache, no-store, must-revalidate"
+                    )
+                    self.send_header("Pragma", "no-cache")
+                    self.send_header("Expires", "0")
                     self._send_cors_headers()
                     self.end_headers()
                     self.wfile.write(data)

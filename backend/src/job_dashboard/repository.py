@@ -1208,13 +1208,16 @@ class JobRepository:
                 )
 
                 # Also log to application_events
-                conn.execute(
-                    """
-                    INSERT INTO application_events (job_id, from_status, to_status, occurred_at)
-                    VALUES (?, 'user_action', ?, ?)
-                """,
-                    (job_id, status, now),
-                )
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO application_events (job_id, from_status, to_status, occurred_at)
+                        VALUES (?, 'user_action', ?, ?)
+                    """,
+                        (job_id, status, now),
+                    )
+                except sqlite3.IntegrityError:
+                    pass
 
                 # And log to new user_application_events for OCC compatibility
                 try:
@@ -1312,9 +1315,17 @@ class JobRepository:
         event_type: str,
         expected_version: int,
         new_macro_stage: str | None = None,
-        payload_json: str = "{}",
+        payload_json: str | dict = "{}",
         idempotency_key: str | None = None,
     ) -> tuple[dict, dict]:
+        if not isinstance(payload_json, str):
+            payload_json = json.dumps(payload_json or {})
+
+        target_app = self.get_user_application(user_id, job_id)
+        if not target_app:
+            raise ValueError(f"Application not found for job '{job_id}'.")
+        app_id = target_app["id"]
+
         now = datetime.now(timezone.utc).isoformat()
         idemp_recovered_event = None
 
@@ -1322,14 +1333,13 @@ class JobRepository:
             conn.row_factory = sqlite3.Row
             with conn:
                 app_row = conn.execute(
-                    "SELECT id, version, macro_stage FROM user_applications WHERE user_id = ? AND job_id = ?",
-                    (user_id, job_id),
+                    "SELECT id, version, macro_stage FROM user_applications WHERE id = ?",
+                    (app_id,),
                 ).fetchone()
 
                 if not app_row:
                     raise ValueError(f"Application not found for job '{job_id}'.")
 
-                app_id = app_row["id"]
                 current_version = app_row["version"]
                 current_stage = app_row["macro_stage"]
 
@@ -1344,24 +1354,26 @@ class JobRepository:
                         (idempotency_key,),
                     ).fetchone()
                     if existing:
-                        if existing["application_id"] != app_id:
+                        if existing["application_id"] == target_app["id"]:
+                            event_dict = {
+                                "id": existing["id"],
+                                "application_id": existing["application_id"],
+                                "event_type": existing["event_type"],
+                                "idempotency_key": existing["idempotency_key"],
+                                "payload_json": existing["payload_json"],
+                                "created_at": existing["created_at"],
+                            }
+                            app_full_row = conn.execute(
+                                "SELECT * FROM user_applications WHERE id = ?",
+                                (app_id,),
+                            ).fetchone()
+                            if app_full_row:
+                                target_app = dict(app_full_row)
+                            return (target_app, event_dict)
+                        else:
                             raise ValueError(
-                                f"Idempotency key collision: key '{idempotency_key}' was used for a different application."
+                                f"Idempotency key collision: key '{idempotency_key}' already used for another application."
                             )
-                        # Replay idempotent event for this application
-                        event_dict = {
-                            "id": existing["id"],
-                            "application_id": existing["application_id"],
-                            "event_type": existing["event_type"],
-                            "idempotency_key": existing["idempotency_key"],
-                            "payload_json": existing["payload_json"],
-                            "created_at": existing["created_at"],
-                        }
-                        app_full_row = conn.execute(
-                            "SELECT * FROM user_applications WHERE id = ?",
-                            (app_id,),
-                        ).fetchone()
-                        return dict(app_full_row) if app_full_row else {}, event_dict
 
                 if current_version != expected_version:
                     if idempotency_key:
@@ -1369,11 +1381,11 @@ class JobRepository:
                             """
                             SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
                             FROM user_application_events
-                            WHERE idempotency_key = ?
+                            WHERE idempotency_key = ? AND application_id = ?
                             """,
-                            (idempotency_key,),
+                            (idempotency_key, app_id),
                         ).fetchone()
-                        if existing and existing["application_id"] == app_id:
+                        if existing:
                             idemp_recovered_event = {
                                 "id": existing["id"],
                                 "application_id": existing["application_id"],
@@ -1409,11 +1421,11 @@ class JobRepository:
                                 """
                                 SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
                                 FROM user_application_events
-                                WHERE idempotency_key = ?
+                                WHERE idempotency_key = ? AND application_id = ?
                                 """,
-                                (idempotency_key,),
+                                (idempotency_key, app_id),
                             ).fetchone()
-                            if existing and existing["application_id"] == app_id:
+                            if existing:
                                 idemp_recovered_event = {
                                     "id": existing["id"],
                                     "application_id": existing["application_id"],
@@ -1451,11 +1463,11 @@ class JobRepository:
                                     """
                                     SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
                                     FROM user_application_events
-                                    WHERE idempotency_key = ?
+                                    WHERE idempotency_key = ? AND application_id = ?
                                     """,
-                                    (idempotency_key,),
+                                    (idempotency_key, app_id),
                                 ).fetchone()
-                                if existing and existing["application_id"] == app_id:
+                                if existing:
                                     idemp_recovered_event = {
                                         "id": existing["id"],
                                         "application_id": existing["application_id"],
@@ -1465,6 +1477,15 @@ class JobRepository:
                                         "created_at": existing["created_at"],
                                     }
                             if not idemp_recovered_event:
+                                if idempotency_key:
+                                    other = conn.execute(
+                                        "SELECT application_id FROM user_application_events WHERE idempotency_key = ?",
+                                        (idempotency_key,),
+                                    ).fetchone()
+                                    if other and other["application_id"] != app_id:
+                                        raise ValueError(
+                                            f"Idempotency key collision: key '{idempotency_key}' already used for another application."
+                                        )
                                 raise
 
                 app_full_row = conn.execute(
@@ -2160,13 +2181,16 @@ class JobRepository:
                 )
 
                 # Append to application_events timeline
-                conn.execute(
-                    """
-                    INSERT INTO application_events (job_id, from_status, to_status, occurred_at)
-                    VALUES (?, 'gmail_sync', ?, ?)
-                """,
-                    (job_id, new_status, email_date or now),
-                )
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO application_events (job_id, from_status, to_status, occurred_at)
+                        VALUES (?, 'gmail_sync', ?, ?)
+                    """,
+                        (job_id, new_status, email_date or now),
+                    )
+                except sqlite3.IntegrityError:
+                    pass
 
         return {
             "user_id": user_id,
@@ -2570,6 +2594,13 @@ class JobRepository:
         with self.pool.connection() as conn:
             conn.execute(
                 """
+                INSERT OR IGNORE INTO users (id, email, password_hash, created_at)
+                VALUES (?, ?, '', ?)
+                """,
+                (user_id, f"{user_id}@local.dev", now_iso),
+            )
+            conn.execute(
+                """
                 INSERT INTO user_subscriptions (
                     id, user_id, stripe_customer_id, stripe_subscription_id,
                     plan_tier, status, current_period_start, current_period_end,
@@ -2622,6 +2653,13 @@ class JobRepository:
         total = prompt_tokens + completion_tokens
 
         with self.pool.connection() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO users (id, email, password_hash, created_at)
+                VALUES (?, ?, '', ?)
+                """,
+                (user_id, f"{user_id}@local.dev", now_iso),
+            )
             conn.execute(
                 """
                 INSERT INTO user_token_ledger (

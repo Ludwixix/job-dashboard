@@ -1,5 +1,5 @@
 // Career Agent Progressive Web App (PWA) Service Worker
-const CACHE_NAME = 'job-dashboard-shell-v2';
+const CACHE_NAME = 'job-dashboard-shell-v3';
 
 const STATIC_SHELL_ASSETS = [
   '/',

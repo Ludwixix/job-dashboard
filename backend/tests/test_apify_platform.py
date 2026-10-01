@@ -255,3 +255,54 @@ def test_dashboard_app_get_sources_for_scrape():
         assert isinstance(sources_apify[0], ApifyPlatformSource)
         assert sources_apify[0].actor_id == "custom/seek-scraper"
         assert sources_apify[0].api_token == "apify_tok_secret"
+
+
+def test_sanitize_apify_actor_id():
+    from job_dashboard.sources.apify_platform import sanitize_apify_actor_id
+
+    # Pure slug
+    assert (
+        sanitize_apify_actor_id("websift/seek-job-scraper")
+        == "websift/seek-job-scraper"
+    )
+    # Pure ID
+    assert sanitize_apify_actor_id("m7tdxsBaMKJhIu4fM") == "m7tdxsBaMKJhIu4fM"
+    # actors/ prefix from console URL path
+    assert sanitize_apify_actor_id("actors/m7tdxsBaMKJhIu4fM") == "m7tdxsBaMKJhIu4fM"
+    # Full console URL
+    url = "https://console.apify.com/actors/m7tdxsBaMKJhIu4fM/input?addFromActorId=m7tdxsBaMKJhIu4fM"
+    assert sanitize_apify_actor_id(url) == "m7tdxsBaMKJhIu4fM"
+    # Empty or whitespace
+    assert sanitize_apify_actor_id("   ") == ""
+    assert sanitize_apify_actor_id(None) == ""
+
+
+def test_normalize_websift_seek_scraper_payload():
+    query = SearchQuery(term="Systems Engineer", location="Melbourne")
+    raw_item = {
+        "id": "86136632",
+        "jobLink": "https://www.seek.com.au/job/86136632",
+        "title": "Senior Cloud Systems Engineer",
+        "salary": "$140,000 - $160,000",
+        "workArrangements": "Hybrid",
+        "listedAt": "2026-09-28T04:00:00.000Z",
+        "joblocationInfo": {
+            "displayLocation": "Melbourne VIC",
+            "location": "Melbourne",
+        },
+        "advertiser": {
+            "name": "Acme Cloud Solutions",
+        },
+        "content": {
+            "unEditedContent": "<p>Lead AWS and Linux infrastructure migrations.</p>",
+        },
+    }
+    rec = normalize_apify_job_record(raw_item, "seek", query)
+    assert rec is not None
+    assert rec["id"] == "seek-86136632"
+    assert rec["title"] == "Senior Cloud Systems Engineer"
+    assert rec["company"] == "Acme Cloud Solutions"
+    assert rec["location"] == "Melbourne VIC"
+    assert rec["url"] == "https://www.seek.com.au/job/86136632"
+    assert rec["posted"] == "2026-09-28"
+    assert "Acme Cloud Solutions" in rec["company"]

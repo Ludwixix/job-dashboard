@@ -6,7 +6,7 @@ import {
   Copy, Check, Sparkles, Clock, Briefcase, ChevronDown, ChevronUp, Download,
   ThumbsUp, ThumbsDown, Train, Car, Bike, Navigation, Eye, Cpu, Layers, Activity,
   RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search, Flame,
-  ClipboardCheck, Compass, BookOpen, Edit3
+  ClipboardCheck, Compass, BookOpen, Edit3, AlertCircle
 } from 'lucide-react';
 import { executeClientSideAutoApply, hasGeneratedApplicationDocs, generateApplicationDocs, AVAILABLE_MODELS } from '../services/generationService';
 import { getLlmConfig, saveLlmConfig } from '../services/llmConfig';

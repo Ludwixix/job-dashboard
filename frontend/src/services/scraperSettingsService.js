@@ -18,6 +18,23 @@ export const DEFAULT_APIFY_ACTORS = {
   adzuna: 'apify/web-scraper',
 };
 
+/**
+ * Strips URLs and 'actors/' path prefixes from user input to ensure a valid Apify slug or ID.
+ * 
+ * @param {string} raw Raw input from user (URL, actors/id, or slug)
+ * @returns {string} Sanitized actor ID or slug
+ */
+export const sanitizeActorId = (raw) => {
+  if (!raw) return '';
+  let clean = String(raw).trim();
+  if (clean.includes('apify.com/actors/')) {
+    clean = clean.split('apify.com/actors/')[1].split('/')[0].split('?')[0];
+  } else if (clean.startsWith('actors/')) {
+    clean = clean.substring('actors/'.length);
+  }
+  return clean.trim();
+};
+
 export const DEFAULT_SCRAPER_SETTINGS = {
   api_token: '',
   platforms: {
@@ -111,10 +128,26 @@ export const saveScraperSettings = async (settings) => {
     const cleanSettings = {
       api_token: String(settings.api_token || '').trim(),
       platforms: {
-        seek: { ...DEFAULT_SCRAPER_SETTINGS.platforms.seek, ...(settings.platforms?.seek || {}) },
-        indeed: { ...DEFAULT_SCRAPER_SETTINGS.platforms.indeed, ...(settings.platforms?.indeed || {}) },
-        linkedin: { ...DEFAULT_SCRAPER_SETTINGS.platforms.linkedin, ...(settings.platforms?.linkedin || {}) },
-        adzuna: { ...DEFAULT_SCRAPER_SETTINGS.platforms.adzuna, ...(settings.platforms?.adzuna || {}) },
+        seek: { 
+          ...DEFAULT_SCRAPER_SETTINGS.platforms.seek, 
+          ...(settings.platforms?.seek || {}),
+          actor_id: sanitizeActorId(settings.platforms?.seek?.actor_id || DEFAULT_SCRAPER_SETTINGS.platforms.seek.actor_id),
+        },
+        indeed: { 
+          ...DEFAULT_SCRAPER_SETTINGS.platforms.indeed, 
+          ...(settings.platforms?.indeed || {}),
+          actor_id: sanitizeActorId(settings.platforms?.indeed?.actor_id || DEFAULT_SCRAPER_SETTINGS.platforms.indeed.actor_id),
+        },
+        linkedin: { 
+          ...DEFAULT_SCRAPER_SETTINGS.platforms.linkedin, 
+          ...(settings.platforms?.linkedin || {}),
+          actor_id: sanitizeActorId(settings.platforms?.linkedin?.actor_id || DEFAULT_SCRAPER_SETTINGS.platforms.linkedin.actor_id),
+        },
+        adzuna: { 
+          ...DEFAULT_SCRAPER_SETTINGS.platforms.adzuna, 
+          ...(settings.platforms?.adzuna || {}),
+          actor_id: sanitizeActorId(settings.platforms?.adzuna?.actor_id || DEFAULT_SCRAPER_SETTINGS.platforms.adzuna.actor_id),
+        },
       },
     };
 

@@ -28,6 +28,7 @@ import {
   testApifyToken,
   fetchBackendScraperConfig,
   DEFAULT_APIFY_ACTORS,
+  sanitizeActorId,
 } from '../services/scraperSettingsService';
 
 export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
@@ -222,13 +223,14 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  };
 
  const handleUpdatePlatformSetting = (platform, field, value) => {
+   const cleanValue = field === 'actor_id' ? sanitizeActorId(value) : value;
    setScraperSettings((prev) => ({
      ...prev,
      platforms: {
        ...prev.platforms,
        [platform]: {
          ...(prev.platforms?.[platform] || {}),
-         [field]: value,
+         [field]: cleanValue,
        },
      },
    }));
@@ -1492,6 +1494,9 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  placeholder={p.defaultActor}
  className="w-full bg-slate-900 border border-slate-700 rounded-sm px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-purple-500"
  />
+ <span className="text-[10px] text-slate-400 font-mono mt-1 block">
+   e.g. <span className="text-purple-300">websift/seek-job-scraper</span> or <span className="text-purple-300">m7tdxsBaMKJhIu4fM</span>
+ </span>
  </div>
 
  {/* Max Results */}

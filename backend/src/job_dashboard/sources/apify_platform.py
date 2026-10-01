@@ -71,6 +71,18 @@ def test_apify_token(api_token: str) -> dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
+def sanitize_apify_actor_id(raw_actor: str | None) -> str:
+    """Normalize actor identifier by removing URL prefixes or 'actors/' namespace."""
+    if not raw_actor:
+        return ""
+    cleaned = str(raw_actor).strip()
+    if "apify.com/actors/" in cleaned:
+        cleaned = cleaned.split("apify.com/actors/")[-1].split("/")[0].split("?")[0]
+    elif cleaned.startswith("actors/"):
+        cleaned = cleaned[len("actors/") :]
+    return cleaned.strip()
+
+
 def build_apify_run_input(
     platform: str, query: SearchQuery, max_results: int, location: str | None = None
 ) -> dict[str, Any]:
@@ -82,6 +94,9 @@ def build_apify_run_input(
     if plat == "seek":
         return {
             "keywords": [term],
+            "searchTerm": term,
+            "query": term,
+            "keyword": term,
             "location": loc,
             "maxResults": max_results,
             "fetchJobDetails": True,
@@ -137,7 +152,16 @@ def normalize_apify_job_record(
         item.get("company")
         or item.get("companyName")
         or item.get("advertiserName")
-        or item.get("advertiser")
+        or (
+            item.get("advertiser", {}).get("name")
+            if isinstance(item.get("advertiser"), dict)
+            else item.get("advertiser")
+        )
+        or (
+            item.get("companyProfile", {}).get("name")
+            if isinstance(item.get("companyProfile"), dict)
+            else ""
+        )
         or item.get("employer")
         or ""
     )
@@ -146,12 +170,15 @@ def normalize_apify_job_record(
     elif not raw_company and isinstance(item.get("hiringOrganization"), str):
         raw_company = item.get("hiringOrganization")
     company = str(raw_company).strip()
+    if company.lower() == "n/a":
+        company = ""
 
     if not title or not company:
         return None
 
     url = str(
         item.get("url")
+        or item.get("jobLink")
         or item.get("jobUrl")
         or item.get("link")
         or item.get("job_url")
@@ -184,6 +211,16 @@ def normalize_apify_job_record(
 
     location = str(
         item.get("location")
+        or (
+            item.get("joblocationInfo", {}).get("displayLocation")
+            if isinstance(item.get("joblocationInfo"), dict)
+            else ""
+        )
+        or (
+            item.get("joblocationInfo", {}).get("location")
+            if isinstance(item.get("joblocationInfo"), dict)
+            else ""
+        )
         or item.get("jobLocation")
         or item.get("place")
         or item.get("formattedLocation")
@@ -191,7 +228,12 @@ def normalize_apify_job_record(
         or "Australia"
     ).strip()
 
-    work_type = str(item.get("workType") or item.get("employmentType") or "").strip()
+    work_type = str(
+        item.get("workType")
+        or item.get("employmentType")
+        or item.get("workTypes")
+        or ""
+    ).strip()
     remote = any(
         marker in f"{title} {location} {work_type}".lower()
         for marker in ("remote", "work from home", " wfh", "hybrid")
@@ -199,6 +241,16 @@ def normalize_apify_job_record(
 
     desc_raw = (
         item.get("fullDescription")
+        or (
+            item.get("content", {}).get("unEditedContent")
+            if isinstance(item.get("content"), dict)
+            else ""
+        )
+        or (
+            item.get("content", {}).get("jobHook")
+            if isinstance(item.get("content"), dict)
+            else ""
+        )
         or item.get("description")
         or item.get("snippet")
         or item.get("teaser")
@@ -219,7 +271,8 @@ def normalize_apify_job_record(
         salary = None
 
     posted_raw = str(
-        item.get("listingDate")
+        item.get("listedAt")
+        or item.get("listingDate")
         or item.get("postedDate")
         or item.get("postedAt")
         or item.get("date")
@@ -290,9 +343,10 @@ class ApifyPlatformSource:
             or os.getenv("APIFY_API_TOKEN")
             or os.getenv("JOB_DASHBOARD_APIFY_API_TOKEN")
         )
-        self.actor_id = (
-            actor_id or DEFAULT_APIFY_ACTORS.get(self.platform, "apify/web-scraper")
-        ).strip()
+        raw_actor = actor_id or DEFAULT_APIFY_ACTORS.get(
+            self.platform, "apify/web-scraper"
+        )
+        self.actor_id = sanitize_apify_actor_id(raw_actor)
         self.max_results = max(1, min(MAX_RESULTS_CAP, int(max_results)))
         self.timeout_secs = max(5, int(timeout_secs))
         self.mode = mode.lower().strip()

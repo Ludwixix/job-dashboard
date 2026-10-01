@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchJobsData, saveUserApplication, deleteUserApplication, normalizeJobKey } from '../services/dataService';
+import { fetchJobsData, saveUserApplication, deleteUserApplication, normalizeJobKey, getUnifiedAppliedLookup, isJobAppliedOrTracked } from '../services/dataService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,7 @@ export const useJobs = () => {
   const [search, setSearch]   = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
+  const [appliedVersion, setAppliedVersion] = useState(0);
 
   // Persisted: rejected IDs
   const [rejectedIds, setRejectedIds] = useState(() => readLS(LS_REJECTED, []));
@@ -38,6 +39,26 @@ export const useJobs = () => {
   // Persisted: per-job field overrides (status, notes, applied date, etc.)
   const [overrides, setOverrides] = useState(() => readLS(LS_OVERRIDES, {}));
   useEffect(() => { writeLS(LS_OVERRIDES, overrides); }, [overrides]);
+
+  // Reactive listener for application events across components & windows
+  useEffect(() => {
+    const handleApplicationEvent = () => {
+      setAppliedVersion(v => v + 1);
+      setOverrides(readLS(LS_OVERRIDES, {}));
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('application-status-updated', handleApplicationEvent);
+      window.addEventListener('job-applied', handleApplicationEvent);
+      window.addEventListener('storage', handleApplicationEvent);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('application-status-updated', handleApplicationEvent);
+        window.removeEventListener('job-applied', handleApplicationEvent);
+        window.removeEventListener('storage', handleApplicationEvent);
+      }
+    };
+  }, []);
 
   // ── Load remote data ──────────────────────────────────────────────────────
   const loadData = useCallback(async (options = {}) => {
@@ -83,6 +104,7 @@ export const useJobs = () => {
 
   const enrichedJobs = useMemo(() => {
     const now = currentTime;
+    const appliedLookup = getUnifiedAppliedLookup();
 
     return rawJobs.map(j => {
       const key   = jobKey(j);
@@ -93,6 +115,13 @@ export const useJobs = () => {
       const merged = { ...j, ...patch };
 
       let status = merged.status || 'sourced';
+
+      // Cross-reference unified applied cache: if tracked/applied anywhere, mark as Applied
+      const isTrackedApplied = isJobAppliedOrTracked(merged, appliedLookup);
+      if (isTrackedApplied && (status === 'sourced' || status === 'Discovered' || !merged.status)) {
+        status = 'Applied';
+      }
+
       const statusLower = status.toLowerCase();
 
       // Non-responsive employer auto-closing rule:
@@ -135,7 +164,7 @@ export const useJobs = () => {
         isClosed 
       };
     });
-  }, [rawJobs, overrides, rejectedIds, currentTime]);
+  }, [rawJobs, overrides, rejectedIds, currentTime, appliedVersion]);
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
 

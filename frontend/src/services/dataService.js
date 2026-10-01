@@ -500,6 +500,143 @@ export const getLocalUserApplications = () => {
 };
 
 /**
+ * Builds a unified lookup structure covering all application tracking stores
+ * (local applications cache, tracked_applications list, and progressed overrides).
+ * Returns Sets for rapid O(1) matching on ID, normalized company/title, and URL.
+ */
+export const getUnifiedAppliedLookup = () => {
+  const appliedIds = new Set();
+  const appliedKeys = new Set();
+  const appliedUrls = new Set();
+
+  const registerApp = (app) => {
+    if (!app || typeof app !== 'object') return;
+    const id = String(app.id || app.job_id || '').trim();
+    if (id) {
+      appliedIds.add(id);
+      appliedIds.add(id.toLowerCase());
+      const stripped = id.replace(/^[a-z_-]+/i, '');
+      if (stripped) {
+        appliedIds.add(stripped);
+      }
+    }
+
+    const comp = String(app.company || '').trim();
+    const tit = String(app.title || '').trim();
+    if (comp && tit) {
+      appliedKeys.add(`${comp.toLowerCase()}_${tit.toLowerCase()}`);
+      const norm = normalizeJobKey(comp, tit);
+      if (norm && norm !== '__') {
+        appliedKeys.add(norm);
+      }
+    }
+
+    const url = String(app.url || app.portalLink || app.link || '').trim();
+    if (url) {
+      try {
+        const clean = url.split('?')[0].replace(/\/+$/, '').toLowerCase();
+        appliedUrls.add(clean);
+      } catch {}
+    }
+  };
+
+  if (typeof localStorage !== 'undefined') {
+    // 1. Check job_dashboard_local_applications
+    try {
+      const local = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+      if (typeof local === 'object' && local !== null) {
+        Object.values(local).forEach(registerApp);
+      }
+    } catch {}
+
+    // 2. Check tracked_applications
+    try {
+      const tracked = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+      if (Array.isArray(tracked)) {
+        tracked.forEach(registerApp);
+      }
+    } catch {}
+
+    // 3. Check jobOverrides for applied / progressed status
+    try {
+      const overrides = JSON.parse(localStorage.getItem('jobOverrides') || '{}');
+      if (typeof overrides === 'object' && overrides !== null) {
+        Object.entries(overrides).forEach(([key, val]) => {
+          const st = String(val?.status || '').toLowerCase();
+          if (
+            st.includes('applied') ||
+            st.includes('interview') ||
+            st.includes('offer') ||
+            st.includes('submitted') ||
+            st.includes('in review') ||
+            st.includes('under review') ||
+            st.includes('action required') ||
+            st.includes('hired') ||
+            st.includes('accepted')
+          ) {
+            appliedIds.add(String(key));
+            appliedIds.add(String(key).toLowerCase());
+            if (val?.company && val?.title) {
+              registerApp(val);
+            }
+          }
+        });
+      }
+    } catch {}
+  }
+
+  return { appliedIds, appliedKeys, appliedUrls };
+};
+
+/**
+ * Checks whether a job matches any recorded application across ID, normalized key, or URL.
+ */
+export const isJobAppliedOrTracked = (job, lookup = null) => {
+  if (!job || typeof job !== 'object') return false;
+  const l = lookup || getUnifiedAppliedLookup();
+
+  const id = String(job.id || job.job_id || '').trim();
+  if (id) {
+    if (l.appliedIds.has(id) || l.appliedIds.has(id.toLowerCase())) return true;
+    const stripped = id.replace(/^[a-z_-]+/i, '');
+    if (stripped && l.appliedIds.has(stripped)) return true;
+  }
+
+  const comp = String(job.company || '').trim();
+  const tit = String(job.title || '').trim();
+  if (comp && tit) {
+    if (l.appliedKeys.has(`${comp.toLowerCase()}_${tit.toLowerCase()}`)) return true;
+    const norm = normalizeJobKey(comp, tit);
+    if (norm && norm !== '__' && l.appliedKeys.has(norm)) return true;
+  }
+
+  const url = String(job.url || job.portalLink || job.link || '').trim();
+  if (url) {
+    try {
+      const clean = url.split('?')[0].replace(/\/+$/, '').toLowerCase();
+      if (l.appliedUrls.has(clean)) return true;
+    } catch {}
+  }
+
+  const s = String(job.status || '').toLowerCase();
+  if (
+    s.includes('applied') ||
+    s.includes('interview') ||
+    s.includes('offer') ||
+    s.includes('submitted') ||
+    s.includes('in review') ||
+    s.includes('under review') ||
+    s.includes('action required') ||
+    s.includes('hired') ||
+    s.includes('accepted')
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * Fetch application statuses submitted/tracked by the user
  */
 export const fetchUserApplications = async () => {
@@ -585,6 +722,10 @@ export const deleteUserApplication = async (jobId) => {
       const filtered = tracked.filter(a => String(a.id || a.job_id || '') !== targetId);
       localStorage.setItem('tracked_applications', JSON.stringify(filtered));
     } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('application-status-updated', { detail: { id: targetId, deleted: true } }));
+    }
   }
 
   return serverSuccess;
@@ -603,17 +744,45 @@ export const saveUserApplication = async (jobData) => {
   }
 
   const targetId = jobData.id || `${jobData.company}_${jobData.title}`;
+  const updatedRecord = {
+    ...jobData,
+    id: targetId,
+    job_id: targetId,
+    status: jobData.status || 'Applied / In Review',
+    updated_at: new Date().toISOString()
+  };
   
   // 1. Persist locally in localStorage for instant offline / cache recovery
   try {
     const saved = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
-    saved[targetId] = {
-      ...jobData,
-      id: targetId,
-      updated_at: new Date().toISOString()
-    };
+    saved[targetId] = updatedRecord;
     localStorage.setItem('job_dashboard_local_applications', JSON.stringify(saved));
   } catch {}
+
+  // 1b. Synchronize to tracked_applications list
+  try {
+    const tracked = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+    const existingIdx = tracked.findIndex(a => 
+      String(a.id || a.job_id || '') === String(targetId) ||
+      (a.company && a.title && normalizeJobKey(a.company, a.title) === normalizeJobKey(jobData.company, jobData.title))
+    );
+    if (existingIdx >= 0) {
+      tracked[existingIdx] = { ...tracked[existingIdx], ...updatedRecord };
+    } else {
+      tracked.unshift(updatedRecord);
+    }
+    localStorage.setItem('tracked_applications', JSON.stringify(tracked));
+  } catch {}
+
+  // 1c. Dispatch window events for live reactive UI updates
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('application-status-updated', { 
+      detail: { job: updatedRecord, status: updatedRecord.status } 
+    }));
+    window.dispatchEvent(new CustomEvent('job-applied', { 
+      detail: { job: updatedRecord } 
+    }));
+  }
 
   // 2. Persist to backend SQLite if authenticated
   const token = getAuthToken();

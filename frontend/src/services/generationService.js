@@ -77,12 +77,15 @@ export const CANDIDATE_PROFILE = {
 };
 
 export const AVAILABLE_MODELS = [
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta Llama 3.3 70B (✨ Free / Zero Cost)', description: 'Full 70B model with exceptional reasoning, cover letter writing, and criteria generation' },
+  { id: 'google/gemini-2.0-flash-exp:free', name: 'Google Gemini 2.0 Flash (✨ Free / High Speed)', description: 'Lightning-fast sub-second document and interview prep generation' },
+  { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1 (✨ Free / Reasoning)', description: 'Rigorous chain-of-thought reasoning model free tier' },
+  { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Fast Flash Tier)', description: 'Rapid, lightweight generation' },
   { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet (⭐ Recommended Elite Writer)', description: 'Industry-leading executive voice, nuanced ATS keyword tailoring, and high-impact accomplishment bullets' },
   { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o (High-Precision ATS)', description: 'Top-tier structural precision, strong metric extraction, and flawless formatting' },
   { id: 'google/gemini-2.5-pro', name: 'Google Gemini 2.5 Pro (Deep Technical)', description: 'Deep technical reasoning and thorough skill alignment' },
   { id: 'google/gemini-2.0-flash-001', name: 'Google Gemini 2.0 Flash (Fast & Sharp)', description: 'Ultra-fast token synthesis with robust structured markdown compliance' },
-  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat (High Performance)', description: 'Exceptional ATS keyword mapping and dense achievement bullets' },
-  { id: 'z-ai/glm-5.3-flash', name: 'GLM 5.3 Flash (Fast Flash Tier)', description: 'Rapid, lightweight generation' }
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat (High Performance)', description: 'Exceptional ATS keyword mapping and dense achievement bullets' }
 ];
 
 export const getActiveApiKey = () => {

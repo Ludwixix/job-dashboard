@@ -54,7 +54,7 @@ import {
 } from '../services/viewSettingsService';
 
 import { EmptyState } from './ui/EmptyState';
-import { cleanDescriptionText } from '../services/dataService';
+import { cleanDescriptionText, getUnifiedAppliedLookup, isJobAppliedOrTracked } from '../services/dataService';
 
 import { compareJobPostedDates, getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 import { matchesSalaryThreshold } from '../utils/salaryUtils';
@@ -292,6 +292,25 @@ export const JobSeeker = ({
  return () => window.removeEventListener('job-view-settings-changed', handleRemoteSettings);
  }, []);
 
+ const [appliedVersion, setAppliedVersion] = useState(0);
+ useEffect(() => {
+   const handleAppliedEvent = () => {
+     setAppliedVersion(v => v + 1);
+   };
+   if (typeof window !== 'undefined') {
+     window.addEventListener('application-status-updated', handleAppliedEvent);
+     window.addEventListener('job-applied', handleAppliedEvent);
+     window.addEventListener('storage', handleAppliedEvent);
+   }
+   return () => {
+     if (typeof window !== 'undefined') {
+       window.removeEventListener('application-status-updated', handleAppliedEvent);
+       window.removeEventListener('job-applied', handleAppliedEvent);
+       window.removeEventListener('storage', handleAppliedEvent);
+     }
+   };
+ }, []);
+
  const [selectedForGenerator, setSelectedForGenerator] = useState(null);
  const [selectedAutoApplyJob, setSelectedAutoApplyJob] = useState(null);
  const [psychologyJob, setPsychologyJob] = useState(null);
@@ -308,47 +327,56 @@ export const JobSeeker = ({
  const [prefToast, setPrefToast] = useState(null);
 
  // Auto-Generated Roles based on Candidate Profile
- // Unsubmitted jobs pool (strictly genuine scraped ads, discarding email pseudo-jobs)
+ // Unsubmitted jobs pool (strictly genuine scraped ads, discarding email pseudo-jobs and already-applied/tracked jobs)
  const unsubmittedJobs = useMemo(() => {
- return (jobs || []).filter(job => {
- if (job.isRejected) return false;
+   const appliedLookup = getUnifiedAppliedLookup();
 
- // Filter out email conversation pseudo-jobs or corrupted company entries
- const comp = (job.company || '').toLowerCase();
- const tit = (job.title || '').toLowerCase();
- if (
- comp === 'gmail' ||
- comp === 'direct employer' ||
- tit.startsWith('exploring a new opportunity') ||
- tit.includes('application was sent to') ||
- tit.includes('application submitted') ||
- tit.includes('application received') ||
- tit.includes('invitation to connect')
- ) {
- return false;
- }
+   return (jobs || []).filter(job => {
+     if (job.isRejected) return false;
 
- const s = (job.status || 'sourced').toLowerCase();
- const isProgressed = s.includes('applied') || 
- s.includes('confirmation') || 
- s.includes('interview') || 
- s.includes('offer') || 
- s.includes('accepted') || 
- s.includes('under review') || 
- s.includes('action required') || 
- s.includes('verification') || 
- s.includes('unsuccessful') || 
- s.includes('closed') || 
- s.includes('rejected') || 
- s.includes('dismissed') || 
- s.includes('expired');
- // Custom jobs that the user manually created should remain visible in the active pool
- if (job.isCustom || String(job.id || '').startsWith('custom_')) {
- return true;
- }
- return !isProgressed;
- });
- }, [jobs]);
+     // Filter out email conversation pseudo-jobs or corrupted company entries
+     const comp = (job.company || '').toLowerCase();
+     const tit = (job.title || '').toLowerCase();
+     if (
+       comp === 'gmail' ||
+       comp === 'direct employer' ||
+       tit.startsWith('exploring a new opportunity') ||
+       tit.includes('application was sent to') ||
+       tit.includes('application submitted') ||
+       tit.includes('application received') ||
+       tit.includes('invitation to connect')
+     ) {
+       return false;
+     }
+
+     // 1. Cross-reference unified applied cache (IDs, URLs, normalized title+company)
+     if (isJobAppliedOrTracked(job, appliedLookup)) {
+       return false;
+     }
+
+     // 2. Check explicit status string
+     const s = (job.status || 'sourced').toLowerCase();
+     const isProgressed = s.includes('applied') || 
+       s.includes('confirmation') || 
+       s.includes('interview') || 
+       s.includes('offer') || 
+       s.includes('accepted') || 
+       s.includes('under review') || 
+       s.includes('action required') || 
+       s.includes('verification') || 
+       s.includes('unsuccessful') || 
+       s.includes('closed') || 
+       s.includes('rejected') || 
+       s.includes('dismissed') || 
+       s.includes('expired');
+
+     if (isProgressed) {
+       return false;
+     }
+
+     return true;
+   });
+ }, [jobs, appliedVersion]);
 
  // Complete Jobs vs Incomplete (Missing Data) Jobs
  const completeJobs = useMemo(() => {

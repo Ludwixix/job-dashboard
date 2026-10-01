@@ -872,11 +872,111 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  {/* GENERATE tab */}
  {activeTab === 'overview' && (
  <div className="space-y-4">
- {genError && (
- <div className="flex items-start gap-3 p-4 bg-rose-950/40 border border-rose-800/50 rounded-sm text-rose-300 text-xs">
- <AlertCircle size={16} className="shrink-0 mt-0.5" />
- <span>{genError}</span>
+ {/* Quick Model Selector & Regeneration Bar */}
+ <div className="p-3.5 rounded-sm bg-slate-950/80 border border-slate-800 space-y-2.5">
+   <div className="flex flex-wrap items-center justify-between gap-2">
+     <div className="flex items-center gap-2">
+       <Cpu size={14} className="text-amber-400" />
+       <span className="text-xs font-bold text-slate-200">Active Model:</span>
+       <select
+         value={selectedModel}
+         onChange={(e) => {
+           const newModel = e.target.value;
+           setSelectedModel(newModel);
+           saveLlmConfig({ ...getLlmConfig(), model: newModel });
+         }}
+         className="bg-slate-900 border border-slate-700 rounded-sm px-2.5 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-400 cursor-pointer max-w-[260px]"
+       >
+         {filteredOpenRouterModels.map(m => (
+           <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+             {m.isFree ? '✨ [FREE] ' : ''}{m.name || m.id}
+           </option>
+         ))}
+       </select>
+     </div>
+
+     <button
+       onClick={handleGenerate}
+       disabled={isGenerating}
+       className="px-3.5 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+       title="Instantly re-run generation with currently selected model"
+     >
+       <RefreshCw size={13} className={isGenerating ? 'animate-spin' : ''} />
+       <span>{isGenerating ? 'GENERATING...' : hasDocuments ? '🔄 REGENERATE WITH MODEL' : '🚀 GENERATE PACKAGE'}</span>
+     </button>
+   </div>
+
+   {/* Quick Preset Model Chips */}
+   <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/80 text-[10px] font-mono">
+     <span className="text-slate-500 mr-1">Quick Presets:</span>
+     {[
+       { id: 'meta-llama/llama-3.3-70b-instruct:free', label: '✨ Free Llama 3.3 70B' },
+       { id: 'google/gemini-2.0-flash-exp:free', label: '✨ Free Gemini 2.0 Flash' },
+       { id: 'z-ai/glm-5.3-flash', label: '⚡ GLM 5.3 Flash' },
+       { id: 'deepseek/deepseek-chat', label: '🔥 DeepSeek V3' },
+       { id: 'anthropic/claude-3.7-sonnet', label: '⭐ Claude 3.7 Sonnet' },
+       { id: 'openai/gpt-4o', label: '🎯 GPT-4o' }
+     ].map(p => (
+       <button
+         key={p.id}
+         type="button"
+         onClick={() => {
+           setSelectedModel(p.id);
+           saveLlmConfig({ ...getLlmConfig(), model: p.id });
+         }}
+         className={`px-2 py-0.5 rounded-sm border cursor-pointer transition-all ${
+           selectedModel === p.id 
+             ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold' 
+             : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+         }`}
+       >
+         {p.label}
+       </button>
+     ))}
+   </div>
  </div>
+
+ {genError && (
+   <div className="p-4 bg-rose-950/40 border border-rose-800/50 rounded-sm text-rose-300 text-xs space-y-2.5">
+     <div className="flex items-start gap-3">
+       <AlertCircle size={16} className="shrink-0 mt-0.5" />
+       <div className="space-y-1">
+         <div className="font-bold text-rose-200">Generation Issue or Model Misconfigured</div>
+         <div>{genError}</div>
+       </div>
+     </div>
+     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-rose-900/40">
+       <span className="text-[11px] text-slate-400">Quick Resolution:</span>
+       <button
+         onClick={() => {
+           const freeModel = 'google/gemini-2.0-flash-exp:free';
+           setSelectedModel(freeModel);
+           saveLlmConfig({ ...getLlmConfig(), model: freeModel });
+           setTimeout(() => handleGenerate(), 50);
+         }}
+         className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-sm text-xs cursor-pointer flex items-center gap-1 shadow-sm"
+       >
+         <Zap size={12} /> Retry with Free Gemini 2.0 Flash (No Key Required)
+       </button>
+       <button
+         onClick={() => {
+           const freeModel = 'meta-llama/llama-3.3-70b-instruct:free';
+           setSelectedModel(freeModel);
+           saveLlmConfig({ ...getLlmConfig(), model: freeModel });
+           setTimeout(() => handleGenerate(), 50);
+         }}
+         className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-sm text-xs cursor-pointer border border-slate-700"
+       >
+         ✨ Free Llama 3.3 70B
+       </button>
+       <button
+         onClick={() => setShowSettings(true)}
+         className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-sm text-xs cursor-pointer border border-slate-700 sm:ml-auto"
+       >
+         Configure API Key
+       </button>
+     </div>
+   </div>
  )}
 
  {isGenerating && (
@@ -1165,6 +1265,42 @@ export const GeneratorModal = ({ job, onClose, onUpdateStatus, onSaveCustomDocs 
  </div>
  ))}
  </div>
+ </div>
+
+ {/* Quick Regenerate Bar inside Quality Gate */}
+ <div className="p-4 rounded-sm bg-slate-950/80 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+   <div className="space-y-0.5">
+     <div className="text-xs font-bold text-white flex items-center gap-1.5">
+       <RefreshCw size={13} className="text-amber-400" />
+       <span>Regenerate with another AI Model or Prompt?</span>
+     </div>
+     <p className="text-[11px] text-slate-400">Re-synthesize the application package instantly using an alternative LLM.</p>
+   </div>
+   <div className="flex flex-wrap items-center gap-2">
+     <select
+       value={selectedModel}
+       onChange={(e) => {
+         const newModel = e.target.value;
+         setSelectedModel(newModel);
+         saveLlmConfig({ ...getLlmConfig(), model: newModel });
+       }}
+       className="bg-slate-900 border border-slate-700 rounded-sm px-2.5 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-400 cursor-pointer max-w-[220px]"
+     >
+       {filteredOpenRouterModels.map(m => (
+         <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+           {m.isFree ? '✨ [FREE] ' : ''}{m.name || m.id}
+         </option>
+       ))}
+     </select>
+     <button
+       onClick={handleGenerate}
+       disabled={isGenerating}
+       className="px-3.5 py-1.5 rounded-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+     >
+       <RefreshCw size={13} className={isGenerating ? 'animate-spin' : ''} />
+       <span>{isGenerating ? 'REGENERATING...' : '🔄 REGENERATE NOW'}</span>
+     </button>
+   </div>
  </div>
  </div>
  )}

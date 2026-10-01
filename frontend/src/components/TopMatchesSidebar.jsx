@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Flame, Award, Sparkles, ArrowRight, MapPin, ExternalLink, Dices, Navigation,
@@ -7,6 +7,7 @@ import {
 import { getJobAgeInDays, formatJobPostedAge } from '../utils/dateUtils';
 import { matchesSalaryThreshold, parseSalaryNumeric } from '../utils/salaryUtils';
 import { calculateDistanceKm } from '../services/commuteService';
+import { getUnifiedAppliedLookup, isJobAppliedOrTracked } from '../services/dataService';
 
 export const extractSuburb = (locStr = '') => {
   if (!locStr) return 'Local';
@@ -231,34 +232,30 @@ export const TopMatchesSidebar = ({
   const [showMostLikely, setShowMostLikely] = useState(false);
   const [wildCardIndex, setWildCardIndex] = useState(0);
 
+  const [appliedVersion, setAppliedVersion] = useState(0);
+  useEffect(() => {
+    const handleAppliedEvent = () => {
+      setAppliedVersion(v => v + 1);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('application-status-updated', handleAppliedEvent);
+      window.addEventListener('job-applied', handleAppliedEvent);
+      window.addEventListener('storage', handleAppliedEvent);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('application-status-updated', handleAppliedEvent);
+        window.removeEventListener('job-applied', handleAppliedEvent);
+        window.removeEventListener('storage', handleAppliedEvent);
+      }
+    };
+  }, []);
+
   // Available Active Jobs Pool (Excluding already applied, tracked, progressed, or closed records)
   const unsubmittedJobs = useMemo(() => {
     if (!jobs || jobs.length === 0) return [];
 
-    const appliedIds = new Set();
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const tracked = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
-        if (Array.isArray(tracked)) {
-          tracked.forEach(a => {
-            if (a.id) appliedIds.add(String(a.id));
-            if (a.job_id) appliedIds.add(String(a.job_id));
-            if (a.company && a.title) {
-              appliedIds.add(`${String(a.company).toLowerCase().trim()}_${String(a.title).toLowerCase().trim()}`);
-            }
-          });
-        }
-      } catch {}
-      try {
-        const localApps = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
-        Object.keys(localApps).forEach(id => appliedIds.add(String(id)));
-        Object.values(localApps).forEach(a => {
-          if (a?.company && a?.title) {
-            appliedIds.add(`${String(a.company).toLowerCase().trim()}_${String(a.title).toLowerCase().trim()}`);
-          }
-        });
-      } catch {}
-    }
+    const appliedLookup = getUnifiedAppliedLookup();
 
     const APPLIED_STATUS_PATTERNS = [
       'applied',
@@ -290,6 +287,11 @@ export const TopMatchesSidebar = ({
       if (Boolean(job.appliedDate || job.applied_at || job.applied_date)) return false;
       if (job.isRejected || job.is_rejected) return false;
 
+      // Check unified application lookup (IDs, URLs, normalized title+company)
+      if (isJobAppliedOrTracked(job, appliedLookup)) {
+        return false;
+      }
+
       const s = String(job.status || 'sourced').toLowerCase();
       const stage = String(job.stage || '').toLowerCase();
 
@@ -297,17 +299,9 @@ export const TopMatchesSidebar = ({
         return false;
       }
 
-      const strId = String(job.id || '');
-      const strJobId = String(job.job_id || '');
-      const key = `${String(job.company || '').toLowerCase().trim()}_${String(job.title || '').toLowerCase().trim()}`;
-
-      if (appliedIds.has(strId) || (strJobId && appliedIds.has(strJobId)) || appliedIds.has(key)) {
-        return false;
-      }
-
       return true;
     });
-  }, [jobs]);
+  }, [jobs, appliedVersion]);
 
   // Top 10 Best Aligned & Newest Job Ads
   const top10Matches = useMemo(() => {

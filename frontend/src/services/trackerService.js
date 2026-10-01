@@ -1,5 +1,5 @@
 import { parseISO, isValid, differenceInDays } from 'date-fns';
-import { cleanDescriptionText } from './dataService';
+import { cleanDescriptionText, normalizeJobKey } from './dataService';
 import { getBackendApiBase } from './apiConfig';
 import { getActiveProfile } from './profileService';
 import { getAuthToken } from './authService';
@@ -297,12 +297,78 @@ ${signature}`;
 export const saveUserApplicationToBackend = async (job, userId) => {
   if (!job || typeof job !== 'object') return null;
   const targetUserId = userId || getActiveProfile()?.id;
-  if (!targetUserId) {
-    throw new Error('Authentication required: valid userId or active profile is required to save application.');
-  }
-  const apiBase = getBackendApiBase();
-  const jobId = job.id || `${job.company}_${job.title}`;
+  const jobId = String(job.id || `${job.company}_${job.title}`);
+  const status = job.status || 'Applied';
+  const appliedAt = job.appliedDate || job.applied_at || job.date || new Date().toISOString();
 
+  const updatedRecord = {
+    ...job,
+    id: jobId,
+    job_id: jobId,
+    company: job.company || '',
+    title: job.title || '',
+    status: status,
+    notes: job.notes || '',
+    resume_text: job.resume_text || job.resumeText || '',
+    cover_letter_text: job.cover_letter_text || job.coverLetterText || '',
+    applied_at: appliedAt,
+    appliedDate: appliedAt,
+    updated_at: new Date().toISOString()
+  };
+
+  // 1. Immediately sync to local caches for instantaneous offline persistence
+  if (typeof localStorage !== 'undefined') {
+    // 1a. job_dashboard_local_applications
+    try {
+      const localApps = JSON.parse(localStorage.getItem('job_dashboard_local_applications') || '{}');
+      localApps[jobId] = updatedRecord;
+      localStorage.setItem('job_dashboard_local_applications', JSON.stringify(localApps));
+    } catch {}
+
+    // 1b. tracked_applications
+    try {
+      const tracked = JSON.parse(localStorage.getItem('tracked_applications') || '[]');
+      const normTarget = normalizeJobKey(job.company, job.title);
+      const existingIdx = tracked.findIndex(a =>
+        String(a.id || a.job_id || '') === jobId ||
+        (a.company && a.title && normalizeJobKey(a.company, a.title) === normTarget)
+      );
+      if (existingIdx >= 0) {
+        tracked[existingIdx] = { ...tracked[existingIdx], ...updatedRecord };
+      } else {
+        tracked.unshift(updatedRecord);
+      }
+      localStorage.setItem('tracked_applications', JSON.stringify(tracked));
+    } catch {}
+
+    // 1c. jobOverrides
+    try {
+      const overrides = JSON.parse(localStorage.getItem('jobOverrides') || '{}');
+      overrides[jobId] = { ...(overrides[jobId] || {}), status: status, ...updatedRecord };
+      const altKey = `${job.company}_${job.title}`;
+      if (altKey) overrides[altKey] = { ...(overrides[altKey] || {}), status: status, ...updatedRecord };
+      const normKey = normalizeJobKey(job.company, job.title);
+      if (normKey && normKey !== '__') overrides[normKey] = { ...(overrides[normKey] || {}), status: status, ...updatedRecord };
+      localStorage.setItem('jobOverrides', JSON.stringify(overrides));
+    } catch {}
+  }
+
+  // 2. Broadcast application events across tabs & components
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('application-status-updated', {
+      detail: { job: updatedRecord, status: updatedRecord.status }
+    }));
+    window.dispatchEvent(new CustomEvent('job-applied', {
+      detail: { job: updatedRecord }
+    }));
+  }
+
+  if (!targetUserId) {
+    // In unauthenticated offline mode, local sync is complete and successful
+    return updatedRecord;
+  }
+
+  const apiBase = getBackendApiBase();
   const token = getAuthToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -316,22 +382,22 @@ export const saveUserApplicationToBackend = async (job, userId) => {
         job_id: jobId,
         company: job.company || '',
         title: job.title || '',
-        status: job.status || 'Applied',
+        status: status,
         notes: job.notes || '',
-        resume_text: job.resume_text || '',
-        cover_letter_text: job.cover_letter_text || '',
-        applied_at: job.appliedDate || job.applied_at || new Date().toISOString(),
+        resume_text: job.resume_text || job.resumeText || '',
+        cover_letter_text: job.cover_letter_text || job.coverLetterText || '',
+        applied_at: appliedAt,
         job_data: job
       })
     });
     if (res.ok) {
       const data = await res.json();
-      return data.application;
+      return data.application || updatedRecord;
     }
   } catch (e) {
     console.warn('Backend application save non-blocking error:', e);
   }
-  return null;
+  return updatedRecord;
 };
 
 /**

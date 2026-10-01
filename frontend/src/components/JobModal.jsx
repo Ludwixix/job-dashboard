@@ -8,7 +8,8 @@ import {
   RefreshCw, Loader2, Scale, Building2, Users, TrendingUp, Search, Flame,
   ClipboardCheck, Compass, BookOpen, Edit3
 } from 'lucide-react';
-import { executeClientSideAutoApply, hasGeneratedApplicationDocs } from '../services/generationService';
+import { executeClientSideAutoApply, hasGeneratedApplicationDocs, generateApplicationDocs, AVAILABLE_MODELS } from '../services/generationService';
+import { getLlmConfig, saveLlmConfig } from '../services/llmConfig';
 import { downloadResumePdf, downloadCoverLetterPdf } from '../utils/pdfGenerator';
 import { isQuickApplyEligible, getQuickApplyPlatform } from '../services/autoApplyService';
 import { promoteSimilarJobs, demoteSimilarJobs, getUserPreferences } from '../services/scoringEngine';
@@ -85,6 +86,77 @@ export const JobModal = ({ job, onClose, onOpenGenerator, onJobStatusUpdate, onR
       .catch(() => {
         setIsSavingNotes(false);
       });
+  };
+
+  // Quick Document Regeneration State
+  const [selectedDocsModel, setSelectedDocsModel] = useState(() => {
+    const raw = job?.docsModel || getLlmConfig()?.model || 'z-ai/glm-5.3-flash';
+    const match = AVAILABLE_MODELS.find(m => m.id === raw || m.name.toLowerCase().includes(String(raw).toLowerCase()));
+    return match ? match.id : (getLlmConfig()?.model || 'z-ai/glm-5.3-flash');
+  });
+  const [isRegeneratingDocs, setIsRegeneratingDocs] = useState(false);
+  const [regenerateStatusMsg, setRegenerateStatusMsg] = useState('');
+  const [regenerateSuccess, setRegenerateSuccess] = useState(false);
+  const [regenerateError, setRegenerateError] = useState('');
+
+  const handleRegenerateDocuments = async (overrideModel) => {
+    const modelToUse = overrideModel || selectedDocsModel;
+    setIsRegeneratingDocs(true);
+    setRegenerateStatusMsg(`Connecting to AI model (${modelToUse.split('/')[1] || modelToUse})...`);
+    setRegenerateError('');
+    setRegenerateSuccess(false);
+
+    try {
+      // Save chosen model into LLM config so it persists
+      const currConfig = getLlmConfig();
+      saveLlmConfig({
+        ...currConfig,
+        model: modelToUse
+      });
+
+      const result = await generateApplicationDocs(
+        job,
+        (msg) => setRegenerateStatusMsg(msg),
+        null,
+        activeProfile
+      );
+
+      if (!result || result.error) {
+        throw new Error(result?.error || 'Generation failed. Check LLM setup or API key.');
+      }
+
+      const updatedJob = {
+        ...job,
+        hasCustomDocs: true,
+        resumeText: result.resume || '',
+        coverLetterText: result.coverLetter || '',
+        linkedInText: result.linkedInOptimization || '',
+        docsModel: result.model || modelToUse,
+        docsGeneratedAt: new Date().toISOString(),
+        date: job.date || new Date().toISOString().split('T')[0]
+      };
+
+      if (onJobStatusUpdate) {
+        onJobStatusUpdate(updatedJob);
+      }
+      saveUserApplicationToBackend(updatedJob).catch(() => {});
+
+      // Instant download of the newly regenerated PDFs
+      if (result.resume) {
+        downloadResumePdf(result.resume, job);
+      }
+      if (result.coverLetter) {
+        setTimeout(() => downloadCoverLetterPdf(result.coverLetter, job), 400);
+      }
+
+      setRegenerateSuccess(true);
+      setTimeout(() => setRegenerateSuccess(false), 4000);
+    } catch (err) {
+      setRegenerateError(err.message || 'Generation failed. Switch to a free model or verify API key.');
+    } finally {
+      setIsRegeneratingDocs(false);
+      setRegenerateStatusMsg('');
+    }
   };
 
   useEffect(() => {
@@ -781,7 +853,7 @@ ${candidatePhone}`;
                   </div>
                 </div>
                 <span className="text-[10px] font-bold bg-slate-800 text-emerald-300 px-2.5 py-1 rounded-lg border border-slate-700 w-fit">
-                  {job.docsModel || 'GLM 5.3 Flash'}
+                  {job.docsModel || selectedDocsModel || 'GLM 5.3 Flash'}
                 </span>
               </div>
 
@@ -814,6 +886,144 @@ ${candidatePhone}`;
                   <Sparkles size={13} className="text-emerald-400" /> EDIT IN STUDIO
                 </button>
               </div>
+
+              {/* Quick Regenerate & Model Switcher Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Change Model:</span>
+                  <select
+                    value={selectedDocsModel}
+                    onChange={(e) => setSelectedDocsModel(e.target.value)}
+                    disabled={isRegeneratingDocs}
+                    className="bg-slate-950 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[220px]"
+                  >
+                    {AVAILABLE_MODELS.map(m => (
+                      <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => handleRegenerateDocuments()}
+                  disabled={isRegeneratingDocs}
+                  className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
+                  title="Regenerate ATS Resume & Cover Letter with selected AI model"
+                >
+                  <RefreshCw size={13} className={isRegeneratingDocs ? 'animate-spin' : ''} />
+                  <span>{isRegeneratingDocs ? 'REGENERATING...' : '🔄 REGENERATE DOCUMENTS'}</span>
+                </button>
+              </div>
+
+              {isRegeneratingDocs && (
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-emerald-500/40 text-[11px] text-emerald-300 flex items-center gap-2 animate-pulse">
+                  <Loader2 size={13} className="animate-spin text-emerald-400" />
+                  <span>{regenerateStatusMsg || 'Regenerating customized application package...'}</span>
+                </div>
+              )}
+
+              {regenerateSuccess && (
+                <div className="p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-500/60 text-[11px] text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>Documents successfully regenerated and downloaded!</span>
+                </div>
+              )}
+
+              {regenerateError && (
+                <div className="p-2.5 rounded-lg bg-rose-950/70 border border-rose-600/60 text-[11px] text-rose-300 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={14} className="text-rose-400 shrink-0" />
+                    <span>{regenerateError}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-rose-900/50">
+                    <button
+                      onClick={() => handleRegenerateDocuments('google/gemini-2.0-flash-exp:free')}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded text-[10px] cursor-pointer"
+                    >
+                      ✨ Switch to Free Gemini 2.0 Flash & Retry
+                    </button>
+                    <button
+                      onClick={() => handleRegenerateDocuments('meta-llama/llama-3.3-70b-instruct:free')}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded text-[10px] cursor-pointer"
+                    >
+                      ✨ Free Llama 3.3 70B
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quick Document Generation Banner if not yet generated */}
+          {!hasGeneratedApplicationDocs(job) && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 text-white border border-slate-700/70 shadow-md font-mono space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-400/30 shrink-0">
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">TAILORED APPLICATION DOCUMENTS</div>
+                    <div className="text-xs font-bold text-slate-200">Synthesize ATS Resume & Cover Letter for this role</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={selectedDocsModel}
+                    onChange={(e) => setSelectedDocsModel(e.target.value)}
+                    disabled={isRegeneratingDocs}
+                    className="bg-slate-950 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer max-w-[200px]"
+                  >
+                    {AVAILABLE_MODELS.map(m => (
+                      <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => handleRegenerateDocuments()}
+                    disabled={isRegeneratingDocs}
+                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
+                  >
+                    <Zap size={13} className={isRegeneratingDocs ? 'animate-spin' : ''} />
+                    <span>{isRegeneratingDocs ? 'GENERATING...' : '🚀 1-CLICK GENERATE'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {isRegeneratingDocs && (
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-indigo-500/40 text-[11px] text-indigo-300 flex items-center gap-2 animate-pulse">
+                  <Loader2 size={13} className="animate-spin text-indigo-400" />
+                  <span>{regenerateStatusMsg || 'Synthesizing tailored documents...'}</span>
+                </div>
+              )}
+
+              {regenerateSuccess && (
+                <div className="p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-500/60 text-[11px] text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>Documents successfully created and downloaded!</span>
+                </div>
+              )}
+
+              {regenerateError && (
+                <div className="p-2.5 rounded-lg bg-rose-950/70 border border-rose-600/60 text-[11px] text-rose-300 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={14} className="text-rose-400 shrink-0" />
+                    <span>{regenerateError}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-rose-900/50">
+                    <button
+                      onClick={() => handleRegenerateDocuments('google/gemini-2.0-flash-exp:free')}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded text-[10px] cursor-pointer"
+                    >
+                      ✨ Switch to Free Gemini 2.0 Flash & Retry
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {/* TAB 0: OFFER RECEIVED & STRATEGIC NEGOTIATION PLAYBOOK */}
@@ -2338,12 +2548,24 @@ ${data.pipeline_result?.cover_text || ''}`;
             </button>
           )}
 
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 font-extrabold text-xs hover:bg-slate-700 transition-colors cursor-pointer"
-          >
-            CLOSE MODAL
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleRegenerateDocuments()}
+              disabled={isRegeneratingDocs}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              title="Quickly regenerate tailored ATS resume and cover letter"
+            >
+              <RefreshCw size={13} className={isRegeneratingDocs ? 'animate-spin' : ''} />
+              <span>{isRegeneratingDocs ? 'REGENERATING...' : '🔄 REGENERATE DOCS'}</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 font-extrabold text-xs hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              CLOSE MODAL
+            </button>
+          </div>
         </div>
 
       </div>

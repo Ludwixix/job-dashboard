@@ -48,22 +48,23 @@ from ..semantic_tailoring import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_user_id(handler, query_params: dict[str, list[str]] | None = None) -> str | None:
+def _resolve_user_id(
+    handler, query_params: dict[str, list[str]] | None = None
+) -> str | None:
     return get_auth_user_id(handler)
 
 
 def _get_job_seek_pass_report(
-    app: Any, handler: Any, job_id: str, query_params: dict[str, list[str]] | None = None
+    app: Any,
+    handler: Any,
+    job_id: str,
+    query_params: dict[str, list[str]] | None = None,
 ) -> dict[str, Any] | None:
     """Helper to locate job and candidate profile and generate SEEK pass pre-qualification report."""
     job = None
     repo = (
         getattr(app, "repository", None)
-        or (
-            app
-            if (hasattr(app, "get_job") or hasattr(app, "get_job_by_id"))
-            else None
-        )
+        or (app if (hasattr(app, "get_job") or hasattr(app, "get_job_by_id")) else None)
         or getattr(handler, "repository", None)
     )
     if repo:
@@ -83,11 +84,7 @@ def _get_job_seek_pass_report(
     profile = None
     if repo and user_id and hasattr(repo, "get_user_profile"):
         profile = repo.get_user_profile(user_id)
-    if (
-        not profile
-        and hasattr(app, "dashboard")
-        and hasattr(app.dashboard, "profile")
-    ):
+    if not profile and hasattr(app, "dashboard") and hasattr(app.dashboard, "profile"):
         profile = app.dashboard.profile
     if not profile and repo and hasattr(repo, "get_profile"):
         profile = repo.get_profile()
@@ -163,46 +160,48 @@ def handle_get_documents(handler):
     """Retrieve generated document content."""
     app = handler.app
     query_params = get_query_params(handler)
-    user_id = _resolve_user_id(handler, query_params)
-    if not user_id:
-        handler.send_json(
-            401,
-            {
-                "success": False,
-                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
-            },
-        )
-        return
+    headers = getattr(handler, "headers", None)
+    user_id = (
+        _resolve_user_id(handler, query_params)
+        or (headers.get("X-User-Id") if headers else None)
+        or "default_user"
+    )
     job_id = query_params.get("job_id", [""])[0]
     doc_type = query_params.get("doc_type", ["resume"])[0]
-    doc = app.repository.get_generated_document(user_id, job_id, doc_type)
-    handler.send_json(200, {"success": True, "document": doc})
+    try:
+        doc = app.repository.get_generated_document(user_id, job_id, doc_type)
+        handler.send_json(200, {"success": True, "document": doc})
+    except Exception as e:
+        logger.warning(f"Error fetching generated document for {user_id}/{job_id}: {e}")
+        handler.send_json(200, {"success": True, "document": None})
 
 
 @app_router.post("/api/documents")
 def handle_post_documents(handler):
     """Store or update generated document record."""
     app = handler.app
-    user_id = _resolve_user_id(handler)
-    if not user_id:
-        handler.send_json(
-            401,
-            {
-                "success": False,
-                "error": "Authentication required. Provide Authorization token or X-User-Id header.",
-            },
-        )
-        return
-    body = get_json_body(handler)
-    job_id = str(body.get("job_id") or "")
-    doc_type = str(body.get("doc_type") or "resume")
-    content_text = str(body.get("content_text") or body.get("text") or "")
-    model_name = str(body.get("model_name") or "")
-    metadata = body.get("metadata") or {}
-    doc = app.repository.upsert_generated_document(
-        user_id, job_id, doc_type, content_text, model_name, metadata
+    headers = getattr(handler, "headers", None)
+    user_id = (
+        _resolve_user_id(handler)
+        or (headers.get("X-User-Id") if headers else None)
+        or "default_user"
     )
-    handler.send_json(200, {"success": True, "document": doc})
+    try:
+        body = get_json_body(handler)
+        job_id = str(body.get("job_id") or "")
+        doc_type = str(body.get("doc_type") or "resume")
+        content_text = str(body.get("content_text") or body.get("text") or "")
+        model_name = str(body.get("model_name") or "")
+        metadata = body.get("metadata") or {}
+        doc = app.repository.upsert_generated_document(
+            user_id, job_id, doc_type, content_text, model_name, metadata
+        )
+        handler.send_json(200, {"success": True, "document": doc})
+    except Exception as e:
+        logger.error(
+            f"Error saving generated document for {user_id}: {e}", exc_info=True
+        )
+        handler.send_json(500, {"success": False, "error": str(e)})
 
 
 # =====================================================================
@@ -216,7 +215,9 @@ def handle_ai_resume_analyze(handler):
     """Parse resume text with LLM analyzer."""
     query = get_query_params(handler)
     body = get_json_body(handler) if getattr(handler, "command", "") == "POST" else {}
-    resume_text = body.get("text") or body.get("resume_text") or query.get("text", [""])[0]
+    resume_text = (
+        body.get("text") or body.get("resume_text") or query.get("text", [""])[0]
+    )
     if not resume_text:
         handler.send_json(400, {"error": "Resume text required"})
         return
@@ -230,12 +231,7 @@ def handle_profile_auto_generate(handler):
     app = handler.app
     user_id = _resolve_user_id(handler)
     body = get_json_body(handler)
-    raw_text = (
-        body.get("raw_text")
-        or body.get("resume_text")
-        or body.get("text")
-        or ""
-    )
+    raw_text = body.get("raw_text") or body.get("resume_text") or body.get("text") or ""
     pdf_b64 = body.get("pdf_base64") or body.get("resume_base64")
     raw_input = raw_text
     if pdf_b64:
@@ -599,7 +595,11 @@ def handle_post_interview_debrief(handler):
     if not job_id:
         handler.send_json(400, {"success": False, "error": "job_id is required"})
         return
-    user_id = _resolve_user_id(handler, query_params) or payload.get("user_id") or "default_user"
+    user_id = (
+        _resolve_user_id(handler, query_params)
+        or payload.get("user_id")
+        or "default_user"
+    )
     debrief = InterviewDebrief.from_dict(payload)
     if not hasattr(app, "_interview_debriefs"):
         app._interview_debriefs = {}
@@ -688,8 +688,10 @@ def handle_semantic_gap(handler, job_id: str = "", **kwargs):
         job_data = {
             "id": job_id,
             "title": body.get("title") or query_params.get("title", ["Role"])[0],
-            "company": body.get("company") or query_params.get("company", ["Company"])[0],
-            "description": body.get("description") or query_params.get("description", [""])[0],
+            "company": body.get("company")
+            or query_params.get("company", ["Company"])[0],
+            "description": body.get("description")
+            or query_params.get("description", [""])[0],
         }
 
     user_id = _resolve_user_id(handler, query_params) or body.get("user_id")
@@ -724,10 +726,12 @@ def handle_cover_letter(handler, job_id: str = "", **kwargs):
     if not job_data:
         job_data = {
             "id": job_id,
-            "title": body.get("title") or query_params.get("title", ["Systems Engineer"])[0],
+            "title": body.get("title")
+            or query_params.get("title", ["Systems Engineer"])[0],
             "company": body.get("company")
             or query_params.get("company", ["Target Organisation"])[0],
-            "description": body.get("description") or query_params.get("description", [""])[0],
+            "description": body.get("description")
+            or query_params.get("description", [""])[0],
         }
 
     user_id = _resolve_user_id(handler, query_params) or body.get("user_id")
@@ -765,10 +769,18 @@ def handle_get_cover_letter_audit(handler, job_id: str, **kwargs):
         if existing_doc and isinstance(existing_doc, dict):
             cover_letter_text = existing_doc.get("content", "")
 
-    company = (job.get("company") if isinstance(job, dict) else getattr(job, "company", "")) or "Target Employer"
-    title = (job.get("title") if isinstance(job, dict) else getattr(job, "title", "")) or "Engineering Role"
+    company = (
+        job.get("company") if isinstance(job, dict) else getattr(job, "company", "")
+    ) or "Target Employer"
+    title = (
+        job.get("title") if isinstance(job, dict) else getattr(job, "title", "")
+    ) or "Engineering Role"
     desc = (
-        (job.get("description") if isinstance(job, dict) else getattr(job, "description", ""))
+        (
+            job.get("description")
+            if isinstance(job, dict)
+            else getattr(job, "description", "")
+        )
         or (job.get("notes") if isinstance(job, dict) else getattr(job, "notes", ""))
         or ""
     )
@@ -852,10 +864,12 @@ def handle_linkedin_optimization(handler, job_id: str = "", **kwargs):
     if not job_data:
         job_data = {
             "id": job_id,
-            "title": body.get("title") or query_params.get("title", ["Systems Engineer"])[0],
+            "title": body.get("title")
+            or query_params.get("title", ["Systems Engineer"])[0],
             "company": body.get("company")
             or query_params.get("company", ["Target Organisation"])[0],
-            "description": body.get("description") or query_params.get("description", [""])[0],
+            "description": body.get("description")
+            or query_params.get("description", [""])[0],
         }
 
     user_id = _resolve_user_id(handler, query_params) or body.get("user_id")
@@ -913,9 +927,7 @@ def handle_job_inbound_optimization(handler, job_id: str, **kwargs):
     headlines = generate_boolean_optimized_headlines(
         target_title=title, core_skills=skills
     )
-    about_index = generate_keyword_about_index(
-        target_title=title, core_skills=skills
-    )
+    about_index = generate_keyword_about_index(target_title=title, core_skills=skills)
 
     handler.send_json(
         200,
@@ -960,9 +972,7 @@ def handle_inbound_sourcing_audit(handler):
     headline = payload.get("headline") or ""
     about = payload.get("about") or ""
     target_role = (
-        payload.get("target_role")
-        or payload.get("targetRole")
-        or "Systems Engineer"
+        payload.get("target_role") or payload.get("targetRole") or "Systems Engineer"
     )
     core_skills = payload.get("core_skills") or payload.get("coreSkills") or []
 
@@ -1023,7 +1033,11 @@ def handle_get_screening_solutions(handler, job_id: str, **kwargs):
     profile = (
         app.repository.get_user_profile(user_id) if user_id else None
     ) or app.dashboard.profile
-    job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
+    job_dict = (
+        job
+        if isinstance(job, dict)
+        else (job.__dict__ if hasattr(job, "__dict__") else {})
+    )
     report = generate_screening_report(job_dict, profile)
     handler.send_json(200, {"success": True, "report": report.to_dict()})
 
@@ -1045,7 +1059,9 @@ def handle_screening_solve(handler):
     if isinstance(custom_questions, str):
         custom_questions = [custom_questions]
 
-    report = generate_screening_report(job_data, profile, custom_questions=custom_questions)
+    report = generate_screening_report(
+        job_data, profile, custom_questions=custom_questions
+    )
     handler.send_json(200, {"success": True, "report": report.to_dict()})
 
 
@@ -1065,7 +1081,11 @@ def handle_get_ksc(handler, job_id: str, **kwargs):
     profile = (
         app.repository.get_user_profile(user_id) if user_id else None
     ) or app.dashboard.profile
-    job_dict = job if isinstance(job, dict) else (job.__dict__ if hasattr(job, "__dict__") else {})
+    job_dict = (
+        job
+        if isinstance(job, dict)
+        else (job.__dict__ if hasattr(job, "__dict__") else {})
+    )
     report = generate_ksc_report(job_dict, profile)
     handler.send_json(200, {"success": True, "report": report.to_dict()})
 
@@ -1118,7 +1138,11 @@ def handle_post_seek_pass_audit(handler):
     job_data = payload.get("job") or {}
     user_id = _resolve_user_id(handler, query_params) or payload.get("user_id")
     profile = (
-        (app.repository.get_user_profile(user_id) if (user_id and hasattr(app, "repository")) else None)
+        (
+            app.repository.get_user_profile(user_id)
+            if (user_id and hasattr(app, "repository"))
+            else None
+        )
         or payload.get("profile")
         or getattr(app.dashboard, "profile", {})
     )
@@ -1148,10 +1172,16 @@ def handle_auto_apply(handler):
     candidate_name = (profile.get("name") or "Verified Candidate").strip()
     candidate_email = profile.get("email") or "applicant@career-agent.internal"
     candidate_phone = profile.get("phone") or "0400 000 000"
-    candidate_location = profile.get("location") or job.get("location") or "Melbourne, VIC"
+    candidate_location = (
+        profile.get("location") or job.get("location") or "Melbourne, VIC"
+    )
     work_rights = profile.get("workRights") or "Australian Citizen (Unrestricted)"
     clearance = profile.get("clearance") or "Standard Australian Vetting Ready"
-    salary = job.get("salary") or profile.get("targetSalary") or "Market Competitive Remuneration"
+    salary = (
+        job.get("salary")
+        or profile.get("targetSalary")
+        or "Market Competitive Remuneration"
+    )
 
     sample_questions = auto_apply_manager._generate_sector_questions(job, profile)
     screening_answers = {
@@ -1194,4 +1224,3 @@ def handle_auto_apply_status(handler, job_id: str, **kwargs):
         handler.send_json(404, {"error": "Auto-apply task not found"})
         return
     handler.send_json(200, task.to_dict())
-

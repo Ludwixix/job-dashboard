@@ -14,6 +14,7 @@
 import { getActiveProfile } from './profileService';
 import { getBackendApiBase } from './apiConfig';
 import { callAIProxy } from './billingService';
+import { getAuthToken } from './authService';
 import { 
   getLlmConfig, 
   saveLlmConfig, 
@@ -201,8 +202,8 @@ ${candidateName}
  * Calls OpenRouter directly via HTTPS CORS with configured provider,
  * or routes through authenticated server-side AI proxy for Pro / Trial users with zero keys.
  */
-export const generateApplicationDocs = async (job, onProgress, onLog, candidateProfile) => {
-  const llmConfig = getLlmConfig();
+export const generateApplicationDocs = async (job, onProgress, onLog, candidateProfile, configOverride = null) => {
+  const llmConfig = configOverride || getLlmConfig();
   const provider = llmConfig.provider || 'openrouter';
   const providerMeta = llmConfig.providerMeta || PROVIDERS[provider] || PROVIDERS.openrouter;
   const apiKey = llmConfig.apiKey;
@@ -303,147 +304,200 @@ export const generateApplicationDocs = async (job, onProgress, onLog, candidateP
   log('Extracting high-priority ATS keywords and requirements…', 'info');
   log(`Dispatching request to ${providerMeta.name} endpoint…`, 'network');
 
-  let res;
-  if (provider === 'anthropic') {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: model,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 4096,
-        stream: true
-      })
-    });
-  } else {
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
+  try {
+    let res;
+    if (provider === 'anthropic') {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: model,
+          system: systemPrompt,
+          messages: [
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 4096,
+          stream: true
+        })
+      });
+    } else {
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+      if (provider === 'openrouter') {
+        headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
+        headers['X-Title'] = 'Job Dashboard Application Studio';
+      }
+
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 16000,
+          stream: true
+        })
+      });
     }
-    if (provider === 'openrouter') {
-      headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://job-dashboard.app';
-      headers['X-Title'] = 'Job Dashboard Application Studio';
-    }
 
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 16000,
-        stream: true
-      })
-    });
-  }
-
-  if (!res.ok) {
-    let errDetail = `HTTP ${res.status}`;
-    try {
-      const errJson = await res.json();
-      if (errJson?.error?.message) errDetail = errJson.error.message;
-    } catch {}
-    log(`${providerMeta.name} API Error: ${errDetail}`, 'error');
-    throw new Error(`${providerMeta.name} API Error: ${errDetail}`);
-  }
-
-  log('Connected to live model stream. Receiving tokens…', 'success');
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let fullContent = '';
-  let reasoningContent = '';
-  let lastProgressUpdate = Date.now();
-  let lineBuffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunkText = decoder.decode(value, { stream: true });
-    lineBuffer += chunkText;
-    const lines = lineBuffer.split('\n');
-    lineBuffer = lines.pop() || '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data:')) continue;
-      const dataStr = trimmed.replace(/^data:\s*/, '');
-      if (dataStr === '[DONE]') break;
-
+    if (!res.ok) {
+      let errDetail = `HTTP ${res.status}`;
       try {
-        const parsed = JSON.parse(dataStr);
-        const delta = parsed?.choices?.[0]?.delta || {};
-        
-        if (delta.content) {
-          fullContent += delta.content;
-        }
-        if (delta.reasoning) {
-          reasoningContent += delta.reasoning;
-        }
-        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-          fullContent += parsed.delta.text;
-        }
-
-        if (Date.now() - lastProgressUpdate > 700) {
-          lastProgressUpdate = Date.now();
-          if (fullContent.length > 0) {
-            log(`⚡ Synthesizing application: ${fullContent.length} chars generated…`, 'info');
-          } else if (reasoningContent.length > 0) {
-            log(`🧠 AI Reasoning: analyzing ATS keywords (${reasoningContent.length} chars)…`, 'info');
-          }
-        }
+        const errJson = await res.json();
+        if (errJson?.error?.message) errDetail = errJson.error.message;
       } catch {}
+
+      const FREE_FALLBACK_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+      if (
+        (res.status === 402 || res.status === 429) &&
+        model !== FREE_FALLBACK_MODEL &&
+        (!configOverride || configOverride.model !== FREE_FALLBACK_MODEL)
+      ) {
+        log(`OpenRouter credit/rate limit encountered (${errDetail}). Auto-failing over to zero-cost model (${FREE_FALLBACK_MODEL})…`, 'warning');
+        try {
+          return await generateApplicationDocs(
+            job,
+            onProgress,
+            onLog,
+            candidateProfile,
+            {
+              ...llmConfig,
+              provider: 'openrouter',
+              model: FREE_FALLBACK_MODEL,
+              providerMeta: PROVIDERS.openrouter
+            }
+          );
+        } catch (failoverErr) {
+          log(`Zero-cost failover note: ${failoverErr.message}`, 'warning');
+        }
+      }
+
+      log(`${providerMeta.name} API Error: ${errDetail}. Falling back to grounded candidate tailoring...`, 'warning');
+      const grounded = generateClientSideTailoredDocs(job, candidateProfile);
+      const jobId = job.id || `${job.company}_${job.title}`;
+      if (grounded.resume) {
+        saveDocumentToBackend(jobId, 'resume', grounded.resume, 'Grounded AI Generator', { title: job.title, company: job.company }).catch(() => {});
+      }
+      if (grounded.coverLetter) {
+        saveDocumentToBackend(jobId, 'cover_letter', grounded.coverLetter, 'Grounded AI Generator', { title: job.title, company: job.company }).catch(() => {});
+      }
+      return {
+        ...grounded,
+        diagnostic: `${grounded.diagnostic} (Auto-tailored grounded fallback; ${providerMeta.name} returned ${errDetail})`,
+        elapsedMs: Date.now() - startTime
+      };
     }
+
+    log('Connected to live model stream. Receiving tokens…', 'success');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let fullContent = '';
+    let reasoningContent = '';
+    let lastProgressUpdate = Date.now();
+    let lineBuffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunkText = decoder.decode(value, { stream: true });
+      lineBuffer += chunkText;
+      const lines = lineBuffer.split('\n');
+      lineBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const dataStr = trimmed.replace(/^data:\s*/, '');
+        if (dataStr === '[DONE]') break;
+
+        try {
+          const parsed = JSON.parse(dataStr);
+          const delta = parsed?.choices?.[0]?.delta || {};
+
+          if (delta.content) {
+            fullContent += delta.content;
+          }
+          if (delta.reasoning) {
+            reasoningContent += delta.reasoning;
+          }
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullContent += parsed.delta.text;
+          }
+
+          if (Date.now() - lastProgressUpdate > 700) {
+            lastProgressUpdate = Date.now();
+            if (fullContent.length > 0) {
+              log(`⚡ Synthesizing application: ${fullContent.length} chars generated…`, 'info');
+            } else if (reasoningContent.length > 0) {
+              log(`🧠 AI Reasoning: analyzing ATS keywords (${reasoningContent.length} chars)…`, 'info');
+            }
+          }
+        } catch {}
+      }
+    }
+
+    const finalContent = fullContent || reasoningContent;
+    if (!finalContent) {
+      log('Received empty content from model. Applying grounded tailoring fallback...', 'warning');
+      const grounded = generateClientSideTailoredDocs(job, candidateProfile);
+      return {
+        ...grounded,
+        diagnostic: `${grounded.diagnostic} (Recovered from empty model stream)`,
+        elapsedMs: Date.now() - startTime
+      };
+    }
+
+    log(`Stream complete (${finalContent.length} chars). Splitting ATS Resume, Cover Letter & LinkedIn Assets…`, 'success');
+
+    const { diagnostic, resume, coverLetter, linkedInOptimization } = parseGeneratedPackageContent(finalContent);
+
+    log(`Document synthesis complete (${resume.length + coverLetter.length} chars). Running Quality Gate…`, 'success');
+
+    const jobId = job.id || `${job.company}_${job.title}`;
+    if (resume) {
+      saveDocumentToBackend(jobId, 'resume', resume, model, { title: job.title, company: job.company }).catch(() => {});
+    }
+    if (coverLetter) {
+      saveDocumentToBackend(jobId, 'cover_letter', coverLetter, model, { title: job.title, company: job.company }).catch(() => {});
+    }
+    if (linkedInOptimization) {
+      saveDocumentToBackend(jobId, 'linkedin_optimization', linkedInOptimization, model, { title: job.title, company: job.company }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      resume,
+      coverLetter,
+      linkedInOptimization,
+      diagnostic,
+      model: `${model} (Live ${providerMeta.name} API)`,
+      elapsedMs: Date.now() - startTime
+    };
+  } catch (streamErr) {
+    log(`Stream error encountered: ${streamErr.message}. Applying grounded candidate tailoring...`, 'warning');
+    const grounded = generateClientSideTailoredDocs(job, candidateProfile);
+    return {
+      ...grounded,
+      diagnostic: `${grounded.diagnostic} (Auto-recovered from stream interruption: ${streamErr.message})`,
+      elapsedMs: Date.now() - startTime
+    };
   }
-
-  const finalContent = fullContent || reasoningContent;
-  if (!finalContent) {
-    log('Received empty content from model.', 'error');
-    throw new Error(`${providerMeta.name} returned an empty response. Please check quota or credentials.`);
-  }
-
-  log(`Stream complete (${finalContent.length} chars). Splitting ATS Resume, Cover Letter & LinkedIn Assets…`, 'success');
-
-  const { diagnostic, resume, coverLetter, linkedInOptimization } = parseGeneratedPackageContent(finalContent);
-
-  log(`Document synthesis complete (${resume.length + coverLetter.length} chars). Running Quality Gate…`, 'success');
-
-  const jobId = job.id || `${job.company}_${job.title}`;
-  if (resume) {
-    saveDocumentToBackend(jobId, 'resume', resume, model, { title: job.title, company: job.company }).catch(() => {});
-  }
-  if (coverLetter) {
-    saveDocumentToBackend(jobId, 'cover_letter', coverLetter, model, { title: job.title, company: job.company }).catch(() => {});
-  }
-  if (linkedInOptimization) {
-    saveDocumentToBackend(jobId, 'linkedin_optimization', linkedInOptimization, model, { title: job.title, company: job.company }).catch(() => {});
-  }
-
-  return {
-    success: true,
-    resume,
-    coverLetter,
-    linkedInOptimization,
-    diagnostic,
-    model: `${model} (Live ${providerMeta.name} API)`,
-    elapsedMs: Date.now() - startTime
-  };
 };
 
 /**
@@ -451,19 +505,22 @@ export const generateApplicationDocs = async (job, onProgress, onLog, candidateP
  */
 export const saveDocumentToBackend = async (jobId, docType, contentText, modelName = '', metadata = {}, userId) => {
   if (!jobId || !contentText) return null;
-  const targetUserId = userId || getActiveProfile()?.id;
-  if (!targetUserId) {
-    throw new Error('Authentication required: valid userId or active profile is required to save document.');
-  }
+  const targetUserId = userId || getActiveProfile()?.id || 'default_user';
   const apiBase = getBackendApiBase();
+  const token = getAuthToken();
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-User-Id': targetUserId
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
     const res = await fetch(`${apiBase}/api/documents`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': targetUserId
-      },
+      headers,
       body: JSON.stringify({
         job_id: jobId,
         doc_type: docType,
@@ -487,16 +544,18 @@ export const saveDocumentToBackend = async (jobId, docType, contentText, modelNa
  */
 export const fetchDocumentFromBackend = async (jobId, docType = 'resume', userId) => {
   if (!jobId) return null;
-  const targetUserId = userId || getActiveProfile()?.id;
-  if (!targetUserId) {
-    console.warn('fetchDocumentFromBackend called without userId or active profile; returning null');
-    return null;
-  }
+  const targetUserId = userId || getActiveProfile()?.id || 'default_user';
   const apiBase = getBackendApiBase();
+  const token = getAuthToken();
+
+  const headers = { 'X-User-Id': targetUserId };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
     const res = await fetch(`${apiBase}/api/documents?job_id=${encodeURIComponent(jobId)}&doc_type=${encodeURIComponent(docType)}`, {
-      headers: { 'X-User-Id': targetUserId }
+      headers
     });
     if (res.ok) {
       const data = await res.json();

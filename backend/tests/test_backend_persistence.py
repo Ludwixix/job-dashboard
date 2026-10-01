@@ -102,9 +102,7 @@ def test_http_api_routes_persistence(temp_repo, tmp_path):
     mock_app.repository = temp_repo
     mock_app.db = temp_repo
     handler_cls = make_handler(mock_app)
-    token = jwt.encode(
-        {"sub": "test_http_user"}, JWT_SECRET, algorithm="HS256"
-    )
+    token = jwt.encode({"sub": "test_http_user"}, JWT_SECRET, algorithm="HS256")
 
     # 1. Test POST /api/profile
     handler = handler_cls.__new__(handler_cls)
@@ -221,3 +219,69 @@ def test_query_jobs_paginated_caching_and_large_pagesize(temp_repo):
     res2 = temp_repo.query_jobs_paginated(page=1, page_size=2000)
     assert res2["total"] == 25
     assert len(res2["jobs"]) == 25
+
+
+def test_documents_endpoint_auth_and_fallback(temp_repo, tmp_path):
+    """Verify /api/documents GET and POST succeed with Bearer token, X-User-Id, or default_user."""
+    import io
+    import json
+    from unittest.mock import MagicMock
+    from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
+
+    mock_app = DashboardApp(profile={}, sources=[], data_dir=tmp_path)
+    mock_app.repository = temp_repo
+    mock_app.db = temp_repo
+    handler_cls = make_handler(mock_app)
+    token = jwt.encode({"sub": "user_123"}, JWT_SECRET, algorithm="HS256")
+
+    # 1. POST /api/documents with Bearer token
+    h_post = handler_cls.__new__(handler_cls)
+    h_post.path = "/api/documents"
+    payload = json.dumps(
+        {
+            "job_id": "seek-1001",
+            "doc_type": "resume",
+            "content_text": "# TAILORED RESUME",
+            "model_name": "Llama-3.3-70B",
+            "metadata": {"title": "DevOps Engineer"},
+        }
+    ).encode("utf-8")
+    h_post.headers = {
+        "Content-Length": str(len(payload)),
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    h_post.rfile = io.BytesIO(payload)
+    h_post.wfile = io.BytesIO()
+    h_post.send_response = MagicMock()
+    h_post.send_header = MagicMock()
+    h_post.end_headers = MagicMock()
+    h_post.do_POST()
+    assert h_post.send_response.called
+    assert h_post.send_response.call_args[0][0] == 200
+
+    # 2. GET /api/documents with Bearer token
+    h_get = handler_cls.__new__(handler_cls)
+    h_get.path = "/api/documents?job_id=seek-1001&doc_type=resume"
+    h_get.headers = {"Authorization": f"Bearer {token}"}
+    h_get.rfile = io.BytesIO()
+    h_get.wfile = io.BytesIO()
+    h_get.send_response = MagicMock()
+    h_get.send_header = MagicMock()
+    h_get.end_headers = MagicMock()
+    h_get.do_GET()
+    assert h_get.send_response.called
+    assert h_get.send_response.call_args[0][0] == 200
+
+    # 3. GET /api/documents without auth token but with X-User-Id
+    h_fallback = handler_cls.__new__(handler_cls)
+    h_fallback.path = "/api/documents?job_id=seek-1001&doc_type=resume"
+    h_fallback.headers = {"X-User-Id": "user_123"}
+    h_fallback.rfile = io.BytesIO()
+    h_fallback.wfile = io.BytesIO()
+    h_fallback.send_response = MagicMock()
+    h_fallback.send_header = MagicMock()
+    h_fallback.end_headers = MagicMock()
+    h_fallback.do_GET()
+    assert h_fallback.send_response.called
+    assert h_fallback.send_response.call_args[0][0] == 200

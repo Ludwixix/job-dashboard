@@ -10,6 +10,7 @@ import logging
 import os
 from collections.abc import Iterable, Mapping
 from typing import Any
+import urllib.parse
 from urllib.parse import urlparse
 
 import requests
@@ -33,6 +34,7 @@ DEFAULT_APIFY_ACTORS: dict[str, str] = {
     "indeed": "misceres/indeed-scraper",
     "linkedin": "curious_coder/linkedin-job-search-scraper",
     "adzuna": "apify/web-scraper",
+    "jora": "memo23/jora-search-cheerio-ppr",
 }
 
 DEFAULT_MAX_RESULTS = 20
@@ -117,6 +119,17 @@ def build_apify_run_input(
             "count": max_results,
             "limit": max_results,
             "searchQueries": [{"keyword": term, "location": loc}],
+        }
+    elif plat == "jora":
+        return {
+            "query": term,
+            "keyword": term,
+            "keywords": [term],
+            "location": loc,
+            "country": "AU",
+            "searchUrl": f"https://au.jora.com/j?q={urllib.parse.quote_plus(term)}&l={urllib.parse.quote_plus(loc)}",
+            "maxResults": max_results,
+            "maxItems": max_results,
         }
     else:
         # Flexible generic payload that works with most Apify job search actors
@@ -203,6 +216,8 @@ def normalize_apify_job_record(
             url = f"https://au.indeed.com/viewjob?jk={raw_job_id}"
         elif plat == "linkedin":
             url = f"https://www.linkedin.com/jobs/view/{raw_job_id}"
+        elif plat == "jora":
+            url = f"https://au.jora.com/job/{raw_job_id}"
 
     if not raw_job_id and url:
         raw_job_id = str(abs(hash(url)))
@@ -286,6 +301,7 @@ def normalize_apify_job_record(
         "indeed": "Indeed",
         "linkedin": "LinkedIn",
         "adzuna": "Adzuna",
+        "jora": "Jora",
     }.get(plat, plat.capitalize())
 
     valid_provider = (

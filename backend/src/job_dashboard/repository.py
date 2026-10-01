@@ -10,6 +10,7 @@ from typing import Any
 from .db import init_db, init_fts5_index
 from .db_pool import get_connection_pool, get_db_connection
 from .logging import get_logger
+from .state_machine import StateTransitionError, validate_transition
 
 logger = get_logger("job_dashboard.repository")
 
@@ -179,6 +180,8 @@ class JobRepository:
             init_db(conn)
             for col_sql in [
                 "ALTER TABLE user_applications ADD COLUMN job_data_json TEXT DEFAULT '{}'",
+                "ALTER TABLE user_applications ADD COLUMN macro_stage TEXT NOT NULL DEFAULT 'LEAD'",
+                "ALTER TABLE user_applications ADD COLUMN version INTEGER NOT NULL DEFAULT 1",
                 "ALTER TABLE user_applications ADD COLUMN company_domain TEXT DEFAULT ''",
                 "ALTER TABLE user_applications ADD COLUMN application_ref_id TEXT DEFAULT ''",
                 "ALTER TABLE user_applications ADD COLUMN email_thread_id TEXT DEFAULT ''",
@@ -1070,6 +1073,7 @@ class JobRepository:
                 """
                 SELECT id, user_id, job_id, status, notes, resume_text, cover_letter_text,
                        resume_url, cover_letter_url, applied_at, updated_at,
+                       macro_stage, version,
                        COALESCE(job_data_json, '{}') AS job_data_json
                 FROM user_applications
                 WHERE user_id = ?
@@ -1108,6 +1112,40 @@ class JobRepository:
                 seen_company_titles.add(comp_key)
             results.append(d)
         return results
+
+    def get_user_application(self, user_id: str, job_id: str) -> dict[str, Any] | None:
+        """Fetch a single private application tracking record for a specific user and job."""
+        if not user_id or not job_id:
+            return None
+
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT id, user_id, job_id, status, notes, resume_text, cover_letter_text,
+                       resume_url, cover_letter_url, applied_at, updated_at,
+                       macro_stage, version,
+                       COALESCE(job_data_json, '{}') AS job_data_json
+                FROM user_applications
+                WHERE user_id = ? AND job_id = ?
+            """,
+                (user_id, job_id),
+            ).fetchone()
+
+        if not row:
+            return None
+
+        d = dict(row)
+        try:
+            extra = json.loads(d.get("job_data_json") or "{}")
+            if isinstance(extra, dict):
+                for k, v in extra.items():
+                    if k not in d or not d[k]:
+                        d[k] = v
+        except Exception:
+            pass
+
+        return d
 
     def upsert_user_application(
         self, user_id: str, job_id: str, data: dict[str, Any]
@@ -1178,6 +1216,31 @@ class JobRepository:
                     (job_id, status, now),
                 )
 
+                # And log to new user_application_events for OCC compatibility
+                try:
+                    import uuid
+
+                    event_id = str(uuid.uuid4())
+                    payload = json.dumps({"status": status})
+                    # We need the app_id which might have been generated or queried
+                    # Let's get the actual app_id first
+                    app_row = conn.execute(
+                        "SELECT id FROM user_applications WHERE user_id = ? AND job_id = ?",
+                        (user_id, job_id),
+                    ).fetchone()
+                    if app_row:
+                        actual_app_id = app_row[0]
+                        conn.execute(
+                            "INSERT INTO user_application_events (id, application_id, event_type, payload_json, created_at) VALUES (?, ?, ?, ?, ?)",
+                            (event_id, actual_app_id, status, payload, now),
+                        )
+                except Exception as e:
+                    import logging
+
+                    logging.getLogger(__name__).warning(
+                        f"Failed to log to user_application_events: {e}"
+                    )
+
         # Multi-signal telemetry auto-recording for application progression
         try:
             status_lower = status.lower()
@@ -1241,31 +1304,252 @@ class JobRepository:
                 )
                 return cur.rowcount > 0
 
+    def dispatch_application_event(
+        self,
+        user_id: str,
+        job_id: str,
+        event_id: str,
+        event_type: str,
+        expected_version: int,
+        new_macro_stage: str | None = None,
+        payload_json: str = "{}",
+        idempotency_key: str | None = None,
+    ) -> tuple[dict, dict]:
+        now = datetime.now(timezone.utc).isoformat()
+        idemp_recovered_event = None
+
+        with get_db_connection(self.path) as conn:
+            conn.row_factory = sqlite3.Row
+            with conn:
+                app_row = conn.execute(
+                    "SELECT id, version, macro_stage FROM user_applications WHERE user_id = ? AND job_id = ?",
+                    (user_id, job_id),
+                ).fetchone()
+
+                if not app_row:
+                    raise ValueError(f"Application not found for job '{job_id}'.")
+
+                app_id = app_row["id"]
+                current_version = app_row["version"]
+                current_stage = app_row["macro_stage"]
+
+                # Check idempotency key before attempting mutation
+                if idempotency_key:
+                    existing = conn.execute(
+                        """
+                        SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
+                        FROM user_application_events
+                        WHERE idempotency_key = ?
+                        """,
+                        (idempotency_key,),
+                    ).fetchone()
+                    if existing:
+                        if existing["application_id"] != app_id:
+                            raise ValueError(
+                                f"Idempotency key collision: key '{idempotency_key}' was used for a different application."
+                            )
+                        # Replay idempotent event for this application
+                        event_dict = {
+                            "id": existing["id"],
+                            "application_id": existing["application_id"],
+                            "event_type": existing["event_type"],
+                            "idempotency_key": existing["idempotency_key"],
+                            "payload_json": existing["payload_json"],
+                            "created_at": existing["created_at"],
+                        }
+                        app_full_row = conn.execute(
+                            "SELECT * FROM user_applications WHERE id = ?",
+                            (app_id,),
+                        ).fetchone()
+                        return dict(app_full_row) if app_full_row else {}, event_dict
+
+                if current_version != expected_version:
+                    if idempotency_key:
+                        existing = conn.execute(
+                            """
+                            SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
+                            FROM user_application_events
+                            WHERE idempotency_key = ?
+                            """,
+                            (idempotency_key,),
+                        ).fetchone()
+                        if existing and existing["application_id"] == app_id:
+                            idemp_recovered_event = {
+                                "id": existing["id"],
+                                "application_id": existing["application_id"],
+                                "event_type": existing["event_type"],
+                                "idempotency_key": existing["idempotency_key"],
+                                "payload_json": existing["payload_json"],
+                                "created_at": existing["created_at"],
+                            }
+                    if not idemp_recovered_event:
+                        raise ValueError(
+                            f"Resource version conflict: expected {expected_version}, got {current_version}"
+                        )
+
+                if not idemp_recovered_event:
+                    # Validate stage transition through two-tier FSM
+                    stage_to_set = validate_transition(
+                        current_stage, event_type, new_macro_stage
+                    ).value
+                    new_version = current_version + 1
+
+                    # OCC update: ensure version hasn't changed between SELECT and UPDATE
+                    cursor = conn.execute(
+                        """
+                        UPDATE user_applications
+                        SET version = ?, macro_stage = ?, updated_at = ?
+                        WHERE id = ? AND version = ?
+                        """,
+                        (new_version, stage_to_set, now, app_id, current_version),
+                    )
+                    if cursor.rowcount == 0:
+                        if idempotency_key:
+                            existing = conn.execute(
+                                """
+                                SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
+                                FROM user_application_events
+                                WHERE idempotency_key = ?
+                                """,
+                                (idempotency_key,),
+                            ).fetchone()
+                            if existing and existing["application_id"] == app_id:
+                                idemp_recovered_event = {
+                                    "id": existing["id"],
+                                    "application_id": existing["application_id"],
+                                    "event_type": existing["event_type"],
+                                    "idempotency_key": existing["idempotency_key"],
+                                    "payload_json": existing["payload_json"],
+                                    "created_at": existing["created_at"],
+                                }
+                        if not idemp_recovered_event:
+                            raise ValueError(
+                                f"Resource version conflict: expected {expected_version}, got {current_version}"
+                            )
+
+                    # Persist event record with unique idempotency_key recovery
+                    if not idemp_recovered_event:
+                        try:
+                            conn.execute(
+                                """
+                                INSERT INTO user_application_events (
+                                    id, application_id, event_type, idempotency_key, payload_json, created_at
+                                ) VALUES (?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    event_id,
+                                    app_id,
+                                    event_type,
+                                    idempotency_key,
+                                    payload_json,
+                                    now,
+                                ),
+                            )
+                        except sqlite3.IntegrityError:
+                            if idempotency_key:
+                                existing = conn.execute(
+                                    """
+                                    SELECT id, application_id, event_type, idempotency_key, payload_json, created_at
+                                    FROM user_application_events
+                                    WHERE idempotency_key = ?
+                                    """,
+                                    (idempotency_key,),
+                                ).fetchone()
+                                if existing and existing["application_id"] == app_id:
+                                    idemp_recovered_event = {
+                                        "id": existing["id"],
+                                        "application_id": existing["application_id"],
+                                        "event_type": existing["event_type"],
+                                        "idempotency_key": existing["idempotency_key"],
+                                        "payload_json": existing["payload_json"],
+                                        "created_at": existing["created_at"],
+                                    }
+                            if not idemp_recovered_event:
+                                raise
+
+                app_full_row = conn.execute(
+                    "SELECT * FROM user_applications WHERE id = ?",
+                    (app_id,),
+                ).fetchone()
+                updated_app = dict(app_full_row) if app_full_row else {}
+
+        if idemp_recovered_event:
+            return updated_app, idemp_recovered_event
+
+        new_event_dict = {
+            "id": event_id,
+            "application_id": app_id,
+            "event_type": event_type,
+            "idempotency_key": idempotency_key,
+            "payload_json": payload_json,
+            "created_at": now,
+        }
+        return updated_app, new_event_dict
+
     def get_application_events(
         self, user_id_or_job_id: str, job_id: str | None = None
     ) -> list[dict[str, Any]]:
-        """Retrieve audit timeline events for an application ordered by occurrence time."""
         target_job_id = job_id if job_id is not None else user_id_or_job_id
+        target_user_id = user_id_or_job_id if job_id is not None else None
         with get_db_connection(self.path) as conn:
-            rows = conn.execute(
-                """
-                SELECT id, job_id, from_status, to_status, occurred_at
-                FROM application_events
-                WHERE job_id = ?
-                ORDER BY occurred_at DESC, id DESC
-                """,
-                (str(target_job_id),),
-            ).fetchall()
-            return [
-                {
-                    "id": r[0],
-                    "job_id": r[1],
-                    "from_status": r[2],
-                    "to_status": r[3],
-                    "occurred_at": r[4],
-                }
-                for r in rows
-            ]
+            # check if new table exists
+            has_new = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='user_application_events'"
+            ).fetchone()
+            if has_new:
+                if target_user_id:
+                    rows = conn.execute(
+                        """
+                        SELECT e.id, e.event_type, e.payload_json, e.created_at, e.idempotency_key, e.application_id
+                        FROM user_application_events e
+                        JOIN user_applications a ON e.application_id = a.id
+                        WHERE a.user_id = ? AND a.job_id = ?
+                        ORDER BY e.created_at DESC
+                        """,
+                        (str(target_user_id), str(target_job_id)),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT e.id, e.event_type, e.payload_json, e.created_at, e.idempotency_key, e.application_id
+                        FROM user_application_events e
+                        JOIN user_applications a ON e.application_id = a.id
+                        WHERE a.job_id = ?
+                        ORDER BY e.created_at DESC
+                        """,
+                        (str(target_job_id),),
+                    ).fetchall()
+                return [
+                    {
+                        "id": r[0],
+                        "event_type": r[1],
+                        "payload_json": r[2],
+                        "created_at": r[3],
+                        "idempotency_key": r[4],
+                        "application_id": r[5],
+                    }
+                    for r in rows
+                ]
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, job_id, from_status, to_status, occurred_at
+                    FROM application_events
+                    WHERE job_id = ?
+                    ORDER BY occurred_at DESC, id DESC
+                    """,
+                    (str(target_job_id),),
+                ).fetchall()
+                return [
+                    {
+                        "id": r[0],
+                        "job_id": r[1],
+                        "from_status": r[2],
+                        "to_status": r[3],
+                        "occurred_at": r[4],
+                    }
+                    for r in rows
+                ]
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         with get_db_connection(self.path) as conn:

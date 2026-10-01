@@ -1393,6 +1393,14 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'llm' }) => {
  desc: 'Comprehensive multi-source aggregator covering public sector & enterprise.',
  defaultActor: DEFAULT_APIFY_ACTORS.adzuna,
  },
+ {
+ key: 'jora',
+ name: 'Jora Australia',
+ badge: 'Seek Group Aggregator',
+ badgeColor: 'border-amber-500/30 bg-amber-500/20 text-amber-300',
+ desc: 'Australian employment aggregator indexing employers and ATS portals. Cloudflare protected.',
+ defaultActor: DEFAULT_APIFY_ACTORS.jora,
+ },
  ].map((p) => {
  const platConfig = scraperSettings.platforms?.[p.key] || {
  enabled: false,

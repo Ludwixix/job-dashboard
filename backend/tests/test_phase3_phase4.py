@@ -144,4 +144,4 @@ def test_decomposed_application_workflow_service(tmp_path):
     # Verify event audit trail
     events = workflow_service.get_application_events("user_test_1", "job_test_1")
     assert len(events) >= 1
-    assert events[0]["to_status"] == "applied"
+    assert events[0]["event_type"] == "applied"

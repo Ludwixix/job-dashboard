@@ -2386,11 +2386,11 @@ def make_handler(app: DashboardApp):
             if origin:
                 self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header(
-                "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
+                "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             )
             self.send_header(
                 "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id",
+                "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id, Idempotency-Key",
             )
             self.send_header("Access-Control-Max-Age", "86400")
 
@@ -2534,6 +2534,19 @@ def make_handler(app: DashboardApp):
                 self.send_json(404, {"error": f"Endpoint not found: {path}"})
             except Exception as error:
                 logger.error(f"POST {path} failed: {error}", exc_info=True)
+                self.send_json(500, {"error": str(error)})
+
+        def do_PATCH(self):
+            self.command = "PATCH"
+            parsed = urlparse(self.path)
+            path = parsed.path
+            query_params = parse_qs(parsed.query)
+            try:
+                if app_router.dispatch(self, "PATCH", path):
+                    return
+                self.send_json(404, {"error": f"Endpoint not found: {path}"})
+            except Exception as error:
+                logger.error(f"PATCH {path} failed: {error}", exc_info=True)
                 self.send_json(500, {"error": str(error)})
 
         def do_DELETE(self):

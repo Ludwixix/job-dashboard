@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS user_applications (
     cover_letter_url TEXT DEFAULT '',
     applied_at TEXT,
     job_data_json TEXT DEFAULT '{}',
+    macro_stage TEXT NOT NULL DEFAULT 'LEAD',
+    version INTEGER NOT NULL DEFAULT 1,
     updated_at TEXT NOT NULL,
     UNIQUE(user_id, job_id)
 );
@@ -66,6 +68,19 @@ CREATE TABLE IF NOT EXISTS application_events (
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
 CREATE INDEX IF NOT EXISTS idx_app_events_job ON application_events(job_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_application_events (
+    id TEXT PRIMARY KEY,
+    application_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    idempotency_key TEXT,
+    payload_json TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(application_id) REFERENCES user_applications(id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_app_events_app_id ON user_application_events(application_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_app_events_idempotency ON user_application_events(idempotency_key) WHERE idempotency_key IS NOT NULL;
+
 
 CREATE TABLE IF NOT EXISTS user_profiles (
     user_id TEXT PRIMARY KEY,

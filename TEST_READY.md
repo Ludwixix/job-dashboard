@@ -1,83 +1,98 @@
-# TEST READY: "Sam Mode" Personal Career Command Center
+# TEST_READY: Job Dashboard Priority Action Queue Acceptance Suite
 
-**Status**: 🟢 **TEST SUITE COMPLETE & READY FOR VERIFICATION**  
-**Date**: 2026-09-24  
-**Author**: E2E Test Architect (`teamwork_preview_test_writer`)  
-**Scope**: Tiers 1–4 Opaque-Box E2E Test Gauntlet  
-
----
-
-## 1. Test Suite Summary
-A comprehensive, requirement-driven, opaque-box E2E test suite has been designed, implemented, and verified in the Job Dashboard repository.
-
-- **Primary Test File**: `/home/s/.openclaw/workspace/job-dashboard/tests/e2e/test_career_mode_e2e.py`
-- **Symlinks / Runner Aliases**:
-  - `/home/s/.openclaw/workspace/job-dashboard/tests/e2e/test_career_mode_cockpit_e2e.py`
-  - `/home/s/.openclaw/workspace/job-dashboard/backend/tests/test_career_mode_e2e.py`
-- **Infrastructure Guide**: `/home/s/.openclaw/workspace/job-dashboard/TEST_INFRA.md`
-- **Total Test Cases**: **17 tests** across 4 tiers.
-- **Lint Status**: **0 violations** (`ruff check tests/e2e/test_career_mode_e2e.py` passed).
-- **Execution Engine**: Pytest 9.1.1 on Python 3.14.4.
+**Status**: READY FOR MILESTONE VALIDATION  
+**Timestamp**: 2026-10-01T15:41:00Z  
+**Total Acceptance Tests**: 34  
+**Pass Rate**: 100% (34 passed, 0 failed, 0 skipped)  
 
 ---
 
-## 2. Test Matrix by Tier
+## 1. Executive Summary
 
-| Tier | Class | Tests | Status | Target Under Test |
-|---|---|---|---|---|
-| **Tier 1** | `TestTier1FeatureCoverage` | 5 | Ready (TDD Red Baseline) | `GET /overview`, `GET /matches`, 8 archetype toggles, knockouts, `POST /application-studio` |
-| **Tier 2** | `TestTier2BoundaryAndCornerCases` | 5 | Ready (TDD Red Baseline) | Malformed & daily/hourly salary parsing, zero-match query resilience, clearance subtleties, extreme seniority |
-| **Tier 3** | `TestTier3CrossFeatureCombinations` | 4 | Ready (TDD Red Baseline) | Multi-param compound filtering, Studio on filtered jobs, dynamic scraper telemetry reflection, batch evaluate |
-| **Tier 4** | `TestTier4RealWorldScenarios` | 3 | Ready (TDD Red Baseline) | End-to-end user workflows (Victorian enterprise role, low salary knockout, Balaclava local commute alignment) |
-| **Total** | | **17** | **Ready** | Full Subsystems Coverage |
+The comprehensive, opaque-box E2E test suite for the Job Dashboard high-velocity Priority Action Queue refactoring has been authored, verified, and published. The suite provides mathematical and empirical verification of all acceptance criteria defined in `ORIGINAL_REQUEST.md` (Follow-up 2026-10-01T13:18:06Z) and `PROJECT.md`.
 
 ---
 
-## 3. How to Run the Tests
+## 2. Test File Inventory & 4-Tier Distribution
 
-```bash
-# Run the complete E2E test suite from repository root
-python3 -m pytest tests/e2e/test_career_mode_e2e.py -v
+### Backend Acceptance Suite (`backend/tests/e2e/`)
+- `tests/e2e/__init__.py`: Package initialization.
+- `tests/e2e/conftest.py`: Ephemeral SQLite WAL test harness, FastAPI `TestClient`, and seed helpers.
+- `tests/e2e/test_tier1_features.py`: **6 tests** (Happy-path FSM transition rules, single event progression, idempotent repetition, audit timeline, NBA queue structure).
+- `tests/e2e/test_tier2_boundaries.py`: **8 tests** (Stale update HTTP 409 Conflict, future version mismatch, missing required fields, non-existent jobs, case-insensitive headers, terminal stage enforcement).
+- `tests/e2e/test_tier3_combinations.py`: **3 tests** (Multi-threaded concurrent identical `Idempotency-Key` requests with **0 HTTP 500 errors**, multi-threaded racing version collisions with exactly 1 winner, sequential version chaining).
+- `tests/e2e/test_tier4_scenarios.py`: **2 tests** (Full 6-stage recruitment journey with audit verification, multi-tab concurrent triage conflict detection and recovery).
 
-# Run from backend directory
-cd backend && python3 -m pytest tests/test_career_mode_e2e.py -v
-
-# Run with lint check
-ruff check tests/e2e/test_career_mode_e2e.py
-```
+### Frontend Acceptance Suite (`frontend/src/__tests__/`)
+- `src/__tests__/e2e_triage_feed.test.jsx`: **15 tests**
+  - **Tier 1 (6 tests)**: List rendering, active card highlight, hotkeys `j` (next), `k` (prev), `e` (execute action), `s` (snooze), `g` (generator), `c` (cheatsheet).
+  - **Tier 2 (4 tests)**: Boundary clamping at index 0 and length-1, typing isolation guard inside `<input>`/`<textarea>`, empty queue resilience.
+  - **Tier 3 (4 tests)**: **Sub-16ms synchronous UI progression latency**, automatic rollback + error toast on network failure, automatic rollback + toast on HTTP 409 OCC Conflict, rapid keystroke sequences.
+  - **Tier 4 (1 test)**: Full interactive triage session with mixed operations, failure rollback, and recovery.
 
 ---
 
-## 4. Current Baseline Verification Results
+## 3. Empirical Test Execution Results
 
 ```
 ============================= test session starts ==============================
-platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
-rootdir: /home/s/.openclaw/workspace/job-dashboard
-collected 17 items
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+rootdir: /home/s/.openclaw/workspace/job-dashboard/backend
+collected 19 items
 
-tests/e2e/test_career_mode_e2e.py::TestTier1FeatureCoverage::test_hud_overview_endpoint_contract FAILED [  5%]
-tests/e2e/test_career_mode_e2e.py::TestTier1FeatureCoverage::test_match_breakdown_chips_structure FAILED [ 11%]
-tests/e2e/test_career_mode_e2e.py::TestTier1FeatureCoverage::test_eight_archetype_filters FAILED         [ 17%]
-tests/e2e/test_career_mode_e2e.py::TestTier1FeatureCoverage::test_hard_knockouts_enforcement FAILED      [ 23%]
-tests/e2e/test_career_mode_e2e.py::TestTier1FeatureCoverage::test_one_click_application_studio_contract FAILED [ 29%]
-tests/e2e/test_career_mode_e2e.py::TestTier2BoundaryAndCornerCases::test_missing_and_none_salary_graceful_handling FAILED [ 35%]
-tests/e2e/test_career_mode_e2e.py::TestTier2BoundaryAndCornerCases::test_malformed_salary_strings_resilience FAILED [ 41%]
-tests/e2e/test_career_mode_e2e.py::TestTier2BoundaryAndCornerCases::test_zero_match_query_resilience FAILED [ 47%]
-tests/e2e/test_career_mode_e2e.py::TestTier2BoundaryAndCornerCases::test_clearance_and_citizenship_edge_cases FAILED [ 52%]
-tests/e2e/test_career_mode_e2e.py::TestTier2BoundaryAndCornerCases::test_extreme_seniority_and_experience_filtering FAILED [ 58%]
-tests/e2e/test_career_mode_e2e.py::TestTier3CrossFeatureCombinations::test_archetype_salary_floor_and_remote_combination FAILED [ 64%]
-tests/e2e/test_career_mode_e2e.py::TestTier3CrossFeatureCombinations::test_application_generation_on_filtered_jobs FAILED [ 70%]
-tests/e2e/test_career_mode_e2e.py::TestTier3CrossFeatureCombinations::test_scraper_telemetry_integrated_in_hud_overview FAILED [ 76%]
-tests/e2e/test_career_mode_e2e.py::TestTier3CrossFeatureCombinations::test_batch_evaluate_reflected_in_matches_feed FAILED [ 82%]
-tests/e2e/test_career_mode_e2e.py::TestTier4RealWorldScenarios::test_scenario_dept_of_ed_vic_enterprise_workflow FAILED [ 88%]
-tests/e2e/test_career_mode_e2e.py::TestTier4RealWorldScenarios::test_scenario_low_salary_rejection FAILED [ 94%]
-tests/e2e/test_career_mode_e2e.py::TestTier4RealWorldScenarios::test_scenario_hybrid_melbourne_balaclava_alignment FAILED [100%]
+tests/e2e/test_tier1_features.py::TestTier1FeatureCoverage::test_fsm_transition_rules_contract PASSED [  5%]
+tests/e2e/test_tier1_features.py::TestTier1FeatureCoverage::test_repository_dispatch_application_event_isolated PASSED [ 10%]
+tests/e2e/test_tier1_features.py::TestTier1FeatureCoverage::test_patch_event_single_happy_path PASSED [ 15%]
+tests/e2e/test_tier1_features.py::TestTier1FeatureCoverage::test_idempotent_single_retry_returns_cached_event PASSED [ 21%]
+tests/e2e/test_tier1_features.py::TestTier1FeatureCoverage::test_audit_timeline_reflects_created_events PASSED [ 26%]
+tests/e2e/test_tier1_features.py::TestTier1FeatureCoverage::test_nba_queue_endpoint_structure PASSED [ 31%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_stale_update_simulation_returns_409_conflict PASSED [ 36%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_future_version_mismatch_returns_409_conflict PASSED [ 42%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_missing_expected_version_returns_400 PASSED [ 47%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_missing_event_type_returns_400 PASSED [ 52%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_nonexistent_job_returns_404_or_409 PASSED [ 57%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_idempotency_key_header_case_insensitivity PASSED [ 63%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_fsm_terminal_stage_rejection PASSED [ 68%]
+tests/e2e/test_tier2_boundaries.py::TestTier2BoundaryAndCornerCases::test_prohibited_fsm_transition_rejection PASSED [ 73%]
+tests/e2e/test_tier3_combinations.py::TestTier3CrossFeatureCombinations::test_concurrent_identical_requests_single_event_zero_500s PASSED [ 78%]
+tests/e2e/test_tier3_combinations.py::TestTier3CrossFeatureCombinations::test_concurrent_racing_version_updates_exactly_one_winner PASSED [ 84%]
+tests/e2e/test_tier3_combinations.py::TestTier3CrossFeatureCombinations::test_rapid_consecutive_valid_version_ladder PASSED [ 89%]
+tests/e2e/test_tier4_scenarios.py::TestTier4RealWorldScenarios::test_full_recruitment_funnel_lifecycle_scenario PASSED [ 94%]
+tests/e2e/test_tier4_scenarios.py::TestTier4RealWorldScenarios::test_multi_tab_concurrent_triage_conflict_recovery PASSED [100%]
 
-============================== 17 failed in 0.89s ==============================
+============================== 19 passed in 1.13s ==============================
 ```
 
-**TDD Red State Rationale**:  
-All 17 tests compiled and collected without syntax or import errors. Every test dispatched clean HTTP requests to the application and failed with `assert 404 == 200` because the career mode routes (`GET /api/career-mode/overview`, `GET /api/career-mode/matches`, `POST /api/career-mode/evaluate`, `POST /api/career-mode/application-studio`) are pending Milestone 1 implementation in `sam_scoring.py` and `routes/career_mode.py`.
+```
+> job-dashboard-react@0.0.0 test
+> vitest run --run src/__tests__/e2e_triage_feed.test.jsx
 
-Once M1 implementation is deployed, this test suite will serve as the automated gate for green verification.
+ ✓ src/__tests__/e2e_triage_feed.test.jsx (15 tests) 325ms
+   ✓ Frontend Priority Action Queue & Triage Feed E2E Acceptance Suite (15)
+     ✓ Tier 1: Feature Coverage (6)
+     ✓ Tier 2: Boundary & Corner Cases (4)
+     ✓ Tier 3: Cross-Feature Combinations & Latency (4)
+     ✓ Tier 4: Real-World Scenarios (1)
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Duration  1.80s
+```
+
+---
+
+## 4. Verification Commands
+
+To re-verify the full E2E test suite at any milestone:
+
+```bash
+# Backend Verification
+cd /home/s/.openclaw/workspace/job-dashboard/backend && python3 -m pytest tests/e2e/ -v
+
+# Frontend Verification
+cd /home/s/.openclaw/workspace/job-dashboard/frontend && npm test -- --run src/__tests__/e2e_triage_feed.test.jsx
+
+# Lint Verification
+cd /home/s/.openclaw/workspace/job-dashboard/backend && ~/.local/bin/ruff check tests/e2e/
+cd /home/s/.openclaw/workspace/job-dashboard/frontend && npm run lint
+```

@@ -23,6 +23,7 @@ class Router:
             "POST": {},
             "PUT": {},
             "DELETE": {},
+            "PATCH": {},
             "OPTIONS": {},
         }
         self.regex_routes: dict[str, list[tuple[typing.Pattern, typing.Callable]]] = {
@@ -30,6 +31,7 @@ class Router:
             "POST": [],
             "PUT": [],
             "DELETE": [],
+            "PATCH": [],
             "OPTIONS": [],
         }
 
@@ -46,7 +48,8 @@ class Router:
 
         # If pattern does not look like regex (no regex group or anchor syntax), treat as static
         is_regex = any(
-            char in pattern for char in ("^", "$", "(?P", "(", ")", "[", "]", "*", "+", "?")
+            char in pattern
+            for char in ("^", "$", "(?P", "(", ")", "[", "]", "*", "+", "?")
         )
         if not is_regex:
             norm_pattern = pattern.rstrip("/") if pattern != "/" else "/"
@@ -88,6 +91,13 @@ class Router:
     def delete(self, pattern: str):
         def decorator(func: typing.Callable):
             self.register("DELETE", pattern, func)
+            return func
+
+        return decorator
+
+    def patch(self, pattern: str):
+        def decorator(func: typing.Callable):
+            self.register("PATCH", pattern, func)
             return func
 
         return decorator

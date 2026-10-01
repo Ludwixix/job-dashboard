@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 import json
+import random
 import re
-from typing import Any
+import threading
+import time
+from typing import Any, Mapping
+from urllib.parse import urlparse
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ..logging import get_logger
 
@@ -384,3 +392,278 @@ ADAPTIVE_BROWSER_EXTRACTOR_JS = """() => {
     return results;
 };
 """
+
+
+class CloudflareChallengeError(Exception):
+    """Raised when an HTTP request is blocked by Cloudflare Turnstile or WAF challenge (403/503)."""
+
+    def __init__(self, domain: str, status_code: int = 403, detail: str = ""):
+        self.domain = domain
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(
+            f"Cloudflare challenge or anti-bot block on {domain} (HTTP {status_code}): {detail}"
+        )
+
+
+class RateLimitBlockedError(Exception):
+    """Raised when an HTTP request is rate-limited (HTTP 429)."""
+
+    def __init__(self, domain: str, retry_after: int = 60):
+        self.domain = domain
+        self.retry_after = retry_after
+        super().__init__(
+            f"Rate limit exceeded on {domain} (HTTP 429). Retry after {retry_after}s"
+        )
+
+
+# Authentic desktop browser profiles with aligned Client Hints and User-Agents
+BROWSER_PROFILES = [
+    {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "sec_ch_ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+        "sec_ch_ua_mobile": "?0",
+        "sec_ch_ua_platform": '"Windows"',
+    },
+    {
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "sec_ch_ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+        "sec_ch_ua_mobile": "?0",
+        "sec_ch_ua_platform": '"macOS"',
+    },
+    {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+        "sec_ch_ua": '"Chromium";v="127", "Not;A=Brand";v="24", "Google Chrome";v="127"',
+        "sec_ch_ua_mobile": "?0",
+        "sec_ch_ua_platform": '"Windows"',
+    },
+]
+
+
+def get_stealth_headers(
+    domain: str | None = None,
+    as_xhr: bool = False,
+    profile_index: int | None = None,
+) -> dict[str, str]:
+    """Generates authentic browser headers with Client Hints to bypass Cloudflare/WAF 403 blocks.
+
+    Ensures that sec-ch-ua, sec-ch-ua-platform, and user-agent match 100% to defeat
+    modern TLS/HTTP fingerprinting and WAF heuristics.
+    """
+    if profile_index is not None and 0 <= profile_index < len(BROWSER_PROFILES):
+        profile = BROWSER_PROFILES[profile_index]
+    else:
+        profile = random.choice(BROWSER_PROFILES)
+
+    headers = {
+        "User-Agent": profile["user_agent"],
+        "sec-ch-ua": profile["sec_ch_ua"],
+        "sec-ch-ua-mobile": profile["sec_ch_ua_mobile"],
+        "sec-ch-ua-platform": profile["sec_ch_ua_platform"],
+        "Accept-Language": "en-AU,en-US;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "DNT": "1",
+        "Connection": "keep-alive",
+    }
+
+    if as_xhr:
+        headers.update(
+            {
+                "Accept": "application/json, text/plain, */*",
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+            }
+        )
+    else:
+        headers.update(
+            {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "sec-fetch-dest": "document",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-site": "none",
+                "sec-fetch-user": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            }
+        )
+
+    if domain:
+        clean_domain = (
+            domain.lower().replace("https://", "").replace("http://", "").split("/")[0]
+        )
+        headers["Host"] = clean_domain
+        headers["Referer"] = f"https://{clean_domain}/"
+
+    return headers
+
+
+class DomainCooldownTracker:
+    """Thread-safe cooldown tracker for domains that returned 403 or challenge pages.
+
+    Prevents hammering blocked domains, avoiding IP blacklisting while giving
+    anti-bot systems time to reset rate-limit thresholds.
+    """
+
+    def __init__(self, default_cooldown_secs: float = 300.0):
+        self.default_cooldown_secs = default_cooldown_secs
+        self._cooldowns: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def mark_blocked(self, domain: str, cooldown_secs: float | None = None) -> None:
+        """Mark a domain as blocked with an expiry timestamp."""
+        duration = (
+            cooldown_secs if cooldown_secs is not None else self.default_cooldown_secs
+        )
+        expiry = time.time() + duration
+        clean = domain.lower().split("/")[0]
+        with self._lock:
+            self._cooldowns[clean] = expiry
+        logger.warning(
+            f"Anti-403: domain '{clean}' placed on {duration:.0f}s cooldown until {time.strftime('%H:%M:%S', time.localtime(expiry))}"
+        )
+
+    def is_cooldown_active(self, domain: str) -> bool:
+        """Check if a domain is currently in an active cooldown."""
+        clean = domain.lower().split("/")[0]
+        now = time.time()
+        with self._lock:
+            expiry = self._cooldowns.get(clean)
+            if expiry is None:
+                return False
+            if now >= expiry:
+                del self._cooldowns[clean]
+                return False
+            return True
+
+    def get_remaining_cooldown(self, domain: str) -> float:
+        """Return remaining seconds of cooldown for a domain, or 0.0 if not blocked."""
+        clean = domain.lower().split("/")[0]
+        now = time.time()
+        with self._lock:
+            expiry = self._cooldowns.get(clean)
+            if expiry and expiry > now:
+                return expiry - now
+            return 0.0
+
+    def clear(self) -> None:
+        with self._lock:
+            self._cooldowns.clear()
+
+
+# Global singleton domain cooldown manager
+domain_cooldown_tracker = DomainCooldownTracker()
+
+
+class ResilientScrapeSession:
+    """A resilient HTTP session designed to minimize 403 Forbidden errors.
+
+    Features:
+    1. Persistent cookie jar across requests (preserves Cloudflare/WAF session cookies).
+    2. Automatic Client Hints and browser headers matching real Chromium.
+    3. Randomized polite jitter delays to prevent burst rate-limit triggers.
+    4. Cloudflare / Turnstile challenge page detection.
+    5. Automatic domain cooldown marking on 403.
+    """
+
+    def __init__(
+        self,
+        domain: str | None = None,
+        timeout: float = 15.0,
+        min_jitter: float = 1.0,
+        max_jitter: float = 2.5,
+        proxy: str | None = None,
+    ):
+        self.domain = domain
+        self.timeout = timeout
+        self.min_jitter = min_jitter
+        self.max_jitter = max_jitter
+        self.proxy = proxy
+        self.session = requests.Session()
+
+        # Mount retrying adapter for transient network blips
+        retries = Retry(
+            total=2,
+            backoff_factor=1.0,
+            status_forcelist=[500, 502, 503, 504],
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retries, pool_connections=5, pool_maxsize=10)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
+
+    def _apply_jitter(self) -> None:
+        if self.min_jitter > 0 and self.max_jitter >= self.min_jitter:
+            delay = random.uniform(self.min_jitter, self.max_jitter)
+            time.sleep(delay)
+
+    def get(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        as_xhr: bool = False,
+        headers: dict[str, str] | None = None,
+        apply_jitter: bool = True,
+    ) -> requests.Response:
+        """Execute an HTTP GET request with anti-403 defenses."""
+        parsed = urlparse(url)
+        domain = parsed.netloc or self.domain or ""
+
+        # Check cooldown
+        if domain and domain_cooldown_tracker.is_cooldown_active(domain):
+            remaining = domain_cooldown_tracker.get_remaining_cooldown(domain)
+            raise CloudflareChallengeError(
+                domain,
+                403,
+                f"Domain is on active cooldown ({remaining:.1f}s remaining)",
+            )
+
+        if apply_jitter:
+            self._apply_jitter()
+
+        req_headers = get_stealth_headers(domain=domain, as_xhr=as_xhr)
+        if headers:
+            req_headers.update(headers)
+
+        try:
+            resp = self.session.get(
+                url,
+                params=params,
+                headers=req_headers,
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+        except requests.exceptions.RequestException as req_err:
+            logger.warning(f"Resilient request error for {url}: {req_err}")
+            raise
+
+        # Anti-bot detection checks
+        if resp.status_code == 429:
+            retry_after = int(resp.headers.get("Retry-After", 60))
+            if domain:
+                domain_cooldown_tracker.mark_blocked(
+                    domain, cooldown_secs=float(retry_after)
+                )
+            raise RateLimitBlockedError(domain, retry_after)
+
+        text_lower = resp.text[:4000].lower() if resp.text else ""
+        is_cf_challenge = (
+            resp.status_code == 403
+            or "just a moment..." in text_lower
+            or "cf-turnstile" in text_lower
+            or "challenges.cloudflare.com" in text_lower
+            or "attention required! | cloudflare" in text_lower
+        )
+
+        if is_cf_challenge:
+            if domain:
+                domain_cooldown_tracker.mark_blocked(domain, cooldown_secs=300.0)
+            raise CloudflareChallengeError(
+                domain,
+                resp.status_code,
+                "Cloudflare anti-bot challenge or Turnstile verification intercepted request",
+            )
+
+        return resp

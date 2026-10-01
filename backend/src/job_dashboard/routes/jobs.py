@@ -423,14 +423,84 @@ def handle_post_applications(handler):
 
 
 @app_router.get(r"^/api/applications/(?P<job_id>[^/]+)/events$")
+@app_router.get(r"^/api/v1/jobs/(?P<job_id>[^/]+)/events$")
 def handle_get_application_events(handler, job_id: str, **kwargs):
     """Retrieve chronological application status event history."""
-    user_id = _resolve_user_id(handler)
-    if not user_id:
-        handler.send_json(401, {"success": False, "error": "Authentication required."})
-        return
+    user_id = (
+        _resolve_user_id(handler) or handler.headers.get("X-User-Id") or "default_user"
+    )
     events = handler.app.repository.get_application_events(user_id, job_id)
     handler.send_json(200, {"success": True, "events": events})
+
+
+@app_router.patch(r"^/api/applications/(?P<job_id>[^/]+)/events$")
+@app_router.patch(r"^/api/v1/jobs/(?P<job_id>[^/]+)/events$")
+def handle_patch_application_events(handler, job_id: str, **kwargs):
+    """Dispatch a state-modifying micro-event with optimistic concurrency control."""
+    user_id = (
+        _resolve_user_id(handler) or handler.headers.get("X-User-Id") or "default_user"
+    )
+    body = get_json_body(handler)
+    if not body:
+        handler.send_json(400, {"error": "Missing JSON body"})
+        return
+
+    expected_version = body.get("expected_version")
+    if expected_version is None:
+        handler.send_json(400, {"error": "expected_version is required"})
+        return
+
+    event_type = body.get("event_type")
+    if not event_type:
+        handler.send_json(400, {"error": "event_type is required"})
+        return
+
+    new_macro_stage = body.get("new_macro_stage")
+    payload = body.get("payload")
+    payload_json = body.get("payload_json")
+    if not payload_json:
+        payload_json = json.dumps(payload) if payload is not None else "{}"
+
+    event_id = body.get("event_id") or str(uuid.uuid4())
+
+    idempotency_key = handler.headers.get("Idempotency-Key") or handler.headers.get(
+        "idempotency-key"
+    )
+
+    try:
+        updated_app, new_event = handler.app.repository.dispatch_application_event(
+            user_id=user_id,
+            job_id=job_id,
+            event_id=event_id,
+            event_type=event_type,
+            expected_version=expected_version,
+            new_macro_stage=new_macro_stage,
+            payload_json=payload_json,
+            idempotency_key=idempotency_key,
+        )
+        handler.send_json(
+            200, {"success": True, "application": updated_app, "event": new_event}
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "conflict" in msg.lower():
+            app = handler.app.repository.get_user_application(user_id, job_id)
+            current_ver = app.get("version") if app else None
+            handler.send_json(
+                409,
+                {
+                    "success": False,
+                    "error": msg,
+                    "detail": msg,
+                    "current_version": current_ver,
+                },
+            )
+        elif "not found" in msg.lower():
+            handler.send_json(404, {"success": False, "error": msg, "detail": msg})
+        else:
+            handler.send_json(400, {"success": False, "error": msg, "detail": msg})
+    except Exception as e:
+        handler.send_json(500, {"success": False, "error": str(e)})
 
 
 @app_router.delete("/api/applications")

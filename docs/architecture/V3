@@ -1,0 +1,344 @@
+Architectural Blueprint and Modernization Strategy: Streamlining the Job-Dashboard System EngineStrategic Architectural VerdictThe architectural diagnosis of the automated job-search dashboard reveals a structural failure pattern common in developer-facing tooling: the conflation of an operational execution engine with an analytical data warehouse. By presenting the user with an eight-column Kanban board alongside twelve uncoordinated modal dialogs, the interface forces the candidate to operate as an administrative database curator rather than an active driver of career outcomes. Technical recruitment pipelines are inherently directional conversion funnels with sharp temporal decay; an open opportunity loses value exponentially with every passing hour of candidate inertia. Consequently, an operational dashboard must function as an opinionated decision-support engine rather than a static repository of application metadata.The recommended technical paradigm replaces the multi-column Kanban board with a Dual-Plane Operational Architecture. The primary execution surface is organized around a keyboard-first Priority Action Queue, drawing on patterns proven in systems such as Linear and Superhuman. This feed evaluates pipeline context through a deterministic arbitration algorithm to present the candidate with the single highest-leverage task required at any given moment.Secondary operations and deep analytical contexts are removed from the central workspace and consolidated into a responsive, multi-tab context drawer. This sliding panel maintains state synchronicity with the active queue item, grouping resume tailoring, interview simulation, and offer modeling into contextual tabs. Funnel-wide telemetry and career matrix visualizations are completely decoupled from daily operations and relocated to an on-demand retrospective analytics surface.By coupling this dual-plane model with a closed-loop attribution system, real-world pipeline outcomes feed directly into tailoring heuristics, transforming the application from a passive tracking board into an adaptive, self-optimizing system.Architectural DimensionLegacy ImplementationModernized Dual-Plane ArchitecturePrimary Interaction ParadigmUnbounded two-dimensional spatial Kanban boardUnidimensional, keyboard-driven Priority Action QueueCognitive SurfacePassive multi-column scanning across dozens of static cardsDirected micro-task triage ordered by algorithmic expected valueWorkspace ModalityTwelve independent, uncoordinated modal dialogsUnified four-tab context drawer maintaining parent statePipeline State ModelingCoarse, ambiguous stage tracking prone to data stalenessTwo-tier finite state machine: macro stages and micro-eventsConcurrency & Latency ControlUnsynchronized REST updates with UI loading blocksVersioned optimistic concurrency control with instant rollbackIntelligence Feedback LoopOpen-loop static heuristics disconnected from outcomesMulti-armed bandit parameter adaptation driven by conversion dataAnalytical SeparationAnalytics mixed directly into daily operational flowsClear separation between operational triage and weekly reviewsDimension A: UX Architecture — Moving Beyond Clunky Kanban BoardsFailure Modes of Single-Player Kanban SystemsMulti-column Kanban boards were designed for collaborative team environments requiring cross-functional visibility, work-in-progress limits, and distributed handoffs. When applied to single-player, time-critical workflows like an engineering job search, the paradigm introduces significant friction:Horizontal Column Sprawl and Visual Satiation: A technical interview pipeline encompasses numerous lifecycle steps, from preliminary sourcing to technical screens, take-home assignments, system design rounds, executive debriefs, and offer negotiations. Spreading these phases across horizontal columns causes wide scrolling, forces card truncation, and obscures actionable information.State Ambiguity and Hidden Work: A card located in an "Interviewing" column provides no immediate clarity regarding required actions. The candidate cannot discern from the column alone whether an outreach message is pending, a take-home exam is due, or feedback is awaited from a recruiter. Each card requires manual inspection, creating maintenance fatigue that frequently leads candidates to abandon board hygiene entirely.Drag-and-Drop Interaction Latency: Dragging cards across wide viewports on trackpads or mobile screens introduces layout shifts, drop-target misalignments, and physical friction. These manual drag operations slow down high-frequency updates that should take milliseconds.Benchmarking High-Velocity Linear Workflow ParadigmsModern developer and productivity tooling prioritizes high-throughput processing over spatial card movement. Linear structures inbound issues into a dedicated triage engine where items are evaluated, snoozed, or committed to active cycles through rapid keystrokes. Superhuman relies on keyboard-driven navigation (j/k for line selection, e for task completion, s for context-aware deferrals), ensuring users maintain flow without lifting their hands from the home row. Duolingo organizes user progress into explicit, sequential micro-actions that eliminate choice paralysis by highlighting a single clear next step.Integrating these principles shifts the job search workflow from passive board maintenance to active pipeline triage. The candidate handles incoming notifications, application reviews, and outreach tasks within an opinionated, vertical feed designed for rapid keyboard execution.The Next Best Action Arbitration EngineTo eliminate decision fatigue, the system calculates an empirical Priority Score $P(a, j)$ for every candidate action $a$ associated with job application $j$. This calculation combines expected conversion yields, pipeline stage values, temporal urgency, and action friction into a single metric:$$P(a, j) = \Big( V(S_j) \times \hat{p}(\text{advance} \mid S_j, \mathbf{x}_j) \times \gamma(t - t_{\text{last}}) \times U_a \Big) - C(a)$$In this formulation, $V(S_j) \in [1, 10]$ represents the baseline value assigned to the macro stage, ensuring that late-stage opportunities receive proportional operational priority. The predicted advancement probability $\hat{p}(\text{advance} \mid S_j, \mathbf{x}_j) \in [0, 1]$ is generated by semantic_scoring.py based on the semantic alignment between the candidate's profile and the role requirements $\mathbf{x}_j$.The temporal decay function $\gamma(\Delta t) = 1 + \beta \ln(1 + \Delta t)$ increases the priority of stagnant applications, preventing stalled communications from slipping through the cracks. The parameter $U_a \in [0.5, 2.0]$ applies an action-specific urgency multiplier, while $C(a) \in [0, 2]$ accounts for operational complexity, ensuring quick micro-tasks can be surfaced during focused processing windows.Action KeyTrigger ConditionPrimary Action Call to ActionSnooze / Dismissal OptionACTION_PREP_INTERVIEWInterview scheduled within 48 hours"Launch Simulation Suite"Snooze until 4 hours priorACTION_FOLLOW_UP_OUTREACHApplication status Applied for $\ge 5$ days without response"Generate Follow-Up Script"Snooze 3 days / Mark GhostedACTION_TAILOR_APPLICATIONUnprocessed role lead with semantic score $\ge 75\%$"Review Tailored Assets"Reject Lead / DemoteACTION_LOG_SCREEN_OUTCOMEScheduled interview timestamp elapsed without notes"Log Recruiter Feedback"Reschedule EventACTION_RESOLVE_OFFERActive offer with pending deadline $\le 72$ hours"Open Offer Action Hub"Decline OfferProgressive Disclosure Framework: Modal ConsolidationThe legacy interface relies on seven independent modal windows (FunnelIntelligenceModal, ScoringTunerModal, OfferActionHubModal, InterviewSuiteModal, ScreeningSolverModal, ExecutiveDossierModal, and CareerMatrixModal). Stacking modal dialogs degrades the user experience by breaking visual continuity, trapping pointer focus, and concealing background context.The modernized layout resolves this with a responsive, two-pane workspace. The primary pane (occupying 60% of viewport width) hosts the Priority Action Queue. The secondary pane (occupying the remaining 40%) is a slide-over context drawer that dynamically updates based on the active queue item. The twelve legacy modals are consolidated into four coherent tabs within this persistent drawer:Consolidated Drawer TabLegacy Modal Components SubsumedPrimary Capabilities and Workflows HandledTab 1: Dossier & MarketExecutiveDossierModal, CareerMatrixModalCompany intelligence, salary compensation bands, seniority leveling, recruiter contact logsTab 2: Tailoring & ScoreScoringTunerModal, Tailoring viewsSemantic match breakdowns, gap analysis, dynamic resume and cover letter variant generationTab 3: Prep & SolverInterviewSuiteModal, ScreeningSolverModalTechnical screening question rehearsal, behavioral prep, AI mock interviewer interactionsTab 4: Offer & CompsOfferActionHubModalTotal compensation benchmarking, equity vesting schedules, counter-offer template draftingMacro-level funnel analytics from FunnelIntelligenceModal are removed from the drawer entirely. Funnel conversion rates, aggregate interview progression velocity, and historical loss ratios belong to periodic retrospective analysis rather than daily execution. They are relocated to a dedicated "Analytics & Telemetry" route accessed via the main navigation bar.Dimension B: Granular Pipeline State ModelingHierarchical Two-Tier Finite State MachinePipeline data often becomes stale when coarse lifecycle categories hide pending operational tasks. Labeling an application simply as "Interviewing" fails to capture whether the candidate is waiting for interview scheduling, preparing for a live coding screen, or reviewing a take-home project.To provide complete operational clarity, the platform implements a two-tier finite state machine:Macro Stage: Non-cyclical lifecycle phases that define the candidate's formal status with the organization.Micro-Event: Discrete, timestamped, append-only operational milestones that track actions taken within a macro stage.Macro StageAllowed Ingress Micro-EventsAllowed Macro Stage ProgressionsFailure & Terminal Exit TransitionsLEADLEAD_IMPORTED, SOURCED_MANUALLY, DOSSIER_COMPILEDTransitions to APPLIED upon submissionLEAD_DISMISSEDAPPLIEDAPPLICATION_SUBMITTED, REFERRAL_REQUESTED, OUTREACH_SENTTransitions to INTERVIEWING upon screen confirmationINSTANT_REJECTION, OUTREACH_GHOSTEDINTERVIEWINGSCREEN_SCHEDULED, ASSESSMENT_RECEIVED, PANEL_SCHEDULEDTransitions to OFFER upon formal offer deliveryINTERVIEW_REJECTION, CANDIDATE_WITHDRAWNOFFEROFFER_RECEIVED, COUNTER_OFFER_SENTTransitions to CLOSED upon offer acceptanceOFFER_DECLINED, OFFER_RESCINDEDCLOSEDOFFER_ACCEPTED, OFFER_DECLINED, REJECTED, GHOSTEDTerminal phase (Read-only historical audit)NoneOptimistic Client State Management and Latency MaskingNetwork round-trips introduce noticeable friction to daily task execution. To keep interactions fluid and responsive, the client applies state updates optimistically via TanStack Query. When a candidate completes a triage task or changes an application state, the client updates its local cache and recalculates the interface immediately. The corresponding network mutation runs asynchronously in the background; if the request encounters an error, the local cache automatically rolls back to its prior snapshot.TypeScriptimport { useMutation, useQueryClient } from '@tanstack/react-query';
+import { JobApplication, JobActionUpdatePayload } from '@/types/job';
+import { api } from '@/api/client';
+
+export const useOptimisticJobAction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ jobId, payload }: { jobId: string; payload: JobActionUpdatePayload }) => {
+      const response = await api.patch<JobApplication>(`/api/v1/jobs/${jobId}/events`, payload);
+      return response.data;
+    },
+    onMutate: async ({ jobId, payload }) => {
+      await queryClient.cancelQueries({ queryKey: ['jobs', 'triage-feed'] });
+      await queryClient.cancelQueries({ queryKey: ['jobs', 'detail', jobId] });
+
+      const previousFeed = queryClient.getQueryData<JobApplication[]>(['jobs', 'triage-feed']);
+      const previousDetail = queryClient.getQueryData<JobApplication>(['jobs', 'detail', jobId]);
+
+      if (previousFeed) {
+        queryClient.setQueryData<JobApplication[]>(
+          ['jobs', 'triage-feed'],
+          previousFeed.map((job) =>
+            job.id === jobId
+              ? {
+                  ...job,
+                  macro_stage: payload.macro_stage || job.macro_stage,
+                  last_micro_event: payload.event_type,
+                  version: job.version + 1,
+                  updated_at: new Date().toISOString(),
+                }
+              : job
+          )
+        );
+      }
+
+      return { previousFeed, previousDetail, jobId };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(['jobs', 'triage-feed'], context.previousFeed);
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(['jobs', 'detail', context.jobId], context.previousDetail);
+      }
+    },
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['jobs', 'triage-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs', 'detail', variables.jobId] });
+    },
+  });
+};
+Idempotent Endpoints and Optimistic Concurrency Control in FastAPIDistributed cloud environments like Google Cloud Run scale horizontally and can process asynchronous events out of order. To prevent race conditions and concurrent write hazards, the backend combines version-based Optimistic Concurrency Control (OCC) with idempotent event tracking.The primary JobApplication table includes an integer version column managed by SQLAlchemy's version_id_col. Every state-modifying payload must include an expected_version property matching the client's current snapshot. If a concurrent operation increments the version before the write completes, the engine detects the mismatch and raises a StaleDataError, which the API handles as an HTTP 409 Conflict. Network retries use an Idempotency-Key header, allowing the system to return existing event records without repeating state modifications.Pythonfrom datetime import datetime
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+from app.schemas.enums import MacroStage, MicroEventType
+
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+
+    id = Column(String(36), primary_key=True, index=True)
+    company_name = Column(String(255), nullable=False)
+    role_title = Column(String(255), nullable=False)
+    macro_stage = Column(SQLEnum(MacroStage), nullable=False, default=MacroStage.LEAD, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    events = relationship("ApplicationEvent", back_populates="application", cascade="all, delete-orphan")
+
+    __mapper_args__ = {
+        "version_id_col": version
+    }
+
+class ApplicationEvent(Base):
+    __tablename__ = "application_events"
+
+    id = Column(String(36), primary_key=True, index=True)
+    application_id = Column(String(36), ForeignKey("job_applications.id"), nullable=False, index=True)
+    event_type = Column(SQLEnum(MicroEventType), nullable=False)
+    idempotency_key = Column(String(64), unique=True, index=True, nullable=True)
+    payload_json = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    application = relationship("JobApplication", back_populates="events")
+Pythonfrom fastapi import APIRouter, Depends, HTTPException, Header, status
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
+from app.db.session import get_db
+from app.models.job import JobApplication, ApplicationEvent
+from app.schemas.job import JobEventCreate, JobApplicationResponse
+
+router = APIRouter()
+
+@router.patch("/{job_id}/events", response_model=JobApplicationResponse)
+def dispatch_application_event(
+    job_id: str,
+    event_in: JobEventCreate,
+    idempotency_key: str = Header(None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db)
+):
+    if idempotency_key:
+        existing_event = db.query(ApplicationEvent).filter(
+            ApplicationEvent.idempotency_key == idempotency_key
+        ).first()
+        if existing_event:
+            return db.query(JobApplication).filter(JobApplication.id == job_id).one()
+
+    job = db.query(JobApplication).filter(JobApplication.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application record missing")
+
+    if event_in.expected_version != job.version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Stale resource version. Client sent {event_in.expected_version}, server holds {job.version}"
+        )
+
+    event_record = ApplicationEvent(
+        id=event_in.event_id,
+        application_id=job.id,
+        event_type=event_in.event_type,
+        idempotency_key=idempotency_key,
+        payload_json=event_in.payload_json
+    )
+    db.add(event_record)
+
+    if event_in.new_macro_stage:
+        job.macro_stage = event_in.new_macro_stage
+
+    try:
+        db.commit()
+        db.refresh(job)
+    except StaleDataError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Optimistic concurrency collision detected. State has been mutated concurrently."
+        )
+
+    return job
+Dimension C: Outcome-Based Adaptive Learning LoopsThe Closed-Loop Feedback ArchitectureThe platform's existing intelligence services (semantic_scoring.py and semantic_tailoring.py) operate without a mechanism to learn from real-world results. The scoring engine evaluates job description alignment against fixed criteria, while the tailoring service generates resumes using static templates. If resumes generated with a particular structural style consistently lead to rejections while another style regularly yields recruiter calls, the generation logic remains unchanged.Closing this loop requires treating resume variants, phrasing styles, and skill configurations as exploratory strategies within a Multi-Armed Bandit (MAB) framework. By linking pipeline outcomes back to the generation context, the application dynamically adjusts its prompts based on observed conversion rates.Mathematical Formulation of Attribution and Multi-Armed Bandit WeightingEach tailored asset generated by semantic_tailoring.py records a metadata vector $\mathbf{x} = \{a_{\text{style}}, \mathbf{k}_{\text{skills}}, d_{\text{density}}\}$ in an AssetTelemetry record. As an application moves through the pipeline, terminal transitions trigger a scalar outcome reward $R(e) \in [-1.0, +3.0]$:$$R(e) = \begin{cases}  +3.0 & \text{if } e \in \{\text{OFFER\_RECEIVED}\} \\ +1.5 & \text{if } e \in \{\text{TECH\_INTERVIEW\_SCHEDULED}\} \\ +1.0 & \text{if } e \in \{\text{SCREEN\_SCHEDULED}\} \\ -0.5 & \text{if } e \in \{\text{REJECTION\_RECEIVED}\} \text{ and } \Delta t \le 72\text{h (Resume Screen Failure)} \\ -0.2 & \text{if } e \in \{\text{APPLICATION\_GHOSTED}\} \\ 0.0 & \text{otherwise} \end{cases}$$Style archetypes (such as STAR_METRIC, ARCHITECTURAL_DECISION, and LEADERSHIP_IMPACT) are evaluated using an Exponential Moving Average (EMA) update rule:$$Q(a) \leftarrow (1 - \alpha) Q(a) + \alpha R(e)$$Setting the learning rate $\alpha = 0.10$ stabilizes the estimates against noisy rejections while preserving sensitivity to genuine hiring signals. Action selection follows an $\epsilon$-Greedy policy with $\epsilon = 0.15$, maintaining continuous exploration of alternative phrasings.Skill-tag relevance is tracked using the point-biserial correlation coefficient $r_{k}$ between the presence of skill $k$ in tailored materials ($b_k \in \{0, 1\}$) and stage advancement ($y \in \{0, 1\}$):$$r_{k} = \frac{\bar{y}_{k=1} - \bar{y}}{\sigma_y} \sqrt{\frac{n_{k=1} n_{k=0}}{n^2}}$$Dynamic Prompt Context ModulationRather than training specialized models, the system injects observed performance metrics directly into runtime prompts. When generating resumes, semantic_tailoring.py queries OutcomeLearningEngine to retrieve high-performing phrasing styles and keyword weights, incorporating them directly into the instructions provided to the model.Pythonfrom typing import Dict, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.models.telemetry import AssetTelemetry, PhrasingArchetypeWeight
+
+class OutcomeLearningEngine:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_tailoring_context_modifiers(self, target_domain: str) -> Dict[str, Any]:
+        best_archetype = (
+            self.db.query(PhrasingArchetypeWeight)
+            .filter(PhrasingArchetypeWeight.domain == target_domain)
+            .order_by(PhrasingArchetypeWeight.q_value.desc())
+            .first()
+        )
+        selected_style = best_archetype.archetype_name if best_archetype else "STAR_METRIC"
+
+        positive_keywords = (
+            self.db.query(AssetTelemetry.skill_tag, func.avg(AssetTelemetry.outcome_reward).label("avg_reward"))
+            .filter(AssetTelemetry.domain == target_domain)
+            .group_by(AssetTelemetry.skill_tag)
+            .having(func.count(AssetTelemetry.id) >= 3)
+            .order_by(func.avg(AssetTelemetry.outcome_reward).desc())
+            .limit(5)
+            .all()
+        )
+
+        negative_keywords = (
+            self.db.query(AssetTelemetry.skill_tag, func.avg(AssetTelemetry.outcome_reward).label("avg_reward"))
+            .filter(AssetTelemetry.domain == target_domain)
+            .group_by(AssetTelemetry.skill_tag)
+            .having(func.count(AssetTelemetry.id) >= 3)
+            .order_by(func.avg(AssetTelemetry.outcome_reward).asc())
+            .limit(3)
+            .all()
+        )
+
+        return {
+            "style_directive": selected_style,
+            "emphasized_skills": [kw[0] for kw in positive_keywords if kw[1] > 0.5],
+            "suppressed_skills": [kw[0] for kw in negative_keywords if kw[1] < -0.2],
+        }
+Pythonfrom app.services.learning_loop import OutcomeLearningEngine
+
+def assemble_tailoring_system_prompt(domain: str, engine: OutcomeLearningEngine) -> str:
+    calibration = engine.get_tailoring_context_modifiers(target_domain=domain)
+    
+    prompt = (
+        "You are an expert technical resume tailoring agent specialized in software engineering.\n"
+        f"CORE STYLISTIC DIRECTIVE: Structure experience bullets using {calibration['style_directive']}.\n"
+    )
+    
+    if calibration["emphasized_skills"]:
+        prompt += (
+            "EMPIRICAL REINFORCEMENT: Historical interview conversions show statistically significant "
+            f"callback improvements when emphasizing: {', '.join(calibration['emphasized_skills'])}. "
+            "Ensure these competencies are credibly highlighted.\n"
+        )
+        
+    if calibration["suppressed_skills"]:
+        prompt += (
+            "EMPIRICAL SUPPRESSION: Avoid over-indexing on low-conversion patterns: "
+            f"{', '.join(calibration['suppressed_skills'])}.\n"
+        )
+        
+    return prompt
+Dimension D: Refactoring and Pruning RoadmapCodebase Audit and Component DecouplingAn audit of the Ludwixix/job-dashboard repository reveals technical debt concentrated around modal state duplication and fragmented analytical logic. Modals implement independent backdrop listeners, escape key handlers, and duplicate loading spinners, while components like semantic_scoring.py and funnel_analytics.py duplicate text tokenization and keyword extraction routines. Several backend modules—including career_matrix.py, interview_simulator.py, and semantic_tailoring.py—operate largely in isolation rather than serving the primary operational workflow.Consolidating these services into shared modules reduces maintenance overhead and clarifies system boundaries:Codebase Module / LayerCurrent Technical Debt StateTarget Refactored ArchitectureFrontend Workspace UISeven independent modal windows with disjointed stateResponsive two-pane workspace with four consolidated drawer tabsTask Management ViewMulti-column drag-and-drop Kanban boardKeyboard-driven Priority Action Queue with sub-16ms optimistic updatesBackend State APIUnchecked HTTP PATCH endpoints susceptible to race conditionsVersioned, idempotent event-sourcing endpoints with OCC validationScoring & Parsing LogicDuplicate tokenization routines across scoring and analyticsUnified scoring engine library (scoring_engine.py)Tailoring EngineStatic, open-loop LLM prompts without performance feedbackClosed-loop dynamic prompt modulation using multi-armed bandit tuningFunnel AnalyticsAnalytical dashboards embedded directly in daily task viewsDedicated retrospective analytics workspace accessible on demandFour-Phase Refactoring Execution PlanPhase 1: Pipeline and State Machine NormalizationThe first phase migrates the database schema to support two-tier state modeling and optimistic concurrency control. An Alembic migration introduces the macro_stage enum, the version integer column, and the application_events table. The backend/app/api/endpoints/jobs.py routes are updated to require version checks and idempotency headers on mutations, rejecting conflicting updates with HTTP 409 Conflict. Integration tests verify that concurrent update attempts are handled correctly by the concurrency controls.Phase 2: Frictionless UI Simplification and Next Best Action FeedThe second phase introduces the action arbitration engine via backend/app/services/action_engine.py, calculating priority scores across all active applications and exposing the /api/v1/jobs/triage-feed endpoint. On the frontend, KanbanBoard.tsx is replaced by TriageFeed.tsx, integrating keyboard navigation shortcuts (j, k, e, s) and TanStack Query optimistic mutation hooks to provide immediate visual feedback.Phase 3: Secondary Feature Consolidation and Context Drawer IntegrationThe third phase removes the standalone modal components and deploys ContextDrawer.tsx. Legacy components (ExecutiveDossierModal, CareerMatrixModal, ScoringTunerModal, InterviewSuiteModal, ScreeningSolverModal, and OfferActionHubModal) are refactored into modular subcomponents within the four drawer tabs. The funnel telemetry views from FunnelIntelligenceModal are migrated into an independent route (AnalyticsDashboard.tsx) for retrospective analysis.Phase 4: Closed-Loop Outcome Tracking and Dynamic CalibrationThe final phase implements the adaptive learning loop. Database tables AssetTelemetry and PhrasingArchetypeWeight are deployed to record generation attributes and performance rewards. The outcome attribution engine is connected to state-change endpoints, updating bandit weights when applications reach terminal outcomes. Finally, semantic_tailoring.py is configured to ingest performance modifiers dynamically during prompt assembly, completing the feedback loop.Master Coding Agent Implementation PromptThe prompt below contains comprehensive instructions for an autonomous coding agent (such as Roo Code or Cline) to execute the refactoring across the repository.Markdown### MASTER IMPLEMENTATION DIRECTIVE: JOB-DASHBOARD RE-ARCHITECTURE
+
+#### OBJECTIVE
+Refactor the "job-dashboard" application from an unfocused Kanban/modal application into a high-velocity, keyboard-first Priority Action Queue (Triage Feed) with a unified Context Drawer and an outcome-driven Closed-Loop Learning Engine. 
+DO NOT rewrite existing, working logic in modular backend services (`semantic_scoring.py`, `semantic_tailoring.py`, `interview_simulator.py`, `funnel_analytics.py`). Reconnect and expose them via clean interfaces.
+
+---
+
+### EXECUTION STAGES
+
+#### PHASE 1: DATABASE & STATE MACHINE NORMALIZATION
+
+1. Edit `backend/app/models/job.py`:
+   - Add SQLAlchemy version-based Optimistic Concurrency Control (OCC):
+     Set `version = Column(Integer, nullable=False, default=1)`.
+     Configure `__mapper_args__ = {"version_id_col": version}`.
+   - Enforce two-tier state:
+     - `macro_stage`: Enum(`LEAD`, `APPLIED`, `INTERVIEWING`, `OFFER`, `CLOSED`).
+   - Create related model `ApplicationEvent`:
+     - `id`: String(36), Primary Key.
+     - `application_id`: ForeignKey("job_applications.id"), Indexed.
+     - `event_type`: Enum(`LEAD_IMPORTED`, `ASSETS_TAILORED`, `APPLICATION_SUBMITTED`, `OUTREACH_SENT`, `SCREEN_SCHEDULED`, `ASSESSMENT_RECEIVED`, `INTERVIEW_COMPLETED`, `OFFER_RECEIVED`, `OFFER_ACCEPTED`, `REJECTED`, `GHOSTED`).
+     - `idempotency_key`: String(64), Unique, Indexed, Nullable.
+     - `payload_json`: Text, Nullable.
+     - `created_at`: DateTime, UTC Default.
+
+2. Edit `backend/app/schemas/job.py`:
+   - Create schemas: `JobEventCreate` (including `expected_version: int`, `event_type: MicroEventType`, `new_macro_stage: Optional[MacroStage]`, `payload_json: Optional[str]`).
+   - Create schema: `TriageActionItem` representing prioritized micro-tasks.
+
+3. Edit `backend/app/api/endpoints/jobs.py`:
+   - Add endpoint `PATCH /api/v1/jobs/{job_id}/events`:
+     - Inspect optional `Idempotency-Key` header; if present and existing, return existing application state.
+     - Verify `expected_version == job.version`. If mismatched, raise `HTTPException(status_code=409, detail="Resource version conflict")`.
+     - Append `ApplicationEvent`, update `job.macro_stage` if applicable, commit transaction, and handle `StaleDataError` by returning HTTP 409.
+
+#### PHASE 2: NEXT BEST ACTION (NBA) ENGINE & TRIAGE FEED
+
+1. Create `backend/app/services/action_engine.py`:
+   - Implement `calculate_priority_score(job: JobApplication) -> float`:
+     - Stage Values: `LEAD: 1.0`, `APPLIED: 3.0`, `INTERVIEWING: 7.0`, `OFFER: 10.0`, `CLOSED: 0.0`.
+     - Match Score: Extract semantic score from metadata, default to 0.70.
+     - Urgency Decay: gamma = 1.0 + 0.2 * ln(1 + days_since_last_event).
+     - Action Weight: Tailoring = 1.0, Follow-up = 1.3, Interview Prep = 2.0.
+   - Implement `generate_triage_feed(db: Session) -> List[TriageActionItem]`:
+     - Query all non-closed applications.
+     - Construct actionable micro-tasks (`ACTION_PREP_INTERVIEW`, `ACTION_FOLLOW_UP_OUTREACH`, `ACTION_TAILOR_APPLICATION`, `ACTION_LOG_OUTCOME`).
+     - Sort descending by priority score.
+
+2. Expose endpoint in `backend/app/api/endpoints/jobs.py`:
+   - `GET /api/v1/jobs/triage-feed` returning `List[TriageActionItem]`.
+
+3. Frontend Triage Implementation:
+   - Create `frontend/src/features/triage/TriageFeed.tsx`:
+     - Replaces `frontend/src/components/KanbanBoard.tsx` as the main route view.
+     - Implement vertical feed with smooth focus transitions.
+     - Implement keyboard bindings via `useEffect`:
+       - `j` / `ArrowDown`: Move selection down.
+       - `k` / `ArrowUp`: Move selection up.
+       - `e`: Advance item / Mark complete.
+       - `s`: Snooze action (opens quick snooze dropdown: 1 day, 3 days, 1 week).
+       - `Enter`: Open Context Drawer for active entity.
+   - Create `frontend/src/features/triage/ActionCard.tsx`:
+     - Visual badge indicating urgency, stage, company name, and explicit prompt text.
+   - Create `frontend/src/hooks/useOptimisticJobMutation.ts`:
+     - Use TanStack Query's `useMutation` with `onMutate` cache snapshots and `onError` rollbacks to mutate state instantaneously.
+
+#### PHASE 3: CONSOLIDATING MODALS INTO CONTEXT DRAWER
+
+1. Delete or Deprecate Standalone Modals:
+   - Mark for removal: `FunnelIntelligenceModal.tsx`, `ScoringTunerModal.tsx`, `OfferActionHubModal.tsx`, `InterviewSuiteModal.tsx`, `ScreeningSolverModal.tsx`, `ExecutiveDossierModal.tsx`, `CareerMatrixModal.tsx`.
+
+2. Create `frontend/src/features/drawer/ContextDrawer.tsx`:
+   - Responsive right-side sliding panel (width: 550px / 40vw).
+   - Smooth transform slide-in when `activeJobId` is set in triage state.
+   - Tab Navigation Header:
+     - `Tab 1: Overview`: Embeds logic from `ExecutiveDossierModal` and `CareerMatrixModal`.
+     - `Tab 2: Tailoring`: Embeds resume tailoring, keyword match diagnostics, and prompts from `ScoringTunerModal`.
+     - `Tab 3: Prep Suite`: Embeds interview simulations and screening solver from `InterviewSuiteModal` and `ScreeningSolverModal`.
+     - `Tab 4: Offer`: Embeds negotiation and compensation calculations from `OfferActionHubModal`.
+   - Action Footer: Quick buttons triggering optimistic state events.
+
+3. Re-house Macro Funnel Analytics:
+   - Create `frontend/src/views/AnalyticsDashboard.tsx`:
+     - Re-home the metrics from `FunnelIntelligenceModal` into an independent top-level tab ("Telemetry") for weekly reviews.
+
+#### PHASE 4: CLOSED-LOOP ATTRIBUTION & PROMPT ADAPTATION
+
+1. Create `backend/app/models/telemetry.py`:
+   - Model `AssetTelemetry`:
+     - `id`: String(36), PK.
+     - `application_id`: ForeignKey("job_applications.id").
+     - `archetype`: String(64) (`STAR_METRIC`, `ARCHITECTURAL_DECISION`, `LEADERSHIP_IMPACT`).
+     - `included_skills`: Text (comma-separated or JSON list).
+     - `outcome_reward`: Float, default 0.0.
+   - Model `PhrasingArchetypeWeight`:
+     - `domain`: String(64), Index.
+     - `archetype_name`: String(64).
+     - `q_value`: Float, default 1.0.
+     - `sample_count`: Integer, default 0.
+
+2. Create `backend/app/services/learning_loop.py`:
+   - Implement `record_application_outcome(db: Session, application_id: str, terminal_event: MicroEventType)`:
+     - Reward mapping: `OFFER_RECEIVED: +3.0`, `INTERVIEW_COMPLETED: +1.0`, `REJECTED: -0.5`, `GHOSTED: -0.2`.
+     - Find all `AssetTelemetry` rows for `application_id` and update `outcome_reward`.
+     - Update `PhrasingArchetypeWeight` using EMA update formula:
+       `Q = Q + 0.1 * (reward - Q)`.
+   - Implement `get_dynamic_prompt_context(db: Session, domain: str) -> Dict[str, Any]`:
+     - Select highest `q_value` archetype for domain.
+     - Aggregate skill tags where average reward > 0.5 to form an `emphasized_skills` list.
+     - Aggregate skill tags where average reward < -0.2 to form a `suppressed_skills` list.
+
+3. Connect to Existing Services:
+   - In `backend/app/services/semantic_tailoring.py`:
+     - Wire `get_dynamic_prompt_context` into the system prompt builder so tailored resumes automatically reflect learned skill emphases and writing styles.
+   - In `backend/app/api/endpoints/jobs.py`:
+     - Trigger `record_application_outcome` whenever an incoming event moves an application to terminal states (`OFFER_RECEIVED`, `REJECTED`, `GHOSTED`).
+
+---
+
+### VERIFICATION & VALIDATION PROTOCOL
+
+1. Backend Concurrency & Idempotency:
+   - Run a test dispatching two identical `PATCH /api/v1/jobs/{id}/events` requests concurrently with the same `Idempotency-Key`. Confirm exactly one event record is created and no 500 errors occur.
+   - Run a test simulating stale updates: Send a PATCH with `expected_version = 1` after the application has moved to `version = 2`. Assert response status is `409 Conflict`.
+
+2. Frontend Latency & Optimistic Rollback:
+   - Trigger a stage progression in `TriageFeed.tsx`. Verify the UI updates instantaneously (<16ms) without waiting for network completion.
+   - Simulate network failure (HTTP 500). Verify that the Triage Feed rolls back the card to its original position and displays an error toast.
+
+3. Closed-Loop Weight Adaptation:
+   - Generate an asset under archetype `STAR_METRIC`. Dispatch an `OFFER_RECEIVED` event.
+   - Query `PhrasingArchetypeWeight` and assert `q_value` increased.
+   - Trigger `assemble_tailoring_system_prompt()` and verify the system prompt includes empirical reinforcement for high-performing skills.
+Operational Synthesis and Long-Term System EvolutionThe transformation of the job-dashboard architecture addresses fundamental issues of cognitive overhead, operational friction, and decoupled intelligence. By transitioning from a multi-column Kanban board to a keyboard-driven Priority Action Queue, the system converts a cluttered data store into a focused execution engine. Consolidating standalone modals into a unified context drawer preserves user focus during detailed task reviews.Underlying this interface, the two-tier finite state machine provides the granular tracking required for reliable pipeline attribution. Combining version-based optimistic concurrency control with idempotent event endpoints ensures data consistency across distributed deployments, while optimistic client updates maintain perceived latency under sixteen milliseconds. Finally, feeding real-world pipeline outcomes back into prompt construction establishes an adaptive learning loop, ensuring that tailoring quality improves with every application cycle.

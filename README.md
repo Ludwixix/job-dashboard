@@ -4,9 +4,10 @@ Polyglot monorepo consolidating the backend domain service, multi-provider scrap
 
 ## 🏗️ Architecture & Subprojects
 
-- **[Backend (`backend/`)](backend/README.md)**: Python package (`job_dashboard`) containing core domain logic, multi-provider scrapers (SEEK, Indeed, Adzuna, RemoteOK), SQLite/WAL persistence, health monitors, and a modular HTTP routing layer.
-- **[Frontend (`frontend/`)](frontend/README.md)**: Vite + React Single Page Application featuring interactive Kanban boards, document generator studio, AI psychology profiler, and minimalist Zen Autopilot.
+- **[Backend (`backend/`)](backend/README.md)**: Python package (`job_dashboard`) containing core domain logic, multi-provider scrapers (SEEK, Indeed, LinkedIn, Adzuna, RemoteOK, **Jora Australia**), anti-403 resilience engine, Apify platform integration, two-tier state machine with OCC, SQLite/WAL persistence, health monitors, and a modular HTTP routing layer.
+- **[Frontend (`frontend/`)](frontend/README.md)**: Vite + React Single Page Application featuring interactive Kanban boards, document generator studio, AI psychology profiler, Scrapers & Apify settings panel, and minimalist Zen Autopilot.
 - **[Documentation & Tasks (`docs/`)](docs/)**: Architectural proposals, task roadmaps, and AI layer evaluations:
+  - `docs/architecture/V3`: High-velocity Priority Action Queue and two-tier finite state machine.
   - `docs/tasks/ai-layer-roadmap.md`: Research evaluation on Crawl4AI and embedding-based matching.
   - `docs/tasks/interview-modals-consolidation-proposal.md`: Consolidation design for interview preparation modals.
   - `docs/tasks/google-integrations-consolidation-proposal.md`: Consolidation design for Google Workspace and passkey identity.
@@ -19,14 +20,16 @@ Polyglot monorepo consolidating the backend domain service, multi-provider scrap
 - **Phase 3 (Dashboard Code-Splitting)**: Converted all 11 heavy modal dialogs to dynamic `React.lazy` imports with `Suspense` and `ModalSkeleton`, shrinking the main JavaScript bundle from 1.84 MB down to 1.19 MB (-34.9% raw, -34.0% gzip).
 - **Phase 4 (Service Consolidation Proposals)**: Produced architectural consolidation proposals for interview intelligence and Google Workspace services.
 - **Phase 5 (Full-Stack De-Monolithification)**: Strangler Fig decomposition of the 6,700-line `web.py` God Object into domain-scoped route modules (`auth`, `billing`, `jobs`, `ai`, `scrape`) via a lightweight custom regex router. Frontend service layers partitioned into `services/prompts/`, `services/parsers/`, `services/profiles/` with 100% backward-compatible facades. `Dashboard.jsx` decoupled into `useDashboardState` / `useScrapeOrchestrator` hooks and `DashboardModals`. `JobModal.jsx` and `OnboardingFlow.jsx` decomposed into dedicated tab/step sub-components. Production bundle reduced by a further ~480 kB.
+- **Phase 6 (Anti-403 Resilience & Jora Ingestion)**: Built centralized `ResilientScrapeSession` with Client Hints, persistent cookie-jar sessions, human-like jitter, and thread-safe domain cooldown circuit breakers (`DomainCooldownTracker`). Built Jora Australia (`au.jora.com`) native scraper with automatic Apify residential proxy failover.
+- **Phase 7 (V3 Two-Tier State Machine & OCC)**: Two-tier Finite State Machine (`MacroStage` + `MicroEvent`) and Optimistic Concurrency Control (`user_application_events`, `PATCH /api/v1/jobs/{job_id}/events`) with HTTP 409 collision detection.
 
 ## 🚀 Quick Start
 
 ### Backend (Python)
 ```bash
 cd backend
-# Run test suite (339 tests, 3 skipped)
-python3 -m pytest tests/ -v
+# Run test suite (700+ tests)
+python3 -m pytest tests/ -q
 
 # Run local API server
 PYTHONPATH=src python3 -m job_dashboard.run_server

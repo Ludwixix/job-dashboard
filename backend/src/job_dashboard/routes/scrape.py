@@ -787,6 +787,14 @@ def handle_get_scrapers_config(handler):
             ),
             "max_results": platforms.get("adzuna", {}).get("max_results", 20),
         },
+        "jora": {
+            "enabled": platforms.get("jora", {}).get("enabled", False),
+            "mode": platforms.get("jora", {}).get("mode", "primary"),
+            "actor_id": platforms.get("jora", {}).get(
+                "actor_id", DEFAULT_APIFY_ACTORS["jora"]
+            ),
+            "max_results": platforms.get("jora", {}).get("max_results", 20),
+        },
     }
 
     handler.send_json(

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import uuid
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 
 from ..repository import JobRepository
+from ..security import decode_token
 from ..verifier import verify_job_url
 
 router = APIRouter(tags=["Jobs"])
@@ -25,11 +29,15 @@ async def get_jobs(
     q: Optional[str] = Query(default=None, description="Search query string"),
     source: Optional[str] = Query(default=None, description="Filter by source"),
     location: Optional[str] = Query(default=None, description="Filter by location"),
-    status: Optional[str] = Query(default=None, description="Filter by application status"),
+    status: Optional[str] = Query(
+        default=None, description="Filter by application status"
+    ),
     min_score: int = Query(default=0, ge=0, le=100, description="Minimum match score"),
     page: int = Query(default=1, ge=1, description="Page number"),
     pageSize: int = Query(default=50, ge=1, le=500, description="Items per page"),
-    page_size: Optional[int] = Query(default=None, ge=1, le=500, description="Alias for pageSize"),
+    page_size: Optional[int] = Query(
+        default=None, ge=1, le=500, description="Alias for pageSize"
+    ),
     repo: JobRepository = Depends(get_repo),
 ) -> Dict[str, Any]:
     """Retrieve filtered and paginated job opportunities."""
@@ -74,7 +82,13 @@ async def get_job_description(
     if not job and url:
         jobs = repo.list_jobs()
         job = next(
-            (j for j in jobs if j.get("portalLink") == url or j.get("url") == url or j.get("link") == url),
+            (
+                j
+                for j in jobs
+                if j.get("portalLink") == url
+                or j.get("url") == url
+                or j.get("link") == url
+            ),
             None,
         )
 
@@ -111,3 +125,101 @@ async def verify_batch_jobs(payload: BatchVerifyRequest) -> Dict[str, Any]:
         "results": results,
     }
 
+
+def get_current_user_id_or_default(
+    authorization: Optional[str] = Header(default=None),
+    x_user_id: Optional[str] = Header(default=None, alias="X-User-Id"),
+    user_id: Optional[str] = Query(default=None),
+    demo: Optional[str] = Query(default=None),
+) -> str:
+    """Resolve user ID from headers/query or default to 'default_user'."""
+    if x_user_id:
+        return x_user_id.strip()
+    if user_id:
+        return user_id.strip()
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ", 1)[1].strip()
+        payload = decode_token(token)
+        if payload and "sub" in payload:
+            return str(payload["sub"])
+    if demo == "true":
+        return "demo_user"
+    return "default_user"
+
+
+class JobEventRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    expected_version: int
+    event_type: str
+    new_macro_stage: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
+    payload_json: Optional[str] = None
+    event_id: Optional[str] = None
+
+
+@router.patch("/api/v1/jobs/{job_id}/events")
+@router.patch("/api/applications/{job_id}/events")
+async def patch_job_event(
+    job_id: str,
+    payload: JobEventRequest,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    user_id: str = Depends(get_current_user_id_or_default),
+    repo: JobRepository = Depends(get_repo),
+) -> Any:
+    """Dispatch state mutation event with optimistic concurrency control and idempotency."""
+    p_json = payload.payload_json
+    if not p_json:
+        p_json = json.dumps(payload.payload) if payload.payload is not None else "{}"
+
+    event_id = payload.event_id or str(uuid.uuid4())
+
+    try:
+        updated_app, new_event = repo.dispatch_application_event(
+            user_id=user_id,
+            job_id=job_id,
+            event_id=event_id,
+            event_type=payload.event_type,
+            expected_version=payload.expected_version,
+            new_macro_stage=payload.new_macro_stage,
+            payload_json=p_json,
+            idempotency_key=idempotency_key,
+        )
+        return {
+            "success": True,
+            "application": updated_app,
+            "event": new_event,
+        }
+    except ValueError as e:
+        msg = str(e)
+        if "conflict" in msg.lower():
+            app = repo.get_user_application(user_id, job_id)
+            current_ver = app.get("version") if app else None
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "detail": msg,
+                    "error": msg,
+                    "current_version": current_ver,
+                },
+            )
+        elif "not found" in msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=msg,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=msg,
+        )
+
+
+@router.get("/api/v1/jobs/{job_id}/events")
+async def get_job_events(
+    job_id: str,
+    user_id: str = Depends(get_current_user_id_or_default),
+    repo: JobRepository = Depends(get_repo),
+) -> Dict[str, Any]:
+    """Retrieve audit timeline events for a job."""
+    events = repo.get_application_events(user_id, job_id)
+    return {"success": True, "job_id": job_id, "events": events}

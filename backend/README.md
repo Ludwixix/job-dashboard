@@ -7,25 +7,32 @@ A comprehensive, commercial-ready, and AI-powered job application system. This p
 The project is structured into robust, decoupled modules:
 
 - **job-dashboard-modular (Backend Core)**:
-  - `models.py`: Stable data contracts (`Job`, `ApplicationRecord`).
+  - `models.py` & `orm_models.py`: Stable data contracts (`Job`, `ApplicationRecord`) and SQLAlchemy 2.0 ORM models with version-based Optimistic Concurrency Control (OCC).
+  - `state_machine.py`: Two-tier Finite State Machine (`MacroStage` [LEAD, SAVED, APPLIED, INTERVIEWING, OFFER, CLOSED] + 11 `MicroEvent` operational transitions).
   - `score.py` & `classify.py`: Calculates fit dimensions and skill gaps from the candidate's actual profile (`coreSkills`, any industry — not a fixed IT-only taxonomy), and categorizes jobs (e.g. `core-it`, `bridge`).
-  - `sources.py`: Multi-source scraping adapters (Seek, Indeed, LinkedIn, Adzuna, RemoteOK) with rate-limiting, per-query caching, and fallbacks. Provider-relative dates are converted to absolute capture-time dates, and `is_recent()` excludes jobs with a missing/unparseable posted date rather than assuming they're fresh.
+  - `sources/`: Multi-source scraping adapters (Seek, Indeed, LinkedIn, Adzuna, RemoteOK, **Jora Australia**) with:
+    - **Anti-403 Scraping Resilience**: Modern Chromium Client Hints alignment (`get_stealth_headers`), persistent cookie-jar sessions (`ResilientScrapeSession`), human-like polite jitter, and thread-safe domain cooldown circuit breakers (`DomainCooldownTracker`).
+    - **Apify Platform Fallback**: Configurable per-portal Apify actors (`memo23/jora-search-cheerio-ppr`, `automation-lab/seek-scraper`, `misceres/indeed-scraper`, `curious_coder/linkedin-job-search-scraper`, `apify/web-scraper`).
   - `seek_cache_ingest.py`: Maintained SEEK cache importer. Validates title/company/URL/description/date, rejects stale or badge-only dates such as `Featured`, deduplicates, and atomically writes `data/seek_cache.json` for fallback ingestion when SEEK returns HTTP 403 or is otherwise unavailable.
   - `health.py`: Persists per-source scrape outcomes (success/degraded/unhealthy, job counts, last error) to SQLite so refresh history survives restarts; exposed via `/api/source-health`.
   - `gcs_backup.py`: Restores the local SQLite job index from a GCS bucket on startup and backs it up after every successful refresh, since Cloud Run's container filesystem is ephemeral.
-  - `applications.py` / `repository.py`: SQLite WAL persistence for jobs, per-user applications, saved searches, and reminders.
-  - `web.py` / `run_server.py`: HTTP API layer integrating Auth, LLM document generation, persistence, and a background sync loop (`JOB_DASHBOARD_SYNC_INTERVAL_SECONDS`, default 30 min) that keeps the index fresh independent of any browser session. Public `GET /api/jobs` reads from the SQLite index, excludes Gmail workflow records and unverifiable dates, and sorts by parsed posting time.
+  - `applications.py` / `repository.py`: SQLite WAL persistence for jobs, per-user applications with `macro_stage` and `version`, saved searches, reminders, and idempotent micro-events (`user_application_events`).
+  - `web.py` / `run_server.py`: HTTP API layer supporting `GET`, `POST`, `PATCH`, `DELETE`, integrating Auth, LLM document generation, persistence, and a background sync loop (`JOB_DASHBOARD_SYNC_INTERVAL_SECONDS`, default 30 min) that keeps the index fresh independent of any browser session. Public `GET /api/jobs` reads from the SQLite index, excludes Gmail workflow records and unverifiable dates, and sorts by parsed posting time.
 
 - **job-dashboard-react (Frontend SPA)**:
   - **Job Cards V2**: Scannable, highly-optimized job cards with an honest "posted X days ago" badge (`src/utils/dateUtils.js` — unknown/unparseable dates are never shown as "posted today").
   - **Application Studio**: Expandable deep-dive view with the real scraped job description (formatted, scrollable, complete), a robust FIT Audit, and real-time synchronized PDF editors.
   - **Career Operations**: Saved search profiles, application reminders, per-job fit explanations, and live scraper source-health, all driven by the backend endpoints below.
+  - **Scrapers & Apify Hub**: User-scoped portal configuration supporting Seek, Indeed, LinkedIn, Adzuna, and Jora with 1-click fallback and custom actor selection.
   - **Enterprise Resilience**: Safe Error Boundaries prevent full-app crashes, backed by safe local storage wrappers.
   - **Smart Profile**: Auto-synthesizes user profiles via resume upload/parsing; saving a profile pushes personalized search queries to the backend (`/api/search-criteria`) and seeds ranking preferences before the next discovery scrape runs.
 
-## ✨ V2.0 Commercial Enhancements
+## ✨ V2.0 Commercial & V3 Architecture Enhancements
 
 - **SQLite WAL Persistence + GCS Backup**: Jobs, applications, saved searches, and reminders persist in a SQLite WAL database, backed up to GCS so the index survives Cloud Run cold starts and redeploys instead of resetting to the container image's baked-in snapshot.
+- **Two-Tier State Machine & OCC**: High-velocity application tracking with versioned Optimistic Concurrency Control, idempotent micro-events (`PATCH /api/v1/jobs/{id}/events`), and HTTP 409 collision prevention.
+- **Anti-403 Scraper Resilience Engine**: Eliminates WAF/Cloudflare blocks with Client Hints, persistent sessions, polite jitter, and automatic failover to Apify residential proxies.
+- **Jora Australia Aggregator Ingestion**: Native + Apify scraping support for Jora (`au.jora.com`), cross-referencing employer ATS postings.
 - **Live PDF Document Sync**: Backend API endpoints orchestrate real-time updates from frontend debounced editors straight into dynamically generated PDFs.
 - **Smart Portal Resolution**: Auto-Apply routing resolves complex scraping links to guarantee accurate application portal handoffs.
 - **Cloud Run Native**: Unified Dockerfile configuration serving both the Python backend and pre-compiled static Vite frontend assets in a single Google Cloud Run deployment.
@@ -38,6 +45,9 @@ The project is structured into robust, decoupled modules:
 |---|---|
 | `GET /api/jobs` | Paginated job index (the source of truth the frontend renders from) |
 | `POST /api/refresh`, `GET/POST /api/scrape/stream` | Trigger a scrape; both are cache-aware (`ttl_hours`, default 12h) and persist results |
+| `GET/POST /api/scrapers/config` | Retrieve or update user-scoped Apify and scraper portal settings (Seek, Indeed, LinkedIn, Adzuna, Jora) |
+| `POST /api/scrapers/apify/test` | Validate Apify API token against official Apify endpoints |
+| `PATCH /api/v1/jobs/{job_id}/events` | Idempotent state machine mutation with version-based OCC conflict handling (HTTP 409) |
 | `POST /api/search-criteria` | Replace the backend's active scrape queries (used for profile-driven personalization) |
 | `GET /api/source-health` | Per-source scrape health history (success/degraded, job counts, last error) |
 | `GET/POST /api/saved-searches` | User-scoped saved search profiles |

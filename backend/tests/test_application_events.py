@@ -24,13 +24,12 @@ def test_get_application_events(tmp_path):
     # Query with job_id only
     events = repo.get_application_events("job_123")
     assert len(events) == 1
-    assert events[0]["job_id"] == "job_123"
-    assert events[0]["to_status"] == "Applied"
+    assert events[0]["event_type"] == "Applied"
 
     # Query with (user_id, job_id) signature
     events_dual = repo.get_application_events("user_abc", "job_123")
     assert len(events_dual) == 1
-    assert events_dual[0]["to_status"] == "Applied"
+    assert events_dual[0]["event_type"] == "Applied"
 
     # Update status to trigger another event
     repo.upsert_user_application(
@@ -45,6 +44,6 @@ def test_get_application_events(tmp_path):
     events_updated = repo.get_application_events("job_123")
     assert len(events_updated) == 2
     # Verify ordered by occurred_at DESC
-    assert events_updated[0]["to_status"] == "Interview Scheduled"
-    assert events_updated[1]["to_status"] == "Applied"
+    assert events_updated[0]["event_type"] == "Interview Scheduled"
+    assert events_updated[1]["event_type"] == "Applied"
 

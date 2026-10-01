@@ -12,6 +12,7 @@ from .sources import (
     ApifySeekFallbackSource,
     IndeedJobSpySource,
     JobSource,
+    JoraSource,
     LinkedInBrowserSource,
     RemoteOkApiSource,
     ScrapePipeline,
@@ -60,6 +61,10 @@ def build_sources(names: list[str]) -> list[JobSource]:
             api_key=settings.adzuna_api_key,
         ),
         "remoteok": RemoteOkApiSource,
+        "jora": lambda: JoraSource(
+            proxy=settings.proxy_url,
+            apify_token=settings.apify_api_token,
+        ),
     }
     unknown = sorted(set(names) - set(factories))
     if unknown:

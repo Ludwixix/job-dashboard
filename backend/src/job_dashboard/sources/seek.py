@@ -29,6 +29,7 @@ from .browser import (
     wait_for_challenge_clearance,
 )
 from .proxy import ProxyRotator
+from .resilience import get_stealth_headers
 
 logger = get_logger("job_dashboard.sources.seek")
 
@@ -243,14 +244,18 @@ class SeekApiSource:
                     "sortmode": "ListedDate",
                 }
             )
-            request = urllib.request.Request(
-                f"{self.endpoint}?{params}",
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36",
+            req_headers = get_stealth_headers(
+                domain="chalice-search-api.cloud.seek.com.au", as_xhr=True
+            )
+            req_headers.update(
+                {
                     "Referer": "https://www.seek.com.au/",
                     "Origin": "https://www.seek.com.au",
-                },
+                }
+            )
+            request = urllib.request.Request(
+                f"{self.endpoint}?{params}",
+                headers=req_headers,
             )
             payload = self._request_json(request, proxy_url=proxy_url)
             if not isinstance(payload, Mapping):

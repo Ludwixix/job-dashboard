@@ -1,128 +1,119 @@
-# Test Infrastructure: "Sam Mode" Personal Career Command Center
+# Test Infrastructure Specification: Job Dashboard Priority Action Queue
 
-## 1. Overview & Architecture
-This document details the test infrastructure for the "Sam Mode" Personal Career Command Center in the Job Dashboard repository (`/home/s/.openclaw/workspace/job-dashboard`).
-
-The test suite is built on **opaque-box, requirement-driven principles**:
-- The tests interact with the application strictly as an external client / HTTP API consumer would, dispatching HTTP requests (`GET`, `POST`) and asserting on HTTP status codes, headers, and JSON response bodies.
-- All test fixtures are **self-contained and isolated**: each test run spins up a temporary SQLite database, loads the canonical profile (`backend/data/job_profile.json`), seeds deterministic test vacancies, and cleans up completely after execution.
-- No database pollution, no dependency on external live job boards, and zero coupling to internal private method names.
+**Revision**: 3.1.0  
+**Target System**: Australian Job Dashboard (`job-dashboard`)  
+**Scope**: Two-Tier State Machine, OCC Concurrency, Idempotency, and Keyboard-First Triage Feed  
+**Author**: E2E Acceptance Test Suite Writer  
 
 ---
 
-## 2. 4-Tier Test Design Matrix
+## 1. Overview & Test Runners
 
-The test suite in `tests/e2e/test_career_mode_e2e.py` implements a 4-Tier verification gauntlet:
+The testing infrastructure spans two coordinated test runners across backend and frontend:
 
-| Tier | Test Focus | Description | Tests |
-|---|---|---|---|
-| **Tier 1** | **Feature Coverage** | Direct verification of every requirement in `ORIGINAL_REQUEST.md` (2026-09-24T09:20:05Z) and `PROJECT.md`: HUD overview, match breakdown chips, 8 archetype filters, hard knockouts, and 1-click tailored application studio. | 5 |
-| **Tier 2** | **Boundary & Corner Cases** | Stress testing edge conditions: missing/None salary, malformed salary strings (daily contractor rates `$900/day`, hourly rates `$85/hr`, text-only packages), zero-match queries, clearance ambiguities (Baseline/NV1 vs TSPV), and extreme experience. | 5 |
-| **Tier 3** | **Cross-Feature Combinations** | Multi-parameter pairwise interactions: filtering by archetype + salary floor + remote work arrangement; generating application materials on filtered subsets; real-time scraper telemetry reflection in cockpit overview. | 4 |
-| **Tier 4** | **Real-World Scenarios** | Holistic end-to-end user workflows: (A) Sam reviewing a Victorian Dept of Education equivalent enterprise role and generating STAR KSC + cover letter; (B) Rejection and exclusion of underpaid role; (C) Commute and local alignment for hybrid Melbourne SE / Balaclava role. | 3 |
-| **Total** | | **Comprehensive E2E Suite** | **17** |
+| Component | Framework | Config File | Execution Root | Test Files |
+|-----------|-----------|-------------|----------------|------------|
+| **Backend** | `pytest>=9.1` | `backend/pyproject.toml` | `backend/` | `tests/e2e/test_tier*.py` |
+| **Frontend** | `vitest>=4.1` | `frontend/vitest.config.js` | `frontend/` | `src/__tests__/e2e_*.test.jsx` |
 
----
-
-## 3. Test Cases Inventory
-
-### Tier 1: Feature Coverage (`TestTier1FeatureCoverage`)
-1. `test_hud_overview_endpoint_contract`:
-   - Validates `GET /api/career-mode/overview`.
-   - Asserts profile data (Sam Ludwig, 10 YOE, Australian Citizen, Baseline/NV1 eligible, $140k-$165k + Super, $120k floor, Balaclava 3183, all 8 canonical target titles).
-   - Asserts telemetry metrics (`last_scraped_at`, `new_vacancies_today`, `feed_health`, `total_matching_jobs`, `high_alignment_jobs`).
-   - Asserts vacancy counts across all 8 target archetypes.
-2. `test_match_breakdown_chips_structure`:
-   - Validates `GET /api/career-mode/matches`.
-   - Asserts presence of instant match breakdown chips (`M365 & Entra ID: 100%`, `Autopilot/Intune: Match`, `Salary: In Range`, `Clearance: Ready`).
-   - Asserts composite Justification Score (>= 80) and Proof-Point synthesis referencing Sam's 660,000+ user enterprise milestone at Dept of Education VIC.
-3. `test_eight_archetype_filters`:
-   - Validates filtering across all 8 target roles:
-     1. Senior Systems Engineer
-     2. Senior Infrastructure Engineer
-     3. Senior M365 Engineer
-     4. Cloud Infrastructure Specialist
-     5. Endpoint / EUC Engineer
-     6. L3 Systems / Operations Lead
-     7. SharePoint & Modern Workplace Architect
-     8. Automation & DevOps Engineer
-4. `test_hard_knockouts_enforcement`:
-   - Validates hard knockout rules across salary floor (< $120k), clearance (strict TSPV), work rights (US Citizen only), and location (Perth on-site).
-   - Validates **ZERO false knockouts** on Australian Citizenship and Baseline/NV1 security clearance requirements.
-5. `test_one_click_application_studio_contract`:
-   - Validates `POST /api/career-mode/application-studio`.
-   - Asserts generation of structured STAR KSC responses grounded in Sam's real enterprise history.
-   - Asserts tailored executive cover letter.
-   - Asserts ATS resume optimization summary (score, matched keywords, tailored summary).
-
-### Tier 2: Boundary & Corner Cases (`TestTier2BoundaryAndCornerCases`)
-6. `test_missing_and_none_salary_graceful_handling`:
-   - Omitted, empty, or `None` salary values do not throw HTTP 500 and pass permissively without false knockouts.
-7. `test_malformed_salary_strings_resilience`:
-   - Daily rate `$850 - $950 per day` annualized to ~$190k-$210k (passes $120k floor).
-   - Daily rate `$350 / day` annualized to ~$80k (fails $120k floor).
-   - Hourly rate `$85 / hr` annualized to ~$170k (passes $120k floor).
-   - Text strings ("Competitive package") handled gracefully without crash.
-   - Boundary checks: `$119,000` (fails floor) vs `$120,000` (passes floor).
-8. `test_zero_match_query_resilience`:
-   - Impossible query parameters return `{"total": 0, "jobs": []}` with HTTP 200 OK.
-9. `test_clearance_and_citizenship_edge_cases`:
-   - "Eligible to obtain Baseline clearance" -> PASS.
-   - "Negative Vetting 1 (NV1) mandatory" -> PASS.
-   - "Active TSPV mandatory" -> KNOCKOUT.
-10. `test_extreme_seniority_and_experience_filtering`:
-    - Entry-level / graduate intern positions receive low justification score and are excluded from the high-alignment feed.
-
-### Tier 3: Cross-Feature Combinations (`TestTier3CrossFeatureCombinations`)
-11. `test_archetype_salary_floor_and_remote_combination`:
-    - Compound filtering (`archetype` + `min_score` + `remote_only`) enforces all constraints conjunctively.
-12. `test_application_generation_on_filtered_jobs`:
-    - Jobs discovered via filtered feed seamlessly feed into the Application Studio generator.
-13. `test_scraper_telemetry_integrated_in_hud_overview`:
-    - Database job additions immediately update HUD vacancy counts.
-14. `test_batch_evaluate_reflected_in_matches_feed`:
-    - Batch evaluation via `POST /api/career-mode/evaluate` updates staged cache and feed scores.
-
-### Tier 4: Real-World Scenarios (`TestTier4RealWorldScenarios`)
-15. `test_scenario_dept_of_ed_vic_enterprise_workflow`:
-    - Sam checks HUD, discovers high-alignment Victorian public sector role, validates 660,000+ user proof points and match chips, and generates 1-click STAR KSC + executive cover letter.
-16. `test_scenario_low_salary_rejection`:
-    - An underpaid $85,000 Desktop Support role is evaluated, flagged as failing the $120,000 salary floor, and excluded from recommended feeds.
-17. `test_scenario_hybrid_melbourne_balaclava_alignment`:
-    - A hybrid role in Balaclava / Melbourne SE is evaluated, matching commute preferences with `location_pass: True`.
+Both runners operate with zero external cloud dependencies using local ephemeral SQLite databases (`jobs.sqlite3` with WAL mode) and JSDOM environments.
 
 ---
 
-## 4. How to Execute Tests
+## 2. Four-Tier Test Architecture
 
-### From Repository Root:
-```bash
-# Run the entire E2E test suite
-python3 -m pytest tests/e2e/test_career_mode_e2e.py -v
+The E2E acceptance suite is systematically organized into four distinct tiers:
 
-# Run a specific tier
-python3 -m pytest tests/e2e/test_career_mode_e2e.py -k "TestTier1" -v
-python3 -m pytest tests/e2e/test_career_mode_e2e.py -k "TestTier2" -v
-python3 -m pytest tests/e2e/test_career_mode_e2e.py -k "TestTier3" -v
-python3 -m pytest tests/e2e/test_career_mode_e2e.py -k "TestTier4" -v
 ```
-
-### From Backend Directory:
-```bash
-cd backend && python3 -m pytest tests/test_career_mode_e2e.py -v
-```
-
-### Linting:
-```bash
-ruff check tests/e2e/test_career_mode_e2e.py
+┌────────────────────────────────────────────────────────────────────────┐
+│ Tier 4: Real-World Scenarios                                           │
+│   • Full recruitment lifecycle (LEAD -> SAVED -> APPLIED -> OFFER)     │
+│   • Multi-tab concurrent triage conflict detection & recovery          │
+│   • Interactive triage session with mixed operations & error recovery  │
+├────────────────────────────────────────────────────────────────────────┤
+│ Tier 3: Cross-Feature Combinations & Concurrency                       │
+│   • Concurrent identical PATCH requests (Same Idempotency-Key)         │
+│   • Concurrent racing updates (Expected Version 1 vs 1)                │
+│   • Rapid version ladder chaining (v1 -> v2 -> v3 -> v4 -> v5)         │
+│   • Instant UI optimistic update (<16ms) with simulated network delay  │
+├────────────────────────────────────────────────────────────────────────┤
+│ Tier 2: Boundary & Corner Cases                                        │
+│   • Stale update OCC conflict (expected=1, current=2) -> HTTP 409      │
+│   • Future version mismatch (expected=99, current=1) -> HTTP 409       │
+│   • Missing expected_version or event_type -> HTTP 400 Bad Request     │
+│   • Case-insensitive Idempotency-Key header recognition                │
+│   • Upper/lower bounds clamping (index 0 and length-1)                 │
+│   • Input element typing isolation guard (input/textarea)              │
+├────────────────────────────────────────────────────────────────────────┤
+│ Tier 1: Feature Coverage (Isolated Happy Path)                         │
+│   • Two-tier FSM transition rules                                      │
+│   • Single valid PATCH event progression & version increment           │
+│   • Idempotent single repetition returns cached 200 without version hop│
+│   • Audit trail timeline reflection                                    │
+│   • Keyboard navigation hotkeys: 'j', 'k', 'e', 's', 'g', 'c'          │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Test Infrastructure Components
-- **Test File**: `tests/e2e/test_career_mode_e2e.py`
-- **Aliases / Symlinks**:
-  - `tests/e2e/test_career_mode_cockpit_e2e.py -> test_career_mode_e2e.py`
-  - `backend/tests/test_career_mode_e2e.py -> ../../tests/e2e/test_career_mode_e2e.py`
-- **Client**: `CareerModeE2EClient` wrapping `make_handler(app)`
-- **Fixture**: `e2e_env` provisioning isolated temporary SQLite database and seeding 15+ diverse job listings covering all edge and pass conditions.
+## 3. Strict Acceptance Thresholds & Invariants
+
+### 3.1 Backend Concurrency & Idempotency Invariants
+1. **Zero 500 Errors Under Concurrency**:
+   - When $N \ge 10$ concurrent threads issue identical `PATCH /api/v1/jobs/{id}/events` requests with the same `Idempotency-Key`, **exactly 0 requests may fail with HTTP 500**.
+   - Exactly one event record must be written to `user_application_events`.
+   - The application `version` must increment exactly once ($1 \to 2$).
+2. **Deterministic OCC Version Conflict (HTTP 409)**:
+   - Any state mutation where `expected_version != current_version` must return `HTTP 409 Conflict`.
+   - The error response must include diagnostic conflict details and the `current_version`.
+3. **FSM Legality Guarantee**:
+   - Applications in terminal stages (`CLOSED`) strictly reject subsequent events.
+   - Prohibited transition leaps (e.g. `LEAD` straight to `OFFER_ACCEPTED`) are rejected.
+
+### 3.2 Frontend Latency & UX Invariants
+1. **Sub-16ms Optimistic UI Progression**:
+   - When a candidate triggers the primary Next Best Action (via `e` or click), the stage change in the UI must execute synchronously in **$< 16\text{ms}$** (within a single 60Hz display frame) before network I/O completes.
+2. **Automatic Rollback & Toast on Network Failure**:
+   - If simulated network requests fail (e.g. 500 error or network disconnection), the UI must instantly revert the item to its previous state and fire an error toast notification.
+3. **Automatic Rollback & Toast on 409 Conflict**:
+   - If the backend returns `409 Conflict`, the UI must revert optimistic changes and alert the user that the item was modified elsewhere.
+4. **Keystroke Isolation Guard**:
+   - Keystrokes (`j`, `k`, `e`, `s`, `g`, `c`) must be strictly ignored when the active element is an `<input>`, `<textarea>`, `<select>`, or `contentEditable` element.
+
+---
+
+## 4. Test Execution Guide
+
+### 4.1 Running the Backend Acceptance Suite
+
+```bash
+# Navigate to backend package
+cd /home/s/.openclaw/workspace/job-dashboard/backend
+
+# Run full E2E test suite (all 4 tiers)
+python3 -m pytest tests/e2e/ -v
+
+# Run individual tiers
+python3 -m pytest tests/e2e/test_tier1_features.py -v
+python3 -m pytest tests/e2e/test_tier2_boundaries.py -v
+python3 -m pytest tests/e2e/test_tier3_combinations.py -v
+python3 -m pytest tests/e2e/test_tier4_scenarios.py -v
+```
+
+### 4.2 Running the Frontend Acceptance Suite
+
+```bash
+# Navigate to frontend package
+cd /home/s/.openclaw/workspace/job-dashboard/frontend
+
+# Run full frontend E2E triage suite
+npm test -- --run src/__tests__/e2e_triage_feed.test.jsx
+```
+
+### 4.3 Running Combined Verification
+
+```bash
+# Run both backend and frontend E2E suites sequentially
+(cd /home/s/.openclaw/workspace/job-dashboard/backend && python3 -m pytest tests/e2e/ -v) && \
+(cd /home/s/.openclaw/workspace/job-dashboard/frontend && npm test -- --run src/__tests__/e2e_triage_feed.test.jsx)
+```

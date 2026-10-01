@@ -16,6 +16,7 @@ export const DEFAULT_APIFY_ACTORS = {
   indeed: 'misceres/indeed-scraper',
   linkedin: 'curious_coder/linkedin-job-search-scraper',
   adzuna: 'apify/web-scraper',
+  jora: 'memo23/jora-search-cheerio-ppr',
 };
 
 /**
@@ -60,6 +61,12 @@ export const DEFAULT_SCRAPER_SETTINGS = {
       enabled: false,
       mode: 'fallback',
       actor_id: 'apify/web-scraper',
+      max_results: 20,
+    },
+    jora: {
+      enabled: false,
+      mode: 'primary',
+      actor_id: 'memo23/jora-search-cheerio-ppr',
       max_results: 20,
     },
   },

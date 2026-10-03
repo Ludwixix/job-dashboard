@@ -149,12 +149,31 @@ def verify_job_url(url: str, force: bool = False) -> Dict[str, Any]:
         _VERIFY_CACHE[clean_url] = result
         return result
 
+import concurrent.futures
+
 def verify_job_urls(urls: List[str], force: bool = False) -> Dict[str, Dict[str, Any]]:
     """
-    Batch verify a list of job URLs.
+    Batch verify a list of job URLs concurrently.
     """
     results = {}
-    for u in (urls or [])[:50]:  # Limit to 50 per batch
-        if u:
-            results[u] = verify_job_url(u, force=force)
+    valid_urls = [u for u in (urls or [])[:50] if u]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_url = {
+            executor.submit(verify_job_url, u, force=force): u for u in valid_urls
+        }
+        for future in concurrent.futures.as_completed(future_to_url):
+            u = future_to_url[future]
+            try:
+                results[u] = future.result()
+            except Exception as e:
+                results[u] = {
+                    "url": u,
+                    "is_valid": False,
+                    "is_expired": True,
+                    "status_code": 0,
+                    "reason": f"Concurrent execution error: {str(e)}",
+                    "timestamp": time.time()
+                }
+
     return results

@@ -153,6 +153,32 @@ def get_security() -> SecurityManager:
     return _security
 
 
+def validate_password_complexity(password: str) -> tuple[bool, str]:
+    """
+    Validates password complexity:
+    - At least 8 characters
+    - At least one uppercase letter [A-Z]
+    - At least one lowercase letter [a-z]
+    - At least one numeric digit [0-9]
+    - At least one special character / symbol
+    """
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not any(c.isupper() for c in password):
+        return False, "Password must include at least one uppercase letter (A-Z)."
+    if not any(c.islower() for c in password):
+        return False, "Password must include at least one lowercase letter (a-z)."
+    if not any(c.isdigit() for c in password):
+        return False, "Password must include at least one number (0-9)."
+    special_chars = set("!@#$%^&*()_+-=[]{};':\"|,.<>/?~`")
+    if not any(c in special_chars for c in password):
+        return (
+            False,
+            "Password must include at least one special character (!@#$%^&* etc.).",
+        )
+    return True, ""
+
+
 def create_access_token(data: dict, expires_hours: int = 24) -> str:
     """Create a signed JWT access token."""
     sec = get_security()

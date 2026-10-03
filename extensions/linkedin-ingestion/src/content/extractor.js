@@ -150,6 +150,7 @@ export function parseRelativeDate(text, now = new Date()) {
   if (daysMatch) {
     const days = parseInt(daysMatch[1], 10);
     const d = new Date(now.getTime() - days * 86400000);
+    if (Number.isNaN(d.getTime())) return now.toISOString().split('T')[0];
     return d.toISOString().split('T')[0];
   }
 
@@ -157,6 +158,7 @@ export function parseRelativeDate(text, now = new Date()) {
   if (weeksMatch) {
     const weeks = parseInt(weeksMatch[1], 10);
     const d = new Date(now.getTime() - weeks * 7 * 86400000);
+    if (Number.isNaN(d.getTime())) return now.toISOString().split('T')[0];
     return d.toISOString().split('T')[0];
   }
 
@@ -164,6 +166,7 @@ export function parseRelativeDate(text, now = new Date()) {
   if (monthsMatch) {
     const months = parseInt(monthsMatch[1], 10);
     const d = new Date(now.getTime() - months * 30 * 86400000);
+    if (Number.isNaN(d.getTime())) return now.toISOString().split('T')[0];
     return d.toISOString().split('T')[0];
   }
 

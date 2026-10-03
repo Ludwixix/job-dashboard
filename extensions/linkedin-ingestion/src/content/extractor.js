@@ -150,21 +150,21 @@ export function parseRelativeDate(text, now = new Date()) {
   if (daysMatch) {
     const days = parseInt(daysMatch[1], 10);
     const d = new Date(now.getTime() - days * 86400000);
-    return d.toISOString().split('T')[0];
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
   const weeksMatch = cleaned.match(/(\d+)\s+week/);
   if (weeksMatch) {
     const weeks = parseInt(weeksMatch[1], 10);
     const d = new Date(now.getTime() - weeks * 7 * 86400000);
-    return d.toISOString().split('T')[0];
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
   const monthsMatch = cleaned.match(/(\d+)\s+month/);
   if (monthsMatch) {
     const months = parseInt(monthsMatch[1], 10);
     const d = new Date(now.getTime() - months * 30 * 86400000);
-    return d.toISOString().split('T')[0];
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
   return now.toISOString().split('T')[0];

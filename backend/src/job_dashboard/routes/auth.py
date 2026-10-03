@@ -137,8 +137,9 @@ def handle_get_session(handler):
         if not user_profile and user_email:
             user_profile = app.repository.get_user_profile(user_email) or {}
         has_profile = _is_valid_profile(user_profile)
-        email_verified = False
-        if user_id:
+        email_verified = payload.get("email_verified")
+        if email_verified is not True and user_id:
+            email_verified = False
             try:
                 with app.db.get_connection() as conn:
                     cur = conn.cursor()
@@ -151,6 +152,8 @@ def handle_get_session(handler):
                         email_verified = True
             except Exception:
                 pass
+
+        email_verified = bool(email_verified)
 
         handler.send_json(
             200,
@@ -231,6 +234,7 @@ def handle_register(handler):
         "sub": user_id,
         "email": email,
         "name": name,
+        "email_verified": False,
         "exp": datetime.datetime.now(timezone.utc)
         + datetime.timedelta(hours=expiry_hours),
     }
@@ -453,6 +457,7 @@ def handle_login(handler):
         "sub": user_id,
         "email": email,
         "name": name,
+        "email_verified": email_verified,
         "exp": datetime.datetime.now(timezone.utc)
         + datetime.timedelta(hours=expiry_hours),
     }
@@ -498,6 +503,7 @@ def handle_passcode_login(handler):
         "sub": user_id,
         "email": email,
         "name": name,
+        "email_verified": True,
         "exp": datetime.datetime.now(timezone.utc)
         + datetime.timedelta(hours=expiry_hours),
     }
@@ -606,6 +612,7 @@ def handle_google_auth(handler):
             "sub": user_id,
             "email": email,
             "name": name,
+            "email_verified": True,
             "exp": datetime.datetime.now(timezone.utc) + datetime.timedelta(days=7),
         },
         jwt_secret,
@@ -747,6 +754,7 @@ def handle_passkey_login(handler):
             "sub": user_id,
             "email": email,
             "name": name,
+            "email_verified": True,
             "exp": now + datetime.timedelta(days=7),
         },
         jwt_secret,

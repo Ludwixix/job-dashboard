@@ -7,7 +7,6 @@ import io
 import json
 import mimetypes
 import os
-import random
 
 import time
 

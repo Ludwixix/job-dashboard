@@ -111,3 +111,18 @@ def test_system_metrics_route(client):
     assert "memory_rss_mb" in data["runtime"]
     assert "database" in data
     assert data["database"]["healthy"] is True
+
+def test_get_query_params_error_path(monkeypatch):
+    import job_dashboard.router as router
+
+    class MockHandler:
+        path = "/api/jobs?pageSize=10"
+
+    def mock_urlparse(*args, **kwargs):
+        raise Exception("Mocked exception in urlparse")
+
+    monkeypatch.setattr(router, "urlparse", mock_urlparse)
+
+    handler = MockHandler()
+    params = router.get_query_params(handler)
+    assert params == {}

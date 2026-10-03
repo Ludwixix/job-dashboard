@@ -29,6 +29,10 @@ PyJWT==2.8.0
 # Persistent index backup/restore (Cloud Run filesystem is ephemeral)
 google-cloud-storage>=2.13.0
 
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+
 # FastAPI, async engine, sanitization
 fastapi>=0.110.0
 uvicorn>=0.28.0

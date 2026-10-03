@@ -7,7 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from job_dashboard.repository import JobRepository
-from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
+import jwt
+from job_dashboard.web import JWT_SECRET, DashboardApp, make_handler
 
 @pytest.fixture
 def test_app_and_handler(tmp_path):

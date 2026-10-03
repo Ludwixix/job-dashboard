@@ -6,7 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from job_dashboard.repository import JobRepository
-from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
+import jwt
+from job_dashboard.web import JWT_SECRET, DashboardApp, make_handler
 from job_dashboard.models import Job
 
 

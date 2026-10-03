@@ -146,28 +146,46 @@ export function parseRelativeDate(text, now = new Date()) {
     return now.toISOString().split('T')[0];
   }
 
-  const daysMatch = cleaned.match(/(\d+)\s+day/);
-  if (daysMatch) {
-    const days = parseInt(daysMatch[1], 10);
-    const d = new Date(now.getTime() - days * 86400000);
-    return d.toISOString().split('T')[0];
+  try {
+    const daysMatch = cleaned.match(/(\d+)\s+day/);
+    if (daysMatch) {
+      const days = parseInt(daysMatch[1], 10);
+      const d = new Date(now.getTime() - days * 86400000);
+      if (!Number.isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    }
+
+    const weeksMatch = cleaned.match(/(\d+)\s+week/);
+    if (weeksMatch) {
+      const weeks = parseInt(weeksMatch[1], 10);
+      const d = new Date(now.getTime() - weeks * 7 * 86400000);
+      if (!Number.isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    }
+
+    const monthsMatch = cleaned.match(/(\d+)\s+month/);
+    if (monthsMatch) {
+      const months = parseInt(monthsMatch[1], 10);
+      const d = new Date(now.getTime() - months * 30 * 86400000);
+      if (!Number.isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    }
+  } catch (e) {
+    // Ignore and fallback to now
   }
 
-  const weeksMatch = cleaned.match(/(\d+)\s+week/);
-  if (weeksMatch) {
-    const weeks = parseInt(weeksMatch[1], 10);
-    const d = new Date(now.getTime() - weeks * 7 * 86400000);
-    return d.toISOString().split('T')[0];
+  try {
+    if (!Number.isNaN(now.getTime())) {
+      return now.toISOString().split('T')[0];
+    }
+  } catch (e) {
+    // Ignore and fallback to a default valid date string
   }
 
-  const monthsMatch = cleaned.match(/(\d+)\s+month/);
-  if (monthsMatch) {
-    const months = parseInt(monthsMatch[1], 10);
-    const d = new Date(now.getTime() - months * 30 * 86400000);
-    return d.toISOString().split('T')[0];
-  }
-
-  return now.toISOString().split('T')[0];
+  return '1970-01-01'; // Fallback if everything is invalid
 }
 
 /**

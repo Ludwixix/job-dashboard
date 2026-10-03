@@ -236,20 +236,14 @@ describe('Challenger Adversarial Stress & Verification Gauntlet', () => {
       expect(parseRelativeDate('posted NaN days ago', fixedNow)).toBe('2026-09-24');
     });
 
-    it('empirically reproduces unhandled RangeError bug on extreme/overflowing relative dates', async () => {
+    it('should not crash when extracting active job on DOM containing extreme date numbers', async () => {
       const fixedNow = new Date('2026-09-24T12:00:00Z');
 
-      // BUG REPRODUCTION 1: parseRelativeDate directly throws RangeError on huge day values
-      let caughtError = null;
-      try {
-        parseRelativeDate('999999999 days ago', fixedNow);
-      } catch (err) {
-        caughtError = err;
-      }
-      expect(caughtError).toBeInstanceOf(RangeError);
-      expect(caughtError.message).toBe('Invalid time value');
+      // VERIFY FIX 1: parseRelativeDate gracefully handles extreme dates
+      const result = parseRelativeDate('999999999 days ago', fixedNow);
+      expect(result).toBe('2026-09-24'); // Should fallback to fixedNow
 
-      // BUG REPRODUCTION 2: extractActiveJob crashes on DOM containing extreme date numbers
+      // VERIFY FIX 2: extractActiveJob handles DOM containing extreme date numbers
       const corruptedDateHtml = `
         <div class="job-details-jobs-unified-top-card">
           <h1 class="job-details-jobs-unified-top-card__job-title">Staff DevOps Engineer</h1>
@@ -259,9 +253,9 @@ describe('Challenger Adversarial Stress & Verification Gauntlet', () => {
         </div>
       `;
       const dom = new JSDOM(corruptedDateHtml);
-      await expect(
-        extractActiveJob(dom.window.document, 'https://www.linkedin.com/jobs/view/12345678')
-      ).rejects.toThrowError(/Invalid time value/);
+      const job = await extractActiveJob(dom.window.document, 'https://www.linkedin.com/jobs/view/12345678');
+      expect(job.title).toBe('Staff DevOps Engineer');
+      expect(job.date_posted).toMatch(/^\d{4}-\d{2}-\d{2}$/); // Assuming fallback is today's date
     });
   });
 

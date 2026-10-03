@@ -84,6 +84,7 @@ from .predictive_analytics import get_predictive_analytics
 from .repository import JobRepository
 from .models import Job
 from .score import explain_score, score_job
+from .security import validate_password_complexity
 from .scrape_config import DEFAULT_QUERIES
 from .service import JobDashboard
 from .sources import (
@@ -2330,32 +2331,6 @@ def resolve_user_id(handler, query_params=None) -> str | None:
     from .router import get_auth_user_id
 
     return get_auth_user_id(handler)
-
-
-def validate_password_complexity(password: str) -> tuple[bool, str]:
-    """
-    Validates password complexity:
-    - At least 8 characters
-    - At least one uppercase letter [A-Z]
-    - At least one lowercase letter [a-z]
-    - At least one numeric digit [0-9]
-    - At least one special character / symbol
-    """
-    if not password or len(password) < 8:
-        return False, "Password must be at least 8 characters long."
-    if not any(c.isupper() for c in password):
-        return False, "Password must include at least one uppercase letter (A-Z)."
-    if not any(c.islower() for c in password):
-        return False, "Password must include at least one lowercase letter (a-z)."
-    if not any(c.isdigit() for c in password):
-        return False, "Password must include at least one number (0-9)."
-    special_chars = set("!@#$%^&*()_+-=[]{};':\"|,.<>/?~`")
-    if not any(c in special_chars for c in password):
-        return (
-            False,
-            "Password must include at least one special character (!@#$%^&* etc.).",
-        )
-    return True, ""
 
 
 # Allowed origins — GitHub Pages deployment + localhost dev + Cloud Run

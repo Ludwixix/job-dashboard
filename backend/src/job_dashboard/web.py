@@ -1913,121 +1913,127 @@ class DashboardApp:
             not company or not left.get("company") or company_overlap
         )
 
-    def scan_gmail(
-        self,
-        username: str | None = None,
-        app_password: str | None = None,
-        days: int = 7,
-    ):
-        with self.lock:
-            days = max(1, min(7, int(days)))
-            credential_candidates = []
-            for candidate in (
-                Path(__file__).resolve().parents[2].glob("client_secret_*.json")
-            ):
-                try:
-                    config = json.loads(candidate.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError):
-                    continue
-                if "installed" in config:
-                    credential_candidates.insert(0, candidate)
-                else:
-                    credential_candidates.append(candidate)
-            if username and app_password:
-                scanner = GmailScanner(username, app_password, days=days)
-            elif credential_candidates:
-                scanner = GmailApiScanner(
-                    str(credential_candidates[0]),
-                    str(self.data_dir / "gmail_token.json"),
-                    days=days,
-                )
+    def _fetch_gmail_messages(self, username: str | None, app_password: str | None, days: int):
+        days = max(1, min(7, int(days)))
+        credential_candidates = []
+        for candidate in (
+            Path(__file__).resolve().parents[2].glob("client_secret_*.json")
+        ):
+            try:
+                config = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if "installed" in config:
+                credential_candidates.insert(0, candidate)
             else:
-                raise RuntimeError(
-                    "Gmail OAuth client file or IMAP credentials are required"
-                )
-            matched = created = updated = 0
-            messages = scanner.application_messages()
-            for message, category, confidence in messages:
-                title, company = self._gmail_job_details(message)
-                existing = next(
-                    (job for job in self.jobs if self._same_job(job, title, company)),
-                    None,
-                )
-                status = self._gmail_status(category)
-                if existing:
-                    job_id = normalize_job(existing).id
-                    events = existing.setdefault("email_events", [])
-                    # Deduplicate event records by email_id
-                    if not any(e.get("email_id") == message.email_id for e in events):
-                        events.append(
-                            {
-                                "email_id": message.email_id,
-                                "category": category,
-                                "received_at": message.received_at,
-                                "confidence": confidence,
-                            }
-                        )
-                    self.repository.update_status(job_id, status)
-                    updated += 1
-                    matched += 1
-                    continue
+                credential_candidates.append(candidate)
+        if username and app_password:
+            scanner = GmailScanner(username, app_password, days=days)
+        elif credential_candidates:
+            scanner = GmailApiScanner(
+                str(credential_candidates[0]),
+                str(self.data_dir / "gmail_token.json"),
+                days=days,
+            )
+        else:
+            raise RuntimeError(
+                "Gmail OAuth client file or IMAP credentials are required"
+            )
+        return scanner.application_messages()
 
-                # Ensure we do not duplicate-create by email_id
-                existing_gmail_job = next(
-                    (
-                        job
-                        for job in self.jobs
-                        if job.get("id") == f"gmail-{message.email_id}"
-                    ),
-                    None,
-                )
-                if existing_gmail_job:
-                    self.repository.update_status(existing_gmail_job["id"], status)
-                    updated += 1
-                    continue
-
-                posted_date = (message.received_at or "")[:10]
-                if not re.match(r"^\d{4}-\d{2}-\d{2}$", posted_date):
-                    posted_date = (
-                        datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-                    )
-
-                clean_desc = EmailClassifier.clean_email_text(
-                    message.body_preview or message.snippet
-                )
-                new_job = {
-                    "id": f"gmail-{message.email_id}",
-                    "title": title,
-                    "company": company,
-                    "location": "",
-                    "description": clean_desc,
-                    "source": "Gmail",
-                    "url": "",
-                    "posted": posted_date,
-                    "remote": False,
-                    "tags": ["gmail", "application", category],
-                    "email_events": [
+    def _process_gmail_messages(self, messages) -> dict[str, Any]:
+        matched = created = updated = 0
+        for message, category, confidence in messages:
+            title, company = self._gmail_job_details(message)
+            existing = next(
+                (job for job in self.jobs if self._same_job(job, title, company)),
+                None,
+            )
+            status = self._gmail_status(category)
+            if existing:
+                job_id = normalize_job(existing).id
+                events = existing.setdefault("email_events", [])
+                # Deduplicate event records by email_id
+                if not any(e.get("email_id") == message.email_id for e in events):
+                    events.append(
                         {
                             "email_id": message.email_id,
                             "category": category,
                             "received_at": message.received_at,
                             "confidence": confidence,
                         }
-                    ],
-                }
-                self.jobs.extend(self.materialize_jobs([new_job]))
-                self.save_jobs()
-                self.repository.update_status(new_job["id"], status)
-                created += 1
-            if updated:
-                self.save_jobs()
-            return {
-                "scanned": len(messages),
-                "matched": matched,
-                "updated": updated,
-                "created": created,
-                "jobs": self.public_jobs(),
+                    )
+                self.repository.update_status(job_id, status)
+                updated += 1
+                matched += 1
+                continue
+
+            # Ensure we do not duplicate-create by email_id
+            existing_gmail_job = next(
+                (
+                    job
+                    for job in self.jobs
+                    if job.get("id") == f"gmail-{message.email_id}"
+                ),
+                None,
+            )
+            if existing_gmail_job:
+                self.repository.update_status(existing_gmail_job["id"], status)
+                updated += 1
+                continue
+
+            posted_date = (message.received_at or "")[:10]
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", posted_date):
+                posted_date = (
+                    datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+                )
+
+            clean_desc = EmailClassifier.clean_email_text(
+                message.body_preview or message.snippet
+            )
+            new_job = {
+                "id": f"gmail-{message.email_id}",
+                "title": title,
+                "company": company,
+                "location": "",
+                "description": clean_desc,
+                "source": "Gmail",
+                "url": "",
+                "posted": posted_date,
+                "remote": False,
+                "tags": ["gmail", "application", category],
+                "email_events": [
+                    {
+                        "email_id": message.email_id,
+                        "category": category,
+                        "received_at": message.received_at,
+                        "confidence": confidence,
+                    }
+                ],
             }
+            self.jobs.extend(self.materialize_jobs([new_job]))
+            self.save_jobs()
+            self.repository.update_status(new_job["id"], status)
+            created += 1
+        if updated:
+            self.save_jobs()
+        return {
+            "scanned": len(messages),
+            "matched": matched,
+            "updated": updated,
+            "created": created,
+            "jobs": self.public_jobs(),
+        }
+
+    def scan_gmail(
+        self,
+        username: str | None = None,
+        app_password: str | None = None,
+        days: int = 7,
+    ) -> dict[str, Any]:
+        with self.lock:
+            messages = self._fetch_gmail_messages(username, app_password, days)
+            return self._process_gmail_messages(messages)
 
     def start_gmail_scan(self):
         thread = threading.Thread(

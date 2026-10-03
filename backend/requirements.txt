@@ -19,7 +19,7 @@ chromadb>=0.4.0
 sentence-transformers>=2.2.0
 
 # Web scraping & job sources
-jobspy>=1.1.0
+jobspy
 playwright>=1.40.0
 apify-client>=1.8,<2
 beautifulsoup4>=4.12.0
@@ -37,7 +37,6 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.6
 
 # Database
-sqlite3  # Built-in
 psycopg2-binary>=2.9.0  # Optional: PostgreSQL support
 
 # Utilities

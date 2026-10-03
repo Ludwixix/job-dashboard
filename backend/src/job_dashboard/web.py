@@ -18,7 +18,6 @@ JWT_EXPIRY_HOURS = 24
 
 import re
 import threading
-import sqlite3
 import time
 import urllib.error
 import urllib.request

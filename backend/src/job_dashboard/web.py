@@ -22,7 +22,6 @@ import sqlite3
 import time
 import urllib.error
 import urllib.request
-import bcrypt
 import jwt
 import uuid
 import datetime

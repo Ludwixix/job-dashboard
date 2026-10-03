@@ -240,14 +240,7 @@ describe('Challenger Adversarial Stress & Verification Gauntlet', () => {
       const fixedNow = new Date('2026-09-24T12:00:00Z');
 
       // BUG REPRODUCTION 1: parseRelativeDate directly throws RangeError on huge day values
-      let caughtError = null;
-      try {
-        parseRelativeDate('999999999 days ago', fixedNow);
-      } catch (err) {
-        caughtError = err;
-      }
-      expect(caughtError).toBeInstanceOf(RangeError);
-      expect(caughtError.message).toBe('Invalid time value');
+      expect(parseRelativeDate('999999999 days ago', fixedNow)).toBe('2026-09-24');
 
       // BUG REPRODUCTION 2: extractActiveJob crashes on DOM containing extreme date numbers
       const corruptedDateHtml = `
@@ -259,9 +252,8 @@ describe('Challenger Adversarial Stress & Verification Gauntlet', () => {
         </div>
       `;
       const dom = new JSDOM(corruptedDateHtml);
-      await expect(
-        extractActiveJob(dom.window.document, 'https://www.linkedin.com/jobs/view/12345678')
-      ).rejects.toThrowError(/Invalid time value/);
+      const job = await extractActiveJob(dom.window.document, 'https://www.linkedin.com/jobs/view/12345678');
+      expect(job.date_posted).toBe(new Date().toISOString().split('T')[0]); // Should fallback to current date
     });
   });
 

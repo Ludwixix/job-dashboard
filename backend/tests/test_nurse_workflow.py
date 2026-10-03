@@ -15,7 +15,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from job_dashboard.repository import JobRepository
-from job_dashboard.web import make_handler, DashboardApp, jwt, JWT_SECRET
+import jwt
+from job_dashboard.web import make_handler, DashboardApp, JWT_SECRET
 from job_dashboard.models import Job
 from job_dashboard.score import score_job
 

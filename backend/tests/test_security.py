@@ -62,7 +62,8 @@ def test_request_identity_uses_bearer_subject_not_caller_supplied_ids(monkeypatc
     assert web.resolve_user_id(spoofed_handler, {"user_id": ["victim"]}) is None
     assert get_auth_user_id(spoofed_handler) is None
 
-    token = web.jwt.encode(
+    import jwt
+    token = jwt.encode(
         {"sub": "verified-user"}, "test-handler-secret", algorithm="HS256"
     )
     authenticated_handler = SimpleNamespace(

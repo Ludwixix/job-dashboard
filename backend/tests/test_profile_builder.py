@@ -9,7 +9,8 @@ from job_dashboard.profile_builder import (
     synthesize_profile_from_text,
     build_candidate_profile
 )
-from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
+import jwt
+from job_dashboard.web import JWT_SECRET, DashboardApp, make_handler
 
 
 def create_mock_handler(handler_cls, method, path, body=None, headers=None):

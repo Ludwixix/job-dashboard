@@ -96,7 +96,8 @@ def test_http_api_routes_persistence(temp_repo, tmp_path):
     import io
     import json
     from unittest.mock import MagicMock
-    from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
+    import jwt
+    from job_dashboard.web import JWT_SECRET, DashboardApp, make_handler
 
     mock_app = DashboardApp(profile={}, sources=[], data_dir=tmp_path)
     mock_app.repository = temp_repo
@@ -226,7 +227,8 @@ def test_documents_endpoint_auth_and_fallback(temp_repo, tmp_path):
     import io
     import json
     from unittest.mock import MagicMock
-    from job_dashboard.web import JWT_SECRET, DashboardApp, jwt, make_handler
+    import jwt
+    from job_dashboard.web import JWT_SECRET, DashboardApp, make_handler
 
     mock_app = DashboardApp(profile={}, sources=[], data_dir=tmp_path)
     mock_app.repository = temp_repo

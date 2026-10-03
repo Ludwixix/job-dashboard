@@ -1528,6 +1528,250 @@ class DashboardApp:
 
         return resolved if resolved else list(self.sources)
 
+    def _normalize_queries(self, queries) -> list[SearchQuery]:
+        normalized_queries: list[SearchQuery] = []
+        for q in queries:
+            if isinstance(q, SearchQuery):
+                term = q.term
+                stream = q.stream
+                loc = q.location
+                is_rem = stream.lower() == "remote" or any(
+                    k in term.lower()
+                    for k in (
+                        "remote",
+                        "wfh",
+                        "work from home",
+                        "anywhere in australia",
+                    )
+                )
+                if is_rem and (
+                    not loc or loc.lower() in ("melbourne, vic", "melbourne", "vic")
+                ):
+                    loc = "Australia"
+                normalized_queries.append(
+                    SearchQuery(
+                        term=term,
+                        location=loc or "Australia",
+                        stream=stream,
+                        group=q.group,
+                        weight=q.weight,
+                        exclude_terms=q.exclude_terms,
+                        enabled=q.enabled,
+                    )
+                )
+            elif isinstance(q, str):
+                if q.strip():
+                    s_term = q.strip()
+                    s_stream = detect_query_stream(s_term)
+                    is_rem = s_stream.lower() == "remote" or any(
+                        k in s_term.lower()
+                        for k in (
+                            "remote",
+                            "wfh",
+                            "work from home",
+                            "anywhere in australia",
+                        )
+                    )
+                    s_loc = "Australia" if is_rem else "Melbourne, VIC"
+                    normalized_queries.append(
+                        SearchQuery(term=s_term, location=s_loc, stream=s_stream)
+                    )
+            elif isinstance(q, dict):
+                term = str(q.get("term") or "").strip()
+                if term:
+                    stream = str(
+                        q.get("stream") or detect_query_stream(term)
+                    ).strip()
+                    is_rem = (
+                        stream.lower() == "remote"
+                        or any(
+                            k in term.lower()
+                            for k in (
+                                "remote",
+                                "wfh",
+                                "work from home",
+                                "anywhere in australia",
+                            )
+                        )
+                        or bool(q.get("remote"))
+                    )
+                    raw_loc = str(
+                        q.get("location")
+                        or ("Australia" if is_rem else "Melbourne, VIC")
+                    ).strip()
+                    loc = (
+                        "Australia"
+                        if (
+                            is_rem
+                            and raw_loc.lower()
+                            in ("melbourne, vic", "melbourne", "vic", "")
+                        )
+                        else (raw_loc or "Australia")
+                    )
+                    enabled = bool(q.get("enabled", True))
+                    normalized_queries.append(
+                        SearchQuery(
+                            term=term, location=loc, stream=stream, enabled=enabled
+                        )
+                    )
+            elif hasattr(q, "term"):
+                term = str(getattr(q, "term", "")).strip()
+                if term:
+                    stream = str(
+                        getattr(q, "stream", detect_query_stream(term))
+                    ).strip()
+                    is_rem = (
+                        stream.lower() == "remote"
+                        or any(
+                            k in term.lower()
+                            for k in (
+                                "remote",
+                                "wfh",
+                                "work from home",
+                                "anywhere in australia",
+                            )
+                        )
+                        or bool(getattr(q, "remote", False))
+                    )
+                    raw_loc = str(
+                        getattr(
+                            q,
+                            "location",
+                            "Australia" if is_rem else "Melbourne, VIC",
+                        )
+                    ).strip()
+                    loc = (
+                        "Australia"
+                        if (
+                            is_rem
+                            and raw_loc.lower()
+                            in ("melbourne, vic", "melbourne", "vic", "")
+                        )
+                        else (raw_loc or "Australia")
+                    )
+                    enabled = bool(getattr(q, "enabled", True))
+                    normalized_queries.append(
+                        SearchQuery(
+                            term=term, location=loc, stream=stream, enabled=enabled
+                        )
+                    )
+        return normalized_queries
+
+    def _filter_queries_for_scrape(self, normalized_queries: list[SearchQuery], force: bool, ttl_hours: float) -> tuple[list[SearchQuery], list[str], list[str]]:
+        queries_to_scrape = []
+        cached_query_terms = []
+        db_satisfied_terms = []
+
+        for q in normalized_queries:
+            term = q.term
+            loc = q.location
+
+            # 1. Database-First: Check if SQLite already has sufficient fresh matching jobs (>= 10)
+            if not force:
+                has_cov, match_count = self.repository.has_sufficient_matching_jobs(
+                    term, loc, threshold=10, max_age_days=21
+                )
+                if has_cov:
+                    db_satisfied_terms.append(term)
+                    cached_query_terms.append(term)
+                    # Record cache entry with actual matching count
+                    self.repository.record_query_scrape(term, loc, match_count)
+                    continue
+
+            # 2. Query Scrape Cache: Check if scraped within TTL
+            if not force and self.repository.is_query_cached(
+                term, loc, ttl_hours=ttl_hours
+            ):
+                cached_query_terms.append(term)
+            else:
+                queries_to_scrape.append(q)
+
+        return queries_to_scrape, cached_query_terms, db_satisfied_terms
+
+    def _execute_scrape(self, queries_to_scrape: list[SearchQuery], on_progress, user_id: str | None) -> tuple[list, list]:
+        if on_progress:
+            on_progress(
+                f"Scanning {len(queries_to_scrape)} live employment gateway queries...",
+                10,
+            )
+        active_sources = self.get_sources_for_scrape(user_id=user_id)
+        pipeline = ScrapePipeline(
+            active_sources, days=14, health_check=self.health_check
+        )
+        fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
+        pipeline_errors = pipeline.errors
+        self.source_health = getattr(pipeline, "source_health", {})
+
+        if getattr(self, "scrape_coordinator", None):
+            for q in queries_to_scrape:
+                key = self.scrape_coordinator._make_key(q)
+                self.scrape_coordinator._cooldown_tracker[key] = time.time()
+
+        return fresh, pipeline_errors
+
+    def _process_and_save_fresh_jobs(self, fresh, on_progress):
+        if on_progress:
+            on_progress("Saving & indexing positions...", 90)
+        # Materialize fresh jobs
+        fresh_materialized = self.materialize_jobs(fresh)
+        # Rebuild merged_jobs from current self.jobs at merge point under lock
+        existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
+        merged_jobs = list(self.jobs)
+
+        for job in fresh_materialized:
+            job_id = job.get("id")
+            if job_id and job_id not in existing_ids:
+                merged_jobs.append(job)
+                existing_ids.add(job_id)
+
+        self.jobs = merged_jobs
+        self.save_jobs()
+
+        # Persist fresh materialized jobs into SQLite repository
+        try:
+            self.repository.replace_jobs(fresh_materialized)
+        except Exception as repo_err:
+            logger.warning(
+                f"Error persisting fresh jobs to repository: {repo_err}"
+            )
+
+        # Update jobs_combined.json for static client compatibility
+        try:
+            combined_path = self.data_dir / "jobs_combined.json"
+            combined_path.write_text(
+                json.dumps(self.jobs, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        except Exception as comb_err:
+            logger.warning(f"Error updating jobs_combined.json: {comb_err}")
+
+        from .config import settings
+
+        if settings.gcs_data_bucket:
+            backup_to_gcs(settings.gcs_data_bucket, self.data_dir)
+
+    def _record_cache_hits(self, queries_to_scrape: list[SearchQuery], fresh: list):
+        for q in queries_to_scrape:
+            term = q.term if hasattr(q, "term") else str(q.get("term", ""))
+            loc = (
+                q.location
+                if hasattr(q, "location")
+                else str(q.get("location", ""))
+            )
+            self.repository.record_query_scrape(term, loc, len(fresh or []))
+
+    def _build_refresh_stats(self, queries_to_scrape, cached_query_terms, db_satisfied_terms) -> dict:
+        return {
+            "total_jobs": len(self.jobs),
+            "queries_scraped": len(queries_to_scrape),
+            "queries_cached": len(cached_query_terms),
+            "satisfied_from_db": db_satisfied_terms,
+            "cache_hit": len(queries_to_scrape) == 0,
+            "cached_terms": cached_query_terms,
+            "skipped_jobs_count": len(getattr(self, "last_skipped_jobs", [])),
+            "skipped_jobs": getattr(self, "last_skipped_jobs", []),
+        }
+
     def refresh(
         self,
         queries,
@@ -1545,231 +1789,20 @@ class DashboardApp:
 
                 queries = resolve_cli_queries(None)
 
-            normalized_queries: list[SearchQuery] = []
-            for q in queries:
-                if isinstance(q, SearchQuery):
-                    term = q.term
-                    stream = q.stream
-                    loc = q.location
-                    is_rem = stream.lower() == "remote" or any(
-                        k in term.lower()
-                        for k in (
-                            "remote",
-                            "wfh",
-                            "work from home",
-                            "anywhere in australia",
-                        )
-                    )
-                    if is_rem and (
-                        not loc or loc.lower() in ("melbourne, vic", "melbourne", "vic")
-                    ):
-                        loc = "Australia"
-                    normalized_queries.append(
-                        SearchQuery(
-                            term=term,
-                            location=loc or "Australia",
-                            stream=stream,
-                            group=q.group,
-                            weight=q.weight,
-                            exclude_terms=q.exclude_terms,
-                            enabled=q.enabled,
-                        )
-                    )
-                elif isinstance(q, str):
-                    if q.strip():
-                        s_term = q.strip()
-                        s_stream = detect_query_stream(s_term)
-                        is_rem = s_stream.lower() == "remote" or any(
-                            k in s_term.lower()
-                            for k in (
-                                "remote",
-                                "wfh",
-                                "work from home",
-                                "anywhere in australia",
-                            )
-                        )
-                        s_loc = "Australia" if is_rem else "Melbourne, VIC"
-                        normalized_queries.append(
-                            SearchQuery(term=s_term, location=s_loc, stream=s_stream)
-                        )
-                elif isinstance(q, dict):
-                    term = str(q.get("term") or "").strip()
-                    if term:
-                        stream = str(
-                            q.get("stream") or detect_query_stream(term)
-                        ).strip()
-                        is_rem = (
-                            stream.lower() == "remote"
-                            or any(
-                                k in term.lower()
-                                for k in (
-                                    "remote",
-                                    "wfh",
-                                    "work from home",
-                                    "anywhere in australia",
-                                )
-                            )
-                            or bool(q.get("remote"))
-                        )
-                        raw_loc = str(
-                            q.get("location")
-                            or ("Australia" if is_rem else "Melbourne, VIC")
-                        ).strip()
-                        loc = (
-                            "Australia"
-                            if (
-                                is_rem
-                                and raw_loc.lower()
-                                in ("melbourne, vic", "melbourne", "vic", "")
-                            )
-                            else (raw_loc or "Australia")
-                        )
-                        enabled = bool(q.get("enabled", True))
-                        normalized_queries.append(
-                            SearchQuery(
-                                term=term, location=loc, stream=stream, enabled=enabled
-                            )
-                        )
-                elif hasattr(q, "term"):
-                    term = str(getattr(q, "term", "")).strip()
-                    if term:
-                        stream = str(
-                            getattr(q, "stream", detect_query_stream(term))
-                        ).strip()
-                        is_rem = (
-                            stream.lower() == "remote"
-                            or any(
-                                k in term.lower()
-                                for k in (
-                                    "remote",
-                                    "wfh",
-                                    "work from home",
-                                    "anywhere in australia",
-                                )
-                            )
-                            or bool(getattr(q, "remote", False))
-                        )
-                        raw_loc = str(
-                            getattr(
-                                q,
-                                "location",
-                                "Australia" if is_rem else "Melbourne, VIC",
-                            )
-                        ).strip()
-                        loc = (
-                            "Australia"
-                            if (
-                                is_rem
-                                and raw_loc.lower()
-                                in ("melbourne, vic", "melbourne", "vic", "")
-                            )
-                            else (raw_loc or "Australia")
-                        )
-                        enabled = bool(getattr(q, "enabled", True))
-                        normalized_queries.append(
-                            SearchQuery(
-                                term=term, location=loc, stream=stream, enabled=enabled
-                            )
-                        )
+            normalized_queries = self._normalize_queries(queries)
 
-            queries_to_scrape = []
-            cached_query_terms = []
-            db_satisfied_terms = []
-
-            for q in normalized_queries:
-                term = q.term
-                loc = q.location
-
-                # 1. Database-First: Check if SQLite already has sufficient fresh matching jobs (>= 10)
-                if not force:
-                    has_cov, match_count = self.repository.has_sufficient_matching_jobs(
-                        term, loc, threshold=10, max_age_days=21
-                    )
-                    if has_cov:
-                        db_satisfied_terms.append(term)
-                        cached_query_terms.append(term)
-                        # Record cache entry with actual matching count
-                        self.repository.record_query_scrape(term, loc, match_count)
-                        continue
-
-                # 2. Query Scrape Cache: Check if scraped within TTL
-                if not force and self.repository.is_query_cached(
-                    term, loc, ttl_hours=ttl_hours
-                ):
-                    cached_query_terms.append(term)
-                else:
-                    queries_to_scrape.append(q)
+            queries_to_scrape, cached_query_terms, db_satisfied_terms = self._filter_queries_for_scrape(
+                normalized_queries, force, ttl_hours
+            )
 
             pipeline_errors = []
             if queries_to_scrape:
-                if on_progress:
-                    on_progress(
-                        f"Scanning {len(queries_to_scrape)} live employment gateway queries...",
-                        10,
-                    )
-                active_sources = self.get_sources_for_scrape(user_id=user_id)
-                pipeline = ScrapePipeline(
-                    active_sources, days=14, health_check=self.health_check
-                )
-                fresh = pipeline.run(queries_to_scrape, on_progress=on_progress)
-                pipeline_errors = pipeline.errors
-                self.source_health = getattr(pipeline, "source_health", {})
-
-                if getattr(self, "scrape_coordinator", None):
-                    for q in queries_to_scrape:
-                        key = self.scrape_coordinator._make_key(q)
-                        self.scrape_coordinator._cooldown_tracker[key] = time.time()
+                fresh, pipeline_errors = self._execute_scrape(queries_to_scrape, on_progress, user_id)
 
                 if fresh:
-                    if on_progress:
-                        on_progress("Saving & indexing positions...", 90)
-                    # Materialize fresh jobs
-                    fresh_materialized = self.materialize_jobs(fresh)
-                    # Rebuild merged_jobs from current self.jobs at merge point under lock
-                    existing_ids = {job.get("id") for job in self.jobs if job.get("id")}
-                    merged_jobs = list(self.jobs)
+                    self._process_and_save_fresh_jobs(fresh, on_progress)
 
-                    for job in fresh_materialized:
-                        job_id = job.get("id")
-                        if job_id and job_id not in existing_ids:
-                            merged_jobs.append(job)
-                            existing_ids.add(job_id)
-
-                    self.jobs = merged_jobs
-                    self.save_jobs()
-
-                    # Persist fresh materialized jobs into SQLite repository
-                    try:
-                        self.repository.replace_jobs(fresh_materialized)
-                    except Exception as repo_err:
-                        logger.warning(
-                            f"Error persisting fresh jobs to repository: {repo_err}"
-                        )
-
-                    # Update jobs_combined.json for static client compatibility
-                    try:
-                        combined_path = self.data_dir / "jobs_combined.json"
-                        combined_path.write_text(
-                            json.dumps(self.jobs, ensure_ascii=False, indent=2) + "\n",
-                            encoding="utf-8",
-                        )
-                    except Exception as comb_err:
-                        logger.warning(f"Error updating jobs_combined.json: {comb_err}")
-
-                    from .config import settings
-
-                    if settings.gcs_data_bucket:
-                        backup_to_gcs(settings.gcs_data_bucket, self.data_dir)
-
-                # Record cache hit timestamps for freshly scraped queries
-                for q in queries_to_scrape:
-                    term = q.term if hasattr(q, "term") else str(q.get("term", ""))
-                    loc = (
-                        q.location
-                        if hasattr(q, "location")
-                        else str(q.get("location", ""))
-                    )
-                    self.repository.record_query_scrape(term, loc, len(fresh or []))
+                self._record_cache_hits(queries_to_scrape, fresh)
             elif on_progress:
                 on_progress(
                     f"All {len(cached_query_terms)} queries already fresh (cached), skipping re-scan...",
@@ -1780,16 +1813,7 @@ class DashboardApp:
             if queries_to_scrape or force:
                 self.jobs = self.materialize_jobs(self.jobs)
 
-            stats = {
-                "total_jobs": len(self.jobs),
-                "queries_scraped": len(queries_to_scrape),
-                "queries_cached": len(cached_query_terms),
-                "satisfied_from_db": db_satisfied_terms,
-                "cache_hit": len(queries_to_scrape) == 0,
-                "cached_terms": cached_query_terms,
-                "skipped_jobs_count": len(getattr(self, "last_skipped_jobs", [])),
-                "skipped_jobs": getattr(self, "last_skipped_jobs", []),
-            }
+            stats = self._build_refresh_stats(queries_to_scrape, cached_query_terms, db_satisfied_terms)
             return self.public_jobs(), pipeline_errors, stats
 
     @staticmethod

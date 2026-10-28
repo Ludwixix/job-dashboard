@@ -40,9 +40,7 @@ def test_default_actors_defined_for_all_major_platforms():
     assert "adzuna" in DEFAULT_APIFY_ACTORS
     assert DEFAULT_APIFY_ACTORS["seek"] == "automation-lab/seek-scraper"
     assert DEFAULT_APIFY_ACTORS["indeed"] == "misceres/indeed-scraper"
-    assert (
-        DEFAULT_APIFY_ACTORS["linkedin"] == "curious_coder/linkedin-job-search-scraper"
-    )
+    assert DEFAULT_APIFY_ACTORS["linkedin"] == "johnvc/linkedin-job-search-scraper"
 
 
 def test_build_apify_run_input():
@@ -63,8 +61,9 @@ def test_build_apify_run_input():
 
     # LinkedIn input
     li_inp = build_apify_run_input("linkedin", query, max_results=30)
+    assert li_inp["search_mode"] == "search"
     assert li_inp["keywords"] == "Senior Cloud Engineer"
-    assert li_inp["count"] == 30
+    assert li_inp["maxItems"] == 30
 
     # Custom / other input
     custom_inp = build_apify_run_input("adzuna", query, max_results=20)
@@ -134,6 +133,9 @@ def test_normalize_apify_linkedin_record():
     assert normalized["company"] == "Canva"
     assert normalized["source"] == "LinkedIn"
     assert normalized["work_mode"] == "remote"
+
+    error_row = {"errorCode": "BLOCKED", "errorMessage": "Search page blocked"}
+    assert normalize_apify_job_record(error_row, "linkedin", query) is None
 
 
 def test_validate_apify_token():

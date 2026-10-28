@@ -32,7 +32,7 @@ logger = get_logger("job_dashboard.sources.apify_platform")
 DEFAULT_APIFY_ACTORS: dict[str, str] = {
     "seek": "automation-lab/seek-scraper",
     "indeed": "misceres/indeed-scraper",
-    "linkedin": "curious_coder/linkedin-job-search-scraper",
+    "linkedin": "johnvc/linkedin-job-search-scraper",
     "adzuna": "apify/web-scraper",
     "jora": "memo23/jora-search-cheerio-ppr",
 }
@@ -40,6 +40,7 @@ DEFAULT_APIFY_ACTORS: dict[str, str] = {
 DEFAULT_MAX_RESULTS = 20
 MAX_RESULTS_CAP = 50
 DEFAULT_TIMEOUT_SECS = 60
+LINKEDIN_TIMEOUT_SECS = 120
 
 
 def test_apify_token(api_token: str) -> dict[str, Any]:
@@ -114,11 +115,10 @@ def build_apify_run_input(
         }
     elif plat == "linkedin":
         return {
+            "search_mode": "search",
             "keywords": term,
             "location": loc,
-            "count": max_results,
-            "limit": max_results,
-            "searchQueries": [{"keyword": term, "location": loc}],
+            "maxItems": max_results,
         }
     elif plat == "jora":
         return {
@@ -152,6 +152,8 @@ def normalize_apify_job_record(
 ) -> dict[str, Any] | None:
     """Normalize a raw Apify dataset item into a canonical JobRecord dictionary."""
     plat = platform.lower()
+    if plat == "linkedin" and item.get("errorCode"):
+        return None
     title = str(
         item.get("title")
         or item.get("positionName")
@@ -267,6 +269,7 @@ def normalize_apify_job_record(
             else ""
         )
         or item.get("description")
+        or item.get("descriptionText")
         or item.get("snippet")
         or item.get("teaser")
         or item.get("jobDescription")
@@ -365,6 +368,8 @@ class ApifyPlatformSource:
         self.actor_id = sanitize_apify_actor_id(raw_actor)
         self.max_results = max(1, min(MAX_RESULTS_CAP, int(max_results)))
         self.timeout_secs = max(5, int(timeout_secs))
+        if self.platform == "linkedin":
+            self.timeout_secs = max(self.timeout_secs, LINKEDIN_TIMEOUT_SECS)
         self.mode = mode.lower().strip()
         self.native_source = native_source
         self.client = client

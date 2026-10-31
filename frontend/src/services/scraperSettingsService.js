@@ -14,7 +14,7 @@ export const SCRAPER_SETTINGS_STORAGE_KEY = 'job_dashboard_apify_settings';
 export const DEFAULT_APIFY_ACTORS = {
   seek: 'automation-lab/seek-scraper',
   indeed: 'misceres/indeed-scraper',
-  linkedin: 'curious_coder/linkedin-job-search-scraper',
+  linkedin: 'johnvc/linkedin-job-search-scraper',
   adzuna: 'apify/web-scraper',
   jora: 'memo23/jora-search-cheerio-ppr',
 };
@@ -54,7 +54,7 @@ export const DEFAULT_SCRAPER_SETTINGS = {
     linkedin: {
       enabled: false,
       mode: 'fallback',
-      actor_id: 'curious_coder/linkedin-job-search-scraper',
+      actor_id: 'johnvc/linkedin-job-search-scraper',
       max_results: 20,
     },
     adzuna: {

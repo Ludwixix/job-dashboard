@@ -834,8 +834,13 @@ class JobRepository:
         remote: bool | None = None,
         sort_by: str = "newest",
         source: str = "",
+        status: str = "",
     ) -> dict[str, Any]:
-        """Query jobs with database-level pagination, search filtering, and sorting."""
+        """Query jobs with database-level pagination, search filtering, and sorting.
+
+        Only active (non-expired, non-rejected) jobs are returned by default.
+        Pass an explicit ``status`` to override the default active-only filter.
+        """
         page = max(1, int(page))
         page_size = max(1, min(5000, int(page_size)))
         offset = (page - 1) * page_size
@@ -846,6 +851,7 @@ class JobRepository:
             and (not industry or industry.lower() == "all")
             and remote is None
             and (not source or source.lower() == "all")
+            and not status
         )
         if (
             is_default_query
@@ -857,6 +863,16 @@ class JobRepository:
             # Gmail messages are workflow records, not public job listings.
             clauses = ["lower(source) != 'gmail'"]
             params: list[Any] = []
+
+            # Only active jobs by default; expired/rejected/closed/dismissed listings are excluded.
+            # Applied/interviewing/offer jobs remain visible because they are still valid listings.
+            if status:
+                clauses.append("lower(status) = ?")
+                params.append(status.strip().lower())
+            else:
+                clauses.append(
+                    "lower(status) NOT IN ('rejected', 'closed', 'expired', 'dismissed', 'unsuccessful')"
+                )
 
             if source and source.lower() != "all":
                 clauses.append("lower(source) = ?")
@@ -899,7 +915,14 @@ class JobRepository:
                             "lower(jobs.source) != 'gmail'",
                             "jobs_fts MATCH ?",
                         ]
-                        fts_params: list[Any] = [fts_query]
+                        if status:
+                            fts_clauses.append("lower(jobs.status) = ?")
+                            fts_params: list[Any] = [fts_query, status.strip().lower()]
+                        else:
+                            fts_clauses.append(
+                                "lower(jobs.status) NOT IN ('rejected', 'closed', 'expired', 'dismissed', 'unsuccessful')"
+                            )
+                            fts_params = [fts_query]
                         if industry and industry.lower() != "all":
                             fts_clauses.append(
                                 "(lower(jobs.stream) LIKE ? OR lower(jobs.data_json) LIKE ?)"
@@ -956,6 +979,19 @@ class JobRepository:
                     job_data = json.loads(row["data_json"])
                     if str(job_data.get("source") or "").strip().lower() == "gmail":
                         continue
+                    # Skip dead/expired listings unless an explicit status filter is requested.
+                    if not status:
+                        job_status = str(
+                            job_data.get("status") or row["status"] or "sourced"
+                        ).strip().lower()
+                        if job_status in (
+                            "rejected",
+                            "closed",
+                            "expired",
+                            "dismissed",
+                            "unsuccessful",
+                        ):
+                            continue
                     posted = self._parse_posted_timestamp(
                         job_data.get("posted") or job_data.get("date")
                     )

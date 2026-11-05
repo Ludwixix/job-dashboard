@@ -1,1 +1,0 @@
-../../tests/e2e/test_career_mode_e2e.py

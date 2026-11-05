@@ -195,6 +195,9 @@ def test_search_criteria_endpoint_formats():
 
 def test_query_jobs_paginated_caching_and_large_pagesize(temp_repo):
     """Test that query_jobs_paginated supports repeated cached calls without UnboundLocalError and handles large page sizes."""
+    from datetime import datetime, timedelta, timezone
+
+    _recent = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d")
     # Seed mock jobs
     mock_jobs = [
         {
@@ -203,7 +206,7 @@ def test_query_jobs_paginated_caching_and_large_pagesize(temp_repo):
             "company": f"Company {i}",
             "location": "Melbourne VIC",
             "source": "Seek",
-            "posted": "2026-09-20",
+            "posted": _recent,
         }
         for i in range(25)
     ]

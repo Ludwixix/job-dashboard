@@ -77,6 +77,10 @@ def handle_get_jobs(handler):
     remote_param = query_params.get("remote", [None])[0]
     remote = None if remote_param is None else (remote_param.lower() in ("true", "1"))
     sort_by = query_params.get("sortBy", ["newest"])[0]
+    try:
+        max_age_days = max(0, int(query_params.get("maxAgeDays", ["30"])[0]))
+    except (ValueError, TypeError):
+        max_age_days = 30
 
     if app.repository.count_jobs() == 0:
         if not app.jobs:
@@ -93,6 +97,7 @@ def handle_get_jobs(handler):
         remote=remote,
         sort_by=sort_by,
         source=source,
+        max_age_days=max_age_days,
     )
     handler.send_json(200, result)
 

@@ -3,7 +3,7 @@ import json
 import re
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -835,11 +835,14 @@ class JobRepository:
         sort_by: str = "newest",
         source: str = "",
         status: str = "",
+        max_age_days: int = 30,
     ) -> dict[str, Any]:
         """Query jobs with database-level pagination, search filtering, and sorting.
 
-        Only active (non-expired, non-rejected) jobs are returned by default.
-        Pass an explicit ``status`` to override the default active-only filter.
+        Only active (non-expired, non-rejected) jobs posted within the last
+        ``max_age_days`` are returned by default. Pass an explicit ``status``
+        to override the default active-only filter, or ``max_age_days=0`` to
+        disable the freshness filter entirely.
         """
         page = max(1, int(page))
         page_size = max(1, min(5000, int(page_size)))
@@ -852,6 +855,7 @@ class JobRepository:
             and remote is None
             and (not source or source.lower() == "all")
             and not status
+            and max_age_days == 30
         )
         if (
             is_default_query
@@ -873,6 +877,16 @@ class JobRepository:
                 clauses.append(
                     "lower(status) NOT IN ('rejected', 'closed', 'expired', 'dismissed', 'unsuccessful')"
                 )
+
+            # Freshness filter: stale listings (older than max_age_days) have
+            # dead links and are excluded by default. Set max_age_days=0 to disable.
+            # ``posted`` is stored as an ISO date string, which sorts lexicographically.
+            if max_age_days and max_age_days > 0:
+                cutoff_date = (
+                    datetime.now(timezone.utc) - timedelta(days=max_age_days)
+                ).strftime("%Y-%m-%d")
+                clauses.append("posted >= ?")
+                params.append(cutoff_date)
 
             if source and source.lower() != "all":
                 clauses.append("lower(source) = ?")
@@ -923,6 +937,12 @@ class JobRepository:
                                 "lower(jobs.status) NOT IN ('rejected', 'closed', 'expired', 'dismissed', 'unsuccessful')"
                             )
                             fts_params = [fts_query]
+                        if max_age_days and max_age_days > 0:
+                            fts_cutoff = (
+                                datetime.now(timezone.utc) - timedelta(days=max_age_days)
+                            ).strftime("%Y-%m-%d")
+                            fts_clauses.append("jobs.posted >= ?")
+                            fts_params.append(fts_cutoff)
                         if industry and industry.lower() != "all":
                             fts_clauses.append(
                                 "(lower(jobs.stream) LIKE ? OR lower(jobs.data_json) LIKE ?)"

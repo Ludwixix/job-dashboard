@@ -83,6 +83,11 @@ def test_upsert_pagination_and_user_applications(tmp_path):
     repo = JobRepository(tmp_path / "test_jobs.sqlite3")
 
     # 1. Test upsert with deduplication
+    from datetime import datetime, timedelta, timezone
+
+    _today = datetime.now(timezone.utc)
+    _recent = (_today - timedelta(days=2)).strftime("%Y-%m-%d")
+    _recent2 = (_today - timedelta(days=3)).strftime("%Y-%m-%d")
     raw_jobs = [
         {
             "title": "M365 Admin",
@@ -91,7 +96,7 @@ def test_upsert_pagination_and_user_applications(tmp_path):
             "stream": "core-it",
             "remote": True,
             "score": 90,
-            "posted": "2026-08-28",
+            "posted": _recent,
         },
         {
             "title": "M365 Admin",
@@ -100,7 +105,7 @@ def test_upsert_pagination_and_user_applications(tmp_path):
             "stream": "core-it",
             "remote": True,
             "score": 92,
-            "posted": "2026-08-28",
+            "posted": _recent,
         },  # Duplicate
         {
             "title": "Azure Consultant",
@@ -109,7 +114,7 @@ def test_upsert_pagination_and_user_applications(tmp_path):
             "stream": "cloud",
             "remote": False,
             "score": 85,
-            "posted": "2026-08-27",
+            "posted": _recent2,
         },
     ]
     upsert_count = repo.upsert_scraped_jobs(raw_jobs)
@@ -190,6 +195,11 @@ def test_public_job_index_excludes_gmail_and_unverifiable_dates_and_sorts_dates(
     tmp_path,
 ):
     repo = JobRepository(tmp_path / "jobs.sqlite3")
+    from datetime import datetime, timedelta, timezone
+
+    _today = datetime.now(timezone.utc)
+    _new = (_today - timedelta(days=2)).strftime("%Y-%m-%d")
+    _old = (_today - timedelta(days=10)).strftime("%Y-%m-%d")
     repo.replace_jobs(
         [
             {
@@ -204,21 +214,21 @@ def test_public_job_index_excludes_gmail_and_unverifiable_dates_and_sorts_dates(
                 "title": "Application confirmation",
                 "company": "Acme",
                 "source": "Gmail",
-                "posted": "2026-08-30",
+                "posted": _new,
             },
             {
                 "id": "old",
                 "title": "Older role",
                 "company": "Acme",
                 "source": "Indeed",
-                "posted": "2026-08-20",
+                "posted": _old,
             },
             {
                 "id": "new",
                 "title": "Newer role",
                 "company": "Acme",
                 "source": "Indeed",
-                "posted": "2026-08-28",
+                "posted": _new,
             },
         ]
     )

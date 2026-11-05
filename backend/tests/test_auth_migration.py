@@ -36,7 +36,7 @@ def parse_response(handler):
 
 
 def test_repository_user_crud_and_migration():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_jobs.db"
         repo = JobRepository(db_path)
 

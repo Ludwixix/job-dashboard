@@ -155,7 +155,7 @@ def test_search_criteria_endpoint_formats():
     from unittest.mock import MagicMock
     from job_dashboard.web import DashboardApp, make_handler
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         app = DashboardApp(data_dir=tmpdir)
         handler_cls = make_handler(app)
 

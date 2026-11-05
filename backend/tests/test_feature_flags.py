@@ -44,7 +44,7 @@ def parse_response(handler):
 
 
 def test_repository_feature_flags_crud():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_flags.db"
         repo = JobRepository(db_path)
 

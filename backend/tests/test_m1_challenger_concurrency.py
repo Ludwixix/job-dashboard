@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 def test_schema_migration_pre_m1_backward_compatibility():
     """Verify pre-M1 database migrates cleanly without data loss or crashes."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "legacy_jobs.sqlite3"
 
         # 1. Create a legacy database without M1 tables
@@ -185,7 +185,7 @@ def test_schema_migration_pre_m1_backward_compatibility():
 
 def test_wal_concurrency_stress_telemetry_and_achievements():
     """Simulate heavy multi-threaded read/write concurrency to verify WAL resilience."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "stress_jobs.sqlite3"
         repo = JobRepository(db_path)
 
@@ -283,7 +283,7 @@ def test_wal_concurrency_stress_telemetry_and_achievements():
 
 def test_unique_constraint_user_achievements():
     """Verify UNIQUE(user_id, achievement_id) prevents duplicates at SQL level."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_unique.sqlite3"
         repo = JobRepository(db_path)
 
@@ -339,7 +339,7 @@ def test_unique_constraint_user_achievements():
 
 def test_concurrent_upsert_on_same_achievement_key():
     """Verify concurrent upserts for the exact same (user_id, achievement_id) do not duplicate rows."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_race_ach.sqlite3"
         repo = JobRepository(db_path)
 
@@ -376,7 +376,7 @@ def test_concurrent_upsert_on_same_achievement_key():
 
 def test_corrupted_json_handling_in_telemetry_reads():
     """Verify repository handles corrupted or non-standard JSON payloads gracefully."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "corrupt_json.sqlite3"
         repo = JobRepository(db_path)
 
@@ -419,7 +419,7 @@ def test_corrupted_json_handling_in_telemetry_reads():
 
 def test_user_id_case_insensitivity():
     """Verify telemetry and achievement queries handle case variations of user_id."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "case_test.sqlite3"
         repo = JobRepository(db_path)
 
@@ -465,7 +465,7 @@ def test_future_timestamp_clock_skew_resilience():
 
 def test_concurrent_wal_readers_during_active_write_transaction():
     """Verify WAL mode allows concurrent readers to query without blocking during write transactions."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "wal_read_write.sqlite3"
         repo = JobRepository(db_path)
 
@@ -552,7 +552,7 @@ def test_concurrent_wal_readers_during_active_write_transaction():
 
 def test_high_volume_batch_concurrency():
     """Stress-test batch telemetry insertion and batch achievement upserts under heavy concurrent load."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "batch_stress.sqlite3"
         repo = JobRepository(db_path)
 
@@ -617,7 +617,7 @@ def test_high_volume_batch_concurrency():
 
 def test_application_lifecycle_auto_telemetry_under_concurrency():
     """Verify application transitions auto-record telemetry under multi-threaded concurrency."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "app_telemetry.sqlite3"
         repo = JobRepository(db_path)
 

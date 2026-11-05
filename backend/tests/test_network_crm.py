@@ -6,7 +6,7 @@ from job_dashboard.network_crm import NetworkCRMManager, NetworkContact
 
 @pytest.fixture
 def crm_manager():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_crm.db"
         manager = NetworkCRMManager(db_path)
         yield manager

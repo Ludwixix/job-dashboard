@@ -57,7 +57,7 @@ def test_schema_ddl_contains_telemetry_and_achievements():
 
 def test_db_init_creates_tables_and_wal_mode():
     """Verify init_db initializes tables in WAL mode without error."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_jobs.sqlite3"
         conn = sqlite3.connect(str(db_path))
         init_db(conn)
@@ -81,7 +81,7 @@ def test_db_init_creates_tables_and_wal_mode():
 
 def test_repository_migration_idempotent_on_existing_db():
     """Verify JobRepository._init_schema safely migrates an existing legacy DB."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "legacy.sqlite3"
         # Create a valid pre-M1 database with jobs and users without M1 tables
         conn = sqlite3.connect(str(db_path))
@@ -369,7 +369,7 @@ def test_pattern_mining_remuneration_anchoring():
 
 def test_repository_telemetry_and_achievements_crud():
     """Verify repository methods for telemetry ingestion and achievement persistence."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_repo.sqlite3"
         repo = JobRepository(str(db_path))
 
@@ -508,7 +508,7 @@ class MockHttpClient:
 
 def test_post_telemetry_events_and_get_patterns_route():
     """Verify POST /api/telemetry/events and GET /api/learning/patterns REST API."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_api.sqlite3"
         app = DashboardApp()
         app.repository = JobRepository(str(db_path))
@@ -589,7 +589,7 @@ def test_post_telemetry_events_and_get_patterns_route():
 
 def test_empty_and_invalid_telemetry_payload_rejected_with_400():
     """Verify empty or malformed telemetry payloads return HTTP 400 instead of logging phantom records."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_empty.sqlite3"
         app = DashboardApp()
         app.repository = JobRepository(str(db_path))
@@ -676,7 +676,7 @@ def test_robustness_non_dict_job_snapshot():
     assert "skills" in patterns
 
     # 3. JobRepository.insert_telemetry_event with non-dict snapshot
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         repo = JobRepository(str(Path(tmpdir) / "test_robust.sqlite3"))
         ev_id = repo.insert_telemetry_event(
             {
@@ -694,7 +694,7 @@ def test_robustness_non_dict_job_snapshot():
 
 def test_robustness_datetime_metadata_serialization():
     """Verify datetime objects in metadata are serialized safely via default=str."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         repo = JobRepository(str(Path(tmpdir) / "test_datetime.sqlite3"))
 
         # 1. Telemetry insertion with datetime in metadata

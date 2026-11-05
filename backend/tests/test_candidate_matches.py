@@ -38,7 +38,7 @@ def parse_response(handler):
 
 
 def test_candidate_matches_crud_and_migration():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_jobs.db"
         repo = JobRepository(db_path)
 
@@ -94,7 +94,7 @@ def test_candidate_matches_crud_and_migration():
 
 
 def test_evaluate_and_stage_matches():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_jobs.db"
         repo = JobRepository(db_path)
 

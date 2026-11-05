@@ -9,6 +9,7 @@ export default defineConfig({
     setupFiles: ['./src/setupTests.js'],
     onConsoleLog: () => false,
     silent: true,
-    pool: 'forks',
+    pool: 'threads',
+    teardownTimeout: 10000,
   },
 });

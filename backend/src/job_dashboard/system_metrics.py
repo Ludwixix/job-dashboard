@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import os
 import platform
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None  # Windows compatibility fallback
 import sys
 import time
 from typing import Any, Dict

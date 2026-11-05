@@ -28,8 +28,14 @@ from job_dashboard.repository import JobRepository
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
     """Provide an isolated temporary directory for test database and artifacts."""
-    with tempfile.TemporaryDirectory() as tmp:
-        yield Path(tmp)
+    tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    try:
+        yield Path(tmp.name)
+    finally:
+        try:
+            tmp.cleanup()
+        except Exception:
+            pass
 
 
 @pytest.fixture
